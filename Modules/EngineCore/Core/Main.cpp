@@ -1,7 +1,9 @@
 #include <iostream>
 
+#include "Log.h"
+
 int ArtifactMain() {
-    std::cout << "Hello, Artifact Engine!" << std::endl;
+    RT_INFO("Hello, Artifact Engine! This is a test log message.");
     return 0;
 }
 

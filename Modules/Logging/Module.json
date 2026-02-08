@@ -1,0 +1,14 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore"
+    ],
+    "IncludePaths": [
+        "ThirdParty/spdlog-1.17.0/include"
+    ],
+    "AddAdditionalCMakeProjects": [
+        "ThirdParty/spdlog-1.17.0"
+    ]
+}

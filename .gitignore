@@ -11,3 +11,4 @@ CMakeLists.txt
 Build/
 Binaries/
 Intermediate/
+*.log
