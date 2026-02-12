@@ -39,5 +39,9 @@ add_library({module} ${{cpp_src}})
                             mf.write(f"target_include_directories({module} PUBLIC {project_path}/Modules/{import_module}/{include_dir})\n")
                     for additional_project in module_json.get("AddAdditionalCMakeProjects", []):
                         mf.write(f"add_subdirectory({additional_project})\n")
+
+
+                    mf.write(f"target_include_directories({module} PUBLIC {project_path}/Build/Intermediate/Classes)\n")
+
                 f.write(f"add_subdirectory(Modules/{module})\n")
                 f.write(f"target_link_libraries(Artifact PUBLIC {module})\n")

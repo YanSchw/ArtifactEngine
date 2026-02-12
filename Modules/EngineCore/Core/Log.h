@@ -1,9 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <format>
 
-enum class LogLevel : int {
+enum class LogLevel : uint32_t {
     TRACE = 0,
     DEBUG = 1,
     INFO = 2,
@@ -19,9 +20,9 @@ public:
 };
 
 // Main Logging Macro
-#define RT_LOG(_LogLevel, ...) ::Logging::Log(_LogLevel, __FILE__, std::format(__VA_ARGS__))
-#define RT_TRACE(...)          RT_LOG(::LogLevel::TRACE, __VA_ARGS__)
-#define RT_INFO(...)           RT_LOG(::LogLevel::INFO, __VA_ARGS__)
-#define RT_WARN(...)           RT_LOG(::LogLevel::WARN, __VA_ARGS__)
-#define RT_ERROR(...)          RT_LOG(::LogLevel::ERROR, __VA_ARGS__)
-#define RT_CRITICAL(...)       RT_LOG(::LogLevel::CRITICAL, __VA_ARGS__)
+#define AE_LOG(_LogLevel, ...) ::Logging::Log(_LogLevel, __FILE__, std::format(__VA_ARGS__))
+#define AE_TRACE(...)          AE_LOG(::LogLevel::TRACE, __VA_ARGS__)
+#define AE_INFO(...)           AE_LOG(::LogLevel::INFO, __VA_ARGS__)
+#define AE_WARN(...)           AE_LOG(::LogLevel::WARN, __VA_ARGS__)
+#define AE_ERROR(...)          AE_LOG(::LogLevel::ERROR, __VA_ARGS__)
+#define AE_CRITICAL(...)       AE_LOG(::LogLevel::CRITICAL, __VA_ARGS__)
