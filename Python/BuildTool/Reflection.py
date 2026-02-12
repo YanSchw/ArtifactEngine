@@ -54,6 +54,6 @@ struct InternalAlloc\\
 private:\
     InternalAlloc() = default;\\
     inline static Object::RegisterArtifactClass<{result['ClassName']}> _ClassAllocator_{result['ClassName']};\\
-}};\\
+}}/* No ; is appended after this struct, since the macro itself is supposed to have a ; */\\
 
 ''')

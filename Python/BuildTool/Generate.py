@@ -43,5 +43,13 @@ add_library({module} ${{cpp_src}})
 
                     mf.write(f"target_include_directories({module} PUBLIC {project_path}/Build/Intermediate/Classes)\n")
 
+                    mf.write(f"""
+if(MSVC)
+  target_compile_options({module} PRIVATE /W4) # /WX
+else()
+  target_compile_options({module} PRIVATE -Wall -Wextra -Wpedantic) # -Werror
+endif()
+""")
+
                 f.write(f"add_subdirectory(Modules/{module})\n")
                 f.write(f"target_link_libraries(Artifact PUBLIC {module})\n")
