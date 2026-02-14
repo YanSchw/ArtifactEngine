@@ -8,6 +8,13 @@ def get_module_json(module_path: str) -> dict:
 def generate_cmake(project_path: str):
     if project_path == ".":
         project_path = os.getcwd()
+
+    __LinkModules = """#include <vector>
+#include <string>
+
+void __LinkModules(std::vector<std::string>& modules) {
+"""
+
     with open(f"{project_path}/CMakeLists.txt", "w") as f:
         f.write(f"""# Generated using Artifact Build Tool
 cmake_minimum_required(VERSION 3.5)
@@ -18,7 +25,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${{CMAKE_SOURCE_DIR}}/Binaries")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${{CMAKE_SOURCE_DIR}}/Binaries")
                 
-add_executable(Artifact {project_path}/Python/empty.cpp)
+add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp)
                 
 """)
         
@@ -29,7 +36,7 @@ add_executable(Artifact {project_path}/Python/empty.cpp)
                     cpp_src = 'file(GLOB_RECURSE cpp_src "*.cpp")' if module_json.get("SourceDirectories", None) is None else f'file(GLOB_RECURSE cpp_src {" ".join([f"{sd}/*.cpp" for sd in module_json.get("SourceDirectories", [])])})'
                     mf.write(f"""# Generated using Artifact Build Tool for {module}
 {cpp_src}
-add_library({module} ${{cpp_src}})
+add_library({module} ${{cpp_src}} {project_path}/Build/Intermediate/Modules/{module}.gen.cpp)
 """)
                     for include_dir in module_json.get("IncludePaths", []):
                         mf.write(f"target_include_directories({module} PUBLIC {include_dir})\n")
@@ -50,6 +57,12 @@ else()
   target_compile_options({module} PRIVATE -Wall -Wextra -Wpedantic) # -Werror
 endif()
 """)
+                    __LinkModules += f'    extern void __LinkModule_{module}(std::vector<std::string>&); __LinkModule_{module}(modules);\n'
 
                 f.write(f"add_subdirectory(Modules/{module})\n")
                 f.write(f"target_link_libraries(Artifact PUBLIC {module})\n")
+
+    __LinkModules += "}\n"
+    os.makedirs(f"{project_path}/Build/Intermediate/Modules", exist_ok=True)
+    with open(f"{project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp", "w") as f:
+        f.write(__LinkModules)

@@ -1,7 +1,23 @@
 import os
 import re
 
+def get_module_name_from_path(module_path: str) -> str:
+    pattern = re.compile(r'.*/Modules/([^/]+)')
+    match = pattern.match(module_path)
+    if match:
+        return match.group(1)
+    else:
+        raise ValueError(f"Could not extract module name from path: {module_path}")
+
 def generate_class_cpp(dir: str):
+    # if dir is not an absolute path, make it absolute by joining with current working directory
+    if not os.path.isabs(dir):
+        dir = os.path.join(os.getcwd(), dir)
+
+    headers_per_module =  {}
+    for modules in os.listdir("./Modules"):
+        if os.path.isdir(f"./Modules/{modules}"):
+            headers_per_module[modules] = []
     for dirpath, dirnames, filenames in os.walk(dir):
         for filename in filenames:
             if filename.endswith('.h') or filename.endswith('.hpp'):
@@ -31,6 +47,7 @@ def generate_class_cpp(dir: str):
                                     'ParentClassName': parent_class,
                                     'ARTIFACT_CLASS_Line': ARTIFACT_class_line
                                 })
+                                headers_per_module[get_module_name_from_path(dirpath)].append(f"{dirpath}/{filename}")
                                 break
 
                     if len(results) > 0:
@@ -57,3 +74,12 @@ private:\
 }}/* No ; is appended after this struct, since the macro itself is supposed to have a ; */\\
 
 ''')
+    for module, headers in headers_per_module.items():
+        unique_headers = list(set(headers)) # remove duplicates
+        with open(f"./Build/Intermediate/Modules/{module}.gen.cpp", 'w') as gen_module_file:
+            gen_module_file.write('#include <vector>\n#include <string>\n\n')
+            for header in unique_headers:
+                gen_module_file.write(f'#include "{header}"\n')
+            gen_module_file.write(f'\nvoid __LinkModule_{module}(std::vector<std::string>& modules) {{\n')
+            gen_module_file.write(f'    modules.push_back("{module}");\n')
+            gen_module_file.write('}\n')
