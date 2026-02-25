@@ -1,11 +1,13 @@
 import os
 import json
 
+from BuildTool.Platforms import PlatformType
+
 def get_module_json(module_path: str) -> dict:
     with open(f"{module_path}/Module.json", "r") as f:
         return json.load(f)
 
-def generate_cmake(project_path: str):
+def generate_cmake(project_path: str, target_platform: str):
     if project_path == ".":
         project_path = os.getcwd()
 
@@ -32,6 +34,11 @@ add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.
         for module in os.listdir(f"{project_path}/Modules"):
             if os.path.isdir(f"{project_path}/Modules/{module}"):
                 module_json = get_module_json(f"{project_path}/Modules/{module}")
+
+                # if TargetPlatforms is not specified, assume it's supported on all platforms
+                if target_platform not in module_json.get("TargetPlatforms", PlatformType.__members__.keys()):
+                    continue
+
                 with open(f"{project_path}/Modules/{module}/CMakeLists.txt", "w") as mf:
                     cpp_src = 'file(GLOB_RECURSE cpp_src "*.cpp")' if module_json.get("SourceDirectories", None) is None else f'file(GLOB_RECURSE cpp_src {" ".join([f"{sd}/*.cpp" for sd in module_json.get("SourceDirectories", [])])})'
                     mf.write(f"""# Generated using Artifact Build Tool for {module}

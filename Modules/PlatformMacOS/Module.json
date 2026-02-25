@@ -1,0 +1,11 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore"
+    ],
+    "TargetPlatforms": [
+        "MacOS"
+    ]
+}

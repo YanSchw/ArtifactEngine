@@ -4,6 +4,7 @@ from BuildTool.Generate import generate_cmake
 from BuildTool.Reflection import generate_class_cpp
 from BuildTool.Build import build_cmake
 from BuildTool.Paths import get_engine_path
+from BuildTool.Platforms import get_current_platform
 import os
 import subprocess
 
@@ -11,7 +12,8 @@ def cmd_build(args):
     print("Building the engine...")
     engine_path = get_engine_path()
     project_path = os.getcwd()
-    generate_cmake(project_path)  # Generate CMakeLists.txt in the project directory
+    target_platform = args.target
+    generate_cmake(project_path, target_platform)  # Generate CMakeLists.txt in the project directory
 
     # Generate reflection code for classes in Modules
     generate_class_cpp(f"{engine_path}/Modules")
@@ -19,6 +21,7 @@ def cmd_build(args):
     build_cmake()
 
 def cmd_run(args):
+    args.target = get_current_platform().name
     cmd_build(args)  # Ensure the engine is built before running
     project_path = os.getcwd()
     subprocess.run([f"{project_path}/Binaries/Artifact"], check=True)
@@ -34,6 +37,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     build_parser = subparsers.add_parser("build", help="Build the engine")
+    build_parser.add_argument("--target", choices=["Win64", "MacOS", "Linux"], default=get_current_platform().name, help="Target platform to build for")
     build_parser.set_defaults(func=cmd_build)
 
     run_parser = subparsers.add_parser("run", help="Run the engine")

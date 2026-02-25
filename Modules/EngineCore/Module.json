@@ -1,5 +1,8 @@
 {
     "ExportIncludePaths": [
         "."
+    ],
+    "IncludePaths": [
+        "."
     ]
 }
