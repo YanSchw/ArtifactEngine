@@ -5,7 +5,7 @@
 #include <vector>
 #include <string>
 
-int ArtifactMain() {
+static void ModuleLinking() {
     std::vector<std::string> linkedModules;
     extern void __LinkModules(std::vector<std::string>& modules);
     __LinkModules(linkedModules);
@@ -14,7 +14,17 @@ int ArtifactMain() {
     for (const auto& module : linkedModules) {
         AE_INFO(" - {0}", module);
     }
-    
+}
+
+int ArtifactMain() {
+    ModuleLinking();
+
+    Engine* engine = Object::Create(Class("EditorEngine"))->As<Engine>();
+    engine->Initialize();
+    engine->MainLoop();
+    engine->Shutdown();
+    delete engine;
+
     return 0;
 }
 
