@@ -11,7 +11,7 @@ import subprocess
 def cmd_build(args):
     print("Building the engine...")
     engine_path = get_engine_path()
-    project_path = os.getcwd()
+    project_path = os.getcwd().replace("\\", "/")
     target_platform = args.target
     generate_cmake(project_path, target_platform)  # Generate CMakeLists.txt in the project directory
 

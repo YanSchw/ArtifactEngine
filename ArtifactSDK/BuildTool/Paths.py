@@ -5,7 +5,7 @@ def get_sdk_path() -> str:
     from pathlib import Path
 
     SRC_ROOT = Path(BuildTool.__file__).resolve().parent.parent
-    return str(SRC_ROOT)
+    return str(SRC_ROOT).replace("\\", "/")
 
 def get_engine_path() -> str:
     """Returns the path to the Artifact Engine root directory."""
@@ -13,4 +13,4 @@ def get_engine_path() -> str:
     from pathlib import Path
 
     SRC_ROOT = Path(BuildTool.__file__).resolve().parent.parent.parent
-    return str(SRC_ROOT)
+    return str(SRC_ROOT).replace("\\", "/")

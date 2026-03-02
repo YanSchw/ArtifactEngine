@@ -60,7 +60,7 @@ def build_cmake(clean: bool = False):
     if os.path.exists("Binaries"):
         shutil.rmtree("Binaries")
 
-    subprocess.run(["cmake", "-S", ".", "-G", "Xcode", "-B", "Build"], check=True)
+    subprocess.run(["cmake", "-S", ".", "-B", "Build"], check=True)
     proc = subprocess.run(
         ["cmake", "--build", "Build", "--config", "Debug"],
         stdout=subprocess.PIPE,

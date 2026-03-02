@@ -2,6 +2,7 @@ import os
 import re
 
 def get_module_name_from_path(module_path: str) -> str:
+    module_path = module_path.replace("\\", "/")
     pattern = re.compile(r'.*/Modules/([^/]+)')
     match = pattern.match(module_path)
     if match:
@@ -10,7 +11,7 @@ def get_module_name_from_path(module_path: str) -> str:
         raise ValueError(f"Could not extract module name from path: {module_path}")
     
 def collect_classes_from_header(h_file_path: str):
-    with open(h_file_path, 'r') as h_file:
+    with open(h_file_path, 'r', encoding='utf-8') as h_file:
         code = h_file.read()
         code_lines = code.splitlines()
         pattern = re.compile(r'class\s+(\w+)\s*:\s*public\s+(\w+)\s*\{', re.MULTILINE)
@@ -58,7 +59,7 @@ def generate_class_cpp(dir: str):
                     
                     gen_file_path = f"./Build/Intermediate/Classes/{filename.rstrip('hpp').rstrip('.')}.gen.h"
                     os.makedirs(os.path.dirname(gen_file_path), exist_ok=True)
-                    with open(gen_file_path, 'w') as gen_file:
+                    with open(gen_file_path, 'w', encoding='utf-8') as gen_file:
                         gen_file.write('#pragma once\n\n')
                         for result in results:
                             if result['ARTIFACT_CLASS_Line'] is not None:
