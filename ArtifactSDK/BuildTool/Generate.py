@@ -61,6 +61,8 @@ add_library({module} ${{cpp_src}} {project_path}/Build/Intermediate/Modules/{mod
                         import_module_json = get_module_json(f"{project_path}/Modules/{import_module}")
                         for include_dir in import_module_json.get("ExportIncludePaths", []):
                             mf.write(f"target_include_directories({module} PUBLIC {project_path}/Modules/{import_module}/{include_dir})\n")
+                        for include_dir in import_module_json.get("IncludePaths", []):
+                            mf.write(f"target_include_directories({module} PUBLIC {project_path}/Modules/{import_module}/{include_dir})\n")
                     for additional_project in module_json.get("AddAdditionalCMakeProjects", []):
                         mf.write(f"add_subdirectory({additional_project})\n")
 

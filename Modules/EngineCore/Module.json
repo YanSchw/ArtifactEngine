@@ -4,5 +4,8 @@
     ],
     "IncludePaths": [
         "."
+    ],
+    "ImportModules": [
+        "GLM_Math"
     ]
 }

@@ -1,0 +1,8 @@
+{
+    "IncludePaths": [
+        "ThirdParty/glm-1.0.3"
+    ],
+    "AddAdditionalCMakeProjects": [
+        "ThirdParty/glm-1.0.3"
+    ]
+}

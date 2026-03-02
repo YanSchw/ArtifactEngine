@@ -46,9 +46,9 @@ def generate_class_cpp(dir: str):
         dir = os.path.join(os.getcwd(), dir)
 
     headers_per_module =  {}
-    for modules in os.listdir("./Modules"):
-        if os.path.isdir(f"./Modules/{modules}"):
-            headers_per_module[modules] = []
+    for module in os.listdir("./Modules"):
+        if os.path.isdir(f"./Modules/{module}"):
+            headers_per_module[module] = []
 
     for dirpath, dirnames, filenames in os.walk(dir):
         for filename in filenames:
