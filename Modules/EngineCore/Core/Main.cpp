@@ -21,11 +21,13 @@ static void ModuleLinking() {
 int ArtifactMain() {
     ModuleLinking();
 
-    #if VERSION_PATCH == None
-    AE_INFO("Artifact Engine Version {0}.{1}", VERSION_MAJOR, VERSION_MINOR);
-    #else
+    #if defined(VERSION_PATCH)
     AE_INFO("Artifact Engine Version {0}.{1}.{2}", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    #else
+    AE_INFO("Artifact Engine Version {0}.{1}", VERSION_MAJOR, VERSION_MINOR);
     #endif
+
+    return 0;
 
     Engine* engine = Object::Create(Class("EditorEngine"))->As<Engine>();
     engine->Initialize();

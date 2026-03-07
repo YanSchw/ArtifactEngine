@@ -59,7 +59,7 @@ add_library({module} ${{cpp_src}} {project_path}/Build/Intermediate/Modules/{mod
 target_compile_definitions({module} PRIVATE
     VERSION_MAJOR={VERSION_MAJOR}
     VERSION_MINOR={VERSION_MINOR}
-    VERSION_PATCH={get_patch_version()}
+    {f'VERSION_PATCH={get_patch_version()}' if get_patch_version() is not None else ''}
 )
 """)
                     for include_dir in module_json.get("IncludePaths", []):
