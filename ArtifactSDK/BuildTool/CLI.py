@@ -32,6 +32,10 @@ def cmd_cook(args):
 def cmd_package(args):
     print("Packaging project not yet implemented")
 
+def cmd_version(args):
+    from BuildTool.Version import get_version_string
+    print(f"Artifact Engine version {get_version_string()}")
+
 def main():
     parser = argparse.ArgumentParser(description="Artifact Engine Build Tool")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -48,6 +52,9 @@ def main():
 
     package_parser = subparsers.add_parser("package", help="Package project")
     package_parser.set_defaults(func=cmd_package)
+
+    version_parser = subparsers.add_parser("version", help="Show engine version")
+    version_parser.set_defaults(func=cmd_version)
 
     args = parser.parse_args()
     args.func(args)

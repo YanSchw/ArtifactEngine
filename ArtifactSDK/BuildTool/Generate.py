@@ -1,6 +1,7 @@
 import os
 import json
 
+from BuildTool.Version import VERSION_MAJOR, VERSION_MINOR, get_patch_version
 from BuildTool.Platforms import PlatformType
 from BuildTool.Util import smart_open
 
@@ -55,6 +56,11 @@ add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.
                     mf.write(f"""# Generated using Artifact Build Tool for {module}
 {cpp_src}
 add_library({module} ${{cpp_src}} {project_path}/Build/Intermediate/Modules/{module}.gen.cpp)
+target_compile_definitions({module} PRIVATE
+    VERSION_MAJOR={VERSION_MAJOR}
+    VERSION_MINOR={VERSION_MINOR}
+    VERSION_PATCH={get_patch_version()}
+)
 """)
                     for include_dir in module_json.get("IncludePaths", []):
                         mf.write(f"target_include_directories({module} PUBLIC {include_dir})\n")

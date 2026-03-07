@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
 
+from BuildTool.Version import get_version_string
+
 def parse_requirements(filename):
     with open(filename, 'r') as f:
         lines = f.read().splitlines()
@@ -8,7 +10,7 @@ def parse_requirements(filename):
 
 setup(
     name="artifact-buildtool",
-    version="0.1.0",
+    version=get_version_string(),
     packages=find_packages(),
     install_requires=parse_requirements('requirements.txt'),
     entry_points={

@@ -2,6 +2,8 @@
 
 #include "Log.h"
 #include "Engine.h"
+#include "Platform.h"
+#include "Common/Types.h"
 #include <vector>
 #include <string>
 
@@ -18,6 +20,12 @@ static void ModuleLinking() {
 
 int ArtifactMain() {
     ModuleLinking();
+
+    #if VERSION_PATCH == None
+    AE_INFO("Artifact Engine Version {0}.{1}", VERSION_MAJOR, VERSION_MINOR);
+    #else
+    AE_INFO("Artifact Engine Version {0}.{1}.{2}", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    #endif
 
     Engine* engine = Object::Create(Class("EditorEngine"))->As<Engine>();
     engine->Initialize();
