@@ -2,6 +2,7 @@ import os
 import json
 
 from BuildTool.Platforms import PlatformType
+from BuildTool.Util import smart_open
 
 def get_module_json(module_path: str) -> dict:
     with open(f"{module_path}/Module.json", "r") as f:
@@ -17,7 +18,7 @@ def generate_cmake(project_path: str, target_platform: str):
 void __LinkModules(std::vector<std::string>& modules) {
 """
 
-    with open(f"{project_path}/CMakeLists.txt", "w") as f:
+    with smart_open(f"{project_path}/CMakeLists.txt") as f:
         f.write(f"""# Generated using Artifact Build Tool
 cmake_minimum_required(VERSION 3.5)
 project(ArtifactEngine LANGUAGES CXX)
@@ -49,7 +50,7 @@ add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.
                 if target_platform not in module_json.get("TargetPlatforms", PlatformType.__members__.keys()):
                     continue
 
-                with open(f"{project_path}/Modules/{module}/CMakeLists.txt", "w") as mf:
+                with smart_open(f"{project_path}/Modules/{module}/CMakeLists.txt") as mf:
                     cpp_src = 'file(GLOB_RECURSE cpp_src "*.cpp")' if module_json.get("SourceDirectories", None) is None else f'file(GLOB_RECURSE cpp_src {" ".join([f"{sd}/*.cpp" for sd in module_json.get("SourceDirectories", [])])})'
                     mf.write(f"""# Generated using Artifact Build Tool for {module}
 {cpp_src}
@@ -83,5 +84,5 @@ endif()
 
     __LinkModules += "}\n"
     os.makedirs(f"{project_path}/Build/Intermediate/Modules", exist_ok=True)
-    with open(f"{project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp", "w") as f:
+    with smart_open(f"{project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp") as f:
         f.write(__LinkModules)

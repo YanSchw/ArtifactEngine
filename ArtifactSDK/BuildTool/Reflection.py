@@ -1,5 +1,6 @@
 import os
 import re
+from BuildTool.Util import smart_open
 
 def get_module_name_from_path(module_path: str) -> str:
     module_path = module_path.replace("\\", "/")
@@ -59,7 +60,7 @@ def generate_class_cpp(dir: str):
                     
                     gen_file_path = f"./Build/Intermediate/Classes/{filename.rstrip('hpp').rstrip('.')}.gen.h"
                     os.makedirs(os.path.dirname(gen_file_path), exist_ok=True)
-                    with open(gen_file_path, 'w', encoding='utf-8') as gen_file:
+                    with smart_open(gen_file_path, encoding='utf-8') as gen_file:
                         gen_file.write('#pragma once\n\n')
                         for result in results:
                             if result['ARTIFACT_CLASS_Line'] is not None:
@@ -82,7 +83,7 @@ private:\
 ''')
     for module, headers in headers_per_module.items():
         unique_headers = list(set(headers)) # remove duplicates
-        with open(f"./Build/Intermediate/Modules/{module}.gen.cpp", 'w') as gen_module_file:
+        with smart_open(f"./Build/Intermediate/Modules/{module}.gen.cpp") as gen_module_file:
             gen_module_file.write('#include <vector>\n#include <string>\n\n')
             for header in unique_headers:
                 gen_module_file.write(f'#include "{header}"\n')
