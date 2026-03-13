@@ -5,6 +5,7 @@
 #include "Platform.h"
 #include "Common/Types.h"
 #include "Common/Version.h"
+#include "Core/Pointer.h"
 #include <vector>
 #include <string>
 
@@ -26,11 +27,10 @@ int ArtifactMain() {
 
     return 0;
 
-    Engine* engine = Object::Create<Engine>(Class("EditorEngine"));
+    SharedObjectPtr<Engine> engine = Object::Create<Engine>(Class("EditorEngine"));
     engine->Initialize();
     engine->MainLoop();
     engine->Shutdown();
-    delete engine;
 
     return 0;
 }
