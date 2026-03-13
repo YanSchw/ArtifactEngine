@@ -56,11 +56,6 @@ add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.
                     mf.write(f"""# Generated using Artifact Build Tool for {module}
 {cpp_src}
 add_library({module} ${{cpp_src}} {project_path}/Build/Intermediate/Modules/{module}.gen.cpp)
-target_compile_definitions({module} PRIVATE
-    VERSION_MAJOR={VERSION_MAJOR}
-    VERSION_MINOR={VERSION_MINOR}
-    {f'VERSION_PATCH={get_patch_version()}' if get_patch_version() is not None else ''}
-)
 """)
                     for include_dir in module_json.get("IncludePaths", []):
                         mf.write(f"target_include_directories({module} PUBLIC {include_dir})\n")
@@ -92,3 +87,9 @@ endif()
     os.makedirs(f"{project_path}/Build/Intermediate/Modules", exist_ok=True)
     with smart_open(f"{project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp") as f:
         f.write(__LinkModules)
+        f.write(f"""
+
+int __VERSION_MAJOR() {{ return {VERSION_MAJOR}; }}
+int __VERSION_MINOR() {{ return {VERSION_MINOR}; }}
+int __VERSION_PATCH() {{ return {get_patch_version() if get_patch_version() is not None else '-1'}; }}
+""")

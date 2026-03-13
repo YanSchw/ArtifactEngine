@@ -37,6 +37,12 @@ public:
     static Object* Create(const Class& type);
 
     template<typename T>
+    static T* Create(const Class& type = T::StaticClass()) {
+        Object* obj = Create(type);
+        return obj->As<T>();
+    }
+
+    template<typename T>
     struct RegisterArtifactClass {
         RegisterArtifactClass() {
             Object::s_ObjectAllocators[T::StaticClass().Name] = Object::InternalAllocate<T>;
