@@ -3,7 +3,7 @@
 #include "Common/Array.h"
 #include <unordered_map>
 #include <memory>
-
+#include <type_traits>
 
 template<class T, bool R> struct TObjectPtr;
 class Object;
@@ -12,6 +12,8 @@ struct InternalPtr {
     static void Nullify(Object* InObject);
 
     InternalPtr();
+    InternalPtr(const InternalPtr& InOther);
+    InternalPtr& operator=(const InternalPtr& InOther);
     ~InternalPtr();
 
     Object* GetAddress() const;
@@ -25,7 +27,7 @@ private:
     inline static std::unordered_map<Object*, uint32_t> s_RefCounts;
 
     Object* m_Value = nullptr;
-    bool m_RefCounting;
+    bool m_RefCounting = false;
 
     template<typename T, bool R> friend struct TObjectPtr;
 };
@@ -37,25 +39,29 @@ struct TObjectPtr {
     TObjectPtr() {
         m_InternalPtr.m_RefCounting = REF_COUNTED;
     }
+
     TObjectPtr(T& InObject) {
         m_InternalPtr.m_RefCounting = REF_COUNTED;
-        m_InternalPtr = (Object*) &InObject;
+        m_InternalPtr = (Object*)&InObject;
     }
+
     TObjectPtr(T* InObject) {
         m_InternalPtr.m_RefCounting = REF_COUNTED;
-        m_InternalPtr = (Object*) InObject;
+        m_InternalPtr = (Object*)InObject;
     }
+
     template<class U, bool R>
     TObjectPtr(const TObjectPtr<U, R>& InPointer) {
         static_assert(std::is_base_of<T, U>::value);
-
         m_InternalPtr.m_RefCounting = REF_COUNTED;
         m_InternalPtr = (Object*)InPointer.Get();
     }
+
     TObjectPtr(const std::shared_ptr<T>& InPointer) {
         m_InternalPtr.m_RefCounting = REF_COUNTED;
-        m_InternalPtr = (Object*) InPointer.get();
+        m_InternalPtr = (Object*)InPointer.get();
     }
+
     ~TObjectPtr() {
         m_InternalPtr.Assign(nullptr);
     }
@@ -63,30 +69,32 @@ struct TObjectPtr {
     inline T* Get() const {
         return (T*)m_InternalPtr.GetAddress();
     }
+
     inline T* operator->() const {
         return (T*)m_InternalPtr.GetAddress();
     }
-    //Dereference operator
+
     inline T& operator*() const {
         return *(T*)m_InternalPtr.GetAddress();
     }
 
-    // Equality
-    template<class U, bool R> 
+    template<class U, bool R>
     inline bool operator==(TObjectPtr<U, R>& InOther) const {
         return m_InternalPtr.GetAddress() == InOther.m_InternalPtr.GetAddress();
     }
+
     template<class U>
     inline bool operator==(U*& InOther) {
         return m_InternalPtr.GetAddress() == InOther;
     }
 
     TObjectPtr<T, REF_COUNTED>& operator=(T& InObject) {
-        m_InternalPtr = (Object*) &InObject;
+        m_InternalPtr = (Object*)&InObject;
         return *this;
     }
+
     TObjectPtr<T, REF_COUNTED>& operator=(T* InObject) {
-        m_InternalPtr = (Object*) InObject;
+        m_InternalPtr = (Object*)InObject;
         return *this;
     }
 
@@ -96,17 +104,18 @@ struct TObjectPtr {
         m_InternalPtr = InPointer.Get();
         return *this;
     }
+
     TObjectPtr<T, REF_COUNTED>& operator=(const std::shared_ptr<T>& InPointer) {
         m_InternalPtr = InPointer.get();
         return *this;
     }
 
-    // Cast operator
     operator T* () const {
         return (T*)m_InternalPtr.GetAddress();
     }
+
     operator bool() const {
-        return m_InternalPtr.GetAddress();
+        return m_InternalPtr.GetAddress() != nullptr;
     }
 
 protected:

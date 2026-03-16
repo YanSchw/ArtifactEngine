@@ -1,27 +1,41 @@
 #include "Pointer.h"
 
 void InternalPtr::Nullify(Object* InObject) {
-    const Array<InternalPtr*>& pointers = s_PtrTable[InObject];
+    auto it = s_PtrTable.find(InObject);
+    if (it == s_PtrTable.end())
+        return;
+
+    Array<InternalPtr*> pointers = it->second;
     for (InternalPtr* ptr : pointers) {
         ptr->m_Value = nullptr;
     }
+
     s_PtrTable.erase(InObject);
     s_RefCounts.erase(InObject);
 }
 
 InternalPtr::InternalPtr()
-    : m_RefCounting(false)
+    : m_Value(nullptr), m_RefCounting(false)
 {
 }
 
-InternalPtr::~InternalPtr() {
-    if (m_Value == nullptr) {
-        return;
-    }
+InternalPtr::InternalPtr(const InternalPtr& InOther) {
+    m_Value = nullptr;
+    m_RefCounting = InOther.m_RefCounting;
+    Assign(InOther.m_Value);
+}
 
-    if (InternalPtr::s_PtrTable[m_Value].Contains(this)) {
-        InternalPtr::s_PtrTable[m_Value].Remove(this);
-    }
+InternalPtr& InternalPtr::operator=(const InternalPtr& InOther) {
+    if (this == &InOther)
+        return *this;
+
+    m_RefCounting = InOther.m_RefCounting;
+    Assign(InOther.m_Value);
+    return *this;
+}
+
+InternalPtr::~InternalPtr() {
+    Assign(nullptr);
 }
 
 Object* InternalPtr::GetAddress() const {
@@ -29,22 +43,23 @@ Object* InternalPtr::GetAddress() const {
 }
 
 void InternalPtr::Assign(Object* InObject) {
-    if (m_Value == InObject) {
-        // No change needed...
+    if (m_Value == InObject)
         return;
-    }
 
     if (m_Value) {
-        if (InternalPtr::s_PtrTable[m_Value].Contains(this)) {
-            InternalPtr::s_PtrTable[m_Value].Remove(this);
+        auto it = s_PtrTable.find(m_Value);
+        if (it != s_PtrTable.end()) {
+            if (it->second.Contains(this))
+                it->second.Remove(this);
         }
 
         if (m_RefCounting) {
-            InternalPtr::s_RefCounts[m_Value]--;
-            if (s_RefCounts[m_Value] <= 0) {
-                delete m_Value;
-                if (s_RefCounts.find(m_Value) != s_RefCounts.end()) {
-                    InternalPtr::Nullify(m_Value);
+            auto rcIt = s_RefCounts.find(m_Value);
+            if (rcIt != s_RefCounts.end()) {
+                if (--rcIt->second == 0) {
+                    Object* old = m_Value;
+                    Nullify(old);
+                    delete old;
                 }
             }
         }
@@ -53,12 +68,11 @@ void InternalPtr::Assign(Object* InObject) {
     m_Value = InObject;
 
     if (m_Value) {
-        if (!InternalPtr::s_PtrTable[m_Value].Contains(this)) {
-            InternalPtr::s_PtrTable[m_Value].Add(this);
-        }
-        if (m_RefCounting) {
-            InternalPtr::s_RefCounts[m_Value]++;
-        }
+        if (!s_PtrTable[m_Value].Contains(this))
+            s_PtrTable[m_Value].Add(this);
+
+        if (m_RefCounting)
+            s_RefCounts[m_Value]++;
     }
 }
 
@@ -68,6 +82,5 @@ Object* InternalPtr::operator=(Object* InObject) {
 }
 
 bool InternalPtr::operator==(InternalPtr& InOther) const {
-    return (m_Value == InOther.m_Value);
+    return m_Value == InOther.m_Value;
 }
-

@@ -25,8 +25,6 @@ int ArtifactMain() {
 
     AE_INFO("Artifact Engine Version {0}", Version::GetVersionString());
 
-    return 0;
-
     SharedObjectPtr<Engine> engine = Object::Create<Engine>(Class("EditorEngine"));
     engine->Initialize();
     engine->MainLoop();
