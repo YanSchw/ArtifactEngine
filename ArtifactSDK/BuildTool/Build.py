@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import sys
 from colorama import Fore, Style
+from BuildTool.Platforms import *
 import re
 
 MSVC_PATTERN = re.compile(
@@ -51,6 +52,16 @@ def parse_output(output: str):
 
     return errors, warnings
 
+def current_platform_generator():
+    platform = get_current_platform()
+    if platform == PlatformType.Win64:
+        return "Visual Studio 17 2022"
+    elif platform == PlatformType.MacOS:
+        return "Xcode"
+    elif platform == PlatformType.Linux:
+        return "Unix Makefiles"
+    else:
+        raise RuntimeError(f"Unsupported development platform: {platform}")
 
 def build_cmake(clean: bool = False):
     if clean:
@@ -60,7 +71,7 @@ def build_cmake(clean: bool = False):
     if os.path.exists("Binaries"):
         shutil.rmtree("Binaries")
 
-    subprocess.run(["cmake", "-S", ".", "-B", "Build"], check=True)
+    subprocess.run(["cmake", "-S", ".", "-G", current_platform_generator(), "-B", "Build"], check=True)
     proc = subprocess.run(
         ["cmake", "--build", "Build", "--config", "Debug"],
         stdout=subprocess.PIPE,

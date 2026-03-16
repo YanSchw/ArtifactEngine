@@ -9,6 +9,25 @@ def get_module_json(module_path: str) -> dict:
     with open(f"{module_path}/Module.json", "r") as f:
         return json.load(f)
 
+def expand_indirect_module_dependencies(project_path: str, import_modules: list[str]) -> set[str]:
+    to_check = set(import_modules)
+    expanded = set()
+
+    while to_check:
+        module = to_check.pop()
+        # skip if already processed
+        if module in expanded:
+            continue
+
+        expanded.add(module)
+        module_json = get_module_json(f"{project_path}/Modules/{module}")
+        import_modules_list = module_json.get("ImportModules", [])
+        for dep in import_modules_list:
+            if dep not in expanded:
+                to_check.add(dep)
+
+    return expanded
+
 def generate_cmake(project_path: str, target_platform: str):
     if project_path == ".":
         project_path = os.getcwd()
@@ -59,7 +78,7 @@ add_library({module} ${{cpp_src}} {project_path}/Build/Intermediate/Modules/{mod
 """)
                     for include_dir in module_json.get("IncludePaths", []):
                         mf.write(f"target_include_directories({module} PUBLIC {include_dir})\n")
-                    for import_module in module_json.get("ImportModules", []):
+                    for import_module in expand_indirect_module_dependencies(project_path, module_json.get("ImportModules", [])):
                         import_module_json = get_module_json(f"{project_path}/Modules/{import_module}")
                         for include_dir in import_module_json.get("ExportIncludePaths", []):
                             mf.write(f"target_include_directories({module} PUBLIC {project_path}/Modules/{import_module}/{include_dir})\n")
