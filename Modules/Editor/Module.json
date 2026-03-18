@@ -3,6 +3,8 @@
         "Source"
     ],
     "ImportModules": [
-        "EngineCore"
+        "EngineCore",
+        "GLFW_Surfaces",
+        "VulkanAPI"
     ]
 }

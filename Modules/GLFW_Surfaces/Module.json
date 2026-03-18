@@ -1,0 +1,18 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore",
+        "VulkanAPI"
+    ],
+    "ExportIncludePaths": [
+        "Source"
+    ],
+    "IncludePaths": [
+        "ThirdParty/glfw-3.4/include"
+    ],
+    "AddAdditionalCMakeProjects": [
+        "ThirdParty/glfw-3.4"
+    ]
+}

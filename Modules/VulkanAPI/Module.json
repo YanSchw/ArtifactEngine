@@ -1,0 +1,15 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "ExportIncludePaths": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore",
+        "GLFW_Surfaces"
+    ],
+    "AddAdditionalCMakeProjects": [
+        "ThirdParty/VulkanSDK"
+    ]
+}
