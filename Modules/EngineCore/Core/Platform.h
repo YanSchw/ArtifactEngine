@@ -13,4 +13,10 @@ public:
     
     static PlatformType CurrentPlatform();
 
+    struct TemporaryDirectory {
+        String Path;
+        TemporaryDirectory();
+        ~TemporaryDirectory();
+    };
+
 };

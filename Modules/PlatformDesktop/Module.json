@@ -1,0 +1,13 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore"
+    ],
+    "TargetPlatforms": [
+        "Win64",
+        "Linux",
+        "MacOS"
+    ]
+}
