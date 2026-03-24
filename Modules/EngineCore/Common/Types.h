@@ -12,6 +12,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/glm.hpp>
 
+#include "Common/String.h"
+
 using byte = uint8_t;
 
 using Vec2 = glm::vec2;

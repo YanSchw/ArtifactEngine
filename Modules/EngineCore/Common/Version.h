@@ -8,5 +8,5 @@ public:
     static int32_t Minor();
     static int32_t Patch();
 
-    static std::string GetVersionString();
+    static String GetVersionString();
 };

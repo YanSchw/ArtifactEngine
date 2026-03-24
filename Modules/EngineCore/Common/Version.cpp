@@ -18,7 +18,7 @@ int32_t Version::Patch() {
     return __VERSION_PATCH();
 }
 
-std::string Version::GetVersionString() {
+String Version::GetVersionString() {
     if (Patch() >= 0) {
         return std::format("{0}.{1}.{2}", Major(), Minor(), Patch());
     }
