@@ -1,4 +1,5 @@
 #include "Object.h"
+#include "Pointer.h"
 
 Object* Object::Create(const Class& type) {
     if (s_ObjectAllocators.find(type.Name) == s_ObjectAllocators.end()) {
@@ -8,7 +9,7 @@ Object* Object::Create(const Class& type) {
 }
 
 Object::~Object() {
-    // InternalPtr::Nullify(this);
+    InternalPtr::Nullify(this);
 }
 
 bool Object::IsA(const Class& type) const {

@@ -4,7 +4,6 @@
     ],
     "ImportModules": [
         "EngineCore",
-        "GLFW_Surfaces",
-        "VulkanAPI"
+        "GLFW_Surfaces"
     ]
 }

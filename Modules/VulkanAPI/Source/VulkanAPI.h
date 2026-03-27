@@ -1,8 +1,14 @@
 #pragma once
+#include "Rendering/RenderingAPI.h"
+#include "VulkanAPI.gen.h"
 
-class VulkanAPI {
+#include <vulkan/vulkan.h>
+
+class VulkanAPI : public RenderingAPI {
 public:
-    static void SetupVulkan();
+    ARTIFACT_CLASS();
+
+    virtual void Initialize() override;
     
     static void CreateInstance();
     static void CreateDebugCallback();
@@ -13,7 +19,7 @@ public:
     static void CreateLogicalDevice();
     static void CreateSemaphores();
     static void CreateCommandPool();
-    static void CreateVertexBuffer();
+    static void CreateVertexDescriptions();
     static void CreateUniformBuffer();
     static void CreateSwapChain();
     static void CreateRenderPass();
@@ -24,10 +30,16 @@ public:
     static void CreateDescriptorSet();
     static void CreateCommandBuffers();
 
-    static void UpdateUniformData();
+    virtual void UpdateUniformData() override;
 
-    static void CleanUp(bool fullClean);
+    virtual void CleanUp(bool fullClean) override;
 
     static void OnWindowSizeChanged();
-    static void Draw();
+    virtual void Draw() override;
+
+    VkDevice GetDevice() const;
+    VkCommandPool GetCommandPool() const;
+    VkQueue GetGraphicsQueue() const;
+
+    virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) override;
 };

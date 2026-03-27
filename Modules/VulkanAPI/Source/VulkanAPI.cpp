@@ -13,7 +13,9 @@
 #include <GLFW/glfw3.h>
 #include "Core/Log.h"
 #include "Window.h"
-#include "Vertex.h"
+#include "Rendering/Vertex.h"
+
+#include "VulkanVertexBuffer.h"
 
 #include "Resources/Shader_Vert.h"
 #include "Resources/Shader_Frag.h"
@@ -53,10 +55,7 @@ static VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
 static VkSemaphore imageAvailableSemaphore;
 static VkSemaphore renderingFinishedSemaphore;
  
-static VkBuffer vertexBuffer;
-static VkDeviceMemory vertexBufferMemory;
-static VkBuffer indexBuffer;
-static VkDeviceMemory indexBufferMemory;
+static Array<SharedObjectPtr<VulkanVertexBuffer>> s_VertexBuffers;
 static VkVertexInputBindingDescription vertexBindingDescription;
 static std::vector<VkVertexInputAttributeDescription> vertexAttributeDescriptions;
 
@@ -143,7 +142,7 @@ VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> presentMo
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-void VulkanAPI::SetupVulkan() {
+void VulkanAPI::Initialize() {
     oldSwapChain = VK_NULL_HANDLE;
 
     VulkanAPI::CreateInstance();
@@ -155,7 +154,7 @@ void VulkanAPI::SetupVulkan() {
     VulkanAPI::CreateLogicalDevice();
     VulkanAPI::CreateSemaphores();
     VulkanAPI::CreateCommandPool();
-    VulkanAPI::CreateVertexBuffer();
+    VulkanAPI::CreateVertexDescriptions();
     VulkanAPI::CreateUniformBuffer();
     VulkanAPI::CreateSwapChain();
     VulkanAPI::CreateRenderPass();
@@ -194,10 +193,9 @@ void VulkanAPI::CleanUp(bool fullClean) {
         vkFreeMemory(device, uniformBufferMemory, nullptr);
 
         // Buffers must be destroyed after no command buffers are referring to them anymore
-        vkDestroyBuffer(device, vertexBuffer, nullptr);
-        vkFreeMemory(device, vertexBufferMemory, nullptr);
-        vkDestroyBuffer(device, indexBuffer, nullptr);
-        vkFreeMemory(device, indexBufferMemory, nullptr);
+        for (auto& It : s_VertexBuffers) {
+            delete It;
+        }
 
         // Note: implicitly destroys images (in fact, we're not allowed to do that explicitly)
         vkDestroySwapchainKHR(device, swapChain, nullptr);
@@ -526,132 +524,10 @@ void VulkanAPI::CreateCommandPool() {
     }
 }
 
-void VulkanAPI::CreateVertexBuffer() {
-    // Setup vertices
-    std::vector<Vertex> vertices = {
-        { { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f } },
-        { { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f } },
-        { {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f } }
-    };
-    uint32_t verticesSize = (uint32_t)(vertices.size() * sizeof(vertices[0]));
-
-    // Setup indices
-    std::vector<uint32_t> indices = { 0, 1, 2 };
-    uint32_t indicesSize = (uint32_t)(indices.size() * sizeof(indices[0]));
-
-    VkMemoryAllocateInfo memAlloc = {};
-    memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    VkMemoryRequirements memReqs;
-    void* data;
-
-    struct StagingBuffer {
-        VkDeviceMemory memory;
-        VkBuffer buffer;
-    };
-
-    struct {
-        StagingBuffer vertices;
-        StagingBuffer indices;
-    } stagingBuffers;
-
-    // Allocate command buffer for copy operation
-    VkCommandBufferAllocateInfo cmdBufInfo = {};
-    cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmdBufInfo.commandPool = commandPool;
-    cmdBufInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmdBufInfo.commandBufferCount = 1;
-
-    VkCommandBuffer copyCommandBuffer;
-    vkAllocateCommandBuffers(device, &cmdBufInfo, &copyCommandBuffer);
-
-    // First copy vertices to host accessible vertex buffer memory
-    VkBufferCreateInfo vertexBufferInfo = {};
-    vertexBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    vertexBufferInfo.size = verticesSize;
-    vertexBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-    vkCreateBuffer(device, &vertexBufferInfo, nullptr, &stagingBuffers.vertices.buffer);
-
-    vkGetBufferMemoryRequirements(device, stagingBuffers.vertices.buffer, &memReqs);
-    memAlloc.allocationSize = memReqs.size;
-    GetMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &memAlloc.memoryTypeIndex);
-    vkAllocateMemory(device, &memAlloc, nullptr, &stagingBuffers.vertices.memory);
-
-    vkMapMemory(device, stagingBuffers.vertices.memory, 0, verticesSize, 0, &data);
-    memcpy(data, vertices.data(), verticesSize);
-    vkUnmapMemory(device, stagingBuffers.vertices.memory);
-    vkBindBufferMemory(device, stagingBuffers.vertices.buffer, stagingBuffers.vertices.memory, 0);
-
-    // Then allocate a gpu only buffer for vertices
-    vertexBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    vkCreateBuffer(device, &vertexBufferInfo, nullptr, &vertexBuffer);
-    vkGetBufferMemoryRequirements(device, vertexBuffer, &memReqs);
-    memAlloc.allocationSize = memReqs.size;
-    GetMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &memAlloc.memoryTypeIndex);
-    vkAllocateMemory(device, &memAlloc, nullptr, &vertexBufferMemory);
-    vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
-
-    // Next copy indices to host accessible index buffer memory
-    VkBufferCreateInfo indexBufferInfo = {};
-    indexBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    indexBufferInfo.size = indicesSize;
-    indexBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-    vkCreateBuffer(device, &indexBufferInfo, nullptr, &stagingBuffers.indices.buffer);
-    vkGetBufferMemoryRequirements(device, stagingBuffers.indices.buffer, &memReqs);
-    memAlloc.allocationSize = memReqs.size;
-    GetMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &memAlloc.memoryTypeIndex);
-    vkAllocateMemory(device, &memAlloc, nullptr, &stagingBuffers.indices.memory);
-    vkMapMemory(device, stagingBuffers.indices.memory, 0, indicesSize, 0, &data);
-    memcpy(data, indices.data(), indicesSize);
-    vkUnmapMemory(device, stagingBuffers.indices.memory);
-    vkBindBufferMemory(device, stagingBuffers.indices.buffer, stagingBuffers.indices.memory, 0);
-
-    // And allocate another gpu only buffer for indices
-    indexBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    vkCreateBuffer(device, &indexBufferInfo, nullptr, &indexBuffer);
-    vkGetBufferMemoryRequirements(device, indexBuffer, &memReqs);
-    memAlloc.allocationSize = memReqs.size;
-    GetMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &memAlloc.memoryTypeIndex);
-    vkAllocateMemory(device, &memAlloc, nullptr, &indexBufferMemory);
-    vkBindBufferMemory(device, indexBuffer, indexBufferMemory, 0);
-
-    // Now copy data from host visible buffer to gpu only buffer
-    VkCommandBufferBeginInfo bufferBeginInfo = {};
-    bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    bufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(copyCommandBuffer, &bufferBeginInfo);
-
-    VkBufferCopy copyRegion = {};
-    copyRegion.size = verticesSize;
-    vkCmdCopyBuffer(copyCommandBuffer, stagingBuffers.vertices.buffer, vertexBuffer, 1, &copyRegion);
-    copyRegion.size = indicesSize;
-    vkCmdCopyBuffer(copyCommandBuffer, stagingBuffers.indices.buffer, indexBuffer, 1, &copyRegion);
-
-    vkEndCommandBuffer(copyCommandBuffer);
-
-    // Submit to queue
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &copyCommandBuffer;
-
-    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(graphicsQueue);
-
-    vkFreeCommandBuffers(device, commandPool, 1, &copyCommandBuffer);
-
-    vkDestroyBuffer(device, stagingBuffers.vertices.buffer, nullptr);
-    vkFreeMemory(device, stagingBuffers.vertices.memory, nullptr);
-    vkDestroyBuffer(device, stagingBuffers.indices.buffer, nullptr);
-    vkFreeMemory(device, stagingBuffers.indices.memory, nullptr);
-
-    AE_INFO("set up vertex and index buffers");
-
+void VulkanAPI::CreateVertexDescriptions() {
     // Binding and attribute descriptions
     vertexBindingDescription.binding = 0;
-    vertexBindingDescription.stride = sizeof(vertices[0]);
+    vertexBindingDescription.stride = sizeof(Vertex);
     vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     // vec2 position
@@ -686,7 +562,7 @@ void VulkanAPI::CreateUniformBuffer() {
     vkAllocateMemory(device, &allocInfo, nullptr, &uniformBufferMemory);
     vkBindBufferMemory(device, uniformBuffer, uniformBufferMemory, 0);
 
-    VulkanAPI::UpdateUniformData();
+    RenderingAPI::GetInstance()->UpdateUniformData();
 }
 
 void VulkanAPI::UpdateUniformData() {
@@ -1238,12 +1114,12 @@ void VulkanAPI::CreateCommandBuffers() {
 
         vkCmdBindPipeline(graphicsCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(graphicsCommandBuffers[i], 0, 1, &vertexBuffer, &offset);
-
-        vkCmdBindIndexBuffer(graphicsCommandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdDrawIndexed(graphicsCommandBuffers[i], 3, 1, 0, 0, 0);
+        for (const auto& It : s_VertexBuffers) {
+            VkDeviceSize offset = 0;
+            vkCmdBindVertexBuffers(graphicsCommandBuffers[i], 0, 1, &It->m_VertexBuffer, &offset);
+            vkCmdBindIndexBuffer(graphicsCommandBuffers[i], It->m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdDrawIndexed(graphicsCommandBuffers[i], It->m_IndexCount, 1, 0, 0, 0);
+        }
 
         vkCmdEndRenderPass(graphicsCommandBuffers[i]);
 
@@ -1280,7 +1156,7 @@ void VulkanAPI::OnWindowSizeChanged() {
     Window::GetInstance()->SetResizedFlag(false);
 
     // Only recreate objects that are affected by framebuffer size changes
-    VulkanAPI::CleanUp(false);
+    RenderingAPI::GetInstance()->CleanUp(false);
 
     VulkanAPI::CreateSwapChain();
     VulkanAPI::CreateRenderPass();
@@ -1348,4 +1224,23 @@ void VulkanAPI::Draw() {
         AE_ERROR("failed to submit present command buffer");
         exit(1);
     }
+}
+
+VkDevice VulkanAPI::GetDevice() const {
+    return device;
+}
+
+VkCommandPool VulkanAPI::GetCommandPool() const {
+    return commandPool;
+}
+
+VkQueue VulkanAPI::GetGraphicsQueue() const {
+    return graphicsQueue;
+}
+
+SharedObjectPtr<VertexBuffer> VulkanAPI::CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) {
+    auto newVertexBuffer = new VulkanVertexBuffer(InVertices, InIndices, *this);
+    s_VertexBuffers.Add(newVertexBuffer);
+    Window::GetInstance()->SetResizedFlag(true);
+    return newVertexBuffer;
 }

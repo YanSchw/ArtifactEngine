@@ -2,7 +2,8 @@
 #include "Core/Log.h"
 
 #include "Window.h"
-#include "VulkanAPI.h"
+#include "Rendering/RenderingAPI.h"
+#include "Rendering/VertexBuffer.h"
 
 SharedObjectPtr<Window> s_Window;
 
@@ -10,12 +11,26 @@ SharedObjectPtr<Window> s_Window;
 void EditorEngine::Initialize() {
     s_Window = Window::Create(WindowParams{ "Artifact Editor", 1280, 720 });
 
-    VulkanAPI::SetupVulkan();
+    Object::Create(Class("VulkanAPI"));
+    RenderingAPI::GetInstance()->Initialize();
+
+    Array<Vertex> vertices1 = {
+        { { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f } },
+        { { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f } },
+        { {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f } }
+    };
+    VertexBuffer::Create(vertices1, { 0, 1, 2 });
+    Array<Vertex> vertices2 = {
+        { { -0.5f, -0.5f,  -1.0f }, { 1.0f, 0.0f, 0.0f } },
+        { { -0.5f,  0.5f,  -1.0f }, { 0.0f, 1.0f, 0.0f } },
+        { {  0.5f,  0.5f,  -1.0f }, { 0.0f, 0.0f, 1.0f } }
+    };
+    VertexBuffer::Create(vertices2, { 0, 1, 2 });
 }
 
 bool EditorEngine::MainTick(double InDeltaTime) {
-    VulkanAPI::UpdateUniformData();
-    VulkanAPI::Draw();
+    RenderingAPI::GetInstance()->UpdateUniformData();
+    RenderingAPI::GetInstance()->Draw();
 
     s_Window->PollEvents();
     return !s_Window->ShouldClose();
@@ -23,5 +38,5 @@ bool EditorEngine::MainTick(double InDeltaTime) {
 
 void EditorEngine::Shutdown() {
     s_Window = nullptr;
-    VulkanAPI::CleanUp(true);
+    RenderingAPI::GetInstance()->CleanUp(true);
 }
