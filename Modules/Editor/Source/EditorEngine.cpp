@@ -7,6 +7,8 @@
 
 SharedObjectPtr<Window> s_Window;
 
+SharedObjectPtr<VertexBuffer> s_VertexBuffer1;
+SharedObjectPtr<VertexBuffer> s_VertexBuffer2;
 
 void EditorEngine::Initialize() {
     s_Window = Window::Create(WindowParams{ "Artifact Editor", 1280, 720 });
@@ -21,17 +23,20 @@ void EditorEngine::Initialize() {
         { { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f } },
         { {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f } }
     };
-    VertexBuffer::Create(vertices1, { 0, 1, 2 });
+    s_VertexBuffer1 = VertexBuffer::Create(vertices1, { 0, 1, 2 });
     Array<Vertex> vertices2 = {
         { { -0.5f, -0.5f,  -1.0f }, { 1.0f, 0.0f, 0.0f } },
         { { -0.5f,  0.5f,  -1.0f }, { 0.0f, 1.0f, 0.0f } },
         { {  0.5f,  0.5f,  -1.0f }, { 0.0f, 0.0f, 1.0f } }
     };
-    VertexBuffer::Create(vertices2, { 0, 1, 2 });
+    s_VertexBuffer2 = VertexBuffer::Create(vertices2, { 0, 1, 2 });
 }
 
 bool EditorEngine::MainTick(double InDeltaTime) {
     RenderingAPI::GetInstance()->UpdateUniformData();
+    s_VertexBuffer1->Draw();
+    s_VertexBuffer2->Draw();
+
     RenderingAPI::GetInstance()->Draw();
 
     s_Window->PollEvents();

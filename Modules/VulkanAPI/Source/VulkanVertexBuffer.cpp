@@ -2,7 +2,10 @@
 
 extern VkBool32 GetMemoryType(uint32_t typeBits, VkFlags properties, uint32_t* typeIndex);
 
+static Array<VulkanVertexBuffer*> s_VertexBuffers;
+
 VulkanVertexBuffer::VulkanVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices, VulkanAPI& InVulkanAPI) {
+    s_VertexBuffers.Add(this);
     uint32_t verticesSize = (uint32_t)(InVertices.Size() * sizeof(InVertices[0]));
     uint32_t indicesSize = (uint32_t)(InIndices.Size() * sizeof(InIndices[0]));
     m_IndexCount = (uint32_t)InIndices.Size();
@@ -117,9 +120,27 @@ VulkanVertexBuffer::VulkanVertexBuffer(const Array<Vertex>& InVertices, const Ar
 }
 
 VulkanVertexBuffer::~VulkanVertexBuffer() {
-    // Implementation for destroying Vulkan vertex buffer
+    s_VertexBuffers.Remove(this);
+    VkDevice device = VulkanAPI::Get().GetDevice();
+    vkDestroyBuffer(device, m_VertexBuffer, nullptr);
+    vkFreeMemory(device, m_VertexBufferMemory, nullptr);
+    vkDestroyBuffer(device, m_IndexBuffer, nullptr);
+    vkFreeMemory(device, m_IndexBufferMemory, nullptr);
 }
 
 void VulkanVertexBuffer::Bind() {
-    // Implementation for binding Vulkan vertex buffer
+    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BindVertexBuffer, CmdBindVertexBuffer{ this });
+}
+
+void VulkanVertexBuffer::Draw() {
+    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BindVertexBuffer, CmdBindVertexBuffer{ this });
+    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::DrawIndexed, CmdDrawIndexed{ m_IndexCount, 0, 0 });
+}
+
+void VulkanVertexBuffer::DestroyAll() {
+    Array<VulkanVertexBuffer*> buffersToDestroy = s_VertexBuffers;
+    for (VulkanVertexBuffer* buffer : buffersToDestroy) {
+        delete buffer;
+    }
+    s_VertexBuffers.Clear();
 }

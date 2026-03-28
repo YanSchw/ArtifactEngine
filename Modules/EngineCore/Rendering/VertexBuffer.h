@@ -9,6 +9,7 @@ public:
 
     virtual ~VertexBuffer() { }
     virtual void Bind() = 0;
+    virtual void Draw() = 0;
 
     static SharedObjectPtr<VertexBuffer> Create(const Array<struct Vertex>& InVertices, const Array<uint32_t>& InIndices);
 };

@@ -8,6 +8,8 @@ class VulkanAPI : public RenderingAPI {
 public:
     ARTIFACT_CLASS();
 
+    static VulkanAPI& Get() { return *RenderingAPI::GetInstance()->As<VulkanAPI>(); }
+
     virtual void Initialize() override;
     
     static void CreateInstance();
@@ -29,6 +31,9 @@ public:
     static void CreateDescriptorPool();
     static void CreateDescriptorSet();
     static void CreateCommandBuffers();
+    static void UpdateCommandBuffer(size_t i);
+
+    void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer);
 
     virtual void UpdateUniformData() override;
 
@@ -41,5 +46,8 @@ public:
     VkCommandPool GetCommandPool() const;
     VkQueue GetGraphicsQueue() const;
 
+    virtual struct RenderCommandQueue& GetRenderQueue() override;
     virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) override;
+
+    RenderCommandQueue m_RenderQueue;
 };

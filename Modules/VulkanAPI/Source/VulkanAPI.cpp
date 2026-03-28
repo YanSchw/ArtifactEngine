@@ -54,8 +54,7 @@ static VkQueue presentQueue;
 static VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
 static VkSemaphore imageAvailableSemaphore;
 static VkSemaphore renderingFinishedSemaphore;
- 
-static Array<SharedObjectPtr<VulkanVertexBuffer>> s_VertexBuffers;
+
 static VkVertexInputBindingDescription vertexBindingDescription;
 static std::vector<VkVertexInputAttributeDescription> vertexAttributeDescriptions;
 
@@ -172,6 +171,7 @@ void VulkanAPI::CleanUp(bool fullClean) {
     vkFreeCommandBuffers(device, commandPool, (uint32_t)graphicsCommandBuffers.size(), graphicsCommandBuffers.data());
 
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
 
     for (size_t i = 0; i < swapChainImages.size(); i++) {
@@ -193,9 +193,7 @@ void VulkanAPI::CleanUp(bool fullClean) {
         vkFreeMemory(device, uniformBufferMemory, nullptr);
 
         // Buffers must be destroyed after no command buffers are referring to them anymore
-        for (auto& It : s_VertexBuffers) {
-            delete It;
-        }
+        VulkanVertexBuffer::DestroyAll();
 
         // Note: implicitly destroys images (in fact, we're not allowed to do that explicitly)
         vkDestroySwapchainKHR(device, swapChain, nullptr);
@@ -1054,12 +1052,20 @@ void VulkanAPI::CreateCommandBuffers() {
     else {
         AE_INFO("allocated graphics command buffers");
     }
+}
 
-    // Prepare data for recording command buffers
+void VulkanAPI::UpdateCommandBuffer(size_t i) {
+    // Reset the command buffer to allow re-recording
+    vkResetCommandBuffer(graphicsCommandBuffers[i], 0);
+
+    // Begin recording the command buffer
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 
+    vkBeginCommandBuffer(graphicsCommandBuffers[i], &beginInfo);
+
+    // Prepare subresource range for barriers
     VkImageSubresourceRange subResourceRange = {};
     subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subResourceRange.baseMipLevel = 0;
@@ -1067,88 +1073,78 @@ void VulkanAPI::CreateCommandBuffers() {
     subResourceRange.baseArrayLayer = 0;
     subResourceRange.layerCount = 1;
 
+    // Barrier to transition image layout for drawing
+    VkImageMemoryBarrier presentToDrawBarrier = {};
+    presentToDrawBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    presentToDrawBarrier.srcAccessMask = 0;
+    presentToDrawBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    presentToDrawBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    presentToDrawBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    if (presentQueueFamily != graphicsQueueFamily) {
+        presentToDrawBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        presentToDrawBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    } else {
+        presentToDrawBarrier.srcQueueFamilyIndex = presentQueueFamily;
+        presentToDrawBarrier.dstQueueFamilyIndex = graphicsQueueFamily;
+    }
+
+    presentToDrawBarrier.image = swapChainImages[i];
+    presentToDrawBarrier.subresourceRange = subResourceRange;
+
+    vkCmdPipelineBarrier(graphicsCommandBuffers[i], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
+
+    // Begin render pass
     VkClearValue clearColor = {
         { 0.1f, 0.1f, 0.1f, 1.0f } // R, G, B, A
     };
 
-    // Record command buffer for each swap image
-    for (size_t i = 0; i < swapChainImages.size(); i++) {
-        vkBeginCommandBuffer(graphicsCommandBuffers[i], &beginInfo);
+    VkRenderPassBeginInfo renderPassBeginInfo = {};
+    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassBeginInfo.renderPass = renderPass;
+    renderPassBeginInfo.framebuffer = swapChainFramebuffers[i];
+    renderPassBeginInfo.renderArea.offset.x = 0;
+    renderPassBeginInfo.renderArea.offset.y = 0;
+    renderPassBeginInfo.renderArea.extent = swapChainExtent;
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearColor;
 
-        // If present queue family and graphics queue family are different, then a barrier is necessary
-        // The barrier is also needed initially to transition the image to the present layout
-        VkImageMemoryBarrier presentToDrawBarrier = {};
-        presentToDrawBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        presentToDrawBarrier.srcAccessMask = 0;
-        presentToDrawBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        presentToDrawBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        presentToDrawBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    vkCmdBeginRenderPass(graphicsCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        if (presentQueueFamily != graphicsQueueFamily) {
-            presentToDrawBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            presentToDrawBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        }
-        else {
-            presentToDrawBarrier.srcQueueFamilyIndex = presentQueueFamily;
-            presentToDrawBarrier.dstQueueFamilyIndex = graphicsQueueFamily;
-        }
+    // Bind descriptor sets and pipeline
+    vkCmdBindDescriptorSets(graphicsCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+    vkCmdBindPipeline(graphicsCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-        presentToDrawBarrier.image = swapChainImages[i];
-        presentToDrawBarrier.subresourceRange = subResourceRange;
+    // Record the render commands using RenderCommandQueue
+    VulkanAPI::Get().RecordCommandBuffer(VulkanAPI::Get().GetRenderQueue(), graphicsCommandBuffers[i]);
 
-        vkCmdPipelineBarrier(graphicsCommandBuffers[i], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
+    // End render pass
+    vkCmdEndRenderPass(graphicsCommandBuffers[i]);
 
-        VkRenderPassBeginInfo renderPassBeginInfo = {};
-        renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassBeginInfo.renderPass = renderPass;
-        renderPassBeginInfo.framebuffer = swapChainFramebuffers[i];
-        renderPassBeginInfo.renderArea.offset.x = 0;
-        renderPassBeginInfo.renderArea.offset.y = 0;
-        renderPassBeginInfo.renderArea.extent = swapChainExtent;
-        renderPassBeginInfo.clearValueCount = 1;
-        renderPassBeginInfo.pClearValues = &clearColor;
+    // Barrier if present and graphics queue families differ
+    if (presentQueueFamily != graphicsQueueFamily) {
+        VkImageMemoryBarrier drawToPresentBarrier = {};
+        drawToPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        drawToPresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        drawToPresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        drawToPresentBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        drawToPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        drawToPresentBarrier.srcQueueFamilyIndex = graphicsQueueFamily;
+        drawToPresentBarrier.dstQueueFamilyIndex = presentQueueFamily;
+        drawToPresentBarrier.image = swapChainImages[i];
+        drawToPresentBarrier.subresourceRange = subResourceRange;
 
-        vkCmdBeginRenderPass(graphicsCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        vkCmdBindDescriptorSets(graphicsCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-
-        vkCmdBindPipeline(graphicsCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-        for (const auto& It : s_VertexBuffers) {
-            VkDeviceSize offset = 0;
-            vkCmdBindVertexBuffers(graphicsCommandBuffers[i], 0, 1, &It->m_VertexBuffer, &offset);
-            vkCmdBindIndexBuffer(graphicsCommandBuffers[i], It->m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdDrawIndexed(graphicsCommandBuffers[i], It->m_IndexCount, 1, 0, 0, 0);
-        }
-
-        vkCmdEndRenderPass(graphicsCommandBuffers[i]);
-
-        // If present and graphics queue families differ, then another barrier is required
-        if (presentQueueFamily != graphicsQueueFamily) {
-            VkImageMemoryBarrier drawToPresentBarrier = {};
-            drawToPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            drawToPresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            drawToPresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-            drawToPresentBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            drawToPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            drawToPresentBarrier.srcQueueFamilyIndex = graphicsQueueFamily;
-            drawToPresentBarrier.dstQueueFamilyIndex = presentQueueFamily;
-            drawToPresentBarrier.image = swapChainImages[i];
-            drawToPresentBarrier.subresourceRange = subResourceRange;
-
-            vkCmdPipelineBarrier(graphicsCommandBuffers[i], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &drawToPresentBarrier);
-        }
-
-        if (vkEndCommandBuffer(graphicsCommandBuffers[i]) != VK_SUCCESS) {
-            AE_ERROR("failed to record command buffer");
-            exit(1);
-        }
+        vkCmdPipelineBarrier(graphicsCommandBuffers[i], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &drawToPresentBarrier);
     }
 
-    AE_INFO("recorded command buffers");
+    // End recording the command buffer
+    if (vkEndCommandBuffer(graphicsCommandBuffers[i]) != VK_SUCCESS) {
+        AE_ERROR("failed to record command buffer");
+        exit(1);
+    }
 
-    // No longer needed
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    // Clear the render queue after recording
+    VulkanAPI::Get().GetRenderQueue().Clear();
 }
 
 void VulkanAPI::OnWindowSizeChanged() {
@@ -1181,6 +1177,9 @@ void VulkanAPI::Draw() {
         AE_ERROR("failed to acquire image");
         exit(1);
     }
+
+    // Update the command buffer for the acquired swap chain image with the current render queue
+    VulkanAPI::UpdateCommandBuffer(imageIndex);
 
     // Wait for image to be available and draw
     VkSubmitInfo submitInfo = {};
@@ -1226,6 +1225,35 @@ void VulkanAPI::Draw() {
     }
 }
 
+void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer) {
+    for (const RenderCommand& cmd : InQueue.commands) {
+        switch (cmd.Type) {
+            case RenderCommandType::BindVertexBuffer: {
+                const auto& data = std::get<CmdBindVertexBuffer>(cmd.Data);
+
+                if (!data.Buffer)
+                    continue;
+
+
+                auto* vkBuffer = data.Buffer->As<VulkanVertexBuffer>();
+
+                VkBuffer vertexBuffers[] = { vkBuffer->m_VertexBuffer };
+                VkDeviceSize offsets[] = { 0 };
+
+                vkCmdBindVertexBuffers(InCmdBuffer, 0, 1, vertexBuffers, offsets);
+                vkCmdBindIndexBuffer(InCmdBuffer, vkBuffer->m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32 );
+                break;
+            }
+
+            case RenderCommandType::DrawIndexed: {
+                const auto& data = std::get<CmdDrawIndexed>(cmd.Data);
+                vkCmdDrawIndexed(InCmdBuffer, data.IndexCount, 1, data.FirstIndex, data.VertexOffset, 0);
+                break;
+            }
+        }
+    }
+}
+
 VkDevice VulkanAPI::GetDevice() const {
     return device;
 }
@@ -1238,9 +1266,11 @@ VkQueue VulkanAPI::GetGraphicsQueue() const {
     return graphicsQueue;
 }
 
+RenderCommandQueue& VulkanAPI::GetRenderQueue() {
+    return m_RenderQueue;
+}
+
 SharedObjectPtr<VertexBuffer> VulkanAPI::CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) {
-    auto newVertexBuffer = new VulkanVertexBuffer(InVertices, InIndices, *this);
-    s_VertexBuffers.Add(newVertexBuffer);
     Window::GetInstance()->SetResizedFlag(true);
-    return newVertexBuffer;
+    return new VulkanVertexBuffer(InVertices, InIndices, *this);
 }
