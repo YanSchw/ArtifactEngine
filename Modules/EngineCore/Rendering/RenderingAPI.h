@@ -1,6 +1,5 @@
 #pragma once
-#include "Core/Object.h"
-#include "Core/Pointer.h"
+#include "CoreMinimal.h"
 #include "Rendering/Vertex.h"
 #include "RenderingAPI.gen.h"
 

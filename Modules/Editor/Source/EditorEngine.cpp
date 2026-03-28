@@ -1,5 +1,5 @@
 #include "EditorEngine.h"
-#include "Core/Log.h"
+#include "CoreMinimal.h"
 
 #include "Window.h"
 #include "Rendering/RenderingAPI.h"
@@ -10,8 +10,10 @@ SharedObjectPtr<Window> s_Window;
 
 void EditorEngine::Initialize() {
     s_Window = Window::Create(WindowParams{ "Artifact Editor", 1280, 720 });
+    AE_ASSERT(s_Window);
 
     Object::Create(Class("VulkanAPI"));
+    AE_ASSERT(RenderingAPI::GetInstance());
     RenderingAPI::GetInstance()->Initialize();
 
     Array<Vertex> vertices1 = {
