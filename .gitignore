@@ -6,6 +6,7 @@ __pycache__
 *egg-info
 
 .DS_Store
+.vscode
 
 CMakeLists.txt
 Build/
