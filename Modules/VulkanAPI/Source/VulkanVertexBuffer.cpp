@@ -128,13 +128,8 @@ VulkanVertexBuffer::~VulkanVertexBuffer() {
     vkFreeMemory(device, m_IndexBufferMemory, nullptr);
 }
 
-void VulkanVertexBuffer::Bind() {
-    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BindVertexBuffer, CmdBindVertexBuffer{ this });
-}
-
-void VulkanVertexBuffer::Draw() {
-    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BindVertexBuffer, CmdBindVertexBuffer{ this });
-    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::DrawIndexed, CmdDrawIndexed{ m_IndexCount, 0, 0 });
+uint32_t VulkanVertexBuffer::GetIndexCount() const {
+    return m_IndexCount;
 }
 
 void VulkanVertexBuffer::DestroyAll() {

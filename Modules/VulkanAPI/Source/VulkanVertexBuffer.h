@@ -12,8 +12,7 @@ public:
 
     VulkanVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices, VulkanAPI& InVulkanAPI);
     virtual ~VulkanVertexBuffer();
-    virtual void Bind() override;
-    virtual void Draw() override;
+    virtual uint32_t GetIndexCount() const override;
 
     static void DestroyAll();
 
