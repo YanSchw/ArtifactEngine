@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include <iterator>
+#include <algorithm>
+#include <ranges>
 
 struct TArray {
 
