@@ -1,5 +1,5 @@
 #pragma once
-#include "Common/String.h"
+#include "CoreMinimal.h"
 
 enum class PlatformType : uint32_t {
     Unknown = 0,
@@ -12,6 +12,8 @@ class Platform {
 public:
     
     static PlatformType CurrentPlatform();
+
+    static Class GetDefaultRenderingAPIClass();
 
     struct TemporaryDirectory {
         String Path;

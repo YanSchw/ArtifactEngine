@@ -1,5 +1,6 @@
 #include "EditorEngine.h"
 #include "CoreMinimal.h"
+#include "Core/Platform.h"
 
 #include "Window.h"
 #include "Rendering/RenderingAPI.h"
@@ -14,8 +15,8 @@ void EditorEngine::Initialize() {
     s_Window = Window::Create(WindowParams{ "Artifact Editor", 1280, 720 });
     AE_ASSERT(s_Window);
 
-    Object::Create(Class("VulkanAPI"));
-    AE_ASSERT(RenderingAPI::GetInstance());
+    Object::Create(Platform::GetDefaultRenderingAPIClass());
+    AE_ASSERT(RenderingAPI::GetInstance(), "Failed to create RenderingAPI instance!");
     RenderingAPI::GetInstance()->Initialize();
 
     Array<Vertex> vertices1 = {
