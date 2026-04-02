@@ -5,9 +5,12 @@
 
 struct Class {
     std::string Name;
-    Class() : Name("None") {};
+    
+    Class() : Name("") {};
     Class(const Class&) = default;
     Class(const std::string& name) : Name(name) {}
+
+    const static Class None;
 };
 
 template <class To, class From> static To* Cast(From* Src);
@@ -53,8 +56,9 @@ private:
     static Object* InternalAllocate() {
         if constexpr (std::is_default_constructible<T>::value) {
             return (Object*) new T();
+        } else {
+            return nullptr;
         }
-        return nullptr;
     }
 
     inline static std::unordered_map<std::string, Object*(*)(void)> s_ObjectAllocators;

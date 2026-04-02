@@ -46,7 +46,7 @@ public:
     VkCommandPool GetCommandPool() const;
     VkQueue GetGraphicsQueue() const;
 
-    virtual struct RenderCommandQueue& GetRenderQueue() override;
+    virtual class RenderCommandQueue& GetRenderQueue() override;
     virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) override;
 
     RenderCommandQueue m_RenderQueue;

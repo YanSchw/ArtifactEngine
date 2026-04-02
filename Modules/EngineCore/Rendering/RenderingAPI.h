@@ -18,7 +18,7 @@ public:
     virtual void Draw() = 0;
     virtual void CleanUp(bool InShouldDestroy) = 0;
 
-    virtual struct RenderCommandQueue& GetRenderQueue() = 0;
+    virtual class RenderCommandQueue& GetRenderQueue() = 0;
     virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) = 0;
 
 private:
