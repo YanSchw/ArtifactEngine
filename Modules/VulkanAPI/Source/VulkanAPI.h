@@ -21,7 +21,6 @@ public:
     static void CreateLogicalDevice();
     static void CreateSemaphores();
     static void CreateCommandPool();
-    static void CreateUniformBuffer();
     static void CreateSwapChain();
     static void CreateRenderPass();
     static void CreateImageViews();
@@ -32,14 +31,13 @@ public:
 
     void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer);
 
-    virtual void UpdateUniformData() override;
-
     virtual void CleanUp(bool fullClean) override;
 
     static void OnWindowSizeChanged();
     virtual void Draw() override;
 
     VkDevice GetDevice() const;
+    VkPhysicalDevice GetPhysicalDevice() const;
     VkCommandPool GetCommandPool() const;
     VkDescriptorPool GetDescriptorPool() const;
     VkQueue GetGraphicsQueue() const;
@@ -49,6 +47,8 @@ public:
     virtual SharedObjectPtr<class Shader> CreateShader(const String& InShaderSource) override;
     virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) override;
     virtual void InvalidateAllPipelines() override;
+    virtual SharedObjectPtr<class UniformBuffer> CreateUniformBuffer(uint32_t InBinding, size_t InSize) override;
+    virtual SharedObjectPtr<class StorageBuffer> CreateStorageBuffer(uint32_t InBinding, size_t InSize) override;
 
     RenderCommandQueue m_RenderQueue;
 };

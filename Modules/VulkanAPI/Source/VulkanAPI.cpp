@@ -17,6 +17,7 @@
 
 #include "VulkanVertexBuffer.h"
 #include "VulkanShader.h"
+#include "VulkanBuffer.h"
 #include "VulkanPipeline.h"
 
 #if defined(__APPLE__)
@@ -54,11 +55,6 @@ static VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
 static VkSemaphore imageAvailableSemaphore;
 static VkSemaphore renderingFinishedSemaphore;
 
-struct {
-    glm::mat4 transformationMatrix;
-} uniformBufferData;
-VkBuffer uniformBuffer;
-static VkDeviceMemory uniformBufferMemory;
 static VkDescriptorPool descriptorPool;
  
 VkExtent2D swapChainExtent = {1280, 720};
@@ -145,7 +141,6 @@ void VulkanAPI::Initialize() {
     VulkanAPI::CreateLogicalDevice();
     VulkanAPI::CreateSemaphores();
     VulkanAPI::CreateCommandPool();
-    VulkanAPI::CreateUniformBuffer();
     VulkanAPI::CreateSwapChain();
     VulkanAPI::CreateRenderPass();
     VulkanAPI::CreateImageViews();
@@ -174,10 +169,10 @@ void VulkanAPI::CleanUp(bool fullClean) {
 
         VulkanPipeline::DestroyAll();
         VulkanShader::DestroyAll();
-        // Clean up uniform buffer related objects
+        
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-        vkDestroyBuffer(device, uniformBuffer, nullptr);
-        vkFreeMemory(device, uniformBufferMemory, nullptr);
+        VulkanUniformBuffer::DestroyAll();
+        VulkanStorageBuffer::DestroyAll();
 
         // Buffers must be destroyed after no command buffers are referring to them anymore
         VulkanVertexBuffer::DestroyAll();
@@ -507,54 +502,6 @@ void VulkanAPI::CreateCommandPool() {
     else {
         AE_INFO("created command pool for graphics queue family");
     }
-}
-
-void VulkanAPI::CreateUniformBuffer() {
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(uniformBufferData);
-    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-
-    vkCreateBuffer(device, &bufferInfo, nullptr, &uniformBuffer);
-
-    VkMemoryRequirements memReqs;
-    vkGetBufferMemoryRequirements(device, uniformBuffer, &memReqs);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memReqs.size;
-    GetMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &allocInfo.memoryTypeIndex);
-
-    vkAllocateMemory(device, &allocInfo, nullptr, &uniformBufferMemory);
-    vkBindBufferMemory(device, uniformBuffer, uniformBufferMemory, 0);
-
-    RenderingAPI::GetInstance()->UpdateUniformData();
-}
-
-void VulkanAPI::UpdateUniformData() {
-    static auto timeStart = std::chrono::high_resolution_clock::now(); // Initialize once
-
-    auto timeNow = std::chrono::high_resolution_clock::now();
-    long long millis = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeStart).count();
-    float angle = (millis % 4000) / 4000.0f * glm::radians(360.f);
-
-    // Proper identity initialization
-    glm::mat4 modelMatrix = glm::mat4(1.0f);
-    modelMatrix = glm::rotate(modelMatrix, angle, glm::vec3(0, 0, 1));
-    modelMatrix = glm::translate(modelMatrix, glm::vec3(0.5f / 3.0f, -0.5f / 3.0f, 0.0f));
-
-    // View and projection
-    auto viewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
-    auto projMatrix = glm::perspective(glm::radians(70.f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
-
-    uniformBufferData.transformationMatrix = projMatrix * viewMatrix * modelMatrix;
-
-    // Upload
-    void* data;
-    vkMapMemory(device, uniformBufferMemory, 0, sizeof(uniformBufferData), 0, &data);
-    memcpy(data, &uniformBufferData, sizeof(uniformBufferData));
-    vkUnmapMemory(device, uniformBufferMemory);
-
 }
 
 void VulkanAPI::CreateSwapChain() {
@@ -1016,6 +963,10 @@ VkDevice VulkanAPI::GetDevice() const {
     return device;
 }
 
+VkPhysicalDevice VulkanAPI::GetPhysicalDevice() const {
+    return physicalDevice;
+}
+
 VkCommandPool VulkanAPI::GetCommandPool() const {
     return commandPool;
 }
@@ -1047,4 +998,12 @@ SharedObjectPtr<Pipeline> VulkanAPI::CreatePipeline(const PipelineDesc& InPipeli
 
 void VulkanAPI::InvalidateAllPipelines() {
     VulkanPipeline::InvalidateAll();
+}
+
+SharedObjectPtr<UniformBuffer> VulkanAPI::CreateUniformBuffer(uint32_t InBinding, size_t InSize) {
+    return new VulkanUniformBuffer(InBinding, InSize, *this);
+}
+
+SharedObjectPtr<StorageBuffer> VulkanAPI::CreateStorageBuffer(uint32_t InBinding, size_t InSize) {
+    return new VulkanStorageBuffer(InBinding, InSize, *this);
 }

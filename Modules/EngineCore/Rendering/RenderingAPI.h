@@ -14,7 +14,6 @@ public:
     void DrawIndexed(uint32_t InIndexCount, uint32_t InFirstIndex, int32_t InVertexOffset);
 
     virtual void Initialize() = 0;
-    virtual void UpdateUniformData() = 0;
     virtual void Draw() = 0;
     virtual void CleanUp(bool InShouldDestroy) = 0;
 
@@ -23,6 +22,8 @@ public:
     virtual SharedObjectPtr<class Shader> CreateShader(const String& InShaderSource) = 0;
     virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) = 0;
     virtual void InvalidateAllPipelines() = 0;
+    virtual SharedObjectPtr<class UniformBuffer> CreateUniformBuffer(uint32_t InBinding, size_t InSize) = 0;
+    virtual SharedObjectPtr<class StorageBuffer> CreateStorageBuffer(uint32_t InBinding, size_t InSize) = 0;
 
 private:
     inline static RenderingAPI* s_Instance = nullptr;

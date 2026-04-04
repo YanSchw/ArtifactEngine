@@ -1,5 +1,6 @@
 #include "VulkanPipeline.h"
 #include "VulkanShader.h"
+#include "VulkanBuffer.h"
 #include "Core/Platform.h"
 #include "Platform/Subprocess.h"
 #include "Platform/FileIO.h"
@@ -15,11 +16,6 @@ extern std::vector<VkImage> swapChainImages;
 extern std::vector<VkImageView> swapChainImageViews;
 extern std::vector<VkFramebuffer> swapChainFramebuffers;
 extern VkRenderPass renderPass;
-
-extern struct {
-    glm::mat4 transformationMatrix;
-} uniformBufferData;
-extern VkBuffer uniformBuffer;
 
 VulkanPipeline::VulkanPipeline(const PipelineDesc& InPipelineDesc, VulkanAPI& InVulkanAPI) {
     s_Pipelines.Add(this);
@@ -246,20 +242,30 @@ void VulkanPipeline::CreateDescriptorSet() {
     }
 
     // Update descriptor set with uniform binding
-    VkDescriptorBufferInfo descriptorBufferInfo = {};
-    descriptorBufferInfo.buffer = uniformBuffer;
-    descriptorBufferInfo.offset = 0;
-    descriptorBufferInfo.range = sizeof(uniformBufferData);
-
-    VkWriteDescriptorSet writeDescriptorSet = {};
-    writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writeDescriptorSet.dstSet = m_DescriptorSet;
-    writeDescriptorSet.descriptorCount = 1;
-    writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-    writeDescriptorSet.dstBinding = 0;
-
-    vkUpdateDescriptorSets(m_VulkanAPI->GetDevice(), 1, &writeDescriptorSet, 0, nullptr);
+    std::vector<VkWriteDescriptorSet> writes = { };
+    for (const SharedObjectPtr<ShaderBuffer>& buffer : m_Desc.Buffers) {
+        if (VulkanUniformBuffer* vkUniformBuffer = buffer->As<VulkanUniformBuffer>()) {
+            VkWriteDescriptorSet bw = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            bw.dstSet = m_DescriptorSet;
+            bw.dstBinding = vkUniformBuffer->m_Binding;
+            bw.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            bw.descriptorCount = 1;
+            bw.pBufferInfo = &vkUniformBuffer->m_BufferInfo;
+            writes.push_back(bw);
+        } else if (VulkanStorageBuffer* vkStorageBuffer = buffer->As<VulkanStorageBuffer>()) {
+            VkWriteDescriptorSet bw = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            bw.dstSet = m_DescriptorSet;
+            bw.dstBinding = vkStorageBuffer->m_Binding;
+            bw.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bw.descriptorCount = 1;
+            bw.pBufferInfo = &vkStorageBuffer->m_BufferInfo;
+            writes.push_back(bw);
+        } else {
+            AE_ERROR("unsupported buffer type in pipeline descriptor set");
+            exit(1);
+        }
+    }
+    vkUpdateDescriptorSets(m_VulkanAPI->GetDevice(), (uint32_t)writes.size(), writes.data(), 0, nullptr);
 }
 
 PipelineDesc VulkanPipeline::GetDesc() const {
