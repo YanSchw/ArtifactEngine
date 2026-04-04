@@ -4,8 +4,13 @@
 #include <vector>
 
 enum class RenderCommandType {
+    BindPipeline,
     BindVertexBuffer,
     DrawIndexed
+};
+
+struct CmdBindPipeline {
+    WeakObjectPtr<class Pipeline> Pipeline;
 };
 
 struct CmdBindVertexBuffer {
@@ -19,6 +24,7 @@ struct CmdDrawIndexed {
 };
 
 using RenderCommandData = std::variant<
+    CmdBindPipeline,
     CmdBindVertexBuffer,
     CmdDrawIndexed
 >;

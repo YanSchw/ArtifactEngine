@@ -6,3 +6,6 @@
 #include "Core/Log.h"
 
 #include "Common/Types.h"
+#include "Common/Array.h"
+#include "Common/Map.h"
+#include "Common/String.h"

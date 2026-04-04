@@ -27,9 +27,7 @@ public:
     static void CreateRenderPass();
     static void CreateImageViews();
     static void CreateFramebuffers();
-    static void CreateGraphicsPipeline();
     static void CreateDescriptorPool();
-    static void CreateDescriptorSet();
     static void CreateCommandBuffers();
     static void UpdateCommandBuffer(size_t i);
 
@@ -44,10 +42,14 @@ public:
 
     VkDevice GetDevice() const;
     VkCommandPool GetCommandPool() const;
+    VkDescriptorPool GetDescriptorPool() const;
     VkQueue GetGraphicsQueue() const;
 
     virtual class RenderCommandQueue& GetRenderQueue() override;
     virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) override;
+    virtual SharedObjectPtr<class Shader> CreateShader(const String& InShaderSource) override;
+    virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) override;
+    virtual void InvalidateAllPipelines() override;
 
     RenderCommandQueue m_RenderQueue;
 };
