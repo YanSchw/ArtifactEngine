@@ -2,7 +2,7 @@
 
 #include "Log.h"
 #include "Engine.h"
-#include "Platform.h"
+#include "Platform/Platform.h"
 #include "Common/Types.h"
 #include "Common/Version.h"
 #include "Core/Pointer.h"

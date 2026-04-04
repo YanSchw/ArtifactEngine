@@ -1,4 +1,4 @@
-#include "Core/Platform.h"
+#include "Platform/Platform.h"
 
 PlatformType Platform::CurrentPlatform() {
     return PlatformType::MacOS;

@@ -1,5 +1,4 @@
 #include "VulkanBuffer.h"
-#include "Core/Platform.h"
 
 static Array<VulkanUniformBuffer*> s_UniformBuffers;
 static Array<VulkanStorageBuffer*> s_StorageBuffers;

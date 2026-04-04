@@ -1,9 +1,6 @@
 #include "VulkanPipeline.h"
 #include "VulkanShader.h"
 #include "VulkanBuffer.h"
-#include "Core/Platform.h"
-#include "Platform/Subprocess.h"
-#include "Platform/FileIO.h"
 
 static Array<VulkanPipeline*> s_Pipelines;
 

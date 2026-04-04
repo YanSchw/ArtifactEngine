@@ -1,6 +1,6 @@
 #include "EditorEngine.h"
 #include "CoreMinimal.h"
-#include "Core/Platform.h"
+#include "Platform/Platform.h"
 #include "Platform/FileIO.h"
 
 #include "Window.h"
