@@ -1,9 +1,11 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Vertex.h"
 #include "Pipeline.gen.h"
 
 struct PipelineDesc {
     SharedObjectPtr<class Shader> Shader;
+    Array<ShaderDataType> VertexLayout = Vertex::GetLayout();
 };
 
 class Pipeline : public Object {

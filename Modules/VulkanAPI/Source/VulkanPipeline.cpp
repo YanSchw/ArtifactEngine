@@ -15,8 +15,6 @@ extern std::vector<VkImage> swapChainImages;
 extern std::vector<VkImageView> swapChainImageViews;
 extern std::vector<VkFramebuffer> swapChainFramebuffers;
 extern VkRenderPass renderPass;
-extern VkVertexInputBindingDescription vertexBindingDescription;
-extern std::vector<VkVertexInputAttributeDescription> vertexAttributeDescriptions;
 
 extern struct {
     glm::mat4 transformationMatrix;
@@ -59,12 +57,13 @@ void VulkanPipeline::Invalidate() {
     VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderCreateInfo, fragmentShaderCreateInfo };
 
     // Describe vertex input
+    CreateVertexDescriptions();
     VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
     vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-    vertexInputCreateInfo.pVertexBindingDescriptions = &vertexBindingDescription;
-    vertexInputCreateInfo.vertexAttributeDescriptionCount = 2;
-    vertexInputCreateInfo.pVertexAttributeDescriptions = vertexAttributeDescriptions.data();
+    vertexInputCreateInfo.pVertexBindingDescriptions = &m_VertexBindingDescription;
+    vertexInputCreateInfo.vertexAttributeDescriptionCount = m_Desc.VertexLayout.Size();
+    vertexInputCreateInfo.pVertexAttributeDescriptions = m_VertexAttributeDescriptions.data();
 
     // Describe input assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo = {};
@@ -203,6 +202,32 @@ void VulkanPipeline::Invalidate() {
     }
 
     CreateDescriptorSet();
+}
+
+void VulkanPipeline::CreateVertexDescriptions() {
+    // attribute descriptions
+    m_VertexAttributeDescriptions.clear();
+    size_t offset = 0;
+    for (size_t i = 0; i < m_Desc.VertexLayout.Size(); i++) {
+        ShaderDataType type = m_Desc.VertexLayout[i];
+        if (type == ShaderDataType::Float3) {
+            VkVertexInputAttributeDescription attributeDescription = {};
+            attributeDescription.binding = 0;
+            attributeDescription.location = (uint32_t)i;
+            attributeDescription.format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributeDescription.offset = offset;
+            m_VertexAttributeDescriptions.push_back(attributeDescription);
+            offset += sizeof(float) * 3;
+        } else {
+            AE_ERROR("unsupported vertex attribute type in pipeline vertex layout");
+            exit(1);
+        }
+    }
+
+    // Binding
+    m_VertexBindingDescription.binding = 0;
+    m_VertexBindingDescription.stride = offset;
+    m_VertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 }
 
 void VulkanPipeline::CreateDescriptorSet() {

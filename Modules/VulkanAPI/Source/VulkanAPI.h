@@ -21,7 +21,6 @@ public:
     static void CreateLogicalDevice();
     static void CreateSemaphores();
     static void CreateCommandPool();
-    static void CreateVertexDescriptions();
     static void CreateUniformBuffer();
     static void CreateSwapChain();
     static void CreateRenderPass();

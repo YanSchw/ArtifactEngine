@@ -15,6 +15,7 @@ public:
     virtual void Invalidate() override;
     virtual PipelineDesc GetDesc() const override;
 
+    void CreateVertexDescriptions();
     void CreateDescriptorSet();
     void Destroy();
 
@@ -28,6 +29,9 @@ private:
     VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout m_DescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
+
+    VkVertexInputBindingDescription m_VertexBindingDescription;
+    std::vector<VkVertexInputAttributeDescription> m_VertexAttributeDescriptions;
 
     friend class VulkanAPI;
 };

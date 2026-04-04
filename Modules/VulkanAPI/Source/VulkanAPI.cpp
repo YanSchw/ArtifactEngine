@@ -54,9 +54,6 @@ static VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
 static VkSemaphore imageAvailableSemaphore;
 static VkSemaphore renderingFinishedSemaphore;
 
-VkVertexInputBindingDescription vertexBindingDescription;
-std::vector<VkVertexInputAttributeDescription> vertexAttributeDescriptions;
-
 struct {
     glm::mat4 transformationMatrix;
 } uniformBufferData;
@@ -148,7 +145,6 @@ void VulkanAPI::Initialize() {
     VulkanAPI::CreateLogicalDevice();
     VulkanAPI::CreateSemaphores();
     VulkanAPI::CreateCommandPool();
-    VulkanAPI::CreateVertexDescriptions();
     VulkanAPI::CreateUniformBuffer();
     VulkanAPI::CreateSwapChain();
     VulkanAPI::CreateRenderPass();
@@ -513,25 +509,6 @@ void VulkanAPI::CreateCommandPool() {
     }
 }
 
-void VulkanAPI::CreateVertexDescriptions() {
-    // Binding and attribute descriptions
-    vertexBindingDescription.binding = 0;
-    vertexBindingDescription.stride = sizeof(Vertex);
-    vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    // vec2 position
-    vertexAttributeDescriptions.resize(2);
-    vertexAttributeDescriptions[0].binding = 0;
-    vertexAttributeDescriptions[0].location = 0;
-    vertexAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-
-    // vec3 color
-    vertexAttributeDescriptions[1].binding = 0;
-    vertexAttributeDescriptions[1].location = 1;
-    vertexAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    vertexAttributeDescriptions[1].offset = sizeof(float) * 3;
-}
-
 void VulkanAPI::CreateUniformBuffer() {
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -791,13 +768,13 @@ void VulkanAPI::CreateDescriptorPool() {
     // This describes how many descriptor sets we'll create from this pool for each type
     VkDescriptorPoolSize typeCount;
     typeCount.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    typeCount.descriptorCount = 1;
+    typeCount.descriptorCount = 100; // total UBO bindings across all sets
 
     VkDescriptorPoolCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     createInfo.poolSizeCount = 1;
     createInfo.pPoolSizes = &typeCount;
-    createInfo.maxSets = 1;
+    createInfo.maxSets = 100; // number of descriptor sets
 
     if (vkCreateDescriptorPool(device, &createInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         AE_ERROR("failed to create descriptor pool");

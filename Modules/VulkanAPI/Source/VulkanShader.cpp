@@ -21,6 +21,11 @@ VkShaderModule CreateShaderModule(const ByteString& InShaderBytes, VulkanAPI& In
 }
 
 VulkanShader::VulkanShader(const String& InShaderSource, VulkanAPI& InVulkanAPI) {
+    if (InShaderSource.empty()) {
+        AE_ERROR("cannot create shader from empty source");
+        return;
+    }
+
     s_Shaders.Add(this);
     m_VulkanAPI = &InVulkanAPI;
     
