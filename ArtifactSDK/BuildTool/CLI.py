@@ -24,7 +24,12 @@ def cmd_run(args):
     args.target = get_current_platform().name
     cmd_build(args)  # Ensure the engine is built before running
     project_path = os.getcwd()
-    subprocess.run([f"{project_path}/Binaries/Artifact"], check=True)
+    try:
+        subprocess.run([f"{project_path}/Binaries/Artifact"], check=True)
+    except KeyboardInterrupt:
+        pass  # Allow graceful exit on Ctrl+C
+    except subprocess.CalledProcessError as e:
+        print(f"Error occurred while running the engine: {e}")
 
 def cmd_cook(args):
     print("Cooking assets not yet implemented")
