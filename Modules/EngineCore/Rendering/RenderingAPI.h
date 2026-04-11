@@ -24,6 +24,10 @@ public:
     virtual void InvalidateAllPipelines() = 0;
     virtual SharedObjectPtr<class UniformBuffer> CreateUniformBuffer(uint32_t InBinding, size_t InSize) = 0;
     virtual SharedObjectPtr<class StorageBuffer> CreateStorageBuffer(uint32_t InBinding, size_t InSize) = 0;
+    virtual SharedObjectPtr<class Image> CreateImage(const struct ImageDesc& InImageDesc) = 0;
+    virtual SharedObjectPtr<class ImageView> CreateImageView(const struct ImageViewDesc& InImageViewDesc) = 0;
+    virtual SharedObjectPtr<class Texture> CreateTexture(const String& InFilePath, const struct TextureDesc& InTextureDesc) = 0;
+    virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) = 0;
 
 private:
     inline static RenderingAPI* s_Instance = nullptr;

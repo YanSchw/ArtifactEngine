@@ -19,6 +19,9 @@
 #include "VulkanShader.h"
 #include "VulkanBuffer.h"
 #include "VulkanPipeline.h"
+#include "VulkanImage.h"
+#include "VulkanTexture.h"
+#include "VulkanFrameBuffer.h"
 
 #if defined(__APPLE__)
 #include <vulkan/vulkan_macos.h>
@@ -65,8 +68,6 @@ std::vector<VkImage> swapChainImages;
 std::vector<VkImageView> swapChainImageViews;
 std::vector<VkFramebuffer> swapChainFramebuffers;
  
-VkRenderPass renderPass;
- 
 static VkCommandPool commandPool;
 static std::vector<VkCommandBuffer> graphicsCommandBuffers;
  
@@ -85,6 +86,19 @@ VkBool32 GetMemoryType(uint32_t typeBits, VkFlags properties, uint32_t* typeInde
         typeBits >>= 1;
     }
     return false;
+}
+
+uint32_t VulkanAPI::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
 }
 
 VkSurfaceFormatKHR ChooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
@@ -142,9 +156,7 @@ void VulkanAPI::Initialize() {
     VulkanAPI::CreateSemaphores();
     VulkanAPI::CreateCommandPool();
     VulkanAPI::CreateSwapChain();
-    VulkanAPI::CreateRenderPass();
     VulkanAPI::CreateImageViews();
-    VulkanAPI::CreateFramebuffers();
     VulkanAPI::CreateDescriptorPool();
     VulkanAPI::CreateCommandBuffers();
 }
@@ -154,10 +166,7 @@ void VulkanAPI::CleanUp(bool fullClean) {
 
     vkFreeCommandBuffers(device, commandPool, (uint32_t)graphicsCommandBuffers.size(), graphicsCommandBuffers.data());
 
-    vkDestroyRenderPass(device, renderPass, nullptr);
-
     for (size_t i = 0; i < swapChainImages.size(); i++) {
-        vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
         vkDestroyImageView(device, swapChainImageViews[i], nullptr);
     }
 
@@ -170,6 +179,8 @@ void VulkanAPI::CleanUp(bool fullClean) {
         VulkanPipeline::DestroyAll();
         VulkanShader::DestroyAll();
         
+        VulkanTexture::DestroyAll();
+
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
         VulkanUniformBuffer::DestroyAll();
         VulkanStorageBuffer::DestroyAll();
@@ -200,7 +211,7 @@ void VulkanAPI::CreateInstance() {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "ClearScreenEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_2;
+    appInfo.apiVersion = VK_API_VERSION_1_3;
 
     // Get instance extensions required by GLFW to draw to window
     unsigned int glfwExtensionCount;
@@ -427,9 +438,9 @@ void VulkanAPI::CreateLogicalDevice() {
     enabledFeatures.shaderCullDistance = VK_TRUE;
 #endif
 
-    const char* deviceExtensions = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-    deviceCreateInfo.enabledExtensionCount = 1;
-    deviceCreateInfo.ppEnabledExtensionNames = &deviceExtensions;
+    const char* deviceExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME };
+    deviceCreateInfo.enabledExtensionCount = 2;
+    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
     deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
 
     if (ENABLE_DEBUGGING) {
@@ -586,8 +597,7 @@ void VulkanAPI::CreateSwapChain() {
     if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
         AE_ERROR("failed to create swap chain");
         exit(1);
-    }
-    else {
+    } else {
         AE_INFO("created swap chain");
     }
 
@@ -617,47 +627,6 @@ void VulkanAPI::CreateSwapChain() {
     AE_INFO("acquired swap chain images");
 }
 
-void VulkanAPI::CreateRenderPass() {
-    VkAttachmentDescription attachmentDescription = {};
-    attachmentDescription.format = swapChainFormat;
-    attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    // Note: hardware will automatically transition attachment to the specified layout
-    // Note: index refers to attachment descriptions array
-    VkAttachmentReference colorAttachmentReference = {};
-    colorAttachmentReference.attachment = 0;
-    colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    // Note: this is a description of how the attachments of the render pass will be used in this sub pass
-    // e.g. if they will be read in shaders and/or drawn to
-    VkSubpassDescription subPassDescription = {};
-    subPassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subPassDescription.colorAttachmentCount = 1;
-    subPassDescription.pColorAttachments = &colorAttachmentReference;
-
-    // Create the render pass
-    VkRenderPassCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    createInfo.attachmentCount = 1;
-    createInfo.pAttachments = &attachmentDescription;
-    createInfo.subpassCount = 1;
-    createInfo.pSubpasses = &subPassDescription;
-
-    if (vkCreateRenderPass(device, &createInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        AE_ERROR("failed to create render pass");
-        exit(1);
-    }
-    else {
-        AE_INFO("created render pass");
-    }
-}
-
 void VulkanAPI::CreateImageViews() {
     swapChainImageViews.resize(swapChainImages.size());
 
@@ -685,30 +654,6 @@ void VulkanAPI::CreateImageViews() {
     }
 
     AE_INFO("created image views for swap chain images");
-}
-
-void VulkanAPI::CreateFramebuffers() {
-    swapChainFramebuffers.resize(swapChainImages.size());
-
-    // Note: Framebuffer is basically a specific choice of attachments for a render pass
-    // That means all attachments must have the same dimensions, interesting restriction
-    for (size_t i = 0; i < swapChainImages.size(); i++) {
-        VkFramebufferCreateInfo createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        createInfo.renderPass = renderPass;
-        createInfo.attachmentCount = 1;
-        createInfo.pAttachments = &swapChainImageViews[i];
-        createInfo.width = swapChainExtent.width;
-        createInfo.height = swapChainExtent.height;
-        createInfo.layers = 1;
-
-        if (vkCreateFramebuffer(device, &createInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
-            AE_ERROR("failed to create framebuffer for swap chain image view #{0}", i);
-            exit(1);
-        }
-    }
-
-    AE_INFO("created framebuffers for swap chain image views");
 }
 
 void VulkanAPI::CreateDescriptorPool() {
@@ -791,28 +736,29 @@ void VulkanAPI::UpdateCommandBuffer(size_t i) {
 
     vkCmdPipelineBarrier(graphicsCommandBuffers[i], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
 
-    // Begin render pass
-    VkClearValue clearColor = {
-        { 0.1f, 0.1f, 0.1f, 1.0f } // R, G, B, A
-    };
+    // Begin dynamic rendering
+    VkRenderingAttachmentInfo colorAttachment{};
+    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachment.imageView = swapChainImageViews[i];
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.clearValue = { 0.1f, 0.1f, 0.1f, 1.0f };
 
-    VkRenderPassBeginInfo renderPassBeginInfo = {};
-    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBeginInfo.renderPass = renderPass;
-    renderPassBeginInfo.framebuffer = swapChainFramebuffers[i];
-    renderPassBeginInfo.renderArea.offset.x = 0;
-    renderPassBeginInfo.renderArea.offset.y = 0;
-    renderPassBeginInfo.renderArea.extent = swapChainExtent;
-    renderPassBeginInfo.clearValueCount = 1;
-    renderPassBeginInfo.pClearValues = &clearColor;
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderingInfo.renderArea = { 0, 0, swapChainExtent.width, swapChainExtent.height };
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachment;
 
-    vkCmdBeginRenderPass(graphicsCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRendering(graphicsCommandBuffers[i], &renderingInfo);
 
     // Record the render commands using RenderCommandQueue
     VulkanAPI::Get().RecordCommandBuffer(VulkanAPI::Get().GetRenderQueue(), graphicsCommandBuffers[i]);
 
-    // End render pass
-    vkCmdEndRenderPass(graphicsCommandBuffers[i]);
+    // End rendering
+    vkCmdEndRendering(graphicsCommandBuffers[i]);
 
     // Barrier if present and graphics queue families differ
     if (presentQueueFamily != graphicsQueueFamily) {
@@ -848,9 +794,7 @@ void VulkanAPI::OnWindowSizeChanged() {
     RenderingAPI::GetInstance()->CleanUp(false);
 
     VulkanAPI::CreateSwapChain();
-    VulkanAPI::CreateRenderPass();
     VulkanAPI::CreateImageViews();
-    VulkanAPI::CreateFramebuffers();
     Pipeline::InvalidateAll();
     VulkanAPI::CreateCommandBuffers();
 }
@@ -1006,4 +950,20 @@ SharedObjectPtr<UniformBuffer> VulkanAPI::CreateUniformBuffer(uint32_t InBinding
 
 SharedObjectPtr<StorageBuffer> VulkanAPI::CreateStorageBuffer(uint32_t InBinding, size_t InSize) {
     return new VulkanStorageBuffer(InBinding, InSize, *this);
+}
+
+SharedObjectPtr<Image> VulkanAPI::CreateImage(const ImageDesc& InImageDesc) {
+    return new VulkanImage(InImageDesc, *this);
+}
+
+SharedObjectPtr<ImageView> VulkanAPI::CreateImageView(const ImageViewDesc& InImageViewDesc) {
+    return new VulkanImageView(InImageViewDesc, *this);
+}
+
+SharedObjectPtr<Texture> VulkanAPI::CreateTexture(const String& InFilePath, const TextureDesc& InTextureDesc) {
+    return new VulkanTexture(InFilePath, InTextureDesc, *this);
+}
+
+SharedObjectPtr<FrameBuffer> VulkanAPI::CreateFrameBuffer(const FrameBufferDesc& InFrameBufferDesc) {
+    return new VulkanFrameBuffer(InFrameBufferDesc, *this);
 }

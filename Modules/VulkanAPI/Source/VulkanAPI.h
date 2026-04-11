@@ -22,9 +22,7 @@ public:
     static void CreateSemaphores();
     static void CreateCommandPool();
     static void CreateSwapChain();
-    static void CreateRenderPass();
     static void CreateImageViews();
-    static void CreateFramebuffers();
     static void CreateDescriptorPool();
     static void CreateCommandBuffers();
     static void UpdateCommandBuffer(size_t i);
@@ -42,6 +40,8 @@ public:
     VkDescriptorPool GetDescriptorPool() const;
     VkQueue GetGraphicsQueue() const;
 
+    uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
     virtual class RenderCommandQueue& GetRenderQueue() override;
     virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) override;
     virtual SharedObjectPtr<class Shader> CreateShader(const String& InShaderSource) override;
@@ -49,6 +49,10 @@ public:
     virtual void InvalidateAllPipelines() override;
     virtual SharedObjectPtr<class UniformBuffer> CreateUniformBuffer(uint32_t InBinding, size_t InSize) override;
     virtual SharedObjectPtr<class StorageBuffer> CreateStorageBuffer(uint32_t InBinding, size_t InSize) override;
+    virtual SharedObjectPtr<class Image> CreateImage(const struct ImageDesc& InImageDesc) override;
+    virtual SharedObjectPtr<class ImageView> CreateImageView(const struct ImageViewDesc& InImageViewDesc) override;
+    virtual SharedObjectPtr<class Texture> CreateTexture(const String& InFilePath, const TextureDesc& InTextureDesc) override;
+    virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) override;
 
     RenderCommandQueue m_RenderQueue;
 };

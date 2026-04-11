@@ -1,6 +1,8 @@
 #include "VulkanPipeline.h"
 #include "VulkanShader.h"
 #include "VulkanBuffer.h"
+#include "VulkanTexture.h"
+#include "VulkanImage.h"
 
 static Array<VulkanPipeline*> s_Pipelines;
 
@@ -137,6 +139,7 @@ void VulkanPipeline::Invalidate() {
     colorBlendCreateInfo.blendConstants[2] = 0.0f;
     colorBlendCreateInfo.blendConstants[3] = 0.0f;
 
+    /*
     // Describe pipeline layout
     // Note: this describes the mapping between memory and shader resources (descriptor sets)
     // This is for uniform buffers and samplers
@@ -156,7 +159,8 @@ void VulkanPipeline::Invalidate() {
         exit(1);
     } else {
         AE_INFO("created descriptor layout");
-    }
+    } */
+    CreateDescriptorSetLayout();
 
     VkPipelineLayoutCreateInfo layoutCreateInfo = {};
     layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -171,8 +175,14 @@ void VulkanPipeline::Invalidate() {
     }
 
     // Create the graphics pipeline
+    VkPipelineRenderingCreateInfo renderingCreateInfo = {};
+    renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    renderingCreateInfo.colorAttachmentCount = 1;
+    renderingCreateInfo.pColorAttachmentFormats = &swapChainFormat;
+
     VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
     pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineCreateInfo.pNext = &renderingCreateInfo;
     pipelineCreateInfo.stageCount = 2;
     pipelineCreateInfo.pStages = shaderStages;
     pipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;
@@ -182,7 +192,7 @@ void VulkanPipeline::Invalidate() {
     pipelineCreateInfo.pMultisampleState = &multisampleCreateInfo;
     pipelineCreateInfo.pColorBlendState = &colorBlendCreateInfo;
     pipelineCreateInfo.layout = m_PipelineLayout;
-    pipelineCreateInfo.renderPass = renderPass;
+    pipelineCreateInfo.renderPass = VK_NULL_HANDLE;
     pipelineCreateInfo.subpass = 0;
     pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineCreateInfo.basePipelineIndex = -1;
@@ -211,6 +221,14 @@ void VulkanPipeline::CreateVertexDescriptions() {
             attributeDescription.offset = offset;
             m_VertexAttributeDescriptions.push_back(attributeDescription);
             offset += sizeof(float) * 3;
+        } else if (type == ShaderDataType::Float2) {
+            VkVertexInputAttributeDescription attributeDescription = {};
+            attributeDescription.binding = 0;
+            attributeDescription.location = (uint32_t)i;
+            attributeDescription.format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescription.offset = offset;
+            m_VertexAttributeDescriptions.push_back(attributeDescription);
+            offset += sizeof(float) * 2;
         } else {
             AE_ERROR("unsupported vertex attribute type in pipeline vertex layout");
             exit(1);
@@ -221,6 +239,59 @@ void VulkanPipeline::CreateVertexDescriptions() {
     m_VertexBindingDescription.binding = 0;
     m_VertexBindingDescription.stride = offset;
     m_VertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+}
+
+
+void VulkanPipeline::CreateDescriptorSetLayout() {
+    // Describe pipeline layout
+    // Note: this describes the mapping between memory and shader resources (descriptor sets)
+    // This is for uniform buffers and samplers
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+    for (const SharedObjectPtr<ShaderBuffer>& buffer : m_Desc.Buffers) {
+        if (VulkanUniformBuffer* vkUniformBuffer = buffer->As<VulkanUniformBuffer>()) {
+            VkDescriptorSetLayoutBinding layoutBinding = {};
+            layoutBinding.binding = vkUniformBuffer->m_Binding;
+            layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            layoutBinding.descriptorCount = 1;
+            layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            layoutBindings.push_back(layoutBinding);
+        } else if (VulkanStorageBuffer* vkStorageBuffer = buffer->As<VulkanStorageBuffer>()) {
+            VkDescriptorSetLayoutBinding layoutBinding = {};
+            layoutBinding.binding = vkStorageBuffer->m_Binding;
+            layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            layoutBinding.descriptorCount = 1;
+            layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            layoutBindings.push_back(layoutBinding);
+        } else {
+            AE_ERROR("unsupported buffer type in pipeline descriptor set");
+            exit(1);
+        }
+    }
+    for (const auto& [binding, texture] : m_Desc.TextureBindings) {
+        if (VulkanTexture* vkTexture = texture->As<VulkanTexture>()) {
+            VkDescriptorSetLayoutBinding layoutBinding = {};
+            layoutBinding.binding = binding;
+            layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            layoutBinding.descriptorCount = 1;
+            layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            layoutBindings.push_back(layoutBinding);
+        } else {
+            AE_ERROR("unsupported texture type in pipeline descriptor set");
+            exit(1);
+        }
+    }
+
+    VkDescriptorSetLayoutCreateInfo descriptorLayoutCreateInfo = {};
+    descriptorLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptorLayoutCreateInfo.bindingCount = layoutBindings.size();
+    descriptorLayoutCreateInfo.pBindings = layoutBindings.data();
+
+    if (vkCreateDescriptorSetLayout(m_VulkanAPI->GetDevice(), &descriptorLayoutCreateInfo, nullptr, &m_DescriptorSetLayout) != VK_SUCCESS) {
+        AE_ERROR("failed to create descriptor layout");
+        exit(1);
+    } else {
+        AE_INFO("created descriptor layout");
+    }
 }
 
 void VulkanPipeline::CreateDescriptorSet() {
@@ -259,6 +330,27 @@ void VulkanPipeline::CreateDescriptorSet() {
             writes.push_back(bw);
         } else {
             AE_ERROR("unsupported buffer type in pipeline descriptor set");
+            exit(1);
+        }
+    }
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    for (const auto& [binding, texture] : m_Desc.TextureBindings) {
+        if (VulkanTexture* vkTexture = texture->As<VulkanTexture>()) {
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = vkTexture->GetDefaultView()->As<VulkanImageView>()->GetVkImageView();
+            imageInfo.sampler = vkTexture->GetVkSampler();
+            imageInfos.push_back(imageInfo);
+
+            VkWriteDescriptorSet bw = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            bw.dstSet = m_DescriptorSet;
+            bw.dstBinding = binding;
+            bw.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bw.descriptorCount = 1;
+            bw.pImageInfo = &imageInfos.back();
+            writes.push_back(bw);
+        } else {
+            AE_ERROR("unsupported texture type in pipeline descriptor set");
             exit(1);
         }
     }

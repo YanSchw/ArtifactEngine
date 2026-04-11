@@ -41,7 +41,7 @@ VulkanShader::VulkanShader(const String& InShaderSource, VulkanAPI& InVulkanAPI)
             }
 
             // Compile shader to SPIR-V using glslangValidator
-            auto result = Subprocess::Run(std::format("glslangValidator -V {0} -o {1}/shader.{2}.spv", tempFilePath, tempDir.Path, shaderType));
+            auto result = Subprocess::Run(std::format("/usr/local/bin/glslangValidator -V {0} -o {1}/shader.{2}.spv", tempFilePath, tempDir.Path, shaderType));
             if (result.ExitCode != 0) {
                 AE_ERROR("failed to compile shader:\n{0}", result.StdOut);
                 return;

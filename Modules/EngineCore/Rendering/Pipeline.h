@@ -7,6 +7,7 @@ struct PipelineDesc {
     SharedObjectPtr<class Shader> Shader;
     Array<ShaderDataType> VertexLayout = Vertex::GetLayout();
     Array<SharedObjectPtr<class ShaderBuffer>> Buffers;
+    Array<std::pair<uint32_t, SharedObjectPtr<class Texture>>> TextureBindings;
 };
 
 class Pipeline : public Object {

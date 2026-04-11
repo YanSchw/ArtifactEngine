@@ -16,6 +16,7 @@ public:
     virtual PipelineDesc GetDesc() const override;
 
     void CreateVertexDescriptions();
+    void CreateDescriptorSetLayout();
     void CreateDescriptorSet();
     void Destroy();
 

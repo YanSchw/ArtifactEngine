@@ -7,6 +7,7 @@
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/VertexBuffer.h"
 #include "Rendering/Shader.h"
+#include "Rendering/Texture.h"
 #include "Rendering/Buffer.h"
 #include "Rendering/Pipeline.h"
 
@@ -16,6 +17,7 @@ SharedObjectPtr<VertexBuffer> s_VertexBuffer1;
 SharedObjectPtr<VertexBuffer> s_VertexBuffer2;
 
 SharedObjectPtr<Shader> s_Shader;
+SharedObjectPtr<Texture> s_Texture;
 SharedObjectPtr<UniformBuffer> s_UniformBuffer;
 SharedObjectPtr<Pipeline> s_Pipeline;
 
@@ -56,23 +58,28 @@ void EditorEngine::Initialize() {
     RenderingAPI::GetInstance()->Initialize();
 
     Array<Vertex> vertices1 = {
-        { { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f } },
-        { { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f } },
-        { {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f } }
+        { { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
+        { { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
+        { {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } }
     };
     s_VertexBuffer1 = VertexBuffer::Create(vertices1, { 0, 1, 2 });
     Array<Vertex> vertices2 = {
-        { { -0.5f, -0.5f,  -1.0f }, { 1.0f, 0.0f, 0.0f } },
-        { { -0.5f,  0.5f,  -1.0f }, { 0.0f, 1.0f, 0.0f } },
-        { {  0.5f,  0.5f,  -1.0f }, { 0.0f, 0.0f, 1.0f } }
+        { { -0.5f, -0.5f,  -1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
+        { { -0.5f,  0.5f,  -1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
+        { {  0.5f,  0.5f,  -1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } }
     };
     s_VertexBuffer2 = VertexBuffer::Create(vertices2, { 0, 1, 2 });
 
     s_Shader = Shader::Create(FileIO::ReadFileToString("/Users/yannick/Developer/ArtifactEngine/Content/Shaders/Shader.glsl"));
+    TextureDesc textureDesc;
+    textureDesc.MagFilter = FilterMode::Nearest;
+    textureDesc.MinFilter = FilterMode::Nearest;
+    s_Texture = Texture::Create("/Users/yannick/Developer/ArtifactEngine/Content/Textures/Checkerboard.png", textureDesc);
     s_UniformBuffer = UniformBuffer::Create(0, sizeof(uniformBufferData));
     PipelineDesc pipelineDesc;
     pipelineDesc.Shader = s_Shader;
     pipelineDesc.Buffers.Add(s_UniformBuffer);
+    pipelineDesc.TextureBindings.Add({ 16, s_Texture });
     s_Pipeline = Pipeline::Create(pipelineDesc);
 }
 

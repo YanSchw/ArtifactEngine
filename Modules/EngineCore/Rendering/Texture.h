@@ -1,0 +1,53 @@
+#pragma once
+#include "Core/Object.h"
+#include "Core/Pointer.h"
+#include "Common/Types.h"
+#include "Image.h"
+#include "Texture.gen.h"
+
+enum class FilterMode {
+    Nearest,
+    Linear
+};
+
+enum class AddressMode {
+    Repeat,
+    Clamp,
+    Mirror
+};
+
+enum class TextureType {
+    Texture2D,
+    TextureCube
+};
+
+struct TextureDesc {
+    TextureType Type = TextureType::Texture2D;
+
+    uint32_t Width = 1;
+    uint32_t Height = 1;
+
+    ImageFormat Format = ImageFormat::RGBA8;
+    ImageUsage Usage = ImageUsage::Sampled;
+
+    bool GenerateMips = true;
+
+    // Sampler settings
+    FilterMode MinFilter = FilterMode::Linear;
+    FilterMode MagFilter = FilterMode::Linear;
+
+    AddressMode AddressU = AddressMode::Repeat;
+    AddressMode AddressV = AddressMode::Repeat;
+    AddressMode AddressW = AddressMode::Repeat;
+};
+
+class Texture : public Object {
+public:
+    ARTIFACT_CLASS();
+    virtual ~Texture() = default;
+
+    virtual SharedObjectPtr<Image> GetImage() const = 0;
+    virtual SharedObjectPtr<ImageView> GetDefaultView() const = 0;
+
+    static SharedObjectPtr<Texture> Create(const String& InFilePath, const TextureDesc& InTextureDesc = TextureDesc());
+};
