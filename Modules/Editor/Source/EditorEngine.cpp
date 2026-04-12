@@ -8,6 +8,7 @@
 #include "Rendering/VertexBuffer.h"
 #include "Rendering/Shader.h"
 #include "Rendering/Texture.h"
+#include "Rendering/Sampler.h"
 #include "Rendering/Buffer.h"
 #include "Rendering/Pipeline.h"
 
@@ -71,15 +72,16 @@ void EditorEngine::Initialize() {
     s_VertexBuffer2 = VertexBuffer::Create(vertices2, { 0, 1, 2 });
 
     s_Shader = Shader::Create(FileIO::ReadFileToString("/Users/yannick/Developer/ArtifactEngine/Content/Shaders/Shader.glsl"));
-    TextureDesc textureDesc;
-    textureDesc.MagFilter = FilterMode::Nearest;
-    textureDesc.MinFilter = FilterMode::Nearest;
-    s_Texture = Texture::Create("/Users/yannick/Developer/ArtifactEngine/Content/Textures/Checkerboard.png", textureDesc);
+    SamplerDesc samplerDesc;
+    samplerDesc.MagFilter = FilterMode::Nearest;
+    samplerDesc.MinFilter = FilterMode::Nearest;
+    s_Texture = Texture::Create("/Users/yannick/Developer/ArtifactEngine/Content/Textures/Checkerboard.png");
+    auto sampler = Sampler::Create(samplerDesc);
     s_UniformBuffer = UniformBuffer::Create(0, sizeof(uniformBufferData));
     PipelineDesc pipelineDesc;
     pipelineDesc.Shader = s_Shader;
     pipelineDesc.Buffers.Add(s_UniformBuffer);
-    pipelineDesc.TextureBindings.Add({ 16, s_Texture });
+    pipelineDesc.ImageBindings.Add({ 16, s_Texture->GetDefaultView(), sampler });
     s_Pipeline = Pipeline::Create(pipelineDesc);
 }
 

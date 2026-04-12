@@ -21,6 +21,7 @@
 #include "VulkanPipeline.h"
 #include "VulkanImage.h"
 #include "VulkanTexture.h"
+#include "VulkanSampler.h"
 #include "VulkanFrameBuffer.h"
 
 #if defined(__APPLE__)
@@ -179,6 +180,7 @@ void VulkanAPI::CleanUp(bool fullClean) {
         VulkanPipeline::DestroyAll();
         VulkanShader::DestroyAll();
         
+        VulkanSampler::DestroyAll();
         VulkanTexture::DestroyAll();
 
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
@@ -962,6 +964,10 @@ SharedObjectPtr<ImageView> VulkanAPI::CreateImageView(const ImageViewDesc& InIma
 
 SharedObjectPtr<Texture> VulkanAPI::CreateTexture(const String& InFilePath, const TextureDesc& InTextureDesc) {
     return new VulkanTexture(InFilePath, InTextureDesc, *this);
+}
+
+SharedObjectPtr<Sampler> VulkanAPI::CreateSampler(const SamplerDesc& InSamplerDesc) {
+    return new VulkanSampler(InSamplerDesc, *this);
 }
 
 SharedObjectPtr<FrameBuffer> VulkanAPI::CreateFrameBuffer(const FrameBufferDesc& InFrameBufferDesc) {

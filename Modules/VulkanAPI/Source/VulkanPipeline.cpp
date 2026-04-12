@@ -2,6 +2,7 @@
 #include "VulkanShader.h"
 #include "VulkanBuffer.h"
 #include "VulkanTexture.h"
+#include "VulkanSampler.h"
 #include "VulkanImage.h"
 
 static Array<VulkanPipeline*> s_Pipelines;
@@ -267,8 +268,8 @@ void VulkanPipeline::CreateDescriptorSetLayout() {
             exit(1);
         }
     }
-    for (const auto& [binding, texture] : m_Desc.TextureBindings) {
-        if (VulkanTexture* vkTexture = texture->As<VulkanTexture>()) {
+    for (const auto& [binding, imageView, sampler] : m_Desc.ImageBindings) {
+        if (VulkanImageView* vkImageView = imageView->As<VulkanImageView>()) {
             VkDescriptorSetLayoutBinding layoutBinding = {};
             layoutBinding.binding = binding;
             layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -334,12 +335,12 @@ void VulkanPipeline::CreateDescriptorSet() {
         }
     }
     std::vector<VkDescriptorImageInfo> imageInfos;
-    for (const auto& [binding, texture] : m_Desc.TextureBindings) {
-        if (VulkanTexture* vkTexture = texture->As<VulkanTexture>()) {
+    for (const auto& [binding, imageView, sampler] : m_Desc.ImageBindings) {
+        if (VulkanImageView* vkImageView = imageView->As<VulkanImageView>()) {
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = vkTexture->GetDefaultView()->As<VulkanImageView>()->GetVkImageView();
-            imageInfo.sampler = vkTexture->GetVkSampler();
+            imageInfo.imageView = vkImageView->GetVkImageView();
+            imageInfo.sampler = sampler->As<VulkanSampler>()->GetVkSampler();
             imageInfos.push_back(imageInfo);
 
             VkWriteDescriptorSet bw = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };

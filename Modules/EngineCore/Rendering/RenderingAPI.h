@@ -27,6 +27,7 @@ public:
     virtual SharedObjectPtr<class Image> CreateImage(const struct ImageDesc& InImageDesc) = 0;
     virtual SharedObjectPtr<class ImageView> CreateImageView(const struct ImageViewDesc& InImageViewDesc) = 0;
     virtual SharedObjectPtr<class Texture> CreateTexture(const String& InFilePath, const struct TextureDesc& InTextureDesc) = 0;
+    virtual SharedObjectPtr<class Sampler> CreateSampler(const struct SamplerDesc& InSamplerDesc) = 0;
     virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) = 0;
 
 private:

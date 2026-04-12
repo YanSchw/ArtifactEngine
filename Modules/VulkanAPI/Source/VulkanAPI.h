@@ -52,6 +52,7 @@ public:
     virtual SharedObjectPtr<class Image> CreateImage(const struct ImageDesc& InImageDesc) override;
     virtual SharedObjectPtr<class ImageView> CreateImageView(const struct ImageViewDesc& InImageViewDesc) override;
     virtual SharedObjectPtr<class Texture> CreateTexture(const String& InFilePath, const TextureDesc& InTextureDesc) override;
+    virtual SharedObjectPtr<class Sampler> CreateSampler(const struct SamplerDesc& InSamplerDesc) override;
     virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) override;
 
     RenderCommandQueue m_RenderQueue;

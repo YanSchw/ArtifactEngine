@@ -5,17 +5,6 @@
 #include "Image.h"
 #include "Texture.gen.h"
 
-enum class FilterMode {
-    Nearest,
-    Linear
-};
-
-enum class AddressMode {
-    Repeat,
-    Clamp,
-    Mirror
-};
-
 enum class TextureType {
     Texture2D,
     TextureCube
@@ -31,14 +20,6 @@ struct TextureDesc {
     ImageUsage Usage = ImageUsage::Sampled;
 
     bool GenerateMips = true;
-
-    // Sampler settings
-    FilterMode MinFilter = FilterMode::Linear;
-    FilterMode MagFilter = FilterMode::Linear;
-
-    AddressMode AddressU = AddressMode::Repeat;
-    AddressMode AddressV = AddressMode::Repeat;
-    AddressMode AddressW = AddressMode::Repeat;
 };
 
 class Texture : public Object {

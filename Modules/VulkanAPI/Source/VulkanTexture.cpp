@@ -6,23 +6,6 @@
 
 static Array<VulkanTexture*> s_Textures;
 
-VkFilter FilterModeToVkFilter(FilterMode mode) {
-    switch (mode) {
-        case FilterMode::Nearest: return VK_FILTER_NEAREST;
-        case FilterMode::Linear: return VK_FILTER_LINEAR;
-        default: return VK_FILTER_LINEAR;
-    }
-}
-
-VkSamplerAddressMode AddressModeToVkAddressMode(AddressMode mode) {
-    switch (mode) {
-        case AddressMode::Repeat: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        case AddressMode::Clamp: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        case AddressMode::Mirror: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-        default: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    }
-}
-
 VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InTextureDesc, VulkanAPI& InVulkanAPI) {
     s_Textures.Add(this);
     m_VulkanAPI = &InVulkanAPI;
@@ -148,37 +131,10 @@ VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InText
     viewDesc.Aspect = ImageAspect::Color;
 
     m_DefaultView = SharedObjectPtr<ImageView>(new VulkanImageView(viewDesc, *m_VulkanAPI));
-
-    // Create sampler
-    VkSamplerCreateInfo samplerInfo{};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = FilterModeToVkFilter(InTextureDesc.MagFilter);
-    samplerInfo.minFilter = FilterModeToVkFilter(InTextureDesc.MinFilter);
-    samplerInfo.addressModeU = AddressModeToVkAddressMode(InTextureDesc.AddressU);
-    samplerInfo.addressModeV = AddressModeToVkAddressMode(InTextureDesc.AddressV);
-    samplerInfo.addressModeW = AddressModeToVkAddressMode(InTextureDesc.AddressW);
-    samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = 16;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f; // No mipmaps for now
-
-    if (vkCreateSampler(m_VulkanAPI->GetDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create texture sampler!");
-    }
 }
 
 VulkanTexture::~VulkanTexture() {
     s_Textures.Remove(this);
-
-    if (m_Sampler != VK_NULL_HANDLE) {
-        vkDestroySampler(m_VulkanAPI->GetDevice(), m_Sampler, nullptr);
-    }
 }
 
 SharedObjectPtr<Image> VulkanTexture::GetImage() const {
