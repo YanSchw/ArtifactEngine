@@ -2,6 +2,9 @@
 #include "VulkanAPI.h"
 #include <stdexcept>
 
+Array<VulkanImage*> s_Images;
+Array<VulkanImageView*> s_ImageViews;
+
 static VkFormat ImageFormatToVkFormat(ImageFormat format) {
     switch (format) {
     case ImageFormat::RGBA8: return VK_FORMAT_R8G8B8A8_UNORM;
@@ -26,6 +29,7 @@ static VkImageUsageFlags ImageUsageToVkImageUsage(ImageUsage usage) {
 }
 
 VulkanImage::VulkanImage(const ImageDesc& InImageDesc, VulkanAPI& InVulkanAPI) {
+    s_Images.Add(this);
     m_Desc = InImageDesc;
     m_VulkanAPI = &InVulkanAPI;
 
@@ -64,6 +68,8 @@ VulkanImage::VulkanImage(const ImageDesc& InImageDesc, VulkanAPI& InVulkanAPI) {
 }
 
 VulkanImage::~VulkanImage() {
+    s_Images.Remove(this);
+
     if (m_DeviceMemory != VK_NULL_HANDLE) {
         vkFreeMemory(m_VulkanAPI->GetDevice(), m_DeviceMemory, nullptr);
     }
@@ -94,6 +100,7 @@ static VkImageAspectFlags ImageAspectToVkImageAspect(ImageAspect aspect) {
 }
 
 VulkanImageView::VulkanImageView(const ImageViewDesc& InImageViewDesc, VulkanAPI& InVulkanAPI) {
+    s_ImageViews.Add(this);
     m_Desc = InImageViewDesc;
     m_VulkanAPI = &InVulkanAPI;
 
@@ -114,7 +121,25 @@ VulkanImageView::VulkanImageView(const ImageViewDesc& InImageViewDesc, VulkanAPI
 }
 
 VulkanImageView::~VulkanImageView() {
+    s_ImageViews.Remove(this);
+
     if (m_ImageView != VK_NULL_HANDLE) {
         vkDestroyImageView(m_VulkanAPI->GetDevice(), m_ImageView, nullptr);
     }
+}
+
+void VulkanImage::DestroyAll() {
+    Array<VulkanImage*> imagesToDestroy = s_Images;
+    for (VulkanImage* image : imagesToDestroy) {
+        delete image;
+    }
+    s_Images.Clear();
+}
+
+void VulkanImageView::DestroyAll() {
+    Array<VulkanImageView*> imageViewsToDestroy = s_ImageViews;
+    for (VulkanImageView* imageView : imageViewsToDestroy) {
+        delete imageView;
+    }
+    s_ImageViews.Clear();
 }

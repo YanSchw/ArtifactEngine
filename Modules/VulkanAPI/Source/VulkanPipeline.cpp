@@ -4,10 +4,10 @@
 #include "VulkanTexture.h"
 #include "VulkanSampler.h"
 #include "VulkanImage.h"
+#include "VulkanFrameBuffer.h"
 
 static Array<VulkanPipeline*> s_Pipelines;
 
-// FROM VulkanAPI.cpp - should be moved to a more appropriate place
 extern VkExtent2D swapChainExtent;
 extern VkFormat swapChainFormat;
 extern VkSwapchainKHR oldSwapChain;
@@ -15,7 +15,46 @@ extern VkSwapchainKHR swapChain;
 extern std::vector<VkImage> swapChainImages;
 extern std::vector<VkImageView> swapChainImageViews;
 extern std::vector<VkFramebuffer> swapChainFramebuffers;
-extern VkRenderPass renderPass;
+
+static VkFormat ImageFormatToVkFormat(ImageFormat format) {
+    switch (format) {
+    case ImageFormat::RGBA8: return VK_FORMAT_R8G8B8A8_UNORM;
+    case ImageFormat::BGRA8: return VK_FORMAT_B8G8R8A8_UNORM;
+    case ImageFormat::RGBA16F: return VK_FORMAT_R16G16B16A16_SFLOAT;
+    case ImageFormat::RGBA32F: return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case ImageFormat::Depth24Stencil8: return VK_FORMAT_D24_UNORM_S8_UINT;
+    case ImageFormat::Depth32F: return VK_FORMAT_D32_SFLOAT;
+    default: return VK_FORMAT_UNDEFINED;
+    }
+}
+
+static VkExtent2D GetPipelineTargetExtent(const PipelineDesc& InDesc) {
+    if (InDesc.IsFrameBufferTarget()) {
+        const auto& frameBuffer = InDesc.Target->As<FrameBuffer>();
+        return { frameBuffer->GetDesc().Width, frameBuffer->GetDesc().Height };
+    } else if (InDesc.IsSurfaceTarget()) {
+        return swapChainExtent;
+    } else {
+        AE_ASSERT(false, "Pipeline target must be either a FrameBuffer or a Surface");
+        return {0, 0};
+    }
+}
+
+static VkFormat GetPipelineTargetColorFormat(const PipelineDesc& InDesc) {
+    if (InDesc.IsFrameBufferTarget()) {
+        const auto& attachments = InDesc.Target->As<FrameBuffer>()->GetDesc().ColorAttachments;
+        AE_ASSERT(!attachments.IsEmpty(), "Framebuffer target must include at least one color attachment");
+        return ImageFormatToVkFormat(attachments[0]->GetDesc().Format);
+    }
+    return swapChainFormat;
+}
+
+static VkFormat GetPipelineTargetDepthFormat(const PipelineDesc& InDesc) {
+    if (InDesc.IsFrameBufferTarget() && InDesc.Target->As<FrameBuffer>()->GetDesc().DepthAttachment) {
+        return ImageFormatToVkFormat(InDesc.Target->As<FrameBuffer>()->GetDesc().DepthAttachment->GetDesc().Format);
+    }
+    return VK_FORMAT_UNDEFINED;
+}
 
 VulkanPipeline::VulkanPipeline(const PipelineDesc& InPipelineDesc, VulkanAPI& InVulkanAPI) {
     s_Pipelines.Add(this);
@@ -67,20 +106,22 @@ void VulkanPipeline::Invalidate() {
     inputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssemblyCreateInfo.primitiveRestartEnable = VK_FALSE;
 
-    // Describe viewport and scissor
+    // Describe viewport and scissor based on the pipeline target
+    VkExtent2D targetExtent = GetPipelineTargetExtent(m_Desc);
+
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = (float)swapChainExtent.width;
-    viewport.height = (float)swapChainExtent.height;
+    viewport.width = (float)targetExtent.width;
+    viewport.height = (float)targetExtent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     VkRect2D scissor = {};
     scissor.offset.x = 0;
     scissor.offset.y = 0;
-    scissor.extent.width = swapChainExtent.width;
-    scissor.extent.height = swapChainExtent.height;
+    scissor.extent.width = targetExtent.width;
+    scissor.extent.height = targetExtent.height;
 
     // Note: scissor test is always enabled (although dynamic scissor is possible)
     // Number of viewports must match number of scissors
@@ -140,27 +181,14 @@ void VulkanPipeline::Invalidate() {
     colorBlendCreateInfo.blendConstants[2] = 0.0f;
     colorBlendCreateInfo.blendConstants[3] = 0.0f;
 
-    /*
-    // Describe pipeline layout
-    // Note: this describes the mapping between memory and shader resources (descriptor sets)
-    // This is for uniform buffers and samplers
-    VkDescriptorSetLayoutBinding layoutBinding = {};
-    layoutBinding.binding = 0;
-    layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    layoutBinding.descriptorCount = 1;
-    layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
 
-    VkDescriptorSetLayoutCreateInfo descriptorLayoutCreateInfo = {};
-    descriptorLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorLayoutCreateInfo.bindingCount = 1;
-    descriptorLayoutCreateInfo.pBindings = &layoutBinding;
-
-    if (vkCreateDescriptorSetLayout(m_VulkanAPI->GetDevice(), &descriptorLayoutCreateInfo, nullptr, &m_DescriptorSetLayout) != VK_SUCCESS) {
-        AE_ERROR("failed to create descriptor layout");
-        exit(1);
-    } else {
-        AE_INFO("created descriptor layout");
-    } */
     CreateDescriptorSetLayout();
 
     VkPipelineLayoutCreateInfo layoutCreateInfo = {};
@@ -175,11 +203,15 @@ void VulkanPipeline::Invalidate() {
         AE_INFO("created pipeline layout");
     }
 
-    // Create the graphics pipeline
+    // Create the graphics pipeline with dynamic rendering
+    std::vector<VkFormat> colorAttachmentFormats;
+    colorAttachmentFormats.push_back(GetPipelineTargetColorFormat(m_Desc));
+
     VkPipelineRenderingCreateInfo renderingCreateInfo = {};
     renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    renderingCreateInfo.colorAttachmentCount = 1;
-    renderingCreateInfo.pColorAttachmentFormats = &swapChainFormat;
+    renderingCreateInfo.colorAttachmentCount = (uint32_t)colorAttachmentFormats.size();
+    renderingCreateInfo.pColorAttachmentFormats = colorAttachmentFormats.data();
+    renderingCreateInfo.depthAttachmentFormat = GetPipelineTargetDepthFormat(m_Desc);
 
     VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
     pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -192,6 +224,7 @@ void VulkanPipeline::Invalidate() {
     pipelineCreateInfo.pRasterizationState = &rasterizationCreateInfo;
     pipelineCreateInfo.pMultisampleState = &multisampleCreateInfo;
     pipelineCreateInfo.pColorBlendState = &colorBlendCreateInfo;
+    pipelineCreateInfo.pDepthStencilState = &depthStencil;
     pipelineCreateInfo.layout = m_PipelineLayout;
     pipelineCreateInfo.renderPass = VK_NULL_HANDLE;
     pipelineCreateInfo.subpass = 0;

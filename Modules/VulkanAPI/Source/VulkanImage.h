@@ -15,6 +15,8 @@ public:
     VkImage GetVkImage() const { return m_Image; }
     VkDeviceMemory GetVkDeviceMemory() const { return m_DeviceMemory; }
 
+    static void DestroyAll();
+
 private:
     VulkanAPI* m_VulkanAPI = nullptr;
     VkImage m_Image = VK_NULL_HANDLE;
@@ -31,6 +33,8 @@ public:
 
     VkImageView GetVkImageView() const { return m_ImageView; }
 
+    static void DestroyAll();
+    
 private:
     VulkanAPI* m_VulkanAPI = nullptr;
     VkImageView m_ImageView = VK_NULL_HANDLE;

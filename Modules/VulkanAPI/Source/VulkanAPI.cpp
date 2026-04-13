@@ -15,6 +15,7 @@
 #include "Window.h"
 #include "Rendering/Vertex.h"
 
+#include "Helpers.h"
 #include "VulkanVertexBuffer.h"
 #include "VulkanShader.h"
 #include "VulkanBuffer.h"
@@ -28,6 +29,17 @@
 #include <vulkan/vulkan_macos.h>
 #endif
 
+static VkFormat ImageFormatToVkFormat(ImageFormat format) {
+    switch (format) {
+    case ImageFormat::RGBA8: return VK_FORMAT_R8G8B8A8_UNORM;
+    case ImageFormat::BGRA8: return VK_FORMAT_B8G8R8A8_UNORM;
+    case ImageFormat::RGBA16F: return VK_FORMAT_R16G16B16A16_SFLOAT;
+    case ImageFormat::RGBA32F: return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case ImageFormat::Depth24Stencil8: return VK_FORMAT_D24_UNORM_S8_UINT;
+    case ImageFormat::Depth32F: return VK_FORMAT_D32_SFLOAT;
+    default: return VK_FORMAT_UNDEFINED;
+    }
+}
 
 const bool ENABLE_DEBUGGING = false;
 
@@ -179,6 +191,9 @@ void VulkanAPI::CleanUp(bool fullClean) {
 
         VulkanPipeline::DestroyAll();
         VulkanShader::DestroyAll();
+
+        VulkanImageView::DestroyAll();
+        VulkanImage::DestroyAll();
         
         VulkanSampler::DestroyAll();
         VulkanTexture::DestroyAll();
@@ -738,29 +753,9 @@ void VulkanAPI::UpdateCommandBuffer(size_t i) {
 
     vkCmdPipelineBarrier(graphicsCommandBuffers[i], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
 
-    // Begin dynamic rendering
-    VkRenderingAttachmentInfo colorAttachment{};
-    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachment.imageView = swapChainImageViews[i];
-    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.clearValue = { 0.1f, 0.1f, 0.1f, 1.0f };
-
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea = { 0, 0, swapChainExtent.width, swapChainExtent.height };
-    renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachment;
-
-    vkCmdBeginRendering(graphicsCommandBuffers[i], &renderingInfo);
 
     // Record the render commands using RenderCommandQueue
-    VulkanAPI::Get().RecordCommandBuffer(VulkanAPI::Get().GetRenderQueue(), graphicsCommandBuffers[i]);
-
-    // End rendering
-    vkCmdEndRendering(graphicsCommandBuffers[i]);
+    VulkanAPI::Get().RecordCommandBuffer(VulkanAPI::Get().GetRenderQueue(), graphicsCommandBuffers[i], i);
 
     // Barrier if present and graphics queue families differ
     if (presentQueueFamily != graphicsQueueFamily) {
@@ -864,9 +859,71 @@ void VulkanAPI::Draw() {
     }
 }
 
-void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer) {
+void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer, uint32_t InImageIndex) {
+    bool hasRenderPassBegun = false;
     for (const RenderCommand& cmd : InQueue.commands) {
         switch (cmd.Type) {
+            case RenderCommandType::BeginRenderPass: {
+                const auto& data = std::get<CmdBeginRenderPass>(cmd.Data);
+                if (hasRenderPassBegun) {
+                    vkCmdEndRendering(InCmdBuffer);
+                }
+
+                if (VulkanFrameBuffer* framebuffer = data.Target ? data.Target->As<VulkanFrameBuffer>() : nullptr) {
+                    auto colorAttachmentInfo = framebuffer->GetColorAttachmentInfo();
+                    auto depthAttachmentInfo = framebuffer->GetDepthAttachmentInfo();
+                    
+                    VkRenderingInfo renderingInfo{};
+                    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                    renderingInfo.renderArea = { 0, 0, framebuffer->GetDesc().Width, framebuffer->GetDesc().Height };
+                    renderingInfo.layerCount = 1;
+                    renderingInfo.colorAttachmentCount = framebuffer->GetColorAttachmentCount();
+                    renderingInfo.pColorAttachments = colorAttachmentInfo.data();
+                    renderingInfo.pDepthAttachment = &depthAttachmentInfo;
+
+                    for (size_t i = 0; i < framebuffer->GetColorAttachmentCount(); i++) {
+                        VulkanHelpers::TransitionImage(InCmdBuffer, 
+                            framebuffer->GetDesc().ColorAttachments[i]->GetDesc().Image->As<VulkanImage>()->GetVkImage(), 
+                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+                            VK_IMAGE_ASPECT_COLOR_BIT);
+                    }
+
+                    if (depthAttachmentInfo.imageView) {
+                        VulkanHelpers::TransitionImage(InCmdBuffer, 
+                            framebuffer->GetDesc().DepthAttachment->GetDesc().Image->As<VulkanImage>()->GetVkImage(), 
+                            VK_IMAGE_LAYOUT_UNDEFINED, 
+                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, 
+                            VK_IMAGE_ASPECT_DEPTH_BIT);
+                    }
+
+                    vkCmdBeginRendering(InCmdBuffer, &renderingInfo);
+                } else if (Surface* surface = data.Target ? data.Target->As<Surface>() : nullptr) {
+                    VkRenderingAttachmentInfo swapchainColorAttachment{};
+                    swapchainColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                    swapchainColorAttachment.imageView = swapChainImageViews[InImageIndex];
+                    swapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    swapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                    swapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+                    swapchainColorAttachment.clearValue = { 0.1f, 0.1f, 0.1f, 1.0f };
+
+                    VkRenderingInfo renderingInfo{};
+                    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                    renderingInfo.renderArea = { 0, 0, swapChainExtent.width, swapChainExtent.height };
+                    renderingInfo.layerCount = 1;
+                    renderingInfo.colorAttachmentCount = 1;
+                    renderingInfo.pColorAttachments = &swapchainColorAttachment;
+                    renderingInfo.pDepthAttachment = nullptr;
+
+                    vkCmdBeginRendering(InCmdBuffer, &renderingInfo);
+                } else {
+                    AE_ASSERT(false, "unsupported render target type");
+                }
+
+                hasRenderPassBegun = true;
+                break;
+            }
+
             case RenderCommandType::BindPipeline: {
                 const auto& data = std::get<CmdBindPipeline>(cmd.Data);
 
@@ -902,6 +959,10 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                 break;
             }
         }
+    }
+
+    if (hasRenderPassBegun) {
+        vkCmdEndRendering(InCmdBuffer);
     }
 }
 

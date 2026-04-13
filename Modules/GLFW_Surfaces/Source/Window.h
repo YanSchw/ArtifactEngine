@@ -1,8 +1,5 @@
 #pragma once
-
-#include "Common/Types.h"
-#include "Core/Object.h"
-#include "Core/Pointer.h"
+#include "Rendering/Surface.h"
 #include "Window.gen.h"
 
 struct WindowParams {
@@ -12,7 +9,7 @@ struct WindowParams {
     bool Fullscreen = false;
 };
 
-class Window : public Object {
+class Window : public Surface {
 public:
     ARTIFACT_CLASS();
 private:
@@ -22,8 +19,8 @@ public:
 
     void TickWindow();
 
-    uint32_t GetWidth() const;
-    uint32_t GetHeight() const;
+    virtual uint32_t GetWidth() const override;
+    virtual uint32_t GetHeight() const override;
     void SetResizedFlag(bool InFlag);
     bool WasWindowResized() const;
 

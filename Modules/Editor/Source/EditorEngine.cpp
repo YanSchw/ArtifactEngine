@@ -11,6 +11,8 @@
 #include "Rendering/Sampler.h"
 #include "Rendering/Buffer.h"
 #include "Rendering/Pipeline.h"
+#include "Rendering/FrameBuffer.h"
+#include "Rendering/Image.h"
 
 SharedObjectPtr<Window> s_Window;
 
@@ -21,6 +23,11 @@ SharedObjectPtr<Shader> s_Shader;
 SharedObjectPtr<Texture> s_Texture;
 SharedObjectPtr<UniformBuffer> s_UniformBuffer;
 SharedObjectPtr<Pipeline> s_Pipeline;
+SharedObjectPtr<FrameBuffer> s_FrameBuffer;
+
+
+SharedObjectPtr<Pipeline> s_FullScreenPipeline;
+SharedObjectPtr<VertexBuffer> s_FullScreenQuadVertexBuffer;
 
 struct {
     glm::mat4 transformationMatrix;
@@ -70,19 +77,65 @@ void EditorEngine::Initialize() {
         { {  0.5f,  0.5f,  -1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } }
     };
     s_VertexBuffer2 = VertexBuffer::Create(vertices2, { 0, 1, 2 });
+    Array<Vertex> fullScreenQuadVertices = {
+        { { -1.0f, -1.0f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
+        { { -1.0f,  1.0f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
+        { {  1.0f,  1.0f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
+        { {  1.0f, -1.0f,  0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }
+    };
+    s_FullScreenQuadVertexBuffer = VertexBuffer::Create(fullScreenQuadVertices, { 0, 1, 2, 0, 2, 3 });
+
+
+    ImageDesc imageDesc;
+    imageDesc.Width = s_Window->GetWidth();
+    imageDesc.Height = s_Window->GetHeight();
+    imageDesc.Format = ImageFormat::RGBA8;
+    imageDesc.Usage = ImageUsage::ColorAttachment | ImageUsage::Sampled;
+    auto image = Image::Create(imageDesc);
+    ImageViewDesc imageViewDesc;
+    imageViewDesc.Image = image;
+    imageViewDesc.Format = ImageFormat::RGBA8;
+    auto imageView = ImageView::Create(imageViewDesc);
+
+    ImageDesc depthImageDesc;
+    depthImageDesc.Width = s_Window->GetWidth();
+    depthImageDesc.Height = s_Window->GetHeight();
+    depthImageDesc.Format = ImageFormat::Depth32F;
+    depthImageDesc.Usage = ImageUsage::DepthStencil;
+    auto depthImage = Image::Create(depthImageDesc);
+
+    ImageViewDesc depthImageViewDesc;
+    depthImageViewDesc.Image = depthImage;
+    depthImageViewDesc.Format = ImageFormat::Depth32F;
+    auto depthImageView = ImageView::Create(depthImageViewDesc);
+
+    FrameBufferDesc frameBufferDesc;
+    frameBufferDesc.Width = s_Window->GetWidth();
+    frameBufferDesc.Height = s_Window->GetHeight();
+    frameBufferDesc.ColorAttachments.Add(imageView);
+    frameBufferDesc.DepthAttachment = depthImageView;
+    s_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
 
     s_Shader = Shader::Create(FileIO::ReadFileToString("/Users/yannick/Developer/ArtifactEngine/Content/Shaders/Shader.glsl"));
+    s_Texture = Texture::Create("/Users/yannick/Developer/ArtifactEngine/Content/Textures/Checkerboard.png");
     SamplerDesc samplerDesc;
     samplerDesc.MagFilter = FilterMode::Nearest;
     samplerDesc.MinFilter = FilterMode::Nearest;
-    s_Texture = Texture::Create("/Users/yannick/Developer/ArtifactEngine/Content/Textures/Checkerboard.png");
     auto sampler = Sampler::Create(samplerDesc);
     s_UniformBuffer = UniformBuffer::Create(0, sizeof(uniformBufferData));
     PipelineDesc pipelineDesc;
+    pipelineDesc.Target = s_FrameBuffer;
     pipelineDesc.Shader = s_Shader;
     pipelineDesc.Buffers.Add(s_UniformBuffer);
     pipelineDesc.ImageBindings.Add({ 16, s_Texture->GetDefaultView(), sampler });
     s_Pipeline = Pipeline::Create(pipelineDesc);
+
+
+    PipelineDesc fullscreenDesc;
+    fullscreenDesc.Target = s_Window;
+    fullscreenDesc.Shader = Shader::Create(FileIO::ReadFileToString("/Users/yannick/Developer/ArtifactEngine/Content/Shaders/Passthrough.glsl"));
+    fullscreenDesc.ImageBindings.Add({ 16, imageView, sampler });
+    s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
 }
 
 bool EditorEngine::MainTick(double InDeltaTime) {
@@ -90,6 +143,9 @@ bool EditorEngine::MainTick(double InDeltaTime) {
     s_Pipeline->Bind();
     s_VertexBuffer1->Draw();
     s_VertexBuffer2->Draw();
+
+    s_FullScreenPipeline->Bind();
+    s_FullScreenQuadVertexBuffer->Draw();
 
     RenderingAPI::GetInstance()->Draw();
 

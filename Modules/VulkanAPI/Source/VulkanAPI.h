@@ -27,7 +27,7 @@ public:
     static void CreateCommandBuffers();
     static void UpdateCommandBuffer(size_t i);
 
-    void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer);
+    void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer, uint32_t InImageIndex);
 
     virtual void CleanUp(bool fullClean) override;
 
