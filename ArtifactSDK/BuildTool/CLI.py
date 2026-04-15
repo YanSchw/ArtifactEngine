@@ -35,7 +35,18 @@ def cmd_cook(args):
     print("Cooking assets not yet implemented")
 
 def cmd_package(args):
-    print("Packaging project not yet implemented")
+    args.target = get_current_platform().name
+    cmd_build(args)
+    
+    project_path = os.getcwd()
+    os.makedirs(f"{project_path}/Dist", exist_ok=True)
+    
+    if args.target == "MacOS":
+        from Package.MacOS import package_for_macos
+        package_for_macos(project_path)
+    else:
+        print("Only MacOS packaging is implemented so far")
+        exit(1)
 
 def cmd_version(args):
     from BuildTool.Version import get_version_string

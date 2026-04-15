@@ -10,6 +10,7 @@ __pycache__
 .vs
 
 CMakeLists.txt
+Dist/
 Build/
 Binaries/
 Intermediate/
