@@ -1,32 +1,10 @@
 #include "VulkanImage.h"
 #include "VulkanAPI.h"
+#include "Helpers.h"
 #include <stdexcept>
 
 Array<VulkanImage*> s_Images;
 Array<VulkanImageView*> s_ImageViews;
-
-static VkFormat ImageFormatToVkFormat(ImageFormat format) {
-    switch (format) {
-    case ImageFormat::RGBA8: return VK_FORMAT_R8G8B8A8_UNORM;
-    case ImageFormat::BGRA8: return VK_FORMAT_B8G8R8A8_UNORM;
-    case ImageFormat::RGBA16F: return VK_FORMAT_R16G16B16A16_SFLOAT;
-    case ImageFormat::RGBA32F: return VK_FORMAT_R32G32B32A32_SFLOAT;
-    case ImageFormat::Depth24Stencil8: return VK_FORMAT_D24_UNORM_S8_UINT;
-    case ImageFormat::Depth32F: return VK_FORMAT_D32_SFLOAT;
-    default: return VK_FORMAT_UNDEFINED;
-    }
-}
-
-static VkImageUsageFlags ImageUsageToVkImageUsage(ImageUsage usage) {
-    VkImageUsageFlags flags = 0;
-    if ((usage & ImageUsage::TransferSrc) != ImageUsage::None) flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    if ((usage & ImageUsage::TransferDst) != ImageUsage::None) flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    if ((usage & ImageUsage::Sampled) != ImageUsage::None) flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-    if ((usage & ImageUsage::Storage) != ImageUsage::None) flags |= VK_IMAGE_USAGE_STORAGE_BIT;
-    if ((usage & ImageUsage::ColorAttachment) != ImageUsage::None) flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    if ((usage & ImageUsage::DepthStencil) != ImageUsage::None) flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    return flags;
-}
 
 VulkanImage::VulkanImage(const ImageDesc& InImageDesc, VulkanAPI& InVulkanAPI) {
     s_Images.Add(this);
@@ -41,10 +19,10 @@ VulkanImage::VulkanImage(const ImageDesc& InImageDesc, VulkanAPI& InVulkanAPI) {
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = InImageDesc.MipLevels;
     imageInfo.arrayLayers = InImageDesc.ArrayLayers;
-    imageInfo.format = ImageFormatToVkFormat(InImageDesc.Format);
+    imageInfo.format = VulkanHelpers::ImageFormatToVkFormat(InImageDesc.Format);
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageInfo.usage = ImageUsageToVkImageUsage(InImageDesc.Usage);
+    imageInfo.usage = VulkanHelpers::ImageUsageToVkImageUsage(InImageDesc.Usage);
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -108,7 +86,7 @@ VulkanImageView::VulkanImageView(const ImageViewDesc& InImageViewDesc, VulkanAPI
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = static_cast<VulkanImage*>(InImageViewDesc.Image.Get())->GetVkImage();
     viewInfo.viewType = ImageViewTypeToVkImageViewType(InImageViewDesc.ViewType);
-    viewInfo.format = ImageFormatToVkFormat(InImageViewDesc.Format);
+    viewInfo.format = VulkanHelpers::ImageFormatToVkFormat(InImageViewDesc.Format);
     viewInfo.subresourceRange.aspectMask = ImageAspectToVkImageAspect(InImageViewDesc.Aspect);
     viewInfo.subresourceRange.baseMipLevel = InImageViewDesc.BaseMip;
     viewInfo.subresourceRange.levelCount = InImageViewDesc.MipCount;
