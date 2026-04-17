@@ -63,7 +63,12 @@ if (MSVC)
 endif()
                 
 add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp)
-                
+
+if (WIN32)
+    set(APP_ICON_RESOURCE "{project_path}/Build/Intermediate/Resources/Win64IconResource.rc")
+    target_sources(Artifact PRIVATE ${{APP_ICON_RESOURCE}})
+endif()
+
 """)
         
         for module in os.listdir(f"{project_path}/Modules"):

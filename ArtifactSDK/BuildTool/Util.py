@@ -1,6 +1,8 @@
 import os
 import io
 from contextlib import contextmanager
+from pathlib import Path
+from PIL import Image
 
 def needs_regeneration(file_path: str, file_content: str, encoding: str = "utf-8") -> bool:
     """
@@ -36,3 +38,15 @@ def smart_open(file_path: str, encoding: str = "utf-8"):
 
         with open(file_path, "w", encoding=encoding) as real_file:
             real_file.write(new_content)
+
+
+def png_to_ico(png_path, ico_path):
+    img = Image.open(png_path)
+
+    # Windows ICO should include multiple sizes
+    sizes = [(16,16), (32,32), (48,48), (64,64), (128,128), (256,256)]
+
+    os.makedirs(Path(ico_path).parent, exist_ok=True)
+    img.save(ico_path, format='ICO', sizes=sizes)
+    with smart_open(str(Path(ico_path).parent) + "/Win64IconResource.rc") as resource_file:
+        resource_file.write('IDI_APP_ICON ICON "IconWin64.ico"')
