@@ -14,6 +14,28 @@
 
 static std::unordered_map<std::string, std::shared_ptr<spdlog::logger>> s_Loggers;
 
+static constexpr bool IsPackagedBuild() {
+#if defined(AE_PACKAGED)
+    return true;
+#else
+    return false;
+#endif
+}
+
+static std::filesystem::path GetPackagedBuildLogFileDirectory() {
+    std::filesystem::path logFilePath;
+#if defined(AE_PLATFORM_WINDOWS)
+    logFilePath = std::filesystem::path(std::getenv("LOCALAPPDATA")) / "ArtifactEngine" / "Logs";
+#elif defined(AE_PLATFORM_MACOS)
+    logFilePath = std::filesystem::path(std::getenv("HOME")) / "Library" / "Logs" / "ArtifactEngine";
+#elif defined(AE_PLATFORM_LINUX)
+    logFilePath = std::filesystem::path(std::getenv("HOME")) / ".local" / "share" / "ArtifactEngine" / "Logs";
+#else
+    logFilePath = std::filesystem::current_path();
+#endif
+    return logFilePath;
+}
+
 static std::vector<std::string> split(const std::string &s, char delim) {
     std::vector<std::string> result;
     std::stringstream ss(s);
@@ -39,11 +61,22 @@ static void CreateLoggerIfNotExists(const std::string& name) {
     }
 
     std::vector<spdlog::sink_ptr> logSinks;
-    logSinks.emplace_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
-    logSinks.emplace_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>("Artifact.log", false));
+    
+    if (!IsPackagedBuild() /* || IsFlagSet("--LogToConsole") */) {
+        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        console_sink->set_pattern("%^[%T] %n: %v%$");
+        logSinks.emplace_back(console_sink);
+    }
 
-    logSinks[0]->set_pattern("%^[%T] %n: %v%$");
-    logSinks[1]->set_pattern("[%T] [%l] %n: %v");
+    std::filesystem::path loggingDirectory = std::filesystem::current_path();
+    if (IsPackagedBuild()) {
+        std::filesystem::path logFilePath = GetPackagedBuildLogFileDirectory();
+        loggingDirectory = logFilePath;
+        std::filesystem::create_directories(loggingDirectory);
+    }
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(loggingDirectory / "Artifact.log", false);
+    file_sink->set_pattern("[%T] [%l] %n: %v");
+    logSinks.emplace_back(file_sink);
 
     std::string logger_label = std::string("[") + ConvertSourceFilenameToLoggerLabel(name) + std::string("]");
     s_Loggers[name] = std::make_shared<spdlog::logger>(logger_label, begin(logSinks), end(logSinks));

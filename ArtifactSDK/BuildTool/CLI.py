@@ -12,8 +12,7 @@ def cmd_build(args):
     print("Building the engine...")
     engine_path = get_engine_path()
     project_path = os.getcwd().replace("\\", "/")
-    target_platform = args.target
-    generate_cmake(project_path, target_platform)  # Generate CMakeLists.txt in the project directory
+    generate_cmake(project_path, args)  # Generate CMakeLists.txt in the project directory
 
     # Generate reflection code for classes in Modules
     generate_class_cpp(f"{engine_path}/Modules")
@@ -22,6 +21,7 @@ def cmd_build(args):
 
 def cmd_run(args):
     args.target = get_current_platform().name
+    args.configuration = "Dev"  # Always run the Dev configuration for better debugging experience
     cmd_build(args)  # Ensure the engine is built before running
     project_path = os.getcwd()
     try:
@@ -36,6 +36,8 @@ def cmd_cook(args):
 
 def cmd_package(args):
     args.target = get_current_platform().name
+    args.configuration = "Dist"  # Always package the Dist configuration
+    args.packaged = True  # Ensure the AE_PACKAGED macro is defined for packaging
     cmd_build(args)
     
     project_path = os.getcwd()
@@ -50,7 +52,7 @@ def cmd_package(args):
 
 def cmd_version(args):
     from BuildTool.Version import get_version_string
-    print(f"Artifact Engine version {get_version_string()}")
+    print(f"Artifact SDK version {get_version_string()}")
 
 def main():
     parser = argparse.ArgumentParser(description="Artifact Engine Build Tool")
@@ -58,6 +60,8 @@ def main():
 
     build_parser = subparsers.add_parser("build", help="Build the engine")
     build_parser.add_argument("--target", choices=["Win64", "MacOS", "Linux"], default=get_current_platform().name, help="Target platform to build for")
+    build_parser.add_argument("--configuration", choices=["Debug", "Dev", "Dist"], default="Dev", help="Build configuration")
+    build_parser.add_argument("--packaged", action="store_true", default=False, help="Whether to build a packaged version (binary may be embedded into an application bundle)")
     build_parser.set_defaults(func=cmd_build)
 
     run_parser = subparsers.add_parser("run", help="Run the engine")

@@ -2,7 +2,8 @@ import os
 import json
 
 from BuildTool.Version import VERSION_MAJOR, VERSION_MINOR, get_patch_version
-from BuildTool.Platforms import PlatformType
+from BuildTool.Platforms import PlatformType, get_current_platform, get_cpp_platform_macro
+from BuildTool.Target import TargetType, get_cpp_target_macro
 from BuildTool.Util import smart_open
 
 def get_module_json(module_path: str) -> dict:
@@ -28,7 +29,10 @@ def expand_indirect_module_dependencies(project_path: str, import_modules: list[
 
     return expanded
 
-def generate_cmake(project_path: str, target_platform: str):
+def generate_cmake(project_path: str, args):
+    target_platform = args.target
+    target_configuration = args.configuration
+    is_packaged = args.packaged if hasattr(args, "packaged") else False
     if project_path == ".":
         project_path = os.getcwd()
 
@@ -76,6 +80,10 @@ add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.
 {cpp_src}
 add_library({module} ${{cpp_src}} {project_path}/Build/Intermediate/Modules/{module}.gen.cpp)
 """)
+                    mf.write(f"target_compile_definitions({module} PUBLIC {get_cpp_platform_macro(get_current_platform())})\n")
+                    mf.write(f"target_compile_definitions({module} PUBLIC {get_cpp_target_macro(target_configuration)})\n")
+                    if is_packaged:
+                        mf.write(f"target_compile_definitions({module} PUBLIC AE_PACKAGED)\n")
                     for include_dir in module_json.get("IncludePaths", []):
                         mf.write(f"target_include_directories({module} PUBLIC {include_dir})\n")
                     for import_module in expand_indirect_module_dependencies(project_path, module_json.get("ImportModules", [])):
