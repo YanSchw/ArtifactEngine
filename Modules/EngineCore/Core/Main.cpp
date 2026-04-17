@@ -1,11 +1,13 @@
 #include <iostream>
 
 #include "Log.h"
+#include "Assert.h"
 #include "Engine.h"
 #include "Platform/Platform.h"
 #include "Common/Types.h"
 #include "Common/Version.h"
 #include "Core/Pointer.h"
+#include "Core/EngineConfig.h"
 #include <vector>
 #include <string>
 
@@ -20,12 +22,14 @@ static void ModuleLinking() {
     }
 }
 
-int ArtifactMain() {
+int ArtifactMain(const Array<String>& InArgs) {
     ModuleLinking();
-
     AE_INFO("Artifact Engine Version {0}", Version::GetVersionString());
 
-    SharedObjectPtr<Engine> engine = Object::Create<Engine>(Class("EditorEngine"));
+    EngineConfig::Initialize(InArgs);
+
+    SharedObjectPtr<Engine> engine = Object::Create<Engine>(EngineConfig::EngineClass());
+    AE_ASSERT(engine, "Failed to create engine instance!");
     engine->Initialize();
     engine->MainLoop();
     engine->Shutdown();
@@ -33,6 +37,10 @@ int ArtifactMain() {
     return 0;
 }
 
-int main() {
-    return ArtifactMain();
+int main(int argc, char** argv) {
+    Array<String> args;
+    for (int i = 0; i < argc; i++) {
+        args.Add(String(argv[i]));
+    }
+    return ArtifactMain(args);
 }

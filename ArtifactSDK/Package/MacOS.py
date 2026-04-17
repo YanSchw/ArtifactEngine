@@ -25,6 +25,13 @@ def copy_binary():
     shutil.copy2(BINARY_PATH, dest)
     os.chmod(dest, 0o755)
 
+def copy_content():
+    content_src = Path("Content")
+    content_dest = APP_PATH / "Contents/Resources/Content"
+    if content_dest.exists():
+        shutil.rmtree(content_dest)
+    shutil.copytree(content_src, content_dest)
+
 def create_plist():
     plist = {
         "CFBundleName": APP_NAME,
@@ -100,9 +107,10 @@ def package_for_macos(project_path):
         shutil.rmtree(APP_PATH)
 
     create_structure()
-    make_icns(Path("/Users/yannick/Developer/ArtifactEngine/Content/Icons/Icon.png"),  APP_PATH / "Contents/Resources/app.icns")
+    make_icns(Path(f"{project_path}/Content/Icons/Icon.png"),  APP_PATH / "Contents/Resources/app.icns")
 
     copy_binary()
+    copy_content()
     create_plist()
     sign_app()
     verify()

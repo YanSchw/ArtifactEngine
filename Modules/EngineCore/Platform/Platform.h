@@ -14,6 +14,7 @@ public:
     static PlatformType CurrentPlatform();
 
     static Class GetDefaultRenderingAPIClass();
+    static String GetContentDirectory();
 
     struct TemporaryDirectory {
         String Path;

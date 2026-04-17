@@ -1,4 +1,4 @@
-#include "EditorEngine.h"
+#include "GameEngine.h"
 #include "CoreMinimal.h"
 #include "Platform/Platform.h"
 #include "Platform/FileIO.h"
@@ -58,8 +58,8 @@ static void UpdateUniformData() {
     s_UniformBuffer->UnmapData();
 }
 
-void EditorEngine::Initialize() {
-    s_Window = Window::Create(WindowParams{ "Artifact Editor", 1280, 720 });
+void GameEngine::Initialize() {
+    s_Window = Window::Create(WindowParams{ "Artifact Engine", 1280, 720 });
     AE_ASSERT(s_Window);
 
     Object::Create(Platform::GetDefaultRenderingAPIClass());
@@ -139,7 +139,7 @@ void EditorEngine::Initialize() {
     s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
 }
 
-bool EditorEngine::MainTick(double InDeltaTime) {
+bool GameEngine::MainTick(double InDeltaTime) {
     UpdateUniformData();
     s_Pipeline->Bind();
     s_VertexBuffer1->Draw();
@@ -154,7 +154,7 @@ bool EditorEngine::MainTick(double InDeltaTime) {
     return !s_Window->ShouldClose();
 }
 
-void EditorEngine::Shutdown() {
+void GameEngine::Shutdown() {
     s_Window = nullptr;
     RenderingAPI::GetInstance()->CleanUp(true);
 }
