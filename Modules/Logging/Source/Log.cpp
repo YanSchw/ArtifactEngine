@@ -74,7 +74,7 @@ static void CreateLoggerIfNotExists(const std::string& name) {
         loggingDirectory = logFilePath;
         std::filesystem::create_directories(loggingDirectory);
     }
-    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(loggingDirectory / "Artifact.log", false);
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((loggingDirectory / "Artifact.log").string(), false);
     file_sink->set_pattern("[%T] [%l] %n: %v");
     logSinks.emplace_back(file_sink);
 
