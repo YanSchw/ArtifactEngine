@@ -1,5 +1,6 @@
 import os
 import io
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from PIL import Image
@@ -50,3 +51,12 @@ def png_to_ico(png_path, ico_path):
     img.save(ico_path, format='ICO', sizes=sizes)
     with smart_open(str(Path(ico_path).parent) + "/Win64IconResource.rc") as resource_file:
         resource_file.write('IDI_APP_ICON ICON "IconWin64.ico"')
+
+def get_module_name_from_path(module_path: str) -> str:
+    module_path = module_path.replace("\\", "/")
+    pattern = re.compile(r'.*/Modules/([^/]+)')
+    match = pattern.match(module_path)
+    if match:
+        return match.group(1)
+    else:
+        raise ValueError(f"Could not extract module name from path: {module_path}")

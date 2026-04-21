@@ -1,7 +1,7 @@
 import argparse
 
+from HeaderTool.HeaderTool import HeaderTool
 from BuildTool.Generate import generate_cmake
-from BuildTool.Reflection import generate_class_cpp
 from BuildTool.Build import build_cmake
 from BuildTool.Paths import get_engine_path
 from BuildTool.Platforms import get_current_platform
@@ -16,8 +16,10 @@ def cmd_build(args):
     generate_cmake(project_path, args)  # Generate CMakeLists.txt in the project directory
 
     # Generate reflection code for classes in Modules
-    generate_class_cpp(f"{engine_path}/Modules")
-    generate_class_cpp(f"{project_path}/Modules")
+    header_tool = HeaderTool()
+    header_tool.collect_headers(f"{engine_path}/Modules")
+    header_tool.collect_headers(f"{project_path}/Modules")
+    header_tool.generate()
     png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
     build_cmake()
 
