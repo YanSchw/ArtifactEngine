@@ -1,18 +1,22 @@
 import argparse
 
+from colorama import Fore, Style
+
 from HeaderTool.HeaderTool import HeaderTool
 from BuildTool.Generate import generate_cmake
 from BuildTool.Build import build_cmake
-from BuildTool.Paths import get_engine_path
+from BuildTool.Paths import get_engine_path, get_project_path
 from BuildTool.Platforms import get_current_platform
 from BuildTool.Util import png_to_ico
+from Lint.Lint import lint_files
 import os
+import sys
 import subprocess
 
 def cmd_build(args):
     print("Building the engine...")
     engine_path = get_engine_path()
-    project_path = os.getcwd().replace("\\", "/")
+    project_path = get_project_path()
     generate_cmake(project_path, args)  # Generate CMakeLists.txt in the project directory
 
     # Generate reflection code for classes in Modules
@@ -54,6 +58,23 @@ def cmd_package(args):
         print("Only MacOS packaging is implemented so far")
         exit(1)
 
+def cmd_lint(args):
+    files = []
+    for root, dirs, filenames in os.walk(get_engine_path()):
+        for name in filenames:
+            if name.endswith((".cpp", ".h")):
+                files.append(os.path.join(root, name))
+    for root, dirs, filenames in os.walk(get_project_path()):
+        for name in filenames:
+            if name.endswith((".cpp", ".h")):
+                files.append(os.path.join(root, name))
+    lint_errors = lint_files(files)
+    if lint_errors > 0:
+        print(f"{Fore.RED}Found {lint_errors} linting errors!{Style.RESET_ALL}")
+    else:
+        print(f"{Fore.GREEN}No linting errors found.{Style.RESET_ALL}")
+    sys.exit(lint_errors)
+
 def cmd_version(args):
     from BuildTool.Version import get_version_string
     print(f"Artifact SDK version {get_version_string()}")
@@ -76,6 +97,9 @@ def main():
 
     package_parser = subparsers.add_parser("package", help="Package project")
     package_parser.set_defaults(func=cmd_package)
+
+    lint_parser = subparsers.add_parser("lint", help="Lint C++/Header files")
+    lint_parser.set_defaults(func=cmd_lint)
 
     version_parser = subparsers.add_parser("version", help="Show engine version")
     version_parser.set_defaults(func=cmd_version)
