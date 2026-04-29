@@ -2,7 +2,7 @@
 #include "VulkanImage.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "ThirdParty/stb_image.h"
 
 static Array<VulkanTexture*> s_Textures;
 

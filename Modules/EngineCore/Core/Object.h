@@ -35,7 +35,7 @@ public:
     template<class T>
     T* As() const {
         return Cast<T>(this);
-	}
+    }
 
     static Object* Create(const Class& type);
 

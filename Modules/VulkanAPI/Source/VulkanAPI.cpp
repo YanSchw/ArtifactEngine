@@ -35,16 +35,16 @@ const char* DEBUG_LAYER = "VK_LAYER_LUNARG_standard_validation";
 
 // Debug callback
 VkBool32 debugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject, size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData) {
-	if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) {
+    if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) {
         AE_ERROR("ERROR: [{0}] Code {1} : {2}", pLayerPrefix, msgCode, pMsg);
-	}
-	else if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) {
+    }
+    else if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) {
         AE_WARN("WARNING: [{0}] Code {1} : {2}", pLayerPrefix, msgCode, pMsg);
-	}
+    }
 
-	//exit(1);
+    //exit(1);
 
-	return VK_FALSE;
+    return VK_FALSE;
 }
 
 
