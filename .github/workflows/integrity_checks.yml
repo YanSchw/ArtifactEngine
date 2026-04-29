@@ -1,0 +1,39 @@
+name: Integrity checks
+
+on:
+  push:
+    branches: [ "main", "*dev*" ]
+  pull_request:
+    branches: [ "main", "*dev*" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create virtual environment
+        run: python -m venv venv
+
+      - name: Activate venv and install SDK
+        shell: pwsh
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          pip install -e .\ArtifactSDK\.
+
+      - name: Run artifact commands
+        shell: pwsh
+        run: |
+          .\venv\Scripts\Activate.ps1
+          artifact version
+          artifact lint
