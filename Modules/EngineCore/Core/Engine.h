@@ -1,5 +1,6 @@
 #pragma once
 #include "Object.h"
+#include "Pointer.h"
 #include "Engine.gen.h"
 
 #include <chrono>
@@ -14,8 +15,9 @@ public:
 
     void MainLoop();
 
-private:
+protected:
     std::chrono::steady_clock::time_point m_PreviousTime;
     double m_DeltaTime;
+    SharedObjectPtr<class RenderPipeline> m_RenderPipeline;
 
 };

@@ -1,0 +1,8 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore"
+    ]
+}
