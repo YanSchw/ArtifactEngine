@@ -11,7 +11,9 @@
 #include <vector>
 #include <string>
 
-static void ModuleLinking() {
+// a call to this function is necessary to ensure that the static libraries are linked in, 
+// otherwise the linker may exclude them since they are not directly referenced and only used via reflection
+static void EnforceLinkingStaticLibraries() {
     std::vector<std::string> linkedModules;
     extern void __LinkModules(std::vector<std::string>& modules);
     __LinkModules(linkedModules);
@@ -23,7 +25,7 @@ static void ModuleLinking() {
 }
 
 int ArtifactMain(const Array<String>& InArgs) {
-    ModuleLinking();
+    EnforceLinkingStaticLibraries();
     AE_INFO("Artifact Engine Version {0}", Version::GetVersionString());
 
     EngineConfig::Initialize(InArgs);
