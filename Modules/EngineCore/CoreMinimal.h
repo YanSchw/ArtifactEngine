@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Core/Object.h"
-#include "Core/Pointer.h"
 #include "Core/Assert.h"
 #include "Core/Log.h"
 
@@ -9,3 +7,6 @@
 #include "Common/Array.h"
 #include "Common/Map.h"
 #include "Common/String.h"
+
+#include "Object/Object.h"
+#include "Object/Pointer.h"

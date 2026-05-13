@@ -6,7 +6,8 @@
 #include "Platform/Platform.h"
 #include "Common/Types.h"
 #include "Common/Version.h"
-#include "Core/Pointer.h"
+#include "Object/Object.h"
+#include "Object/Pointer.h"
 #include "Core/EngineConfig.h"
 #include <vector>
 #include <string>

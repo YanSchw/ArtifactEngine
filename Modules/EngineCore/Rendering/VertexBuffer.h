@@ -1,6 +1,5 @@
 #pragma once
-#include "Core/Object.h"
-#include "Core/Pointer.h"
+#include "CoreMinimal.h"
 #include "VertexBuffer.gen.h"
 
 class VertexBuffer : public Object {

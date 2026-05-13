@@ -2,7 +2,7 @@
 
 #include <filesystem>
 #include "Log.h"
-#include "Core/Pointer.h"
+#include "Object/Pointer.h"
 #include "Platform/Platform.h"
 
 void EngineConfig::Initialize(const Array<String>& InArgs) {

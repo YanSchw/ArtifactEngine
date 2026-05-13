@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Object.h"
-#include "Core/Pointer.h"
+#include "Object/Object.h"
+#include "Object/Pointer.h"
 #include "Common/Types.h"
 #include "EngineConfig.gen.h"
 

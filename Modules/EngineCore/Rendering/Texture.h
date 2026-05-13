@@ -1,6 +1,5 @@
 #pragma once
-#include "Core/Object.h"
-#include "Core/Pointer.h"
+#include "CoreMinimal.h"
 #include "Common/Types.h"
 #include "Image.h"
 #include "Texture.gen.h"

@@ -1,6 +1,6 @@
 #pragma once
-#include "Object.h"
-#include "Pointer.h"
+#include "Object/Object.h"
+#include "Object/Pointer.h"
 #include "Engine.gen.h"
 
 #include <chrono>
