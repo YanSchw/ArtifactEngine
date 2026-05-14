@@ -1,5 +1,6 @@
 #pragma once
 #include "Object.h"
+#include "Common/String.h"
 #include "Property.gen.h"
 
 #define PROPERTY(...)
