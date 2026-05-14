@@ -3,6 +3,14 @@ import re
 
 ENUM_CODE = """
 {FORWARD_DECLARATION}
+
+inline {ENUM_NAME} operator|({ENUM_NAME} a, {ENUM_NAME} b) {{
+    return ({ENUM_NAME})(({UNDERLYING_TYPE})a | ({UNDERLYING_TYPE})b);
+}}
+inline {ENUM_NAME} operator&({ENUM_NAME} a, {ENUM_NAME} b) {{
+    return ({ENUM_NAME})(({UNDERLYING_TYPE})a & ({UNDERLYING_TYPE})b);
+}}
+
 struct E{ENUM_NAME} {{
     static Enum StaticEnum() {{
         return Enum("{ENUM_NAME}");
@@ -21,6 +29,7 @@ struct E{ENUM_NAME} {{
         return StaticEnum().ConvertValueToString(static_cast<int64_t>(InValue));
     }}
 
+private:
     inline static Enum::RegisterEnumValues _EnumValues_{ENUM_NAME} = Enum::RegisterEnumValues("{ENUM_NAME}", {{
 {ENUM_VALUES}
     }});

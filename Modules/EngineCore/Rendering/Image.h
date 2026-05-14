@@ -28,13 +28,6 @@ enum class ImageUsage : uint32_t {
     DepthStencil    = 1 << 5
 };
 
-inline ImageUsage operator|(ImageUsage a, ImageUsage b) {
-    return (ImageUsage)((uint32_t)a | (uint32_t)b);
-}
-inline ImageUsage operator&(ImageUsage a, ImageUsage b) {
-    return (ImageUsage)((uint32_t)a & (uint32_t)b);
-}
-
 ARTIFACT_ENUM();
 enum class ImageAspect {
     Color,
