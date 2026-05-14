@@ -37,7 +37,10 @@ private:
 """
 
 class Enum:
+    ALL_ENUMS = []
+
     def __init__(self, name: str, line: int, body: str, is_enum_class: bool, underlying_type: str):
+        Enum.ALL_ENUMS.append(self)
         self.Name = name
         self.Line = line
         self.Body = body

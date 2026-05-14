@@ -74,3 +74,5 @@ template <class To, class From>
 static To* Cast(From* Src) {
     return Src ? (Src->IsObjectOfClass(To::StaticClass()) ? (To*)Src : nullptr) : nullptr;
 }
+
+#include "Property.h"

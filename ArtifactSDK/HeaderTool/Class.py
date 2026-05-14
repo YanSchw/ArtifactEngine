@@ -1,3 +1,4 @@
+from HeaderTool.Properties import generate_properties_registration_code
 
 CLASS_CODE = """
 using Super = {PARENT_CLASS_NAME};
@@ -11,21 +12,39 @@ struct InternalAlloc {{
 private:
     InternalAlloc() = default;
     inline static Object::RegisterArtifactClass<{CLASS_NAME}> _ClassAllocator_{CLASS_NAME};
+    {PROPERTIES_REGISTRATION_CODE}
 }}/* No ; is appended after this struct, since the macro itself is supposed to have a ; */
 """
 
 class Class:
+    ALL_CLASSES = []
+
     def __init__(self, name: str, line: int, body: str, parent_class_name: str):
+        Class.ALL_CLASSES.append(self)
         self.Name = name
         self.Line = line
         self.Body = body
         self.ParentClassName = parent_class_name
+
+
+    def is_a(self, other_class_name: str) -> bool:
+        if other_class_name == "Object":
+            return True
+        if self.Name == other_class_name:
+            return True
+        
+        for parent in Class.ALL_CLASSES:
+            if parent.Name == self.ParentClassName:
+                return parent.is_a(other_class_name)
+
+        return False
 
     def generate_class_code(self, gen_file):
         gen_file.write(f'''#define _GENERATED_BODY_{self.Line} \\
 {CLASS_CODE.format(
     CLASS_NAME=self.Name,
     PARENT_CLASS_NAME=self.ParentClassName,
+    PROPERTIES_REGISTRATION_CODE=generate_properties_registration_code(self.Name, self.Body),
 ).replace('\n', '\\\n')}
 
 ''')
