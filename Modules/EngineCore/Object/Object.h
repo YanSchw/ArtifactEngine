@@ -67,7 +67,7 @@ private:
 
 #define GENERATED_BODY_CONCAT(line) _GENERATED_BODY_##line
 #define GENERATED_BODY(line) GENERATED_BODY_CONCAT(line)
-#define ARTIFACT_CLASS() GENERATED_BODY(__LINE__)
+#define ARTIFACT_CLASS(...) GENERATED_BODY(__LINE__)
 
 // Dynamically cast an object type-safely.
 template <class To, class From>

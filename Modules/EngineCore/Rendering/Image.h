@@ -3,6 +3,7 @@
 #include "Common/Types.h"
 #include "Image.gen.h"
 
+ARTIFACT_ENUM();
 enum class ImageFormat {
     None,
 
@@ -15,6 +16,8 @@ enum class ImageFormat {
     Depth32F
 };
 
+
+ARTIFACT_ENUM();
 enum class ImageUsage : uint32_t {
     None            = 0,
     TransferSrc     = 1 << 0,
@@ -32,6 +35,7 @@ inline ImageUsage operator&(ImageUsage a, ImageUsage b) {
     return (ImageUsage)((uint32_t)a & (uint32_t)b);
 }
 
+ARTIFACT_ENUM();
 enum class ImageAspect {
     Color,
     Depth,
@@ -39,6 +43,8 @@ enum class ImageAspect {
     DepthStencil
 };
 
+
+ARTIFACT_ENUM();
 enum class ImageViewType {
     Type2D,
     Type2DArray,

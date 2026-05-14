@@ -5,10 +5,18 @@
 #include "FrameBuffer.gen.h"
 
 struct FrameBufferDesc {
+    ARTIFACT_STRUCT();
+
+    PROPERTY()
     uint32_t Width = 1;
+
+    PROPERTY()
     uint32_t Height = 1;
 
+    PROPERTY()
     Array<SharedObjectPtr<ImageView>> ColorAttachments;
+    
+    PROPERTY()
     SharedObjectPtr<ImageView> DepthAttachment;
 };
 

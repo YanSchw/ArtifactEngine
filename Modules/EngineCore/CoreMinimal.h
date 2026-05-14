@@ -8,5 +8,8 @@
 #include "Common/Map.h"
 #include "Common/String.h"
 
+#include "Object/Struct.h"
 #include "Object/Object.h"
+#include "Object/Enum.h"
+#include "Object/Property.h"
 #include "Object/Pointer.h"
