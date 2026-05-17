@@ -54,8 +54,11 @@ struct SharedObjectPtrProperty : public Property {
 struct ArrayProperty : public Property {
     ARTIFACT_CLASS();
 
-    Property* InnerProperty;
+    using GetSizeFn = size_t(*)(void*);
 
-    ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty)
-        : Property(name, offset), InnerProperty(innerProperty) {}
+    Property* InnerProperty;
+    GetSizeFn GetSize;
+
+    ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty, GetSizeFn getSize)
+        : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize) {}
 };

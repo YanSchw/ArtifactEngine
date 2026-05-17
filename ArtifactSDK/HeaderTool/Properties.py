@@ -12,6 +12,14 @@ PROPERTY_PATTERN = re.compile(
 
 SIMPLE_PROPERTY = """static {PROPERTY_TYPE} _Property_{PROPERTY_NAME} = {PROPERTY_TYPE}("{PROPERTY_NAME}", {OFFSET}{INITIALIZER});"""
 
+ARRAY_GETSIZE = """
+/* GetSize */
+[](void* ptr) -> size_t {{
+    auto& arr = *reinterpret_cast<Array<{PROPERTY_TYPE}>*>(ptr);
+    return arr.Size();
+}}
+"""
+
 def generate_property_type(full_typename: str, prop_name: str, class_or_struct_typename: str, use_offset: bool = True) -> str:
     offset = f"offsetof({class_or_struct_typename}, {prop_name})" if use_offset else "0"
 
@@ -47,7 +55,7 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
     if full_typename.startswith("Array<") and full_typename.endswith(">"):
         inner_type = full_typename[len("Array<"):-1].strip()
         inner_type_str = generate_property_type(inner_type, prop_name + "_InnerArrayProperty", class_or_struct_typename, use_offset=False)
-        return inner_type_str + "\n" + SIMPLE_PROPERTY.format(PROPERTY_TYPE="ArrayProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', &_Property_{prop_name}_InnerArrayProperty')
+        return inner_type_str + "\n" + SIMPLE_PROPERTY.format(PROPERTY_TYPE="ArrayProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', &_Property_{prop_name}_InnerArrayProperty,{ARRAY_GETSIZE.format(PROPERTY_TYPE=inner_type)}')
 
     raise NotImplementedError(f"Property type '{full_typename}' is not supported yet.")
 
