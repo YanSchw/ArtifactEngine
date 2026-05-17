@@ -21,10 +21,19 @@ class Struct:
         self.Body = body
 
     def generate_struct_code(self, gen_file):
-        gen_file.write(f'''#define _GENERATED_BODY_{self.Line} \\
-{STRUCT_CODE.format(
-    STRUCT_NAME=self.Name,
-    PROPERTIES_REGISTRATION_CODE=generate_properties_registration_code(self.Name, self.Body),
-).replace('\n', '\\\n')}
+        properties_code = generate_properties_registration_code(
+            self.Name,
+            self.Body
+        )
 
-''')
+        struct_code = STRUCT_CODE.format(
+            STRUCT_NAME=self.Name,
+            PROPERTIES_REGISTRATION_CODE=properties_code,
+        )
+
+        escaped_struct_code = struct_code.replace('\n', '\\\n')
+
+        gen_file.write(
+            f"#define _GENERATED_BODY_{self.Line} \\\n"
+            f"{escaped_struct_code}\n\n"
+        )
