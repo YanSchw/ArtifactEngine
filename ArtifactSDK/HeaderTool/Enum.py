@@ -78,16 +78,27 @@ class Enum:
         if self.IsEnumClass:
             forward_declaration += "class "
         forward_declaration += self.Name
+
         if self.UnderlyingType:
             forward_declaration += f" : {self.UnderlyingType}"
+
         forward_declaration += ";"
 
-        gen_file.write(f'''#define _GENERATED_BODY_{self.Line} \\
-{ENUM_CODE.format(
-    FORWARD_DECLARATION=forward_declaration,
-    ENUM_NAME=self.Name,
-    UNDERLYING_TYPE=self.UnderlyingType or 'int',
-    ENUM_VALUES='\n'.join([f'        {{"{name}", {value}}},' for name, value in self.parse_enum_values()]),
-).replace('\n', '\\\n')}
+        enum_values = "\n".join(
+            f'        {{"{name}", {value}}},'
+            for name, value in self.parse_enum_values()
+        )
 
-''')
+        enum_code = ENUM_CODE.format(
+            FORWARD_DECLARATION=forward_declaration,
+            ENUM_NAME=self.Name,
+            UNDERLYING_TYPE=self.UnderlyingType or "int",
+            ENUM_VALUES=enum_values,
+        )
+
+        escaped_enum_code = enum_code.replace("\n", "\\\n")
+
+        gen_file.write(
+            f"#define _GENERATED_BODY_{self.Line} \\\n"
+            f"{escaped_enum_code}\n\n"
+        )
