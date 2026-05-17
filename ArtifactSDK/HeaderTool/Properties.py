@@ -70,15 +70,27 @@ def generate_properties_registration_code(typename: str, body: str) -> str:
         prop_name = m.group(2).strip()
         raw_properties.append((type_name, prop_name))
 
-    create_properties_list = [generate_property_type(type_name, prop_name, typename) for type_name, prop_name in raw_properties]
+    create_properties_list = [
+        generate_property_type(type_name, prop_name, typename)
+        for type_name, prop_name in raw_properties
+    ]
+
     create_properties = "\n".join(create_properties_list)
+
     properties_list = "\n                ".join(
-        f"&_Property_{prop_name}," for _, prop_name in raw_properties
+        f"&_Property_{prop_name},"
+        for _, prop_name in raw_properties
     )
+
+    indented_properties = "\n".join(
+        "            " + line
+        for line in create_properties.splitlines()
+    )
+
     return f"""struct InternalRegisterProperties {{
         InternalRegisterProperties() {{
             {typename}* _NullInstance = nullptr;
-{"\n".join("            " + line for line in create_properties.splitlines())}
+{indented_properties}
             Property::RegisterTypeProperties("{typename}", {{
                 {properties_list}
             }});
