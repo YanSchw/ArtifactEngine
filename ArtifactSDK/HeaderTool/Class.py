@@ -40,12 +40,21 @@ class Class:
         return False
 
     def generate_class_code(self, gen_file):
-        gen_file.write(f'''#define _GENERATED_BODY_{self.Line} \\
-{CLASS_CODE.format(
-    CLASS_NAME=self.Name,
-    PARENT_CLASS_NAME=self.ParentClassName,
-    PROPERTIES_REGISTRATION_CODE=generate_properties_registration_code(self.Name, self.Body),
-).replace('\n', '\\\n')}
+        properties_code = generate_properties_registration_code(
+            self.Name,
+            self.Body
+        )
 
+        class_code = CLASS_CODE.format(
+            CLASS_NAME=self.Name,
+            PARENT_CLASS_NAME=self.ParentClassName,
+            PROPERTIES_REGISTRATION_CODE=properties_code,
+        )
+
+        escaped_class_code = class_code.replace('\n', '\\\n')
+
+        gen_file.write(
+            f'''#define _GENERATED_BODY_{self.Line} \\
+    {escaped_class_code}
 ''')
         
