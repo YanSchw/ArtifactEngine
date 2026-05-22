@@ -1,6 +1,8 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Platform.gen.h"
 
+ARTIFACT_ENUM();
 enum class PlatformType : uint32_t {
     Unknown = 0,
     Win64,
