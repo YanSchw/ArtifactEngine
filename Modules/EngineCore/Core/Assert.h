@@ -42,3 +42,5 @@
 #else
     #define AE_VERIFY(...)
 #endif
+
+#include "Log.h"
