@@ -2,7 +2,9 @@
 #include <vector>
 #include <iterator>
 #include <algorithm>
+#include <functional>
 #include <ranges>
+#include "Core/Assert.h"
 
 struct TArray {
 
@@ -16,12 +18,8 @@ private:
 
 public:
 
-    Array() {
-        m_Data = std::vector<T>();
-    }
-    Array(size_t size) {
-        m_Data = std::vector<T>(size);
-    }
+    Array() = default;
+    Array(size_t size) : m_Data(size) { }
     Array(const std::vector<T>& vector) {
         m_Data = vector;
     }
@@ -29,18 +27,23 @@ public:
         m_Data = vector;
     }
 
-    void Emplace(T item) {
-        return m_Data.emplace_back(item);
+    template<typename... Args>
+    void Emplace(Args&&... args) {
+        m_Data.emplace_back(std::forward<Args>(args)...);
     }
     void Add(T&& item) {
-        m_Data.push_back(item);
+        m_Data.push_back(std::move(item));
     }
     void Add(const T& item) {
         m_Data.push_back(item);
     }
 
-    void Insert(int32_t index, T& item) {
+    void Insert(int32_t index, const T& item) {
         m_Data.insert(m_Data.begin() + index, item);
+    }
+
+    void Insert(int32_t index, T&& item) {
+        m_Data.insert(m_Data.begin() + index, std::move(item));
     }
 
     void SwapElements(int32_t indexA, int32_t indexB) {
@@ -66,7 +69,7 @@ public:
         return m_Data[index];
     }
 
-    int32_t IndexOf(const T& item) {
+    int32_t IndexOf(const T& item) const {
         auto it = std::find(m_Data.begin(), m_Data.end(), item);
 
         if (it != m_Data.end()) return (int32_t)(it - m_Data.begin());
@@ -74,10 +77,13 @@ public:
     }
 
     void RemoveAt(int32_t index) {
+        AE_ASSERT(index >= 0 && index < Size());
         m_Data.erase(m_Data.begin() + index);
     }
     void Remove(const T& item) {
-        RemoveAt(IndexOf(item));
+        const int32_t index = IndexOf(item);
+        if (index != -1)
+            RemoveAt(index);
     }
     inline void RemoveFirstItem() {
         RemoveAt(0);
@@ -93,15 +99,17 @@ public:
         return std::find(m_Data.begin(), m_Data.end(), item) != m_Data.end();
     }
 
-    Array<T> operator+(Array<T>& other) {
-        std::vector<T> AB;
-        AB.reserve(m_Data.size() + other.GetData().size()); // preallocate memory
-        AB.insert(AB.end(), m_Data.begin(), m_Data.end());
-        AB.insert(AB.end(), other.GetData().begin(), other.GetData().end());
-        return { AB };
+    Array<T> operator+(const Array<T>& other) const {
+        Array<T> result = *this;
+        result += other;
+        return result;
     }
-    void operator+=(Array<T>& other) {
-        *this = *this + other;
+    void operator+=(const Array<T>& other) {
+        m_Data.insert(
+            m_Data.end(),
+            other.m_Data.begin(),
+            other.m_Data.end()
+        );
     }
 
     void Clear() {
@@ -120,12 +128,20 @@ public:
         return m_Data.empty();
     }
 
+    const std::vector<T>& GetData() const {
+        return m_Data;
+    }
+
     std::vector<T>& GetData() {
         return m_Data;
     }
 
-    void SetData(std::vector<T>& data) {
-        this->m_Data = data;
+    void SetData(const std::vector<T>& data) {
+        m_Data = data;
+    }
+
+    void SetData(std::vector<T>&& data) {
+        m_Data = std::move(data);
     }
 
     // Ascending: a < b
