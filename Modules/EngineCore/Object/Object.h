@@ -23,6 +23,9 @@ public:
     virtual bool IsObjectOfClass(const Class& type) const {
         return type.Name == "Object";
     }
+    virtual Class GetClass() const {
+        return Class("Object");
+    }
     static Class StaticClass() {
         return Class("Object"); 
     }

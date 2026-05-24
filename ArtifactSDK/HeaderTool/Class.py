@@ -5,6 +5,9 @@ using Super = {PARENT_CLASS_NAME};
 bool IsObjectOfClass(const Class &type) const override {{
     return type.Name == "{CLASS_NAME}" || Super::IsObjectOfClass(type);
 }}
+virtual Class GetClass() const {{
+    return Class("{CLASS_NAME}");
+}}
 static Class StaticClass() {{
     return Class("{CLASS_NAME}");
 }}

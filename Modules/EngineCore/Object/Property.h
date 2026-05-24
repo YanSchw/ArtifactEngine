@@ -18,6 +18,12 @@ struct Property : public Object {
     static void RegisterTypeProperties(const String& InTypename, const Array<Property*>& InProperties) {
         s_TypeProperties[InTypename] = InProperties;
     }
+    static Array<Property*> GetTypeProperties(const String& InTypeName) {
+        if (!s_TypeProperties.ContainsKey(InTypeName))
+            return Array<Property*>();
+
+        return s_TypeProperties[InTypeName];
+    }
 
 private:
     inline static Map<String, Array<Property*>> s_TypeProperties;
@@ -55,10 +61,14 @@ struct ArrayProperty : public Property {
     ARTIFACT_CLASS();
 
     using GetSizeFn = size_t(*)(void*);
+    using GetElementPtrFn = void*(*)(void*, size_t);
+    using AddDefaultFn = void(*)(void*);
 
     Property* InnerProperty;
     GetSizeFn GetSize;
+    GetElementPtrFn GetElementPtr;
+    AddDefaultFn AddDefault;
 
-    ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty, GetSizeFn getSize)
-        : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize) {}
+    ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty, GetSizeFn getSize, GetElementPtrFn getElementPtr, AddDefaultFn addDefault)
+        : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize), GetElementPtr(getElementPtr), AddDefault(addDefault) {}
 };
