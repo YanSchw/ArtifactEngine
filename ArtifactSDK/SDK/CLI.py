@@ -8,7 +8,6 @@ from BuildTool.Build import build_cmake
 from SDK.Paths import get_engine_path, get_project_path
 from SDK.Platforms import get_current_platform
 from SDK.Util import png_to_ico
-from SDK.Job import Job
 from Lint.Lint import lint_files
 import os
 import sys
