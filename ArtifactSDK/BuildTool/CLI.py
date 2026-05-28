@@ -79,6 +79,10 @@ def cmd_version(args):
     from BuildTool.Version import get_version_string
     print(f"Artifact SDK version {get_version_string()}")
 
+def cmd_location(args):
+    from BuildTool.Paths import get_engine_path
+    print(get_engine_path())
+
 def main():
     parser = argparse.ArgumentParser(description="Artifact Engine Build Tool")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -103,6 +107,9 @@ def main():
 
     version_parser = subparsers.add_parser("version", help="Show engine version")
     version_parser.set_defaults(func=cmd_version)
+
+    location_parser = subparsers.add_parser("location", help="Print the engine path to the terminal")
+    location_parser.set_defaults(func=cmd_location)
 
     args = parser.parse_args()
     args.func(args)
