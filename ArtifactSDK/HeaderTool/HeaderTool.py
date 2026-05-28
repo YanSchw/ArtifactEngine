@@ -4,7 +4,7 @@ import sys
 from HeaderTool.Class import Class
 from HeaderTool.Struct import Struct
 from HeaderTool.Enum import Enum
-from BuildTool.Util import get_module_name_from_path, smart_open
+from SDK.Util import get_module_name_from_path, smart_open
 
 class HeaderTool:
     def __init__(self):

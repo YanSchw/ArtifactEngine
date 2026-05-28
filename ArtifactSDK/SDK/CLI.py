@@ -5,27 +5,34 @@ from colorama import Fore, Style
 from HeaderTool.HeaderTool import HeaderTool
 from BuildTool.Generate import generate_cmake
 from BuildTool.Build import build_cmake
-from BuildTool.Paths import get_engine_path, get_project_path
-from BuildTool.Platforms import get_current_platform
-from BuildTool.Util import png_to_ico
+from SDK.Paths import get_engine_path, get_project_path
+from SDK.Platforms import get_current_platform
+from SDK.Util import png_to_ico
+from SDK.Job import Job
 from Lint.Lint import lint_files
 import os
 import sys
 import subprocess
 
 def cmd_build(args):
-    print("Building the engine...")
-    engine_path = get_engine_path()
-    project_path = get_project_path()
-    generate_cmake(project_path, args)  # Generate CMakeLists.txt in the project directory
+    try:
+        print("Building the engine...")
+        engine_path = get_engine_path()
+        project_path = get_project_path()
+        generate_cmake(project_path, args)  # Generate CMakeLists.txt in the project directory
 
-    # Generate reflection code for classes in Modules
-    header_tool = HeaderTool()
-    header_tool.collect_headers(f"{engine_path}/Modules")
-    header_tool.collect_headers(f"{project_path}/Modules")
-    header_tool.generate()
-    png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
-    build_cmake()
+        # Generate reflection code for classes in Modules
+        header_tool = HeaderTool()
+        header_tool.collect_headers(f"{engine_path}/Modules")
+        header_tool.collect_headers(f"{project_path}/Modules")
+        header_tool.generate()
+        png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
+        build_cmake()
+    except KeyboardInterrupt:
+        print("Build cancelled by user.")
+        sys.exit(1)
+    except Exception as e:
+        raise e
 
 def cmd_run(args):
     args.target = get_current_platform().name
@@ -76,11 +83,11 @@ def cmd_lint(args):
     sys.exit(lint_errors)
 
 def cmd_version(args):
-    from BuildTool.Version import get_version_string
+    from SDK.Version import get_version_string
     print(f"Artifact SDK version {get_version_string()}")
 
 def cmd_location(args):
-    from BuildTool.Paths import get_engine_path
+    from SDK.Paths import get_engine_path
     print(get_engine_path())
 
 def main():

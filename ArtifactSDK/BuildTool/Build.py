@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import sys
 from colorama import Fore, Style
-from BuildTool.Platforms import *
+from SDK.Platforms import *
 import re
 
 MSVC_PATTERN = re.compile(

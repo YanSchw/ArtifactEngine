@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-from BuildTool.Version import get_version_string
+from SDK.Version import get_version_string
 
 def parse_requirements(filename):
     with open(filename, 'r') as f:
@@ -15,7 +15,7 @@ setup(
     install_requires=parse_requirements('requirements.txt'),
     entry_points={
         "console_scripts": [
-            "artifact = BuildTool.CLI:main",
+            "artifact = SDK.CLI:main",
         ],
     },
     python_requires='>=3.7',

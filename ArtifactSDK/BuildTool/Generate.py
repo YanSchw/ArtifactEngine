@@ -1,10 +1,10 @@
 import os
 import json
 
-from BuildTool.Version import VERSION_MAJOR, VERSION_MINOR, get_patch_version
-from BuildTool.Platforms import PlatformType, get_current_platform, get_cpp_platform_macro
+from SDK.Version import VERSION_MAJOR, VERSION_MINOR, get_patch_version
+from SDK.Platforms import PlatformType, get_current_platform, get_cpp_platform_macro
 from BuildTool.Target import TargetType, get_cpp_target_macro
-from BuildTool.Util import smart_open
+from SDK.Util import smart_open
 
 def get_module_json(module_path: str) -> dict:
     with open(f"{module_path}/Module.json", "r") as f:
