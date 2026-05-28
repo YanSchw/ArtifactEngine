@@ -12,7 +12,7 @@ String JsonSerializer::SerializeObject(const Object* InObject) {
     j = SerializeType((void*)InObject, typeName);
     j["$type"] = typeName;
 
-    return j.dump();
+    return j.dump(4);
 }
 void JsonSerializer::DeserializeObject(Object* OutObject, const String& InJsonString) {
     json j = json::parse(InJsonString);
@@ -27,7 +27,7 @@ void JsonSerializer::DeserializeObject(Object* OutObject, const String& InJsonSt
 String JsonSerializer::SerializeStruct(const void* InStruct, const Struct& InStructType) {
     json j = json::object();
     j = SerializeType((void*)InStruct, InStructType.Name);
-    return j.dump();
+    return j.dump(4);
 }
 
 void JsonSerializer::DeserializeStruct(void* OutStruct, const Struct& InStructType, const String& InJsonString) {
