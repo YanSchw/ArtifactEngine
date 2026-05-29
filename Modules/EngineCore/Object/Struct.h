@@ -18,3 +18,5 @@ struct Struct {
 #endif
 
 #define ARTIFACT_STRUCT(...) GENERATED_BODY(__LINE__)
+
+#include "Property.h"
