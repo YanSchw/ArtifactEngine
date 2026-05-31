@@ -48,6 +48,13 @@ struct FloatProperty : public Property {
         : Property(name, offset), IsDouble(isDouble) {}
 };
 
+struct StringProperty : public Property {
+    ARTIFACT_CLASS();
+
+    StringProperty(const std::string& name, uint64_t offset)
+        : Property(name, offset) {}
+};
+
 struct SharedObjectPtrProperty : public Property {
     ARTIFACT_CLASS();
 
@@ -55,6 +62,24 @@ struct SharedObjectPtrProperty : public Property {
 
     SharedObjectPtrProperty(const std::string& name, uint64_t offset, const Class& innerClass)
         : Property(name, offset), InnerClass(innerClass) {}
+};
+
+struct StructProperty : public Property {
+    ARTIFACT_CLASS();
+
+    String InnerStructTypename;
+
+    StructProperty(const std::string& name, uint64_t offset, const String& innerStructTypename)
+        : Property(name, offset), InnerStructTypename(innerStructTypename) {}
+};
+
+struct EnumProperty : public Property {
+    ARTIFACT_CLASS();
+
+    String InnerEnumTypename;
+
+    EnumProperty(const std::string& name, uint64_t offset, const String& innerEnumTypename)
+        : Property(name, offset), InnerEnumTypename(innerEnumTypename) {}
 };
 
 struct ArrayProperty : public Property {

@@ -10,4 +10,6 @@ public:
 
     static bool WriteStringToFile(const String& InFilePath, const String& InData);
     static bool WriteBytesToFile(const String& InFilePath, const ByteString& InData);
+
+    static Array<String> ListFilesInDirectory(const String& InDirectoryPath, bool InRecursive = false);
 };

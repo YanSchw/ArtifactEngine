@@ -59,3 +59,53 @@ bool FileIO::WriteBytesToFile(const String& InFilePath, const ByteString& InData
 
     return file.good();
 }
+
+Array<String> FileIO::ListFilesInDirectory(const String& InDirectoryPath, bool InRecursive) {
+    Array<String> files;
+
+    namespace fs = std::filesystem;
+
+    std::error_code ec;
+
+    if (!fs::exists(InDirectoryPath, ec) || !fs::is_directory(InDirectoryPath, ec)) {
+        return files;
+    }
+
+    if (InRecursive) {
+        fs::recursive_directory_iterator it(
+            InDirectoryPath,
+            fs::directory_options::skip_permission_denied,
+            ec);
+
+        fs::recursive_directory_iterator end;
+
+        while (!ec && it != end) {
+            std::error_code entryEc;
+
+            if (it->is_regular_file(entryEc) && !entryEc) {
+                files.Add(it->path().string());
+            }
+
+            it.increment(ec);
+        }
+    } else {
+        fs::directory_iterator it(
+            InDirectoryPath,
+            fs::directory_options::skip_permission_denied,
+            ec);
+
+        fs::directory_iterator end;
+
+        while (!ec && it != end) {
+            std::error_code entryEc;
+
+            if (it->is_regular_file(entryEc) && !entryEc) {
+                files.Add(it->path().string());
+            }
+
+            it.increment(ec);
+        }
+    }
+
+    return files;
+}

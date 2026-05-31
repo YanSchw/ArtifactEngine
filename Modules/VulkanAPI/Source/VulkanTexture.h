@@ -10,6 +10,7 @@ public:
     ARTIFACT_CLASS();
 
     VulkanTexture(const String& InFilePath, const TextureDesc& InTextureDesc, VulkanAPI& InVulkanAPI);
+    VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const TextureDesc& InTextureDesc, VulkanAPI& InVulkanAPI);
     virtual ~VulkanTexture();
 
     virtual SharedObjectPtr<Image> GetImage() const override;

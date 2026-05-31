@@ -10,6 +10,7 @@ public:
     EngineConfig() = delete;
 
 public:
+    static bool IsPackagedBuild();
     static Class EngineClass() { return s_EngineClass; }
     static Class RenderPipelineClass() { return s_RenderPipelineClass; }
     static String ContentDir() { return s_ContentDir; }

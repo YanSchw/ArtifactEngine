@@ -83,6 +83,8 @@ json JsonSerializer::SerializeProperty(Property* property, void* valuePtr) {
             return *(double*)valuePtr;
         else
             return *(float*)valuePtr;
+    } else if (auto p = Cast<StringProperty>(property)) {
+        return *(String*)valuePtr;
     } else if (auto p = Cast<SharedObjectPtrProperty>(property)) {
         auto& ptr = *(SharedObjectPtr<Object>*)valuePtr;
 
@@ -132,6 +134,9 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
         else
             *(float*)valuePtr = j.get<float>();
 
+        return;
+    } else if (auto p = Cast<StringProperty>(property)) {
+        *(String*)valuePtr = j.get<String>();
         return;
     } else if (auto p = Cast<SharedObjectPtrProperty>(property)) {
         if (j.is_null()) {

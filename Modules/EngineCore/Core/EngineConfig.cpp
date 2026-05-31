@@ -56,3 +56,11 @@ void EngineConfig::ResolvePaths() {
 
     AE_INFO("Resolved Content Directory: {0}", s_ContentDir);
 }
+
+bool EngineConfig::IsPackagedBuild() {
+#if defined(AE_PACKAGED)
+    return true;
+#else
+    return false;
+#endif
+}

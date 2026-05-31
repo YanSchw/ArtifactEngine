@@ -1,8 +1,7 @@
 #include "VulkanTexture.h"
 #include "VulkanImage.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "ThirdParty/stb_image.h"
+#include "Serialization/ThirdParty/stb_image/stb_image.h"
 
 static Array<VulkanTexture*> s_Textures;
 
@@ -106,6 +105,125 @@ VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InText
     region.imageSubresource.layerCount = 1;
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {(uint32_t)width, (uint32_t)height, 1};
+
+    vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, 
+                          m_Image->As<VulkanImage>()->GetVkImage(), 
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    // Transition image layout to shader read
+    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(), 
+                         VK_FORMAT_R8G8B8A8_UNORM, 
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+                         commandBuffer);
+
+    EndSingleTimeCommands(commandBuffer, *m_VulkanAPI);
+
+    // Clean up staging buffer
+    vkDestroyBuffer(m_VulkanAPI->GetDevice(), stagingBuffer, nullptr);
+    vkFreeMemory(m_VulkanAPI->GetDevice(), stagingBufferMemory, nullptr);
+
+    // Create image view
+    ImageViewDesc viewDesc;
+    viewDesc.Image = m_Image;
+    viewDesc.Format = ImageFormat::RGBA8;
+    viewDesc.Aspect = ImageAspect::Color;
+
+    m_DefaultView = SharedObjectPtr<ImageView>(new VulkanImageView(viewDesc, *m_VulkanAPI));
+}
+
+VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const TextureDesc& InTextureDesc, VulkanAPI& InVulkanAPI) {
+    s_Textures.Add(this);
+    m_VulkanAPI = &InVulkanAPI;
+    
+    if (!InPixels) {
+        // Fallback to 1x1 texture if loading fails
+        ImageDesc imageDesc;
+        imageDesc.Width = 1;
+        imageDesc.Height = 1;
+        imageDesc.Format = ImageFormat::RGBA8;
+        imageDesc.Usage = ImageUsage::Sampled | ImageUsage::TransferDst;
+
+        m_Image = SharedObjectPtr<Image>(new VulkanImage(imageDesc, *m_VulkanAPI));
+
+        ImageViewDesc viewDesc;
+        viewDesc.Image = m_Image;
+        viewDesc.Format = ImageFormat::RGBA8;
+        viewDesc.Aspect = ImageAspect::Color;
+
+        m_DefaultView = SharedObjectPtr<ImageView>(new VulkanImageView(viewDesc, *m_VulkanAPI));
+        return;
+    }
+
+    size_t imageSize = (size_t)InWidth * InHeight * InChannels;
+
+    // Create Vulkan image
+    ImageDesc imageDesc;
+    imageDesc.Width = (uint32_t)InWidth;
+    imageDesc.Height = (uint32_t)InHeight;
+    imageDesc.Format = ImageFormat::RGBA8;
+    imageDesc.Usage = ImageUsage::Sampled | ImageUsage::TransferDst;
+    imageDesc.MipLevels = 1; // For now, no mipmaps
+
+    m_Image = SharedObjectPtr<Image>(new VulkanImage(imageDesc, *m_VulkanAPI));
+
+    // Create staging buffer
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = imageSize;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(m_VulkanAPI->GetDevice(), &bufferInfo, nullptr, &stagingBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create staging buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(m_VulkanAPI->GetDevice(), stagingBuffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = m_VulkanAPI->FindMemoryType(memRequirements.memoryTypeBits, 
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(m_VulkanAPI->GetDevice(), &allocInfo, nullptr, &stagingBufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate staging buffer memory!");
+    }
+
+    vkBindBufferMemory(m_VulkanAPI->GetDevice(), stagingBuffer, stagingBufferMemory, 0);
+
+    // Copy pixel data to staging buffer
+    void* data;
+    vkMapMemory(m_VulkanAPI->GetDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, InPixels, imageSize);
+    vkUnmapMemory(m_VulkanAPI->GetDevice(), stagingBufferMemory);
+
+    // Copy from staging buffer to image
+    VkCommandBuffer commandBuffer = BeginSingleTimeCommands(*m_VulkanAPI);
+
+    // Transition image layout to transfer destination
+    AE_ASSERT(m_Image->IsA<VulkanImage>(), "Invalid image type");
+    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(), 
+                         VK_FORMAT_R8G8B8A8_UNORM, 
+                         VK_IMAGE_LAYOUT_UNDEFINED, 
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+                         commandBuffer);
+
+    // Copy buffer to image
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {(uint32_t)InWidth, (uint32_t)InHeight, 1};
 
     vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, 
                           m_Image->As<VulkanImage>()->GetVkImage(), 

@@ -3,6 +3,8 @@
 #include "Platform/FileIO.h"
 
 #include "ArtifactRenderPipeline.h"
+#include "Assets/AssetManager.h"
+#include "Assets/Texture2D.h"
 #include "Core/EngineConfig.h"
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/VertexBuffer.h"
@@ -18,7 +20,6 @@ static SharedObjectPtr<VertexBuffer> s_VertexBuffer1;
 static SharedObjectPtr<VertexBuffer> s_VertexBuffer2;
 
 static SharedObjectPtr<Shader> s_Shader;
-static SharedObjectPtr<Texture> s_Texture;
 static SharedObjectPtr<UniformBuffer> s_UniformBuffer;
 static SharedObjectPtr<Pipeline> s_Pipeline;
 static SharedObjectPtr<FrameBuffer> s_FrameBuffer;
@@ -113,7 +114,6 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     s_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
 
     s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::ContentDir() + "/Shaders/Shader.glsl"));
-    s_Texture = Texture::Create(EngineConfig::ContentDir() + "/Textures/Checkerboard.png");
     SamplerDesc samplerDesc;
     samplerDesc.MagFilter = FilterMode::Nearest;
     samplerDesc.MinFilter = FilterMode::Nearest;
@@ -123,7 +123,7 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     pipelineDesc.Target = s_FrameBuffer;
     pipelineDesc.Shader = s_Shader;
     pipelineDesc.Buffers.Add(s_UniformBuffer);
-    pipelineDesc.ImageBindings.Add({ 16, s_Texture->GetDefaultView(), sampler });
+    pipelineDesc.ImageBindings.Add({ 16, AssetManager::Get().GetAsset<Texture2D>(UUID::FromString("8c2146d1-c4d7-41b4-b456-9fd071812573"))->GetTexture()->GetDefaultView(), sampler });
     s_Pipeline = Pipeline::Create(pipelineDesc);
 }
 

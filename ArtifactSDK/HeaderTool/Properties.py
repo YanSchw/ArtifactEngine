@@ -55,6 +55,9 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
     if full_typename == "double":
         return SIMPLE_PROPERTY.format(PROPERTY_TYPE="FloatProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=", true")
 
+    if full_typename == "String":
+        return SIMPLE_PROPERTY.format(PROPERTY_TYPE="StringProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER="")
+
     if full_typename.startswith("SharedObjectPtr<") and full_typename.endswith(">"):
         inner_type = full_typename[len("SharedObjectPtr<"):-1].strip()
         return SIMPLE_PROPERTY.format(PROPERTY_TYPE="SharedObjectPtrProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', Class("{inner_type}")')
@@ -63,6 +66,15 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
         inner_type = full_typename[len("Array<"):-1].strip()
         inner_type_str = generate_property_type(inner_type, prop_name + "_InnerArrayProperty", class_or_struct_typename, use_offset=False)
         return inner_type_str + "\n" + SIMPLE_PROPERTY.format(PROPERTY_TYPE="ArrayProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', &_Property_{prop_name}_InnerArrayProperty,{ARRAY_LAMBDAS.format(PROPERTY_TYPE=inner_type)}')
+
+    from HeaderTool.HeaderTool import Class, Struct, Enum
+    for struct in Struct.ALL_STRUCTS:
+        if struct.Name == full_typename:
+            return SIMPLE_PROPERTY.format(PROPERTY_TYPE="StructProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', "{full_typename}"')
+        
+    for enum in Enum.ALL_ENUMS:
+        if enum.Name == full_typename:
+            return SIMPLE_PROPERTY.format(PROPERTY_TYPE="EnumProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', "{full_typename}"')
 
     raise NotImplementedError(f"Property type '{full_typename}' is not supported yet.")
 

@@ -128,6 +128,18 @@ public:
         return m_Data.empty();
     }
 
+    void Resize(size_t size) {
+        m_Data.resize(size);
+    }
+
+    T* Data() {
+        return m_Data.data();
+    }
+
+    const T* Data() const {
+        return m_Data.data();
+    }
+
     const std::vector<T>& GetData() const {
         return m_Data;
     }

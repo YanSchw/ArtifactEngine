@@ -1015,6 +1015,10 @@ SharedObjectPtr<Texture> VulkanAPI::CreateTexture(const String& InFilePath, cons
     return new VulkanTexture(InFilePath, InTextureDesc, *this);
 }
 
+SharedObjectPtr<Texture> VulkanAPI::CreateTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const TextureDesc& InTextureDesc) {
+    return new VulkanTexture(InPixels, InWidth, InHeight, InChannels, InTextureDesc, *this);
+}
+
 SharedObjectPtr<Sampler> VulkanAPI::CreateSampler(const SamplerDesc& InSamplerDesc) {
     return new VulkanSampler(InSamplerDesc, *this);
 }
