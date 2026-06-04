@@ -5,6 +5,8 @@
 #include <random>
 #include <sstream>
 
+const UUID UUID::INVALID = UUID{};
+
 namespace {
 
 bool HexValue(char c, uint8_t& out) {
@@ -92,7 +94,7 @@ UUID UUID::FromString(const String& str) {
     UUID result;
 
     if (!TryParse(str, result)) {
-        return UUID{};
+        return UUID::INVALID;
     }
 
     return result;

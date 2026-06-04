@@ -58,6 +58,8 @@ struct UUID {
     uint8_t* Bytes() {
         return Data.data();
     }
+
+    static const UUID INVALID;
 };
 
 namespace std {
