@@ -12,12 +12,21 @@ from Lint.Lint import lint_files
 import os
 import sys
 import subprocess
+import shutil
 
 def cmd_build(args):
     try:
         print("Building the engine...")
         engine_path = get_engine_path()
         project_path = get_project_path()
+        
+        # Clean build artifacts if requested
+        if args.clean:
+            if os.path.exists(f"{project_path}/Build"):
+                shutil.rmtree(f"{project_path}/Build")
+            if os.path.exists(f"{project_path}/Binaries"):
+                shutil.rmtree(f"{project_path}/Binaries")
+        
         cmake_regenerated = generate_cmake(project_path, args)
 
         # Generate reflection code for classes in Modules
@@ -98,9 +107,11 @@ def main():
     build_parser.add_argument("--target", choices=["Win64", "MacOS", "Linux"], default=get_current_platform().name, help="Target platform to build for")
     build_parser.add_argument("--configuration", choices=["Debug", "Dev", "Dist"], default="Dev", help="Build configuration")
     build_parser.add_argument("--packaged", action="store_true", default=False, help="Whether to build a packaged version (binary may be embedded into an application bundle)")
+    build_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before building")
     build_parser.set_defaults(func=cmd_build)
 
     run_parser = subparsers.add_parser("run", help="Run the engine")
+    run_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before running")
     run_parser.set_defaults(func=cmd_run)
 
     cook_parser = subparsers.add_parser("cook", help="Cook assets")
