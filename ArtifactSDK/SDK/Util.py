@@ -42,6 +42,14 @@ def smart_open(file_path: str, encoding: str = "utf-8"):
 
 
 def png_to_ico(png_path, ico_path):
+    # Check if ICO already exists and is newer than PNG
+    if os.path.exists(ico_path):
+        png_mtime = os.path.getmtime(png_path)
+        ico_mtime = os.path.getmtime(ico_path)
+        if ico_mtime >= png_mtime:
+            # ICO is up-to-date, skip conversion
+            return
+    
     img = Image.open(png_path)
 
     # Windows ICO should include multiple sizes

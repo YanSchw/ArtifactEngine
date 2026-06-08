@@ -18,15 +18,16 @@ def cmd_build(args):
         print("Building the engine...")
         engine_path = get_engine_path()
         project_path = get_project_path()
-        generate_cmake(project_path, args)  # Generate CMakeLists.txt in the project directory
+        cmake_regenerated = generate_cmake(project_path, args)
 
         # Generate reflection code for classes in Modules
         header_tool = HeaderTool()
         header_tool.collect_headers(f"{engine_path}/Modules")
         header_tool.collect_headers(f"{project_path}/Modules")
         header_tool.generate()
+
         png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
-        build_cmake()
+        build_cmake(regenerated=cmake_regenerated)
     except KeyboardInterrupt:
         print("Build cancelled by user.")
         sys.exit(1)
