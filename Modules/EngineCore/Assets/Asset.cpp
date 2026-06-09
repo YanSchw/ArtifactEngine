@@ -1,5 +1,8 @@
 #include "Asset.h"
 #include "AssetManager.h"
+#include "Core/EngineConfig.h"
+#include "Serialization/ChunkedBinary.h"
+#include "Serialization/Binary.h"
 
 // AssetStreamHandle
 
@@ -66,6 +69,17 @@ void AssetStreamHandle::Release() {
 
 
 // Asset
+
+void Asset::Cook(ChunkedBinary& OutChunkedBinary) {
+    auto bytes = BinarySerializer::SerializeObject(this);
+    ChunkWriter writer;
+    writer.WriteBytes(bytes->GetData(), bytes->GetSizeInBytes());
+    OutChunkedBinary.AddChunk(0, writer);
+}
+
+SharedObjectPtr<ChunkedBinary> Asset::GetChunkedBinary() const {
+    return ChunkedBinary::LoadFromFile(EngineConfig::ContentDir() + "/" + GetId().ToString());
+} 
 
 bool Asset::IsLoaded() const {
     return true;

@@ -15,6 +15,7 @@
 #include "Rendering/Pipeline.h"
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
+#include "Assets/AssetManager.h"
 
 static SharedObjectPtr<Window> s_Window;
 static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
@@ -27,6 +28,8 @@ void GameEngine::Initialize() {
     Object::Create(Platform::GetDefaultRenderingAPIClass());
     AE_ASSERT(RenderingAPI::GetInstance(), "Failed to create RenderingAPI instance!");
     RenderingAPI::GetInstance()->Initialize();
+
+    (new AssetManager())->Initialize();
 
     m_RenderPipeline = Object::Create(EngineConfig::RenderPipelineClass())->As<RenderPipeline>();
     AE_ASSERT(m_RenderPipeline, "Failed to create RenderPipeline instance!");
@@ -68,6 +71,7 @@ bool GameEngine::MainTick(double InDeltaTime) {
 }
 
 void GameEngine::Shutdown() {
+    AssetManager::Get().Shutdown();
     s_Window = nullptr;
     RenderingAPI::GetInstance()->CleanUp(true);
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "Common/UUID.h"
 #include "Object/Object.h"
+#include "Object/Pointer.h"
 #include "Object/Enum.h"
 #include "Asset.gen.h"
 
@@ -54,11 +55,14 @@ public:
 protected:
     virtual void Load() = 0;
     virtual void Unload() = 0;
+    virtual void Cook(class ChunkedBinary& OutChunkedBinary);
 
+    SharedObjectPtr<class ChunkedBinary> GetChunkedBinary() const;
 public:
     virtual bool IsLoaded() const;
     bool IsMissing() const;
     AssetStreamHandle GetStreamHandle() const;
+    UUID GetId() const { return m_Id; }
 
 protected:
     PROPERTY()
@@ -73,4 +77,5 @@ protected:
 
     friend struct AssetStreamHandle;
     friend class AssetManager;
+    friend class AssetCookerEngine;
 };

@@ -14,6 +14,7 @@ public:
 protected:
     virtual void Load() override;
     virtual void Unload() override;
+    virtual void Cook(class ChunkedBinary& OutChunkedBinary) override;
 
 public:
     virtual bool IsLoaded() const override;

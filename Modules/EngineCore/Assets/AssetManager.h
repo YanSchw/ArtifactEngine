@@ -14,7 +14,7 @@ public:
 
     static AssetManager& Get();
 
-    void Initialize();
+    void Initialize(bool InLoadAssets = true);
     void Shutdown();
     void HotLoadAssets();
 
@@ -30,7 +30,10 @@ public:
 
 private:
     static void AssetStreamingThreadFunc();
+    Array<Asset*> GetAllAssets() const;
 
 private:
     Map<UUID, Asset*> m_Assets;
+
+    friend class AssetCookerEngine;
 };

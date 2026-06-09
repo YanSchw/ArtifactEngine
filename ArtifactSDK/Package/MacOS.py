@@ -32,6 +32,10 @@ def copy_content():
         shutil.rmtree(content_dest)
     shutil.copytree(content_src, content_dest)
 
+    # copy cooked assets into content_dest
+    cooked_src = OUTPUT_DIR / "Cooked"
+    shutil.copytree(cooked_src, content_dest, dirs_exist_ok=True)
+
 def create_plist():
     plist = {
         "CFBundleName": APP_NAME,

@@ -2,6 +2,8 @@
 #include "Asset.h"
 #include "Platform/FileIO.h"
 #include "Serialization/ThirdParty/nlohmann/json.hpp"
+#include "Serialization/ChunkedBinary.h"
+#include "Serialization/Binary.h"
 #include "Serialization/Json.h"
 #include "Core/EngineConfig.h"
 
@@ -25,7 +27,7 @@ AssetManager& AssetManager::Get() {
     return *s_Instance;
 }
 
-void AssetManager::Initialize() {
+void AssetManager::Initialize(bool InLoadAssets) {
     AE_ASSERT(!s_Instance, "AssetManager instance is already initialized!");
     s_Instance = this;
 
@@ -33,18 +35,41 @@ void AssetManager::Initialize() {
     s_AssetLoadingThread = std::thread(AssetManager::AssetStreamingThreadFunc);
 
     if (EngineConfig::IsPackagedBuild()) {
-        // In packaged builds, we would load asset metadata from a file (e.g., "AssetIndex.json") that lists all assets and their UUIDs.
-        AE_ASSERT(false, "Asset loading from packaged builds is not implemented yet!");
+        // In packaged builds, we load asset metadata from the "AssetIndex" that lists all assets and their UUIDs.
+        auto assetIndexBinary = ChunkedBinary::LoadFromFile(EngineConfig::ContentDir() + "/AssetIndex");
+        AE_ASSERT(assetIndexBinary, "Failed to load AssetIndex!");
+        auto assetIndexChunk0 = assetIndexBinary->GetChunk(0);
+        auto assetIndexChunk1 = assetIndexBinary->GetChunk(1);
+        uint32_t assetCount;
+        assetIndexChunk0 >> assetCount;
+        for (uint32_t i = 0; i < assetCount; i++) {
+            UUID assetId;
+            String assetClassName;
+            assetIndexChunk1 >> assetId;
+            assetIndexChunk1 >> assetClassName;
+
+            Asset* asset = Object::Create(Class(assetClassName))->As<Asset>();
+            AE_ASSERT(asset, "Failed to create asset instance");
+            asset->m_Id = assetId;
+            m_Assets[asset->GetId()] = asset;
+        }
+        for (auto& [id, asset] : m_Assets) {
+            // Load asset data from chunk 0
+            auto assetDataChunk = asset->GetChunkedBinary()->GetChunk(0);
+            BinarySerializer::DeserializeObject(asset, assetDataChunk.GetByteString());
+        }
     } else {
         // In non-packaged builds, we can scan the Content directory for assets and load their metadata.
         HotLoadAssets();
     }
 
     // Load all Assets that are marked as AlwaysLoaded
-    for (auto& [id, asset] : m_Assets) {
-        if (asset->m_StreamType == AssetStreamType::AlwaysLoaded) {
-            AE_INFO("Loading asset: {0}", asset->m_Id.ToString());
-            asset->Load();
+    if (InLoadAssets) {
+        for (auto& [id, asset] : m_Assets) {
+            if (asset->m_StreamType == AssetStreamType::AlwaysLoaded) {
+                AE_INFO("Loading asset: {0}", asset->GetId().ToString());
+                asset->Load();
+            }
         }
     }
 }
@@ -56,9 +81,21 @@ void AssetManager::Shutdown() {
 }
 
 AssetManager::~AssetManager() {
+    // wait for streaming to finish any pending load/unload operations before shutting down
+    do {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::lock_guard<std::mutex> lock(s_AssetLoadingMutex);
+        if (s_PendingAssetLoadRequests.IsEmpty())
+            break;
+        AE_WARN("Waiting for {0} pending asset load requests to finish before shutting down AssetManager.", s_PendingAssetLoadRequests.Size());
+    } while (true);
+
+    // Unload all loaded assets
     for (auto& [id, asset] : m_Assets) {
-        AE_INFO("Unloading asset: {0}", asset->m_Id.ToString());
-        asset->Unload();
+        if (asset->IsLoaded()) {
+            AE_INFO("Unloading asset: {0}", asset->GetId().ToString());
+            asset->Unload();
+        }
     }
 
     s_Instance = nullptr;
@@ -86,9 +123,10 @@ void AssetManager::HotLoadAssets() {
             UUID assetId = UUID::FromString(j["m_Id"].get<String>());
 
             Asset* asset = Object::Create(Class(assetClassName))->As<Asset>();
+            AE_ASSERT(asset, "Failed to create asset instance");
             asset->m_Id = assetId;
             jsonStrings[asset] = jsonString;
-            m_Assets[asset->m_Id] = asset;
+            m_Assets[asset->GetId()] = asset;
         }
     }
 
@@ -142,12 +180,20 @@ void AssetManager::AssetStreamingThreadFunc() {
         AE_ASSERT(request.m_Asset->IsLoaded() != request.m_Load, "Asset is already in the desired load state!");
 
         if (request.m_Load) {
-            AE_INFO("Loading asset: {0}", request.m_Asset->m_Id.ToString());
+            AE_INFO("Loading asset: {0}", request.m_Asset->GetId().ToString());
             request.m_Asset->Load();
         } else {
-            AE_INFO("Unloading asset: {0}", request.m_Asset->m_Id.ToString());
+            AE_INFO("Unloading asset: {0}", request.m_Asset->GetId().ToString());
             request.m_Asset->Unload();
         }
 
     }
+}
+
+Array<Asset*> AssetManager::GetAllAssets() const {
+    Array<Asset*> assets;
+    for (const auto& [id, asset] : m_Assets) {
+        assets.Add(asset);
+    }
+    return assets;
 }

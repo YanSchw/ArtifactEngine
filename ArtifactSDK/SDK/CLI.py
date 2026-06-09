@@ -56,15 +56,40 @@ def cmd_run(args):
         print(f"Error occurred while running the engine: {e}")
 
 def cmd_cook(args):
-    print("Cooking assets not yet implemented")
+    args.target = get_current_platform().name
+    args.configuration = "Dev"
+    args.clean = args.clean if hasattr(args, "clean") else False
+    cmd_build(args)  # Ensure the engine is built before running the AssetCooker
+    project_path = os.getcwd()
+    cook_dir = f"{project_path}/Build/Intermediate/Cooked"
+    os.makedirs(cook_dir, exist_ok=True)
+    try:
+        subprocess.run([
+            f"{project_path}/Binaries/Artifact",
+            "-EngineClass=AssetCookerEngine",
+            f"-CookDirectory={cook_dir}",
+        ], check=True)
+    except KeyboardInterrupt:
+        pass  # Allow graceful exit on Ctrl+C
+    except subprocess.CalledProcessError as e:
+        print(f"Error occurred while running the engine: {e}")
 
 def cmd_package(args):
+    project_path = os.getcwd()
+    cmd_cook(args)  # Ensure assets are cooked before packaging
+    # copy cooked assets to Content directory so they get included in the package
+    cooked_src = f"{project_path}/Build/Intermediate/Cooked"
+    content_dest = f"{project_path}/Dist/Cooked"
+    if os.path.exists(content_dest):
+        shutil.rmtree(content_dest)
+    shutil.copytree(cooked_src, content_dest)
+
     args.target = get_current_platform().name
     args.configuration = "Dist"  # Always package the Dist configuration
     args.packaged = True  # Ensure the AE_PACKAGED macro is defined for packaging
+    args.clean = True # Clean build artifacts before packaging to ensure a clean package
     cmd_build(args)
     
-    project_path = os.getcwd()
     os.makedirs(f"{project_path}/Dist", exist_ok=True)
     
     if args.target == "MacOS":
