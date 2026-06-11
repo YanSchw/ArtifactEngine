@@ -20,14 +20,14 @@ def cmd_build(args):
         engine_path = get_engine_path()
         project_path = get_project_path()
         
-        # Clean build artifacts if requested
-        if args.clean:
-            if os.path.exists(f"{project_path}/Build"):
-                shutil.rmtree(f"{project_path}/Build")
-            if os.path.exists(f"{project_path}/Binaries"):
-                shutil.rmtree(f"{project_path}/Binaries")
+        # Clean build if requested (do this BEFORE generating files)
+        clean = getattr(args, 'clean', False)
+        if clean:
+            build_dir = f"{project_path}/Build"
+            if os.path.exists(build_dir):
+                shutil.rmtree(build_dir)
         
-        cmake_regenerated = generate_cmake(project_path, args)
+        generate_cmake(project_path, args)
 
         # Generate reflection code for classes in Modules
         header_tool = HeaderTool()
@@ -36,7 +36,7 @@ def cmd_build(args):
         header_tool.generate()
 
         png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
-        build_cmake(regenerated=cmake_regenerated)
+        build_cmake()
     except KeyboardInterrupt:
         print("Build cancelled by user.")
         sys.exit(1)

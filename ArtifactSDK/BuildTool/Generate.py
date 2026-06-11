@@ -1,69 +1,11 @@
 import os
 import json
 
-from SDK.Paths import get_project_path
 from SDK.Version import VERSION_MAJOR, VERSION_MINOR, get_patch_version
 from SDK.Platforms import PlatformType, get_current_platform, get_cpp_platform_macro
 from BuildTool.Target import TargetType, get_cpp_target_macro
 from BuildTool.Module import ArtifactModule
 from SDK.Util import smart_open
-
-CMAKE_CACHE_FILE = f"{get_project_path()}/Build/Intermediate/CMakeGenerate.cache.json"
-
-def _load_cmake_cache():
-    """Load cached build configuration and module mtimes from previous generation."""
-    if os.path.exists(CMAKE_CACHE_FILE):
-        try:
-            with open(CMAKE_CACHE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-def _save_cmake_cache(cache_data):
-    """Save build configuration and module mtimes for next generation."""
-    os.makedirs(os.path.dirname(CMAKE_CACHE_FILE) or ".", exist_ok=True)
-    with open(CMAKE_CACHE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(cache_data, f, indent=4)
-
-def _collect_module_mtimes(project_path: str) -> dict:
-    """Collect modification times of all Module.json files."""
-    mtimes = {}
-    modules_dir = f"{project_path}/Modules"
-    if os.path.isdir(modules_dir):
-        for module_name in os.listdir(modules_dir):
-            module_json = f"{modules_dir}/{module_name}/Module.json"
-            if os.path.isfile(module_json):
-                mtimes[module_json] = os.path.getmtime(module_json)
-    return mtimes
-
-def _cmake_needs_regeneration(project_path: str, args) -> bool:
-    """Check if CMake files need regeneration based on input changes."""
-    cached = _load_cmake_cache()
-    
-    # Build current cache key and mtimes
-    current_config = {
-        "target": args.target,
-        "configuration": args.configuration,
-        "packaged": args.packaged if hasattr(args, "packaged") else False
-    }
-    current_mtimes = _collect_module_mtimes(project_path)
-    
-    # Check if configuration changed
-    if cached.get("config") != current_config:
-        return True
-    
-    # Check if module count changed
-    cached_mtimes = cached.get("module_mtimes", {})
-    if len(current_mtimes) != len(cached_mtimes):
-        return True
-    
-    # Check if any module.json files changed
-    for module_json, mtime in current_mtimes.items():
-        if module_json not in cached_mtimes or cached_mtimes[module_json] != mtime:
-            return True
-    
-    return False
 
 def expand_indirect_module_dependencies(project_path: str, import_modules: list[str]) -> set[str]:
     to_check = set(import_modules)
@@ -83,18 +25,12 @@ def expand_indirect_module_dependencies(project_path: str, import_modules: list[
 
     return expanded
 
-def generate_cmake(project_path: str, args) -> bool:
-    """Generate CMake files if needed. Returns True if regeneration occurred, False if skipped."""
+def generate_cmake(project_path: str, args):
     target_platform = args.target
     target_configuration = args.configuration
     is_packaged = args.packaged if hasattr(args, "packaged") else False
     if project_path == ".":
         project_path = os.getcwd()
-
-    # Check if regeneration is needed based on module changes
-    if not _cmake_needs_regeneration(project_path, args):
-        print("No CMake input changes detected, skipping CMakeLists.txt generation.")
-        return False
 
     __LinkModules = """#include <vector>
 #include <string>
@@ -186,15 +122,3 @@ int __VERSION_MAJOR() {{ return {VERSION_MAJOR}; }}
 int __VERSION_MINOR() {{ return {VERSION_MINOR}; }}
 int __VERSION_PATCH() {{ return {get_patch_version() if get_patch_version() is not None else '-1'}; }}
 """)
-    
-    # Save cache for next generation
-    cache_data = {
-        "config": {
-            "target": args.target,
-            "configuration": args.configuration,
-            "packaged": args.packaged if hasattr(args, "packaged") else False
-        },
-        "module_mtimes": _collect_module_mtimes(project_path)
-    }
-    _save_cmake_cache(cache_data)
-    return True

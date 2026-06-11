@@ -63,14 +63,11 @@ def current_platform_generator():
     else:
         raise RuntimeError(f"Unsupported development platform: {platform}")
 
-def build_cmake(regenerated: bool = True):
-    """Build with CMake. Set regenerated=False to skip cmake configuration if files didn't change."""
-    
-    # Only run cmake configuration if CMakeLists.txt was regenerated or if this is first build
-    if regenerated or not os.path.exists("Build/CMakeCache.txt"):
-        subprocess.run(["cmake", "-S", ".", "-G", current_platform_generator(), "-B", "Build"], check=True)
-    else:
-        print("CMake configuration is up-to-date, skipping cmake configuration step.")
+def build_cmake():
+    if os.path.exists("Binaries"):
+        shutil.rmtree("Binaries")
+
+    subprocess.run(["cmake", "-S", ".", "-G", current_platform_generator(), "-B", "Build"], check=True)
     proc = subprocess.run(
         ["cmake", "--build", "Build", "--config", "Debug"],
         stdout=subprocess.PIPE,
