@@ -53,7 +53,7 @@ class HeaderTool:
             code_lines = code.splitlines()
             results = []
             # ARTIFACT_CLASS()
-            pattern = re.compile(r'(?:class|struct)\s+(\w+)\s*:\s*public\s+(\w+)\s*\{', re.MULTILINE)
+            pattern = re.compile(r'(?:class|struct)\s+(\w+)\s*(?:final\s*)?:\s*public\s+(\w+)\s*\{', re.MULTILINE)
             for match in pattern.finditer(code):
                 class_name = match.group(1)
                 parent_class = match.group(2)

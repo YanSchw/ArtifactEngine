@@ -13,3 +13,9 @@
 #include "Object/Enum.h"
 #include "Object/Property.h"
 #include "Object/Pointer.h"
+
+#include "GameFramework/Node.h"
+#include "GameFramework/Node3D.h"
+#include "GameFramework/Component.h"
+class World;
+class GameInstance;

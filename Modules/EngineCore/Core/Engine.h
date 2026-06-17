@@ -9,6 +9,10 @@ class Engine : public Object {
 public:
     ARTIFACT_CLASS();
 
+    Engine();
+    static Engine& Get();
+
+protected:
     virtual void Initialize() = 0;
     virtual bool MainTick(double InDeltaTime) = 0;
     virtual void Shutdown() = 0;
@@ -20,4 +24,5 @@ protected:
     double m_DeltaTime;
     SharedObjectPtr<class RenderPipeline> m_RenderPipeline;
 
+    friend int ArtifactMain(const Array<String>&);
 };

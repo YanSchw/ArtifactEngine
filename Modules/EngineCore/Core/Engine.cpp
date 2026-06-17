@@ -1,5 +1,11 @@
 #include "Engine.h"
 
+static Engine* s_Instance = nullptr;
+
+Engine::Engine() {
+    s_Instance = this;
+}
+
 void Engine::MainLoop() {
     m_PreviousTime = std::chrono::steady_clock::now();
     do {
@@ -12,4 +18,8 @@ void Engine::MainLoop() {
 
         m_PreviousTime = currentTime;
     } while (MainTick(static_cast<float>(m_DeltaTime)));
+}
+
+Engine& Engine::Get() {
+    return *s_Instance;
 }

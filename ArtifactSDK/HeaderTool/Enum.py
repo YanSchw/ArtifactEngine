@@ -7,8 +7,14 @@ ENUM_CODE = """
 inline {ENUM_NAME} operator|({ENUM_NAME} a, {ENUM_NAME} b) {{
     return ({ENUM_NAME})(({UNDERLYING_TYPE})a | ({UNDERLYING_TYPE})b);
 }}
+inline {ENUM_NAME}& operator|=({ENUM_NAME}& a, {ENUM_NAME} b) {{
+    return ({ENUM_NAME}&)(({UNDERLYING_TYPE}&)a |= ({UNDERLYING_TYPE})b);
+}}
 inline {ENUM_NAME} operator&({ENUM_NAME} a, {ENUM_NAME} b) {{
     return ({ENUM_NAME})(({UNDERLYING_TYPE})a & ({UNDERLYING_TYPE})b);
+}}
+inline {ENUM_NAME}& operator&=({ENUM_NAME}& a, {ENUM_NAME} b) {{
+    return ({ENUM_NAME}&)(({UNDERLYING_TYPE}&)a &= ({UNDERLYING_TYPE})b);
 }}
 
 struct E{ENUM_NAME} {{

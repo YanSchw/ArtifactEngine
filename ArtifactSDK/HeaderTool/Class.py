@@ -14,6 +14,7 @@ static Class StaticClass() {{
 struct InternalAlloc {{
 private:
     InternalAlloc() = default;
+    inline static Class::RegisterParentChildClassRelationship _ClassParentChildRelationship_{CLASS_NAME} = {{ "{CLASS_NAME}", "{PARENT_CLASS_NAME}" }};
     inline static Object::RegisterArtifactClass<{CLASS_NAME}> _ClassAllocator_{CLASS_NAME};
     {PROPERTIES_REGISTRATION_CODE}
 }}/* No ; is appended after this struct, since the macro itself is supposed to have a ; */

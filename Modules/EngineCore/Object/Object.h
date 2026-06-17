@@ -1,4 +1,5 @@
 #pragma once
+#include "Common/String.h"
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -9,6 +10,16 @@ struct Class {
     Class() : Name("") {};
     Class(const Class&) = default;
     Class(const std::string& name) : Name(name) {}
+
+    Class GetParentClass() const;
+    bool IsSubclassOf(const Class& InBaseClass) const;
+
+    inline bool operator==(const Class& InOther) const { return Name == InOther.Name; }
+    inline bool operator!=(const Class& InOther) const { return !operator==(InOther); }
+
+    struct RegisterParentChildClassRelationship {
+        RegisterParentChildClassRelationship(const String& InChild, const String& InParent);
+    };
 
     const static Class None;
 };
