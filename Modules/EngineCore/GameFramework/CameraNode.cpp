@@ -9,7 +9,7 @@ CameraNode::CameraNode() {
 
 void CameraNode::BeginPlay() {
     Super::BeginPlay();
-    if (GetWorld()->GetMainCamera() == nullptr)	{
+    if (GetWorld()->GetMainCamera() == nullptr) {
         GetWorld()->SetMainCamera(this);
     }
     RecalculateProjection();
