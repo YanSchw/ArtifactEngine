@@ -191,10 +191,17 @@ void VulkanPipeline::Invalidate() {
 
     CreateDescriptorSetLayout();
 
+    VkPushConstantRange pushConstantRange = {};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = MAX_SHADER_DATA_SIZE;
+
     VkPipelineLayoutCreateInfo layoutCreateInfo = {};
     layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layoutCreateInfo.setLayoutCount = 1;
     layoutCreateInfo.pSetLayouts = &m_DescriptorSetLayout;
+    layoutCreateInfo.pushConstantRangeCount = 1;
+    layoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 
     if (vkCreatePipelineLayout(m_VulkanAPI->GetDevice(), &layoutCreateInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS) {
         AE_ERROR("failed to create pipeline layout");

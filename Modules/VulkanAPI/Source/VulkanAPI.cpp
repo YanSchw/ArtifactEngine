@@ -14,6 +14,7 @@
 #include "Core/Log.h"
 #include "Window.h"
 #include "Rendering/Vertex.h"
+#include "Rendering/ShaderData.h"
 
 #include "Helpers.h"
 #include "VulkanVertexBuffer.h"
@@ -849,6 +850,8 @@ void VulkanAPI::Draw() {
 
 void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer, uint32_t InImageIndex) {
     bool hasRenderPassBegun = false;
+    VulkanPipeline* currentPipeline = nullptr;
+
     for (const RenderCommand& cmd : InQueue.commands) {
         switch (cmd.Type) {
             case RenderCommandType::BeginRenderPass: {
@@ -919,6 +922,7 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                     continue;
 
                 VulkanPipeline* pipeline = data.Pipeline->As<VulkanPipeline>();
+                currentPipeline = pipeline;
 
                 vkCmdBindDescriptorSets(InCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_PipelineLayout, 0, 1, &pipeline->m_DescriptorSet, 0, nullptr);
                 vkCmdBindPipeline(InCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_Pipeline);
@@ -944,6 +948,27 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
             case RenderCommandType::DrawIndexed: {
                 const auto& data = std::get<CmdDrawIndexed>(cmd.Data);
                 vkCmdDrawIndexed(InCmdBuffer, data.IndexCount, 1, data.FirstIndex, data.VertexOffset, 0);
+                break;
+            }
+
+            case RenderCommandType::SetShaderData: {
+                const auto& data = std::get<CmdSetShaderData>(cmd.Data);
+
+                if (!data.Data)
+                    continue;
+
+                AE_ASSERT(currentPipeline, "A Pipeline has to be bound for ShaderData to be uploaded!");
+                AE_ASSERT(data.Data->Size() <= VulkanPipeline::MAX_SHADER_DATA_SIZE);
+
+                vkCmdPushConstants(
+                    InCmdBuffer,
+                    currentPipeline->m_PipelineLayout,
+                    VK_SHADER_STAGE_VERTEX_BIT |
+                    VK_SHADER_STAGE_FRAGMENT_BIT,
+                    0,
+                    static_cast<uint32_t>(data.Data->Size()),
+                    data.Data->Data());
+
                 break;
             }
         }

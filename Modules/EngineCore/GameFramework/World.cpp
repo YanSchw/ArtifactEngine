@@ -49,6 +49,14 @@ Array<Node*> World::GetAllNodes() const {
     return m_WorldNodes;
 }
 
+CameraNode* World::GetMainCamera() const {
+    return m_MainCamera;
+}
+
+void World::SetMainCamera(CameraNode* InCamera) {
+    m_MainCamera = InCamera;
+}
+
 void World::UnregisterNode(Node* node) {
     if (m_WorldNodes.Contains(node)) m_WorldNodes.Remove(node);
     if (node->IsUpdateFlagSet(UpdateFlag::WorldUpdate) && m_WorldUpdateNodes.Contains(node)) m_WorldUpdateNodes[m_WorldUpdateNodes.IndexOf(node)] = nullptr;

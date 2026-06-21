@@ -23,6 +23,9 @@ public:
     static void InvalidateAll();
     static void DestroyAll();
 
+public:
+    static const constexpr uint32_t MAX_SHADER_DATA_SIZE = 128;
+
 private:
     PipelineDesc m_Desc;
     VulkanAPI* m_VulkanAPI = nullptr;

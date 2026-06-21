@@ -4,6 +4,7 @@
 #include "World.gen.h"
 
 class Node;
+class CameraNode;
 
 /** Container for all Nodes during Gameplay */
 class World final : public Object {
@@ -13,6 +14,9 @@ public:
     void Update(double InDeltatime);
 
     Array<Node*> GetAllNodes() const;
+
+    CameraNode* GetMainCamera() const;
+    void SetMainCamera(CameraNode* InCamera);
 
     Node* Spawn(const Class& InClass);
     template<typename T>
@@ -41,6 +45,8 @@ private:
     /** Array of all nodes, that will be killed at the end of the frame. 
     *   Kill happens outside of Gameplay Context. */
     Array<Node*> m_PendingKills;
+
+    WeakObjectPtr<CameraNode> m_MainCamera;
 
     friend class Node;
 };

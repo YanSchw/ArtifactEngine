@@ -16,6 +16,10 @@
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
 #include "Assets/AssetManager.h"
+#include "GameFramework/GameInstance.h"
+#include "GameFramework/World.h"
+#include "GameFramework/CameraNode.h"
+#include "GameFramework/StaticMeshNode.h"
 
 static SharedObjectPtr<Window> s_Window;
 static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
@@ -49,10 +53,23 @@ void GameEngine::Initialize() {
     fullscreenDesc.Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::ContentDir() + "/Shaders/Passthrough.glsl"));
     fullscreenDesc.ImageBindings.Add({ 16, m_RenderPipeline->GetFinalImageView(), sampler });
     s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
+
+    // create GameInstance and World
+    m_GameInstance = new GameInstance();
+    World* world = m_GameInstance->CreateNewWorld(true);
+    world->Spawn<CameraNode>();
+    world->Spawn<StaticMeshNode>()->SetPosition(Vec3(-4, 0, 0));
+    world->Spawn<StaticMeshNode>()->SetPosition(Vec3(+4, 0, 0));
 }
 
 bool GameEngine::MainTick(double InDeltaTime) {
-    m_RenderPipeline->Render(InDeltaTime, RenderParams{ s_Window->GetWidth(), s_Window->GetHeight() });
+    GetGameInstance()->Update(InDeltaTime);
+
+    m_RenderPipeline->Render(InDeltaTime, RenderParams {
+        s_Window->GetWidth(), 
+        s_Window->GetHeight(),
+        GetGameInstance()->GetCurrentWorld()
+    });
 
     auto[binding, imageView, sampler] = s_FullScreenPipeline->GetDesc().ImageBindings[0];
     if (imageView != m_RenderPipeline->GetFinalImageView()) {

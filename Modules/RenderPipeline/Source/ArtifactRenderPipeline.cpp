@@ -15,9 +15,11 @@
 #include "Rendering/Pipeline.h"
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
+#include "GameFramework/World.h"
+#include "GameFramework/CameraNode.h"
+#include "GameFramework/StaticMeshNode.h"
 
-static SharedObjectPtr<VertexBuffer> s_VertexBuffer1;
-static SharedObjectPtr<VertexBuffer> s_VertexBuffer2;
+static SharedObjectPtr<VertexBuffer> s_VertexBuffer;
 
 static SharedObjectPtr<Shader> s_Shader;
 static SharedObjectPtr<UniformBuffer> s_UniformBuffer;
@@ -31,26 +33,14 @@ static uint32_t s_Width  = 0;
 static uint32_t s_Height = 0;
 
 static struct {
-    glm::mat4 transformationMatrix;
+    glm::mat4 viewProjectionMatrix;
 } uniformBufferData;
 
 static void UpdateUniformData(const RenderParams& InParams) {
-    static auto timeStart = std::chrono::high_resolution_clock::now(); // Initialize once
-
-    auto timeNow = std::chrono::high_resolution_clock::now();
-    long long millis = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeStart).count();
-    float angle = (millis % 4000) / 4000.0f * glm::radians(360.f);
-
-    // Proper identity initialization
-    glm::mat4 modelMatrix = glm::mat4(1.0f);
-    modelMatrix = glm::rotate(modelMatrix, angle, glm::vec3(0, 0, 1));
-    modelMatrix = glm::translate(modelMatrix, glm::vec3(0.5f / 3.0f, -0.5f / 3.0f, 0.0f));
-
-    // View and projection
-    auto viewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
-    auto projMatrix = glm::perspective(glm::radians(70.f), InParams.Width / (float)InParams.Height, 0.1f, 10.0f);
-
-    uniformBufferData.transformationMatrix = projMatrix * viewMatrix * modelMatrix;
+    if (InParams.m_World && InParams.m_World->GetMainCamera()) {
+        InParams.m_World->GetMainCamera()->SetAspectRatio(InParams.Height / (float) InParams.Width);
+        uniformBufferData.viewProjectionMatrix = InParams.m_World->GetMainCamera()->GetViewProjectionMatrix();
+    }
 
     // Upload
     void* data = s_UniformBuffer->MapData(sizeof(uniformBufferData), 0);
@@ -62,18 +52,12 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     s_Width = InWidth;
     s_Height = InHeight;
 
-    Array<Vertex> vertices1 = {
+    Array<Vertex> vertices = {
         { { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
         { { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
         { {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } }
     };
-    s_VertexBuffer1 = VertexBuffer::Create(vertices1, { 0, 1, 2 });
-    Array<Vertex> vertices2 = {
-        { { -0.5f, -0.5f,  -1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
-        { { -0.5f,  0.5f,  -1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
-        { {  0.5f,  0.5f,  -1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } }
-    };
-    s_VertexBuffer2 = VertexBuffer::Create(vertices2, { 0, 1, 2 });
+    s_VertexBuffer = VertexBuffer::Create(vertices, { 0, 1, 2 });
     Array<Vertex> fullScreenQuadVertices = {
         { { -1.0f, -1.0f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
         { { -1.0f,  1.0f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
@@ -134,8 +118,12 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
 
     UpdateUniformData(InParams);
     s_Pipeline->Bind();
-    s_VertexBuffer1->Draw();
-    s_VertexBuffer2->Draw();
+    for (Node* node : InParams.m_World->GetAllNodes()) {
+        if (StaticMeshNode* staticMesh = node->As<StaticMeshNode>()) {
+            RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData, CmdSetShaderData{ staticMesh->GetPerMeshShaderData() });
+            s_VertexBuffer->Draw();
+        }
+    }
 }
 
 SharedObjectPtr<class ImageView> ArtifactRenderPipeline::GetFinalImageView() const {

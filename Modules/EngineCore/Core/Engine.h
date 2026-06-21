@@ -5,12 +5,16 @@
 
 #include <chrono>
 
+class GameInstance;
+
 class Engine : public Object {
 public:
     ARTIFACT_CLASS();
 
     Engine();
     static Engine& Get();
+
+    GameInstance* GetGameInstance() const;
 
 protected:
     virtual void Initialize() = 0;
@@ -23,6 +27,7 @@ protected:
     std::chrono::steady_clock::time_point m_PreviousTime;
     double m_DeltaTime;
     SharedObjectPtr<class RenderPipeline> m_RenderPipeline;
+    SharedObjectPtr<class GameInstance> m_GameInstance;
 
     friend int ArtifactMain(const Array<String>&);
 };

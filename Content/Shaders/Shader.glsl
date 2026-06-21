@@ -9,11 +9,15 @@ layout(binding = 0) uniform UBO {
     mat4 u_ViewProjection;
 };
 
+layout(push_constant) uniform ShaderData {
+    mat4 WorldTransform;
+} u_ShaderData;
+
 layout(location = 1) out vec4 v_Color;
 layout(location = 2) out vec2 v_UV;
 
 void main() {
-    gl_Position = u_ViewProjection * vec4(a_Position, 1.0);
+    gl_Position = u_ViewProjection * u_ShaderData.WorldTransform * vec4(a_Position, 1.0);
     v_Color = vec4(a_Color, 1.0);
     v_UV = a_UV;
 }

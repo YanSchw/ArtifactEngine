@@ -5,6 +5,7 @@
 struct RenderParams {
     uint32_t Width;
     uint32_t Height;
+    class World* m_World = nullptr;
 };
 
 class RenderPipeline : public Object {

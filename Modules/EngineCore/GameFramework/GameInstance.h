@@ -15,6 +15,7 @@ public:
     Array<SharedObjectPtr<World>> GetAllWorld();
     SharedObjectPtr<World> GetCurrentWorld() const;
     void SetCurrentWorld(World* InWorld);
+    World* CreateNewWorld(bool InIsNewCurrentWorld);
 
 private:
     SharedObjectPtr<World> m_CurrentWorld;

@@ -31,3 +31,12 @@ void GameInstance::SetCurrentWorld(World* InWorld) {
     }
     AE_ASSERT(false, "A World not managed by GameInstance may never become the new current world!");
 }
+
+World* GameInstance::CreateNewWorld(bool InIsNewCurrentWorld) {
+    World* world = new World();
+    m_Worlds.Add(world);
+    if (InIsNewCurrentWorld) {
+        SetCurrentWorld(world);
+    }
+    return world;
+}

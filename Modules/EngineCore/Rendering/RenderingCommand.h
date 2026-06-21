@@ -7,7 +7,8 @@ enum class RenderCommandType {
     BeginRenderPass,
     BindPipeline,
     BindVertexBuffer,
-    DrawIndexed
+    DrawIndexed,
+    SetShaderData
 };
 
 struct CmdBeginRenderPass {
@@ -28,11 +29,16 @@ struct CmdDrawIndexed {
     int32_t  VertexOffset;
 };
 
+struct CmdSetShaderData {
+    WeakObjectPtr<class ShaderData> Data;
+};
+
 using RenderCommandData = std::variant<
     CmdBeginRenderPass,
     CmdBindPipeline,
     CmdBindVertexBuffer,
-    CmdDrawIndexed
+    CmdDrawIndexed,
+    CmdSetShaderData
 >;
 
 struct RenderCommand {

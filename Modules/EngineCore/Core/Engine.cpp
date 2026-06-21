@@ -6,6 +6,10 @@ Engine::Engine() {
     s_Instance = this;
 }
 
+GameInstance* Engine::GetGameInstance() const {
+    return m_GameInstance;
+}
+
 void Engine::MainLoop() {
     m_PreviousTime = std::chrono::steady_clock::now();
     do {
