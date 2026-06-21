@@ -36,6 +36,10 @@ public:
         return m_Map.size();
     }
 
+    void Reserve(size_t capacity) {
+        m_Map.reserve(capacity);
+    }
+
     // Iterators
 
     typename std::unordered_map<K, V>::iterator begin() { return m_Map.begin(); }

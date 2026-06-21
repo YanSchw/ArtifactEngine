@@ -2,12 +2,20 @@
 #include "Pointer.h"
 #include "Common/Map.h"
 
-static Map<String, String> s_ChildToParentClassnames;
+static Map<String, String>* GetChildToParentClassnames() {
+    static Map<String, String>* s_ChildToParentClassnames = nullptr;
+    if (!s_ChildToParentClassnames) {
+        s_ChildToParentClassnames = new Map<String, String>();
+        // Reserve capacity for expected class count to avoid rehashing during initialization
+        s_ChildToParentClassnames->Reserve(256);
+    }
+    return s_ChildToParentClassnames;
+}
 
 const Class Class::None = Class("");
 
 Class Class::GetParentClass() const {
-    return s_ChildToParentClassnames.At(Name);
+    return GetChildToParentClassnames()->At(Name);
 }
 
 bool Class::IsSubclassOf(const Class& InBaseClass) const {
@@ -26,7 +34,7 @@ bool Class::IsSubclassOf(const Class& InBaseClass) const {
 }
 
 Class::RegisterParentChildClassRelationship::RegisterParentChildClassRelationship(const String& InChild, const String& InParent) {
-    s_ChildToParentClassnames[InChild] = InParent;
+    (*GetChildToParentClassnames())[InChild] = InParent;
 }
 
 Object* Object::Create(const Class& type) {
