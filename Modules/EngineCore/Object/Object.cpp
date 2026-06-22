@@ -1,6 +1,16 @@
 #include "Object.h"
 #include "Pointer.h"
 #include "Common/Map.h"
+#include "Common/Array.h"
+
+static Array<Class>* GetListOfAllClasses() {
+    static Array<Class>* s_ListOfAllClasses = nullptr;
+    if (!s_ListOfAllClasses) {
+        s_ListOfAllClasses = new Array<Class>();
+        s_ListOfAllClasses->Add(Class("Object"));
+    }
+    return s_ListOfAllClasses;
+}
 
 static Map<String, String>* GetChildToParentClassnames() {
     static Map<String, String>* s_ChildToParentClassnames = nullptr;
@@ -33,8 +43,23 @@ bool Class::IsSubclassOf(const Class& InBaseClass) const {
         );
 }
 
+Array<Class> Class::GetSubclassesOf(const Class& InBaseClass) {
+    Array<Class> subClasses;
+    for (auto It : *GetListOfAllClasses()) {
+        if (It != Class::None && It.IsSubclassOf(InBaseClass)) {
+            subClasses.Add(It);
+        }
+    }
+    return subClasses;
+}
+
+Array<Class> Class::GetAllClasses() {
+    return *GetListOfAllClasses();
+}
+
 Class::RegisterParentChildClassRelationship::RegisterParentChildClassRelationship(const String& InChild, const String& InParent) {
     (*GetChildToParentClassnames())[InChild] = InParent;
+    (*GetListOfAllClasses()).Add(Class(InChild));
 }
 
 Object* Object::Create(const Class& type) {

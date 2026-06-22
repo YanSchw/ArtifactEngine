@@ -4,6 +4,8 @@
 #include <string>
 #include <unordered_map>
 
+template<typename T> struct Array;
+
 struct Class {
     std::string Name;
     
@@ -13,6 +15,9 @@ struct Class {
 
     Class GetParentClass() const;
     bool IsSubclassOf(const Class& InBaseClass) const;
+    static Array<Class> GetSubclassesOf(const Class& InBaseClass);
+
+    static Array<Class> GetAllClasses();
 
     inline bool operator==(const Class& InOther) const { return Name == InOther.Name; }
     inline bool operator!=(const Class& InOther) const { return !operator==(InOther); }
