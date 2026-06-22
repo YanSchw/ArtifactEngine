@@ -5,6 +5,7 @@
 #include "ArtifactRenderPipeline.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Texture2D.h"
+#include "Assets/Mesh.h"
 #include "Core/EngineConfig.h"
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/VertexBuffer.h"
@@ -18,8 +19,6 @@
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
 #include "GameFramework/StaticMeshNode.h"
-
-static SharedObjectPtr<VertexBuffer> s_VertexBuffer;
 
 static SharedObjectPtr<Shader> s_Shader;
 static SharedObjectPtr<UniformBuffer> s_UniformBuffer;
@@ -52,12 +51,6 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     s_Width = InWidth;
     s_Height = InHeight;
 
-    Array<Vertex> vertices = {
-        { { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
-        { { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
-        { {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } }
-    };
-    s_VertexBuffer = VertexBuffer::Create(vertices, { 0, 1, 2 });
     Array<Vertex> fullScreenQuadVertices = {
         { { -1.0f, -1.0f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
         { { -1.0f,  1.0f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
@@ -121,7 +114,13 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
     for (Node* node : InParams.m_World->GetAllNodes()) {
         if (StaticMeshNode* staticMesh = node->As<StaticMeshNode>()) {
             RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData, CmdSetShaderData{ staticMesh->GetPerMeshShaderData() });
-            s_VertexBuffer->Draw();
+            
+            Mesh* mesh = staticMesh->GetMesh();
+            if (mesh) {
+                VertexBuffer* vertexBuffer = mesh->GetVertexBuffer();
+                AE_ASSERT(vertexBuffer);
+                vertexBuffer->Draw();
+            }
         }
     }
 }

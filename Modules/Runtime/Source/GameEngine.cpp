@@ -58,8 +58,8 @@ void GameEngine::Initialize() {
     m_GameInstance = new GameInstance();
     World* world = m_GameInstance->CreateNewWorld(true);
     world->Spawn<CameraNode>();
-    world->Spawn<StaticMeshNode>()->SetPosition(Vec3(-4, 0, 0));
-    world->Spawn<StaticMeshNode>()->SetPosition(Vec3(+4, 0, 0));
+    world->Spawn<StaticMeshNode>()->SetPosition(Vec3(-2, 0, 0));
+    world->Spawn<StaticMeshNode>()->SetPosition(Vec3(+2, 0, 0));
 }
 
 bool GameEngine::MainTick(double InDeltaTime) {
