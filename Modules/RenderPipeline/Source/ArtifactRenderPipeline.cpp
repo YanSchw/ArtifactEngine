@@ -109,6 +109,11 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
         Invalidate(InParams.Width, InParams.Height);
     }
 
+    if (InParams.m_World == nullptr) {
+        AE_WARN("ArtifactRenderPipeline cannot be invoked without a world");
+        return;
+    }
+
     UpdateUniformData(InParams);
     s_Pipeline->Bind();
     for (Node* node : InParams.m_World->GetAllNodes()) {
