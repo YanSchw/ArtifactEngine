@@ -19,6 +19,14 @@ int64_t Enum::ConvertStringToValue(const String& InString) const {
     return -1;
 }
 
+const Array<Enum::EnumValue>& Enum::GetValues() const {
+    if (Enum::s_EnumValues.ContainsKey(Name)) {
+        return Enum::s_EnumValues[Name];
+    }
+    static const Array<EnumValue> s_Empty;
+    return s_Empty;
+}
+
 String Enum::ConvertValueToString(int64_t InValue) const {
     if (Enum::s_EnumValues.ContainsKey(Name)) {
         const auto& values = Enum::s_EnumValues[Name];

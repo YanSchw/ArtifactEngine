@@ -15,6 +15,10 @@ struct Enum {
         String Name;
         int64_t Value;
     };
+
+    // Returns every registered (Name, Value) pair for this enum, in declaration
+    // order. Returns an empty array if the enum has no registered values.
+    const Array<EnumValue>& GetValues() const;
 private:
     inline static Map<String, Array<EnumValue>> s_EnumValues;
 public:

@@ -35,6 +35,23 @@ struct E{ENUM_NAME} {{
         return StaticEnum().ConvertValueToString(static_cast<int64_t>(InValue));
     }}
 
+    /* Returns every declared value of {ENUM_NAME}, in declaration order. */
+    static Array<{ENUM_NAME}> GetValues() {{
+        Array<{ENUM_NAME}> result;
+        for (const auto& value : StaticEnum().GetValues()) {{
+            result.Add(static_cast<{ENUM_NAME}>(value.Value));
+        }}
+        return result;
+    }}
+    /* Returns the name of every declared value of {ENUM_NAME}, in declaration order. */
+    static Array<String> GetNames() {{
+        Array<String> result;
+        for (const auto& value : StaticEnum().GetValues()) {{
+            result.Add(value.Name);
+        }}
+        return result;
+    }}
+
 private:
     inline static Enum::RegisterEnumValues _EnumValues_{ENUM_NAME} = Enum::RegisterEnumValues("{ENUM_NAME}", {{
 {ENUM_VALUES}
