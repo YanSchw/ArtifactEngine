@@ -4,7 +4,8 @@
     ],
     "ImportModules": [
         "EngineCore",
-        "VulkanAPI"
+        "VulkanAPI",
+        "InputSystem"
     ],
     "ExportIncludePaths": [
         "Source"

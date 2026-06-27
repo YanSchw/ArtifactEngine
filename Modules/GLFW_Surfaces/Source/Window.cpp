@@ -1,6 +1,10 @@
 #include "Window.h"
 #include "Core/Log.h"
 
+#include "GLFWKeyboardDevice.h"
+#include "GLFWMouseDevice.h"
+#include "InputSystem/InputSystem.h"
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -34,6 +38,14 @@ Window::Window(const WindowParams& InParams) {
         return;
     }
     glfwSetWindowSizeCallback(m_Window, OnWindowResized);
+
+    // Spin up the global input devices the first time a window is created.
+    static bool s_InputDevicesCreated = false;
+    if (!s_InputDevicesCreated) {
+        s_InputDevicesCreated = true;
+        InputSystem::Get().AddDevice(new GLFWKeyboardDevice());
+        InputSystem::Get().AddDevice(new GLFWMouseDevice());
+    }
 }
 Window::~Window() {
     // Destructor implementation
