@@ -14,7 +14,7 @@ public:
     void SetPerspective(float verticalFOV, float nearClip, float farClip);
     void SetOrthographic(float size, float nearClip, float farClip);
     void SetViewportSize(uint32_t width, uint32_t height);
-    void SetAspectRatio(float aspect) { m_AspectRatio = aspect; }
+    void SetAspectRatio(float aspect) { m_AspectRatio = aspect; RecalculateProjection(); }
     float GetAspectRatio() const { return m_AspectRatio; }
     float GetPerspectiveVerticalFOV() const { return m_PerspectiveFOV; }
     void SetPerspectiveVerticalFOV(float verticalFov) { m_PerspectiveFOV = verticalFov; RecalculateProjection(); }

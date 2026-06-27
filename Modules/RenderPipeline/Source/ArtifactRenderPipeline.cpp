@@ -37,7 +37,7 @@ static struct {
 
 static void UpdateUniformData(const RenderParams& InParams) {
     if (InParams.m_World && InParams.m_World->GetMainCamera()) {
-        InParams.m_World->GetMainCamera()->SetAspectRatio(InParams.Height / (float) InParams.Width);
+        InParams.m_World->GetMainCamera()->SetAspectRatio(InParams.Width / (float) InParams.Height);
         uniformBufferData.viewProjectionMatrix = InParams.m_World->GetMainCamera()->GetViewProjectionMatrix();
     }
 
