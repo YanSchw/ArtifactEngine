@@ -27,6 +27,16 @@ ARRAY_LAMBDAS = """
 }}
 """
 
+def _enum_underlying_byte_size(underlying: str) -> int:
+    sizes = {
+        "uint8_t": 1, "int8_t": 1, "uint8": 1, "int8": 1,
+        "uint16_t": 2, "int16_t": 2, "uint16": 2, "int16": 2,
+        "uint32_t": 4, "int32_t": 4, "uint32": 4, "int32": 4,
+        "uint64_t": 8, "int64_t": 8, "uint64": 8, "int64": 8,
+    }
+    return sizes.get(underlying, 4)  # default 'int' is 4 bytes
+
+
 def generate_property_type(full_typename: str, prop_name: str, class_or_struct_typename: str, use_offset: bool = True) -> str:
     offset = f"offsetof({class_or_struct_typename}, {prop_name})" if use_offset else "0"
 
@@ -49,6 +59,9 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
     if full_typename == "int64_t" or full_typename == "int64":
         return SIMPLE_PROPERTY.format(PROPERTY_TYPE="IntProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=", false, 64")
     
+
+    if full_typename == "bool":
+        return SIMPLE_PROPERTY.format(PROPERTY_TYPE="BoolProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER="")
 
     if full_typename == "float":
         return SIMPLE_PROPERTY.format(PROPERTY_TYPE="FloatProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=", false")
@@ -74,7 +87,8 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
         
     for enum in Enum.ALL_ENUMS:
         if enum.Name == full_typename:
-            return SIMPLE_PROPERTY.format(PROPERTY_TYPE="EnumProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', "{full_typename}"')
+            byte_size = _enum_underlying_byte_size(enum.UnderlyingType)
+            return SIMPLE_PROPERTY.format(PROPERTY_TYPE="EnumProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', "{full_typename}", {byte_size}')
 
     raise NotImplementedError(f"Property type '{full_typename}' is not supported yet.")
 

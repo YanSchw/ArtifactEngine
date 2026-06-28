@@ -64,10 +64,12 @@ void GameEngine::Initialize() {
     world->Spawn<StaticMeshNode>()->SetPosition(Vec3(+2, 0, 0));
 }
 
-bool GameEngine::MainTick(double InDeltaTime) {
+void GameEngine::TickInput(double InDeltaTime) {
     // Refresh devices + evaluate action maps before gameplay reads them.
     InputSystem::Get().Tick((float)InDeltaTime);
+}
 
+bool GameEngine::MainTick(double InDeltaTime) {
     GetGameInstance()->Update(InDeltaTime);
 
     m_RenderPipeline->Render(InDeltaTime, RenderParams {

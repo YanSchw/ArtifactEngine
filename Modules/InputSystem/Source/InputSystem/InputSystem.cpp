@@ -1,6 +1,6 @@
 #include "InputSystem.h"
 #include "InputDevice.h"
-#include "InputActionMap.h"
+#include "InputActionMapping.h"
 
 InputSystem& InputSystem::Get() {
     static InputSystem s_InputSystem;
@@ -28,20 +28,20 @@ void InputSystem::RemoveDevice(InputDevice* InDevice) {
     }
 }
 
-Array<SharedObjectPtr<InputActionMap>> InputSystem::GetActionMaps() const {
-    return m_ActionMaps;
+Array<SharedObjectPtr<InputActionMapping>> InputSystem::GetActionMappings() const {
+    return m_ActionMappings;
 }
 
-void InputSystem::AddActionMap(InputActionMap* InMap) {
-    AE_ASSERT(InMap);
-    m_ActionMaps.Add(InMap);
+void InputSystem::AddActionMapping(InputActionMapping* InMapping) {
+    AE_ASSERT(InMapping);
+    m_ActionMappings.Add(InMapping);
 }
 
-void InputSystem::RemoveActionMap(InputActionMap* InMap) {
-    AE_ASSERT(InMap);
-    for (int32_t i = 0; i < m_ActionMaps.Size(); i++) {
-        if (m_ActionMaps[i] == InMap) {
-            m_ActionMaps.RemoveAt(i);
+void InputSystem::RemoveActionMapping(InputActionMapping* InMapping) {
+    AE_ASSERT(InMapping);
+    for (int32_t i = 0; i < m_ActionMappings.Size(); i++) {
+        if (m_ActionMappings[i] == InMapping) {
+            m_ActionMappings.RemoveAt(i);
             return;
         }
     }
@@ -96,7 +96,7 @@ void InputSystem::Tick(float InDeltatime) {
     }
 
     // Devices are now up to date for this frame; evaluate actions on top of them.
-    for (const auto& actionMap : m_ActionMaps) {
-        actionMap->Evaluate();
+    for (const auto& actionMapping : m_ActionMappings) {
+        actionMapping->Evaluate();
     }
 }

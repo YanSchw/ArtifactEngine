@@ -16,6 +16,7 @@
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
 #include "Assets/AssetManager.h"
+#include "InputSystem/InputSystem.h"
 
 static SharedObjectPtr<Window> s_Window;
 static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
@@ -49,6 +50,11 @@ void EditorEngine::Initialize() {
     fullscreenDesc.Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::ContentDir() + "/Shaders/Passthrough.glsl"));
     fullscreenDesc.ImageBindings.Add({ 16, m_RenderPipeline->GetFinalImageView(), sampler });
     s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
+}
+
+void EditorEngine::TickInput(double InDeltaTime) {
+    // Refresh devices + evaluate action maps before gameplay reads them.
+    InputSystem::Get().Tick((float)InDeltaTime);
 }
 
 bool EditorEngine::MainTick(double InDeltaTime) {

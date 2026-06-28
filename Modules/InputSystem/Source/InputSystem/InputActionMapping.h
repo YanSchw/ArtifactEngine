@@ -1,15 +1,21 @@
 #pragma once
-#include "Object/Object.h"
+#include "Assets/Asset.h"
 #include "Object/Pointer.h"
 #include "InputAction.h"
-#include "InputActionMap.gen.h"
+#include "InputActionMapping.gen.h"
 
-class InputActionMap : public Object {
+// A named, enable-able set of input actions, authored and loaded as an Asset
+class InputActionMapping : public Asset {
 public:
     ARTIFACT_CLASS();
 
+    PROPERTY()
     String Name;
-    bool   Enabled = true;
+
+    PROPERTY()
+    bool Enabled = true;
+
+    PROPERTY()
     Array<SharedObjectPtr<InputAction>> Actions;
 
     // Find an action by name, or nullptr if absent.
@@ -17,4 +23,8 @@ public:
 
     // Evaluate every action (no-op while disabled).
     void Evaluate();
+
+protected:
+    virtual void Load() override;
+    virtual void Unload() override;
 };

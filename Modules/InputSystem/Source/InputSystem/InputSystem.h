@@ -5,7 +5,7 @@
 #include "InputSystem.gen.h"
 
 class InputDevice;
-class InputActionMap;
+class InputActionMapping;
 
 class InputSystem : public Object {
 public:
@@ -17,9 +17,9 @@ public:
     void AddDevice(InputDevice* InDevice);
     void RemoveDevice(InputDevice* InDevice);
 
-    Array<SharedObjectPtr<InputActionMap>> GetActionMaps() const;
-    void AddActionMap(InputActionMap* InMap);
-    void RemoveActionMap(InputActionMap* InMap);
+    Array<SharedObjectPtr<InputActionMapping>> GetActionMappings() const;
+    void AddActionMapping(InputActionMapping* InMapping);
+    void RemoveActionMapping(InputActionMapping* InMapping);
 
     // Resolve a control path like "Keyboard/W" against the connected devices.
     // Returns false (and leaves OutValue at its default) if nothing matches.
@@ -39,6 +39,6 @@ public:
 
 private:
     Array<SharedObjectPtr<InputDevice>> m_Devices;
-    Array<SharedObjectPtr<InputActionMap>> m_ActionMaps;
+    Array<SharedObjectPtr<InputActionMapping>> m_ActionMappings;
     WeakObjectPtr<InputDevice> m_LastActiveDevice;
 };

@@ -11,8 +11,13 @@ class InputAction : public Object {
 public:
     ARTIFACT_CLASS();
 
-    String         Name;
+    PROPERTY()
+    String Name;
+
+    PROPERTY()
     InputValueType Type = InputValueType::Bool;
+
+    PROPERTY()
     Array<SharedObjectPtr<InputBinding>> Bindings;
 
     // Polling API

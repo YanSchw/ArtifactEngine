@@ -1,13 +1,17 @@
 #include "CameraController.h"
 
 #include "Window.h"
+#include "Assets/AssetManager.h"
+#include "Common/UUID.h"
 #include "InputSystem/InputSystem.h"
-#include "InputSystem/InputActionMap.h"
+#include "InputSystem/InputActionMapping.h"
 #include "InputSystem/InputAction.h"
-#include "InputSystem/InputBinding.h"
 #include "InputSystem/GamepadDevice.h"
 
 #define LOOK_SENSITIVITY 7.0f
+
+// Content/DefaultInputMappings.asset
+static const UUID s_InputMappingId = UUID::FromString("f47ac10b-58cc-4372-a567-0e02b2c3d479");
 
 void CameraController::BeginPlay() {
     Super::BeginPlay();
@@ -22,56 +26,18 @@ void CameraController::BeginPlay() {
     m_Pitch = euler.x;
     m_Yaw = euler.y;
 
-    InputActionMap* map = new InputActionMap();
-    map->Name = "CameraController";
+    // Load the action mapping (with all its bindings) from the asset.
+    InputActionMapping* mapping = AssetManager::Get().GetAsset<InputActionMapping>(s_InputMappingId);
+    AE_ASSERT(mapping, "Failed to load DefaultInputMappings.asset");
 
-    // Move: WASD as a normalized Vec2, or the gamepad left stick.
-    m_MoveAction = new InputAction();
-    m_MoveAction->Name = "Move";
-    m_MoveAction->Type = InputValueType::Vec2;
-    {
-        Vector2Composite* wasd = new Vector2Composite();
-        wasd->Up = "Keyboard/W";
-        wasd->Down = "Keyboard/S";
-        wasd->Left = "Keyboard/A";
-        wasd->Right = "Keyboard/D";
-        m_MoveAction->Bindings.Add(wasd);
+    // InputSystem keeps the mapping alive and evaluates it each Tick.
+    InputSystem::Get().AddActionMapping(mapping);
 
-        PathBinding* stick = new PathBinding();
-        stick->Path = "Gamepad/LeftStick";
-        m_MoveAction->Bindings.Add(stick);
-    }
-    map->Actions.Add(m_MoveAction);
-
-    // Look: mouse delta (pixels/frame) or the gamepad right stick.
-    m_LookAction = new InputAction();
-    m_LookAction->Name = "Look";
-    m_LookAction->Type = InputValueType::Vec2;
-    {
-        PathBinding* mouse = new PathBinding();
-        mouse->Path = "Mouse/Delta";
-        m_LookAction->Bindings.Add(mouse);
-
-        PathBinding* stick = new PathBinding();
-        stick->Path = "Gamepad/RightStick";
-        m_LookAction->Bindings.Add(stick);
-    }
-    map->Actions.Add(m_LookAction);
-
-    // Fly: vertical movement, Space up / Left-Ctrl down.
-    m_FlyAction = new InputAction();
-    m_FlyAction->Name = "Fly";
-    m_FlyAction->Type = InputValueType::Float;
-    {
-        Axis1DComposite* fly = new Axis1DComposite();
-        fly->Positive = "Keyboard/Q";
-        fly->Negative = "Keyboard/E";
-        m_FlyAction->Bindings.Add(fly);
-    }
-    map->Actions.Add(m_FlyAction);
-
-    // InputSystem keeps the map alive and evaluates it each Tick.
-    InputSystem::Get().AddActionMap(map);
+    // Grab the action pointers by name for use in WorldUpdate.
+    m_MoveAction = mapping->Find("Move");
+    m_LookAction = mapping->Find("Look");
+    m_FlyAction = mapping->Find("Fly");
+    AE_ASSERT(m_MoveAction && m_LookAction && m_FlyAction, "Input mapping is missing an expected action");
 }
 
 void CameraController::WorldUpdate(float InDeltatime) {

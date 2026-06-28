@@ -21,6 +21,9 @@ void Engine::MainLoop() {
         // Cap the Framerate in Application
 
         m_PreviousTime = currentTime;
+
+        // Refresh input before gameplay reads it this frame.
+        TickInput(m_DeltaTime);
     } while (MainTick(static_cast<float>(m_DeltaTime)));
 }
 

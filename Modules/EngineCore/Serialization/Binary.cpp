@@ -2,6 +2,9 @@
 #include "ChunkedBinary.h"
 
 #include "Core/Assert.h"
+#include "Object/Enum.h"
+
+#include <cstring>
 
 SharedObjectPtr<ByteString> BinarySerializer::SerializeObject(const Object* InObject) {
     ChunkWriter writer;
@@ -76,6 +79,8 @@ void BinarySerializer::SerializeProperty(ChunkWriter& writer, Property* property
         } else {
             writer << *(float*)valuePtr;
         }
+    } else if (auto p = Cast<BoolProperty>(property)) {
+        writer << *(bool*)valuePtr;
     } else if (auto p = Cast<StringProperty>(property)) {
         writer << *(String*)valuePtr;
     } else if (auto p = Cast<SharedObjectPtrProperty>(property)) {
@@ -100,6 +105,10 @@ void BinarySerializer::SerializeProperty(ChunkWriter& writer, Property* property
             void* elem = p->GetElementPtr(valuePtr, i);
             SerializeProperty(writer, p->InnerProperty, elem);
         }
+    } else if (auto p = Cast<EnumProperty>(property)) {
+        int64_t value = 0;
+        std::memcpy(&value, valuePtr, p->ByteSize);
+        writer << Enum(p->InnerEnumTypename).ConvertValueToString(value);
     } else {
         AE_ASSERT(false, "Unsupported property type for serialization: " + property->Name);
     }
@@ -132,6 +141,10 @@ void BinarySerializer::DeserializeProperty(ChunkReader& reader, Property* proper
             reader >> v;
             *(float*)valuePtr = v;
         }
+    } else if (auto p = Cast<BoolProperty>(property)) {
+        bool v;
+        reader >> v;
+        *(bool*)valuePtr = v;
     } else if (auto p = Cast<StringProperty>(property)) {
         String v;
         reader >> v;
@@ -150,7 +163,13 @@ void BinarySerializer::DeserializeProperty(ChunkReader& reader, Property* proper
             reader.ReadBytes(buffer, dataSize);
             auto data = SharedObjectPtr<ByteString>(new ByteString(dataSize, buffer));
 
-            Object* obj = Object::Create(p->InnerClass);
+            // Peek the concrete type recorded by SerializeObject so polymorphic
+            // pointers create the right subclass, not the declared inner class.
+            ChunkReader peeker(data);
+            String concreteType;
+            peeker >> concreteType;
+
+            Object* obj = Object::Create(Class(concreteType));
             DeserializeObject(obj, data);
             *(SharedObjectPtr<Object>*)valuePtr = SharedObjectPtr<Object>(obj);
         }
@@ -166,6 +185,11 @@ void BinarySerializer::DeserializeProperty(ChunkReader& reader, Property* proper
 
             DeserializeProperty(reader, p->InnerProperty, elemPtr);
         }
+    } else if (auto p = Cast<EnumProperty>(property)) {
+        String name;
+        reader >> name;
+        int64_t value = Enum(p->InnerEnumTypename).ConvertStringToValue(name);
+        std::memcpy(valuePtr, &value, p->ByteSize);
     } else {
         AE_ASSERT(false, "Unsupported property type for deserialization: " + property->Name);
     }

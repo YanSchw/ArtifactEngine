@@ -48,6 +48,13 @@ struct FloatProperty : public Property {
         : Property(name, offset), IsDouble(isDouble) {}
 };
 
+struct BoolProperty : public Property {
+    ARTIFACT_CLASS();
+
+    BoolProperty(const std::string& name, uint64_t offset)
+        : Property(name, offset) {}
+};
+
 struct StringProperty : public Property {
     ARTIFACT_CLASS();
 
@@ -77,9 +84,10 @@ struct EnumProperty : public Property {
     ARTIFACT_CLASS();
 
     String InnerEnumTypename;
+    uint8_t ByteSize;  // size of the enum's underlying type, for raw memory access
 
-    EnumProperty(const std::string& name, uint64_t offset, const String& innerEnumTypename)
-        : Property(name, offset), InnerEnumTypename(innerEnumTypename) {}
+    EnumProperty(const std::string& name, uint64_t offset, const String& innerEnumTypename, uint8_t byteSize)
+        : Property(name, offset), InnerEnumTypename(innerEnumTypename), ByteSize(byteSize) {}
 };
 
 struct ArrayProperty : public Property {

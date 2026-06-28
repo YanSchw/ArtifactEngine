@@ -2,6 +2,9 @@
 #include "ThirdParty/nlohmann/json.hpp"
 
 #include "Core/Assert.h"
+#include "Object/Enum.h"
+
+#include <cstring>
 
 using json = nlohmann::json;
 
@@ -83,6 +86,8 @@ json JsonSerializer::SerializeProperty(Property* property, void* valuePtr) {
             return *(double*)valuePtr;
         else
             return *(float*)valuePtr;
+    } else if (auto p = Cast<BoolProperty>(property)) {
+        return *(bool*)valuePtr;
     } else if (auto p = Cast<StringProperty>(property)) {
         return *(String*)valuePtr;
     } else if (auto p = Cast<SharedObjectPtrProperty>(property)) {
@@ -104,6 +109,10 @@ json JsonSerializer::SerializeProperty(Property* property, void* valuePtr) {
         }
 
         return arr;
+    } else if (auto p = Cast<EnumProperty>(property)) {
+        int64_t value = 0;
+        std::memcpy(&value, valuePtr, p->ByteSize);
+        return Enum(p->InnerEnumTypename).ConvertValueToString(value);
     } else {
         AE_ASSERT(false, "Unsupported property type for serialization: " + property->Name);
     }
@@ -113,17 +122,17 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
     if (auto p = Cast<IntProperty>(property)) {
         if (p->IsUnsigned) {
             switch (p->NumBits) {
-                case 8:  *(uint8_t*)valuePtr = j.get<uint8_t>();
-                case 16: *(uint16_t*)valuePtr = j.get<uint16_t>();
-                case 32: *(uint32_t*)valuePtr = j.get<uint32_t>();
-                case 64: *(uint64_t*)valuePtr = j.get<uint64_t>();
+                case 8:  *(uint8_t*)valuePtr = j.get<uint8_t>(); break;
+                case 16: *(uint16_t*)valuePtr = j.get<uint16_t>(); break;
+                case 32: *(uint32_t*)valuePtr = j.get<uint32_t>(); break;
+                case 64: *(uint64_t*)valuePtr = j.get<uint64_t>(); break;
             }
         } else {
             switch (p->NumBits) {
-                case 8:  *(int8_t*)valuePtr = j.get<int8_t>();
-                case 16: *(int16_t*)valuePtr = j.get<int16_t>();
-                case 32: *(int32_t*)valuePtr = j.get<int32_t>();
-                case 64: *(int64_t*)valuePtr = j.get<int64_t>();
+                case 8:  *(int8_t*)valuePtr = j.get<int8_t>(); break;
+                case 16: *(int16_t*)valuePtr = j.get<int16_t>(); break;
+                case 32: *(int32_t*)valuePtr = j.get<int32_t>(); break;
+                case 64: *(int64_t*)valuePtr = j.get<int64_t>(); break;
             }
         }
 
@@ -135,6 +144,9 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
             *(float*)valuePtr = j.get<float>();
 
         return;
+    } else if (auto p = Cast<BoolProperty>(property)) {
+        *(bool*)valuePtr = j.get<bool>();
+        return;
     } else if (auto p = Cast<StringProperty>(property)) {
         *(String*)valuePtr = j.get<String>();
         return;
@@ -144,7 +156,11 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
             return;
         }
 
-        Object* obj = Object::Create(p->InnerClass);
+        // Instantiate the concrete runtime type recorded in $type, so
+        // polymorphic pointers (e.g. InputBinding -> PathBinding) round-trip
+        // instead of always creating the declared inner class.
+        AE_ASSERT(j.contains("$type"), "Serialized object pointer is missing $type");
+        Object* obj = Object::Create(Class(j["$type"].get<String>()));
         DeserializeObject(obj, j.dump());
         *(SharedObjectPtr<Object>*)valuePtr = SharedObjectPtr<Object>(obj);
 
@@ -158,6 +174,9 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
 
             DeserializeProperty(p->InnerProperty, elemPtr, elemJson);
         }
+    } else if (auto p = Cast<EnumProperty>(property)) {
+        int64_t value = Enum(p->InnerEnumTypename).ConvertStringToValue(j.get<String>());
+        std::memcpy(valuePtr, &value, p->ByteSize);
     } else {
         AE_ASSERT(false, "Unsupported property type for deserialization: " + property->Name);
     }

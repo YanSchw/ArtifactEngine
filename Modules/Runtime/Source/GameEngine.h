@@ -9,5 +9,6 @@ public:
 protected:
     virtual void Initialize() override;
     virtual bool MainTick(double InDeltaTime) override;
+    virtual void TickInput(double InDeltaTime) override;
     virtual void Shutdown() override;
 };

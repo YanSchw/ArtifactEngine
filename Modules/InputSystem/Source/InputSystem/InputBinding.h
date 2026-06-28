@@ -16,6 +16,7 @@ class PathBinding : public InputBinding {
 public:
     ARTIFACT_CLASS();
 
+    PROPERTY()
     String Path;
 
     virtual InputValue Read() const override;
@@ -26,7 +27,10 @@ class Axis1DComposite : public InputBinding {
 public:
     ARTIFACT_CLASS();
 
+    PROPERTY()
     String Negative;
+
+    PROPERTY()
     String Positive;
 
     virtual InputValue Read() const override;
@@ -37,10 +41,19 @@ class Vector2Composite : public InputBinding {
 public:
     ARTIFACT_CLASS();
 
+    PROPERTY()
     String Up;
+
+    PROPERTY()
     String Down;
+
+    PROPERTY()
     String Left;
+
+    PROPERTY()
     String Right;
+
+    PROPERTY()
     bool Normalize = true;
 
     virtual InputValue Read() const override;

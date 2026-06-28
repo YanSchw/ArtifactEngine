@@ -1,0 +1,55 @@
+{
+    "$type": "InputActionMapping",
+    "AssetClass": "InputActionMapping",
+    "m_Id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "Name": "DefaultInputMappings",
+    "Enabled": true,
+    "Actions": [
+        {
+            "$type": "InputAction",
+            "Name": "Move",
+            "Type": "Vec2",
+            "Bindings": [
+                {
+                    "$type": "Vector2Composite",
+                    "Up": "Keyboard/W",
+                    "Down": "Keyboard/S",
+                    "Left": "Keyboard/A",
+                    "Right": "Keyboard/D",
+                    "Normalize": true
+                },
+                {
+                    "$type": "PathBinding",
+                    "Path": "Gamepad/LeftStick"
+                }
+            ]
+        },
+        {
+            "$type": "InputAction",
+            "Name": "Look",
+            "Type": "Vec2",
+            "Bindings": [
+                {
+                    "$type": "PathBinding",
+                    "Path": "Mouse/Delta"
+                },
+                {
+                    "$type": "PathBinding",
+                    "Path": "Gamepad/RightStick"
+                }
+            ]
+        },
+        {
+            "$type": "InputAction",
+            "Name": "Fly",
+            "Type": "Float",
+            "Bindings": [
+                {
+                    "$type": "Axis1DComposite",
+                    "Positive": "Keyboard/Q",
+                    "Negative": "Keyboard/E"
+                }
+            ]
+        }
+    ]
+}

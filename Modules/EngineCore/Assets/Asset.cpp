@@ -79,7 +79,7 @@ void Asset::Cook(ChunkedBinary& OutChunkedBinary) {
 
 SharedObjectPtr<ChunkedBinary> Asset::GetChunkedBinary() const {
     return ChunkedBinary::LoadFromFile(EngineConfig::ContentDir() + "/" + GetId().ToString());
-} 
+}
 
 bool Asset::IsLoaded() const {
     return true;

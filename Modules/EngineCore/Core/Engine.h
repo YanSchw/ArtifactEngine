@@ -21,6 +21,11 @@ protected:
     virtual bool MainTick(double InDeltaTime) = 0;
     virtual void Shutdown() = 0;
 
+    // Called by MainLoop every frame before MainTick, so input is fresh for
+    // gameplay. EngineCore can't depend on InputSystem (that would be a circular
+    // module dependency), so engine modules override this to tick it.
+    virtual void TickInput(double InDeltaTime) {}
+
     void MainLoop();
 
 protected:
