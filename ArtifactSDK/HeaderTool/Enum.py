@@ -71,9 +71,16 @@ class Enum:
         self.UnderlyingType = underlying_type
 
     def parse_enum_values(self):
+        # Strip block and line comments first: otherwise a trailing/leading
+        # comment makes its comma-split chunk start with comment text, the
+        # '\w+' match fails, and the enumerator is silently dropped. A comma
+        # inside a comment (e.g. '/* , */') would also split mid-comment.
+        body = re.sub(r'/\*.*?\*/', '', self.Body, flags=re.DOTALL)
+        body = re.sub(r'//[^\n]*', '', body)
+
         entries = [
             e.strip()
-            for e in self.Body.split(',')
+            for e in body.split(',')
             if e.strip()
         ]
 
@@ -83,6 +90,7 @@ class Enum:
         for entry in entries:
             m = re.match(r'(\w+)(?:\s*=\s*(.+))?$', entry)
             if not m:
+                print(f"Warning: Enum {self.Name} (line {self.Line}): could not parse enumerator '{entry}'; it will be skipped.")
                 continue
 
             name = m.group(1)
