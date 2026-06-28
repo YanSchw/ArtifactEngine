@@ -27,10 +27,16 @@ public:
     bool ShouldClose() const;
     void PollEvents();
 
+    // Lock + hide the cursor for relative mouse look (GLFW_CURSOR_DISABLED),
+    // or restore the normal visible cursor.
+    void SetCursorLocked(bool InLocked);
+    bool IsCursorLocked() const;
+
     static SharedObjectPtr<Window> Create(const WindowParams& InParams);
     static Window* GetInstance();
     static struct GLFWwindow* GetGLFWwindow();
 private:
     WindowParams m_Params;
     struct GLFWwindow* m_Window = nullptr;
+    bool m_CursorLocked = false;
 };

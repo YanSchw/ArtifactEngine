@@ -4,6 +4,7 @@
 #include "Platform/FileIO.h"
 
 #include "Window.h"
+#include "InputSystem/InputSystem.h"
 #include "Core/EngineConfig.h"
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/RenderingAPI.h"
@@ -19,6 +20,7 @@
 #include "GameFramework/GameInstance.h"
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
+#include "CameraController.h"
 #include "GameFramework/StaticMeshNode.h"
 
 static SharedObjectPtr<Window> s_Window;
@@ -57,12 +59,15 @@ void GameEngine::Initialize() {
     // create GameInstance and World
     m_GameInstance = new GameInstance();
     World* world = m_GameInstance->CreateNewWorld(true);
-    world->Spawn<CameraNode>();
+    world->Spawn<CameraController>();
     world->Spawn<StaticMeshNode>()->SetPosition(Vec3(-2, 0, 0));
     world->Spawn<StaticMeshNode>()->SetPosition(Vec3(+2, 0, 0));
 }
 
 bool GameEngine::MainTick(double InDeltaTime) {
+    // Refresh devices + evaluate action maps before gameplay reads them.
+    InputSystem::Get().Tick((float)InDeltaTime);
+
     GetGameInstance()->Update(InDeltaTime);
 
     m_RenderPipeline->Render(InDeltaTime, RenderParams {

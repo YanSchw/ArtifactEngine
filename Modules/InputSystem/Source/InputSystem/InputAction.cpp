@@ -1,4 +1,5 @@
 #include "InputAction.h"
+#include "InputSystem.h"
 
 // Magnitude past which a control counts as actuated (drives the press/release
 // edges). 0.5 works for buttons (0/1) and as a deadzone-ish gate for axes.
@@ -68,6 +69,11 @@ void InputAction::Evaluate() {
         }
     }
     m_Value = best;
+
+    // Remember which device drove us active, for GetLastActiveDevice().
+    if (IsActive() && m_Value.Device) {
+        InputSystem::Get().SetLastActiveDevice(m_Value.Device);
+    }
 
     // Bool-style edges.
     if (WasPerformedThisFrame()) {

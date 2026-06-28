@@ -3,6 +3,7 @@
 
 #include "GLFWKeyboardDevice.h"
 #include "GLFWMouseDevice.h"
+#include "GLFWGamepadDevice.h"
 #include "InputSystem/InputSystem.h"
 
 #define GLFW_INCLUDE_VULKAN
@@ -45,6 +46,7 @@ Window::Window(const WindowParams& InParams) {
         s_InputDevicesCreated = true;
         InputSystem::Get().AddDevice(new GLFWKeyboardDevice());
         InputSystem::Get().AddDevice(new GLFWMouseDevice());
+        InputSystem::Get().AddDevice(new GLFWGamepadDevice());
     }
 }
 Window::~Window() {
@@ -80,6 +82,20 @@ bool Window::ShouldClose() const {
 
 void Window::PollEvents() {
     glfwPollEvents();
+}
+
+void Window::SetCursorLocked(bool InLocked) {
+    m_CursorLocked = InLocked;
+    glfwSetInputMode(m_Window, GLFW_CURSOR, InLocked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+
+    // Raw motion (unaccelerated) gives cleaner relative look while locked.
+    if (glfwRawMouseMotionSupported()) {
+        glfwSetInputMode(m_Window, GLFW_RAW_MOUSE_MOTION, InLocked ? GLFW_TRUE : GLFW_FALSE);
+    }
+}
+
+bool Window::IsCursorLocked() const {
+    return m_CursorLocked;
 }
 
 SharedObjectPtr<Window> Window::Create(const WindowParams& InParams) {

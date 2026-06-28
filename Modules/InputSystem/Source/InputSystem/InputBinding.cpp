@@ -1,5 +1,6 @@
 #include "InputBinding.h"
 #include "InputSystem.h"
+#include <cmath>
 
 InputValue PathBinding::Read() const {
     InputValue value;
@@ -12,7 +13,15 @@ InputValue Axis1DComposite::Read() const {
     InputValue negative, positive;
     input.ReadPath(Negative, negative);
     input.ReadPath(Positive, positive);
-    return {{positive.AsFloat() - negative.AsFloat(), 0.0f}};
+
+    InputValue result;
+    result.Raw = {positive.AsFloat() - negative.AsFloat(), 0.0f};
+    // Carry the source from the stronger-actuated side.
+    const InputValue& dominant =
+        std::abs(positive.AsFloat()) >= std::abs(negative.AsFloat()) ? positive : negative;
+    result.Device = dominant.Device;
+    result.DeviceIndex = dominant.DeviceIndex;
+    return result;
 }
 
 InputValue Vector2Composite::Read() const {
@@ -27,5 +36,17 @@ InputValue Vector2Composite::Read() const {
     if (Normalize && (value.x != 0.0f || value.y != 0.0f)) {
         value = glm::normalize(value);
     }
-    return {value};
+
+    InputValue result;
+    result.Raw = value;
+    // Carry the source from the strongest-actuated component.
+    const InputValue* dominant = &up;
+    for (const InputValue* component : {&down, &left, &right}) {
+        if (std::abs(component->AsFloat()) > std::abs(dominant->AsFloat())) {
+            dominant = component;
+        }
+    }
+    result.Device = dominant->Device;
+    result.DeviceIndex = dominant->DeviceIndex;
+    return result;
 }

@@ -29,9 +29,16 @@ public:
     // binding dropdown: "Keyboard/W", "Mouse/Delta", ...
     Array<String> GetControlPaths(InputValueType InFilter);
 
+    // The device that most recently drove an action active, so callers can tell
+    // whether the player is currently on keyboard+mouse or a gamepad. Null until
+    // the first input; persists until a different device takes over.
+    WeakObjectPtr<InputDevice> GetLastActiveDevice() const;
+    void SetLastActiveDevice(const WeakObjectPtr<InputDevice>& InDevice);
+
     void Tick(float InDeltatime);
 
 private:
     Array<SharedObjectPtr<InputDevice>> m_Devices;
     Array<SharedObjectPtr<InputActionMap>> m_ActionMaps;
+    WeakObjectPtr<InputDevice> m_LastActiveDevice;
 };
