@@ -30,6 +30,11 @@ public:
     float GetScrollX() const;
     float GetScrollY() const;
 
+    // InputDevice / control-path interface
+    virtual String GetDeviceName() const override;
+    virtual Array<InputControl> GetControls() const override;
+    virtual bool ReadControl(const String& InControl, InputValue& OutValue) override;
+
     // Return the first available instance of MouseDevice if present
     static MouseDevice* Instance();
 
@@ -44,4 +49,5 @@ protected:
 private:
     Map<MouseCode, bool> m_ButtonsLastFrame;
     Vec2 m_PositionLastFrame = {0.0f, 0.0f};
+    Map<String, MouseCode> m_NameToButton;
 };

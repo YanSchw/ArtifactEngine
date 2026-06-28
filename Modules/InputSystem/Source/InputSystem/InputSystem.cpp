@@ -1,5 +1,6 @@
 #include "InputSystem.h"
 #include "InputDevice.h"
+#include "InputActionMap.h"
 
 InputSystem& InputSystem::Get() {
     static InputSystem s_InputSystem;
@@ -27,8 +28,60 @@ void InputSystem::RemoveDevice(InputDevice* InDevice) {
     }
 }
 
+Array<SharedObjectPtr<InputActionMap>> InputSystem::GetActionMaps() const {
+    return m_ActionMaps;
+}
+
+void InputSystem::AddActionMap(InputActionMap* InMap) {
+    AE_ASSERT(InMap);
+    m_ActionMaps.Add(InMap);
+}
+
+void InputSystem::RemoveActionMap(InputActionMap* InMap) {
+    AE_ASSERT(InMap);
+    for (int32_t i = 0; i < m_ActionMaps.Size(); i++) {
+        if (m_ActionMaps[i] == InMap) {
+            m_ActionMaps.RemoveAt(i);
+            return;
+        }
+    }
+}
+
+bool InputSystem::ReadPath(const String& InPath, InputValue& OutValue) {
+    size_t slash = InPath.find('/');
+    if (slash == String::npos) {
+        return false;
+    }
+    String device = InPath.substr(0, slash);
+    String control = InPath.substr(slash + 1);
+    for (const auto& it : m_Devices) {
+        if (it->GetDeviceName() == device) {
+            return it->ReadControl(control, OutValue);
+        }
+    }
+    return false;
+}
+
+Array<String> InputSystem::GetControlPaths(InputValueType InFilter) {
+    Array<String> paths;
+    for (const auto& device : m_Devices) {
+        const String prefix = device->GetDeviceName() + "/";
+        for (const InputControl& control : device->GetControls()) {
+            if (control.Type == InFilter) {
+                paths.Add(prefix + control.Name);
+            }
+        }
+    }
+    return paths;
+}
+
 void InputSystem::Tick(float InDeltatime) {
     for (int32_t i = m_Devices.Last(); i >= 0; i--) {
         m_Devices[i]->Tick();
+    }
+
+    // Devices are now up to date for this frame; evaluate actions on top of them.
+    for (const auto& actionMap : m_ActionMaps) {
+        actionMap->Evaluate();
     }
 }

@@ -4,9 +4,31 @@
 KeyboardDevice::KeyboardDevice() {
     for (KeyCode key : EKeyCode::GetValues()) {
         m_Keys[key] = false;
+        m_NameToKey[EKeyCode::ConvertEnumToString(key)] = key;
     }
 
     m_KeysLastFrame = m_Keys;
+}
+
+String KeyboardDevice::GetDeviceName() const {
+    return "Keyboard";
+}
+
+Array<InputControl> KeyboardDevice::GetControls() const {
+    Array<InputControl> controls;
+    for (KeyCode key : EKeyCode::GetValues()) {
+        controls.Add({EKeyCode::ConvertEnumToString(key), InputValueType::Bool});
+    }
+    return controls;
+}
+
+bool KeyboardDevice::ReadControl(const String& InControl, InputValue& OutValue) {
+    if (!m_NameToKey.ContainsKey(InControl)) {
+        return false;
+    }
+    KeyCode key = m_NameToKey.At(InControl);
+    OutValue = {{IsPressed(key) ? 1.0f : 0.0f, 0.0f}};
+    return true;
 }
 
 bool KeyboardDevice::IsPressed(KeyCode InCode) {

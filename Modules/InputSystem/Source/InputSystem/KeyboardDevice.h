@@ -13,6 +13,11 @@ public:
     bool IsDown(KeyCode InCode);
     bool IsUp(KeyCode InCode);
 
+    // InputDevice / control-path interface
+    virtual String GetDeviceName() const override;
+    virtual Array<InputControl> GetControls() const override;
+    virtual bool ReadControl(const String& InControl, InputValue& OutValue) override;
+
     // Return the first available instance of KeyboardDevice if present
     static KeyboardDevice* Instance();
 
@@ -24,4 +29,5 @@ protected:
 
 private:
     Map<KeyCode, bool> m_KeysLastFrame;
+    Map<String, KeyCode> m_NameToKey;
 };

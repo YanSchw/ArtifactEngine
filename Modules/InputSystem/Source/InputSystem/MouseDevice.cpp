@@ -4,9 +4,46 @@
 MouseDevice::MouseDevice() {
     for (MouseCode button : EMouseCode::GetValues()) {
         m_Buttons[button] = false;
+        m_NameToButton[EMouseCode::ConvertEnumToString(button)] = button;
     }
 
     m_ButtonsLastFrame = m_Buttons;
+}
+
+String MouseDevice::GetDeviceName() const {
+    return "Mouse";
+}
+
+Array<InputControl> MouseDevice::GetControls() const {
+    Array<InputControl> controls;
+    for (MouseCode button : EMouseCode::GetValues()) {
+        controls.Add({EMouseCode::ConvertEnumToString(button), InputValueType::Bool});
+    }
+    controls.Add({"Delta", InputValueType::Vec2});
+    controls.Add({"Position", InputValueType::Vec2});
+    controls.Add({"Scroll", InputValueType::Vec2});
+    return controls;
+}
+
+bool MouseDevice::ReadControl(const String& InControl, InputValue& OutValue) {
+    if (InControl == "Delta") {
+        OutValue = {GetPositionDelta()};
+        return true;
+    }
+    if (InControl == "Position") {
+        OutValue = {GetPosition()};
+        return true;
+    }
+    if (InControl == "Scroll") {
+        OutValue = {GetScrollDelta()};
+        return true;
+    }
+    if (m_NameToButton.ContainsKey(InControl)) {
+        MouseCode button = m_NameToButton.At(InControl);
+        OutValue = {{IsPressed(button) ? 1.0f : 0.0f, 0.0f}};
+        return true;
+    }
+    return false;
 }
 
 bool MouseDevice::IsPressed(MouseCode InCode) {
