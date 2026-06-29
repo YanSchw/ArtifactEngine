@@ -16,6 +16,11 @@ public:
     static PlatformType CurrentPlatform();
 
     static Class GetDefaultRenderingAPIClass();
+
+    // Directory holding the application's bundled resources. In packaged builds this is the
+    // platform's resource location (e.g. Contents/Resources inside a macOS .app); otherwise it is
+    // the directory next to the executable. GetContentDirectory() resolves relative to this.
+    static String GetResourceDirectory();
     static String GetContentDirectory();
 
     struct TemporaryDirectory {

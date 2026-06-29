@@ -11,7 +11,8 @@ static String GetGlslShaderCompilerPath() {
         if (Platform::CurrentPlatform() == PlatformType::Win64) {
             return "glslangValidator.exe";
         } else if (Platform::CurrentPlatform() == PlatformType::MacOS) {
-            return "/usr/local/bin/glslangValidator";
+            // Bundled alongside the app's resources (see Package/MacOS.py).
+            return std::format("\"{0}/glslangValidator\"", Platform::GetResourceDirectory());
         } else if (Platform::CurrentPlatform() == PlatformType::Linux) {
             return "/usr/bin/glslangValidator";
         } else {

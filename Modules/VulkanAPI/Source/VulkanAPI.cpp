@@ -12,7 +12,12 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include "Core/Log.h"
+#include "Core/EngineConfig.h"
+#include "Platform/Platform.h"
 #include "Window.h"
+
+#include <cstdlib>
+#include <filesystem>
 #include "Rendering/Vertex.h"
 #include "Rendering/ShaderData.h"
 
@@ -210,7 +215,33 @@ void VulkanAPI::CleanUp(bool fullClean) {
     }
 }
 
+// In a packaged macOS .app the MoltenVK driver and its ICD manifest are bundled inside the app
+// (see Package/MacOS.py). The Vulkan loader does not search app bundles, so point it at the
+// bundled manifest before the first ICD enumeration. Only set what the user hasn't overridden.
+static void PointLoaderAtBundledDrivers() {
+#if defined(__APPLE__)
+    if (!EngineConfig::IsPackagedBuild()) {
+        return;
+    }
+
+    const std::filesystem::path manifest =
+        std::filesystem::path(Platform::GetResourceDirectory()) / "vulkan" / "icd.d" / "MoltenVK_icd.json";
+
+    if (!std::filesystem::exists(manifest)) {
+        AE_WARN("Bundled MoltenVK ICD manifest not found at {0}", manifest.string());
+        return;
+    }
+
+    // VK_DRIVER_FILES is the modern variable; VK_ICD_FILENAMES is the legacy fallback. Set both so
+    // we work regardless of loader version. overwrite=0 lets an explicit user override win.
+    setenv("VK_DRIVER_FILES", manifest.string().c_str(), 0);
+    setenv("VK_ICD_FILENAMES", manifest.string().c_str(), 0);
+#endif
+}
+
 void VulkanAPI::CreateInstance() {
+    PointLoaderAtBundledDrivers();
+
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "VulkanClear";

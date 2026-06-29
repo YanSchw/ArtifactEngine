@@ -16,9 +16,10 @@ Class Platform::GetDefaultRenderingAPIClass() {
     return Class("VulkanAPI");
 }
 
-String Platform::GetContentDirectory() {
-    auto exePath = GetExecutablePath();
-    auto baseDir = exePath.parent_path();
+String Platform::GetResourceDirectory() {
+    return GetExecutablePath().parent_path().string();
+}
 
-    return (baseDir / "Content").string();
+String Platform::GetContentDirectory() {
+    return (std::filesystem::path(GetResourceDirectory()) / "Content").string();
 }

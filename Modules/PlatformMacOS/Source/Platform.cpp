@@ -30,12 +30,16 @@ Class Platform::GetDefaultRenderingAPIClass() {
     return Class("VulkanAPI");
 }
 
-String Platform::GetContentDirectory() {
+String Platform::GetResourceDirectory() {
     auto resources = GetMacOSResourcesPath();
     if (resources.empty()) {
         AE_ASSERT(false, "Failed to get macOS resources path");
-        return "Content";
+        return ".";
     }
 
-    return (resources / "Content").string();
+    return resources.string();
+}
+
+String Platform::GetContentDirectory() {
+    return (std::filesystem::path(GetResourceDirectory()) / "Content").string();
 }
