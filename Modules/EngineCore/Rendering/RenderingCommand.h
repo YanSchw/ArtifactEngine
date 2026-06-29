@@ -49,7 +49,7 @@ struct RenderCommand {
 class RenderCommandQueue {
 public:
     RenderCommandQueue();
-    
+
     template<typename T>
     void Push(RenderCommandType type, const T& cmd) {
         commands.push_back({ type, cmd });

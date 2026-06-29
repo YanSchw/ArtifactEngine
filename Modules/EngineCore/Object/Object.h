@@ -8,7 +8,7 @@ template<typename T> struct Array;
 
 struct Class {
     std::string Name;
-    
+
     Class() : Name("") {};
     Class(const Class&) = default;
     Class(const std::string& name) : Name(name) {}
@@ -43,7 +43,7 @@ public:
         return Class("Object");
     }
     static Class StaticClass() {
-        return Class("Object"); 
+        return Class("Object");
     }
 
     bool IsA(const Class& type) const;

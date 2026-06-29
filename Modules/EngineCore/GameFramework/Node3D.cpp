@@ -94,7 +94,7 @@ void Node3D::SetLocalEulerRotation(const Vec3& InEulerAngles) {
 }
 
 void Node3D::Rotate(const Quat& InQuat) {
-    // TODO: Double check this 
+    // TODO: Double check this
     SetRotation(GetRotation() * InQuat);
 }
 

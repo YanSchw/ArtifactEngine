@@ -60,7 +60,7 @@ VulkanPipeline::VulkanPipeline(const PipelineDesc& InPipelineDesc, VulkanAPI& In
     s_Pipelines.Add(this);
     m_Desc = InPipelineDesc;
     m_VulkanAPI = &InVulkanAPI;
-    
+
     Invalidate();
 }
 

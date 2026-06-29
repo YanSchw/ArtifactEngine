@@ -56,7 +56,7 @@ void Mesh::Cook(ChunkedBinary& OutChunkedBinary) {
     Array<Vertex> vertices;
     Array<uint32_t> indices;
     String path = EngineConfig::ContentDir() + m_MeshPath;
-    
+
     Array<Class> meshLoaderClasses = Class::GetSubclassesOf(MeshLoader::StaticClass());
     AE_ASSERT(meshLoaderClasses.Size() > 1, "No MeshLoader classes found!");
     SharedObjectPtr<MeshLoader> meshLoader = Object::Create<MeshLoader>(meshLoaderClasses[1]);

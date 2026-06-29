@@ -28,7 +28,7 @@ VulkanShader::VulkanShader(const String& InShaderSource, VulkanAPI& InVulkanAPI)
 
     s_Shaders.Add(this);
     m_VulkanAPI = &InVulkanAPI;
-    
+
     try {
         Map<String, String> shaderCode = PreProcess(InShaderSource);
         Platform::TemporaryDirectory tempDir;
@@ -53,7 +53,7 @@ VulkanShader::VulkanShader(const String& InShaderSource, VulkanAPI& InVulkanAPI)
                 AE_ERROR("failed to read compiled shader bytes");
                 return;
             }
-            
+
             if (shaderType == "vert") {
                 m_VertexShaderModule = CreateShaderModule(*shaderBytes, InVulkanAPI);
             }
@@ -72,7 +72,7 @@ VulkanShader::VulkanShader(const String& InShaderSource, VulkanAPI& InVulkanAPI)
         AE_ERROR("failed to compile shader: {0}", e.what());
         return;
     }
-    
+
 }
 
 VulkanShader::~VulkanShader() {

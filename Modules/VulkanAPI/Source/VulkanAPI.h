@@ -11,7 +11,7 @@ public:
     static VulkanAPI& Get() { return *RenderingAPI::GetInstance()->As<VulkanAPI>(); }
 
     virtual void Initialize() override;
-    
+
     static void CreateInstance();
     static void CreateDebugCallback();
     static void CreateWindowSurface();

@@ -55,7 +55,7 @@ VulkanUniformBuffer::VulkanUniformBuffer(uint32_t InBinding, VkDeviceSize InSize
 
 VulkanUniformBuffer::~VulkanUniformBuffer() {
     s_UniformBuffers.Remove(this);
-    
+
     if (m_Buffer != VK_NULL_HANDLE) {
         vkDestroyBuffer(m_VulkanAPI->GetDevice(), m_Buffer, nullptr);
         m_Buffer = VK_NULL_HANDLE;
@@ -102,7 +102,7 @@ VulkanStorageBuffer::VulkanStorageBuffer(uint32_t InBinding, VkDeviceSize InSize
 
 VulkanStorageBuffer::~VulkanStorageBuffer() {
     s_StorageBuffers.Remove(this);
-    
+
     if (m_Buffer != VK_NULL_HANDLE) {
         vkDestroyBuffer(m_VulkanAPI->GetDevice(), m_Buffer, nullptr);
         m_Buffer = VK_NULL_HANDLE;

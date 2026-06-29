@@ -109,7 +109,7 @@ def cmd_lint(args):
         for name in filenames:
             if name.endswith((".cpp", ".h")):
                 files.append(os.path.join(root, name))
-    lint_errors = lint_files(files)
+    lint_errors = lint_files(files, fix=args.fix)
     if lint_errors > 0:
         print(f"{Fore.RED}Found {lint_errors} linting errors!{Style.RESET_ALL}")
     else:
@@ -146,6 +146,7 @@ def main():
     package_parser.set_defaults(func=cmd_package)
 
     lint_parser = subparsers.add_parser("lint", help="Lint C++/Header files")
+    lint_parser.add_argument("--fix", action="store_true", default=False, help="Automatically fix fixable lint errors in place")
     lint_parser.set_defaults(func=cmd_lint)
 
     version_parser = subparsers.add_parser("version", help="Show engine version")

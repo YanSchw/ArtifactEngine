@@ -119,7 +119,7 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
     for (Node* node : InParams.m_World->GetAllNodes()) {
         if (StaticMeshNode* staticMesh = node->As<StaticMeshNode>()) {
             RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData, CmdSetShaderData{ staticMesh->GetPerMeshShaderData() });
-            
+
             Mesh* mesh = staticMesh->GetMesh();
             if (mesh) {
                 VertexBuffer* vertexBuffer = mesh->GetVertexBuffer();

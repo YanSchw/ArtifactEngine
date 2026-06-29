@@ -15,7 +15,7 @@ struct FrameBufferDesc {
 
     PROPERTY()
     Array<SharedObjectPtr<ImageView>> ColorAttachments;
-    
+
     PROPERTY()
     SharedObjectPtr<ImageView> DepthAttachment;
 };

@@ -15,7 +15,7 @@ public:
 
     const std::vector<VkImageView>& GetColorAttachmentViews() const { return m_ColorAttachmentViews; }
     VkImageView GetDepthAttachmentView() const { return m_DepthAttachmentView; }
-    
+
     uint32_t GetColorAttachmentCount() const { return (uint32_t)m_ColorAttachmentViews.size(); }
 
     std::vector<VkRenderingAttachmentInfo> GetColorAttachmentInfo() const;

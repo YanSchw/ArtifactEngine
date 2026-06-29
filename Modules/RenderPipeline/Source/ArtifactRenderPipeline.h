@@ -13,5 +13,5 @@ public:
 
     virtual void Render(double InDeltaTime, const RenderParams& InParams) override;
     virtual SharedObjectPtr<class ImageView> GetFinalImageView() const override;
-    
+
 };

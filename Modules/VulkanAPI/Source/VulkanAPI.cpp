@@ -61,7 +61,7 @@ static VkSemaphore imageAvailableSemaphore;
 static VkSemaphore renderingFinishedSemaphore;
 
 static VkDescriptorPool descriptorPool;
- 
+
 VkExtent2D swapChainExtent = {1280, 720};
 VkFormat swapChainFormat;
 VkSwapchainKHR oldSwapChain;
@@ -69,10 +69,10 @@ VkSwapchainKHR swapChain;
 std::vector<VkImage> swapChainImages;
 std::vector<VkImageView> swapChainImageViews;
 std::vector<VkFramebuffer> swapChainFramebuffers;
- 
+
 static VkCommandPool commandPool;
 static std::vector<VkCommandBuffer> graphicsCommandBuffers;
- 
+
 static uint32_t graphicsQueueFamily;
 static uint32_t presentQueueFamily;
 
@@ -126,7 +126,7 @@ VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities)
 
         swapChainExtent.width = std::min(std::max(Window::GetInstance()->GetWidth(), surfaceCapabilities.minImageExtent.width), surfaceCapabilities.maxImageExtent.width);
         swapChainExtent.height = std::min(std::max(Window::GetInstance()->GetHeight(), surfaceCapabilities.minImageExtent.height), surfaceCapabilities.maxImageExtent.height);
-        
+
         return swapChainExtent;
     }
     else {
@@ -183,7 +183,7 @@ void VulkanAPI::CleanUp(bool fullClean) {
 
         VulkanImageView::DestroyAll();
         VulkanImage::DestroyAll();
-        
+
         VulkanSampler::DestroyAll();
         VulkanTexture::DestroyAll();
 
@@ -228,7 +228,7 @@ void VulkanAPI::CreateInstance() {
     for (size_t i = 0; i < glfwExtensionCount; i++) {
         extensions.push_back(glfwExtensions[i]);
     }
-    
+
 #if defined(__APPLE__)
     extensions.push_back("VK_KHR_portability_enumeration");
 #endif
@@ -863,7 +863,7 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                 if (VulkanFrameBuffer* framebuffer = data.Target ? data.Target->As<VulkanFrameBuffer>() : nullptr) {
                     auto colorAttachmentInfo = framebuffer->GetColorAttachmentInfo();
                     auto depthAttachmentInfo = framebuffer->GetDepthAttachmentInfo();
-                    
+
                     VkRenderingInfo renderingInfo{};
                     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
                     renderingInfo.renderArea = { 0, 0, framebuffer->GetDesc().Width, framebuffer->GetDesc().Height };
@@ -873,18 +873,18 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                     renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
                     for (size_t i = 0; i < framebuffer->GetColorAttachmentCount(); i++) {
-                        VulkanHelpers::TransitionImage(InCmdBuffer, 
-                            framebuffer->GetDesc().ColorAttachments[i]->GetDesc().Image->As<VulkanImage>()->GetVkImage(), 
-                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+                        VulkanHelpers::TransitionImage(InCmdBuffer,
+                            framebuffer->GetDesc().ColorAttachments[i]->GetDesc().Image->As<VulkanImage>()->GetVkImage(),
+                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT);
                     }
 
                     if (depthAttachmentInfo.imageView) {
-                        VulkanHelpers::TransitionImage(InCmdBuffer, 
-                            framebuffer->GetDesc().DepthAttachment->GetDesc().Image->As<VulkanImage>()->GetVkImage(), 
-                            VK_IMAGE_LAYOUT_UNDEFINED, 
-                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, 
+                        VulkanHelpers::TransitionImage(InCmdBuffer,
+                            framebuffer->GetDesc().DepthAttachment->GetDesc().Image->As<VulkanImage>()->GetVkImage(),
+                            VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_ASPECT_DEPTH_BIT);
                     }
 

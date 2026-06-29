@@ -12,7 +12,7 @@
 #include <vector>
 #include <string>
 
-// a call to this function is necessary to ensure that the static libraries are linked in, 
+// a call to this function is necessary to ensure that the static libraries are linked in,
 // otherwise the linker may exclude them since they are not directly referenced and only used via reflection
 static void EnforceLinkingStaticLibraries() {
     std::vector<std::string> linkedModules;

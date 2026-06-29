@@ -61,7 +61,7 @@ static void CreateLoggerIfNotExists(const std::string& name) {
     }
 
     std::vector<spdlog::sink_ptr> logSinks;
-    
+
     if (!IsPackagedBuild() /* || IsFlagSet("--LogToConsole") */) {
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_pattern("%^[%T] %n: %v%$");

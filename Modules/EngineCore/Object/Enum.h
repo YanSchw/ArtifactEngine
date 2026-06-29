@@ -5,7 +5,7 @@
 
 struct Enum {
     String Name;
-    
+
     Enum(const String& name) : Name(name) {}
 
     int64_t ConvertStringToValue(const String& InString) const;

@@ -5,7 +5,7 @@
 class GameEngine : public Engine {
 public:
     ARTIFACT_CLASS();
-    
+
 protected:
     virtual void Initialize() override;
     virtual bool MainTick(double InDeltaTime) override;

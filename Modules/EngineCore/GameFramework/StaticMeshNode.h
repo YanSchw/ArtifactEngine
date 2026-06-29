@@ -13,7 +13,7 @@ public:
     StaticMeshNode();
     ~StaticMeshNode();
     ShaderData* GetPerMeshShaderData();
-    
+
     Mesh* GetMesh() const;
     void SetMesh(Mesh* InMesh);
 

@@ -30,13 +30,13 @@ Class Class::GetParentClass() const {
 
 bool Class::IsSubclassOf(const Class& InBaseClass) const {
     if ((*this) == InBaseClass) return true;
-    return (Name == "Object") 
-        ? false 
+    return (Name == "Object")
+        ? false
         : (
             GetParentClass() == InBaseClass
                 ? true
                 : (
-                    GetParentClass() != Class::None 
+                    GetParentClass() != Class::None
                         ? GetParentClass().IsSubclassOf(InBaseClass)
                         : false
                 )

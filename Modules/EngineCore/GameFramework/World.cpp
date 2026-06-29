@@ -104,5 +104,5 @@ void World::WorldUpdate(float deltaTime) {
 }
 
 void World::PrepareLocalUpdate() {
-    
+
 }

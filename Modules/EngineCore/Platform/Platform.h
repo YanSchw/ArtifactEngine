@@ -12,7 +12,7 @@ enum class PlatformType : uint32_t {
 
 class Platform {
 public:
-    
+
     static PlatformType CurrentPlatform();
 
     static Class GetDefaultRenderingAPIClass();

@@ -73,7 +73,7 @@ bool GameEngine::MainTick(double InDeltaTime) {
     GetGameInstance()->Update(InDeltaTime);
 
     m_RenderPipeline->Render(InDeltaTime, RenderParams {
-        s_Window->GetWidth(), 
+        s_Window->GetWidth(),
         s_Window->GetHeight(),
         GetGameInstance()->GetCurrentWorld()
     });

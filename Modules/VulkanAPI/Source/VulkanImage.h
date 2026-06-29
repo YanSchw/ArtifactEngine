@@ -34,7 +34,7 @@ public:
     VkImageView GetVkImageView() const { return m_ImageView; }
 
     static void DestroyAll();
-    
+
 private:
     VulkanAPI* m_VulkanAPI = nullptr;
     VkImageView m_ImageView = VK_NULL_HANDLE;

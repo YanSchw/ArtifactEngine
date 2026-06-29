@@ -16,5 +16,5 @@ public:
 
     virtual void Render(double InDeltaTime, const RenderParams& InParams) = 0;
     virtual SharedObjectPtr<class ImageView> GetFinalImageView() const = 0;
-    
+
 };

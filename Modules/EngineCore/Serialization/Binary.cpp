@@ -21,7 +21,7 @@ void BinarySerializer::DeserializeObject(Object* OutObject, const SharedObjectPt
 
     String typeName;
     reader >> typeName;
-    
+
     AE_ASSERT(typeName == OutObject->GetClass().Name, "Binary type does not match object type");
 
     DeserializeType(reader, OutObject, OutObject->GetClass().Name);
@@ -92,7 +92,7 @@ void BinarySerializer::SerializeProperty(ChunkWriter& writer, Property* property
         } else {
             // Write non-null marker
             writer << (uint8_t)1;
-            
+
             auto serialized = SerializeObject(ptr.Get());
             writer << (uint64_t)serialized->GetSizeInBytes();
             writer.WriteBytes(serialized->GetData(), serialized->GetSizeInBytes());

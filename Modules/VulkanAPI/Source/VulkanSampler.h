@@ -15,7 +15,7 @@ public:
     VkSampler GetVkSampler() const { return m_Sampler; }
 
     static void DestroyAll();
-    
+
 private:
     VulkanAPI* m_VulkanAPI = nullptr;
     VkSampler m_Sampler = VK_NULL_HANDLE;

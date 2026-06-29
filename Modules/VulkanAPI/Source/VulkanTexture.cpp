@@ -8,7 +8,7 @@ static Array<VulkanTexture*> s_Textures;
 VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InTextureDesc, VulkanAPI& InVulkanAPI) {
     s_Textures.Add(this);
     m_VulkanAPI = &InVulkanAPI;
-    
+
     // Load image using stb_image
     int width, height, channels;
     stbi_uc* pixels = stbi_load(InFilePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
@@ -65,7 +65,7 @@ VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InText
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = m_VulkanAPI->FindMemoryType(memRequirements.memoryTypeBits, 
+    allocInfo.memoryTypeIndex = m_VulkanAPI->FindMemoryType(memRequirements.memoryTypeBits,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     if (vkAllocateMemory(m_VulkanAPI->GetDevice(), &allocInfo, nullptr, &stagingBufferMemory) != VK_SUCCESS) {
@@ -88,10 +88,10 @@ VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InText
 
     // Transition image layout to transfer destination
     AE_ASSERT(m_Image->IsA<VulkanImage>(), "Invalid image type");
-    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(), 
-                         VK_FORMAT_R8G8B8A8_UNORM, 
-                         VK_IMAGE_LAYOUT_UNDEFINED, 
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(),
+                         VK_FORMAT_R8G8B8A8_UNORM,
+                         VK_IMAGE_LAYOUT_UNDEFINED,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          commandBuffer);
 
     // Copy buffer to image
@@ -106,15 +106,15 @@ VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InText
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {(uint32_t)width, (uint32_t)height, 1};
 
-    vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, 
-                          m_Image->As<VulkanImage>()->GetVkImage(), 
+    vkCmdCopyBufferToImage(commandBuffer, stagingBuffer,
+                          m_Image->As<VulkanImage>()->GetVkImage(),
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
     // Transition image layout to shader read
-    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(), 
-                         VK_FORMAT_R8G8B8A8_UNORM, 
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(),
+                         VK_FORMAT_R8G8B8A8_UNORM,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                          commandBuffer);
 
     EndSingleTimeCommands(commandBuffer, *m_VulkanAPI);
@@ -135,7 +135,7 @@ VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InText
 VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const TextureDesc& InTextureDesc, VulkanAPI& InVulkanAPI) {
     s_Textures.Add(this);
     m_VulkanAPI = &InVulkanAPI;
-    
+
     if (!InPixels) {
         // Fallback to 1x1 texture if loading fails
         ImageDesc imageDesc;
@@ -187,7 +187,7 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = m_VulkanAPI->FindMemoryType(memRequirements.memoryTypeBits, 
+    allocInfo.memoryTypeIndex = m_VulkanAPI->FindMemoryType(memRequirements.memoryTypeBits,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     if (vkAllocateMemory(m_VulkanAPI->GetDevice(), &allocInfo, nullptr, &stagingBufferMemory) != VK_SUCCESS) {
@@ -207,10 +207,10 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
 
     // Transition image layout to transfer destination
     AE_ASSERT(m_Image->IsA<VulkanImage>(), "Invalid image type");
-    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(), 
-                         VK_FORMAT_R8G8B8A8_UNORM, 
-                         VK_IMAGE_LAYOUT_UNDEFINED, 
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(),
+                         VK_FORMAT_R8G8B8A8_UNORM,
+                         VK_IMAGE_LAYOUT_UNDEFINED,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          commandBuffer);
 
     // Copy buffer to image
@@ -225,15 +225,15 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {(uint32_t)InWidth, (uint32_t)InHeight, 1};
 
-    vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, 
-                          m_Image->As<VulkanImage>()->GetVkImage(), 
+    vkCmdCopyBufferToImage(commandBuffer, stagingBuffer,
+                          m_Image->As<VulkanImage>()->GetVkImage(),
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
     // Transition image layout to shader read
-    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(), 
-                         VK_FORMAT_R8G8B8A8_UNORM, 
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+    TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(),
+                         VK_FORMAT_R8G8B8A8_UNORM,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                          commandBuffer);
 
     EndSingleTimeCommands(commandBuffer, *m_VulkanAPI);

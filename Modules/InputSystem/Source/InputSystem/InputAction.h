@@ -30,7 +30,7 @@ public:
     bool WasPerformedThisFrame() const;  // inactive -> active this frame
     bool WasReleasedThisFrame() const;   // active -> inactive this frame
 
-    // Callback API. Each listener lives only as long as InOwner: 
+    // Callback API. Each listener lives only as long as InOwner:
     // when that Object dies its callbacks are
     // pruned automatically, so no manual Unbind is required on teardown.
     //   Bool actions:         Pressed / Released / Held

@@ -62,19 +62,19 @@ private:
 
 /**
  * ChunkedBinary: General-purpose chunked binary format for assets, caches, shaders, etc.
- * 
+ *
  * Supports:
  * - Lazy loading: Only chunk table loaded at startup (2 KB header for 2 GB texture pack)
  * - Region reads: Load specific chunk regions from disk on demand
  * - Multiple open chunks: No global cursor state
  * - mmap-friendly architecture
  * - Compression/encryption ready
- * 
+ *
  * Reading:
  *     ChunkedBinary file(path);
  *     ChunkReader chunk = file.GetChunk(ChunkId);
  *     chunk >> value;
- * 
+ *
  * Writing:
  *     ChunkedBinary file;
  *     ChunkWriter chunk;
@@ -108,7 +108,7 @@ public:
 
 public:
     ChunkedBinary();
-    
+
     // Loading from disk (lazy)
     static SharedObjectPtr<ChunkedBinary> LoadFromFile(const String& InPath);
 

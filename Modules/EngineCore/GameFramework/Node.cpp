@@ -68,7 +68,7 @@ void Node::SetName(const String& InName) {
         }
     }
 }
-    
+
 void Node::WorldUpdate(float InDeltatime) {
     AE_INFO("Node::WorldUpdate(float InDeltatime)[{0}]: {1}", GetName(), InDeltatime);
 }
@@ -148,7 +148,7 @@ Node* Node::CreateChild(const Class& InChildClass) {
             return nullptr;
         }
     }
-    
+
     node->SetParent(this, false);
 
     if (IsInitialized()) {

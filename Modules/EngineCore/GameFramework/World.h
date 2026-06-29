@@ -42,7 +42,7 @@ private:
     /** Array of all nodes, that need to have BeginPlay() called. */
     Array<WeakObjectPtr<Node>> m_BeginPlayIssues;
 
-    /** Array of all nodes, that will be killed at the end of the frame. 
+    /** Array of all nodes, that will be killed at the end of the frame.
     *   Kill happens outside of Gameplay Context. */
     Array<Node*> m_PendingKills;
 

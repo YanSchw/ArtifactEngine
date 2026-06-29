@@ -35,7 +35,7 @@ public:
      *  Last chance to do gameplay stuff */
     virtual void EndPlay() { }
 
-    /** WorldUpdate is called every frame on the main thread 
+    /** WorldUpdate is called every frame on the main thread
      *  UpdateFlag::WorldUpdate needs to be set first */
     virtual void WorldUpdate(float InDeltatime);
 

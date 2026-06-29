@@ -28,12 +28,24 @@ def lint(*exts):
     return decorator
 
 
+def fix_for(rule):
+    # Registers a fix function for a lint rule. A fixer takes the file content
+    # and returns the corrected content. Rules without a fixer are simply not
+    # auto-fixable; --fix leaves their errors to be reported as usual.
+    def decorator(func):
+        func._fixes_rule = rule
+        return func
+
+    return decorator
+
+
 import importlib
 import pkgutil
 import inspect
 
 def load_lint_functions(package_name="Lint.Rules"):
-    functions = []
+    lint_functions = []
+    fix_functions = {}  # rule function -> fix function
 
     package = importlib.import_module(package_name)
 
@@ -42,13 +54,15 @@ def load_lint_functions(package_name="Lint.Rules"):
 
         for _, obj in inspect.getmembers(module, inspect.isfunction):
             if hasattr(obj, "_lint_exts"):
-                functions.append(obj)
+                lint_functions.append(obj)
+            if hasattr(obj, "_fixes_rule"):
+                fix_functions[obj._fixes_rule] = obj
 
-    return functions
+    return lint_functions, fix_functions
 
 
-def lint_files(files: list[str]) -> int:
-    lint_functions = load_lint_functions()
+def lint_files(files: list[str], fix: bool = False) -> int:
+    lint_functions, fix_functions = load_lint_functions()
     error_count = 0
 
     for file in files:
@@ -64,6 +78,15 @@ def lint_files(files: list[str]) -> int:
             print(f"{file}: failed to read ({e})")
             error_count += 1
             continue
+
+        if fix:
+            original = content
+            for func in lint_functions:
+                if ext in func._lint_exts and func in fix_functions:
+                    content = fix_functions[func](content)
+            if content != original:
+                path.write_text(content, encoding="utf-8")
+                print(f"{Fore.YELLOW}[fixed] {file}{Style.RESET_ALL}")
 
         for func in lint_functions:
             if ext in func._lint_exts:

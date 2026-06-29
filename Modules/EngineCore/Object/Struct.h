@@ -5,7 +5,7 @@
 
 struct Struct {
     std::string Name;
-    
+
     Struct() : Name("") {};
     Struct(const Struct&) = default;
     Struct(const std::string& name) : Name(name) {}

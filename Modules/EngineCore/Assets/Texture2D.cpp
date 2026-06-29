@@ -42,7 +42,7 @@ void Texture2D::Cook(ChunkedBinary& OutChunkedBinary) {
     String path = EngineConfig::ContentDir() + m_TexturePath;
     stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
     channels = 4;
-    
+
     ChunkWriter chunkWriter;
     chunkWriter << width;
     chunkWriter << height;
