@@ -5,7 +5,18 @@ from colorama import Fore, Style
 
 
 class LintError(Exception):
-    pass
+    def __init__(self, message):
+        # A rule may raise a single LintError (with a message) or pass a list of
+        # LintErrors / messages to report several problems from one invocation.
+        if isinstance(message, (list, tuple)):
+            self.errors = [
+                e if isinstance(e, LintError) else LintError(e)
+                for e in message
+            ]
+            super().__init__(f"{len(self.errors)} lint errors")
+        else:
+            self.errors = [self]
+            super().__init__(message)
 
 def lint(*exts):
     exts = {e.lower() for e in exts}
@@ -59,7 +70,8 @@ def lint_files(files: list[str]) -> int:
                 try:
                     func(file, content)
                 except LintError as e:
-                    print(f"{Fore.RED}[{func.__name__}] {e}{Style.RESET_ALL}")
-                    error_count += 1
+                    for err in e.errors:
+                        print(f"{Fore.RED}[{func.__name__}] {err}{Style.RESET_ALL}")
+                        error_count += 1
 
     return error_count
