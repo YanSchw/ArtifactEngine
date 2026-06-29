@@ -1,9 +1,34 @@
 #include "VulkanShader.h"
+#include "Core/EngineConfig.h"
 #include "Platform/Platform.h"
 #include "Platform/Subprocess.h"
 #include "Platform/FileIO.h"
 
 static Array<VulkanShader*> s_Shaders;
+
+static String GetGlslShaderCompilerPath() {
+    if (EngineConfig::IsPackagedBuild()) {
+        if (Platform::CurrentPlatform() == PlatformType::Win64) {
+            return "glslangValidator.exe";
+        } else if (Platform::CurrentPlatform() == PlatformType::MacOS) {
+            return "/usr/local/bin/glslangValidator";
+        } else if (Platform::CurrentPlatform() == PlatformType::Linux) {
+            return "/usr/bin/glslangValidator";
+        } else {
+            AE_ASSERT(false, "Vulkan Shader compilation not supported on current Platform.");
+        }
+    } else {
+        if (Platform::CurrentPlatform() == PlatformType::Win64) {
+            return "glslangValidator.exe";
+        } else if (Platform::CurrentPlatform() == PlatformType::MacOS) {
+            return "/usr/local/bin/glslangValidator";
+        } else if (Platform::CurrentPlatform() == PlatformType::Linux) {
+            return "/usr/bin/glslangValidator";
+        } else {
+            AE_ASSERT(false, "Vulkan Shader compilation not supported on current Platform.");
+        }
+    }
+}
 
 VkShaderModule CreateShaderModule(const ByteString& InShaderBytes, VulkanAPI& InVulkanAPI) {
     VkShaderModuleCreateInfo createInfo = {};
@@ -41,7 +66,7 @@ VulkanShader::VulkanShader(const String& InShaderSource, VulkanAPI& InVulkanAPI)
             }
 
             // Compile shader to SPIR-V using glslangValidator
-            auto result = Subprocess::Run(std::format("/usr/local/bin/glslangValidator -V {0} -o {1}/shader.{2}.spv", tempFilePath, tempDir.Path, shaderType));
+            auto result = Subprocess::Run(std::format("{0} -V {1} -o {2}/shader.{3}.spv", GetGlslShaderCompilerPath(), tempFilePath, tempDir.Path, shaderType));
             if (result.ExitCode != 0) {
                 AE_ERROR("failed to compile shader:\n{0}", result.StdOut);
                 return;
