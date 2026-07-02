@@ -145,7 +145,7 @@ class HeaderTool:
 
     def generate_module_registration_code(self):
         for module, headers in self.headers_per_module.items():
-            unique_headers = list(set(headers)) # remove duplicates
+            unique_headers = sorted(set(headers)) # remove duplicates; sorted so the generated #include order is stable across runs (avoids needless recompiles)
             with smart_open(f"./Build/Intermediate/Modules/{module}.gen.cpp") as gen_module_file:
                 gen_module_file.write('#include <vector>\n#include <string>\n\n')
                 for header in unique_headers:

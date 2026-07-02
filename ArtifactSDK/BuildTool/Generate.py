@@ -67,7 +67,7 @@ endif()
 
 """)
         
-        for module_name in os.listdir(f"{project_path}/Modules"):
+        for module_name in sorted(os.listdir(f"{project_path}/Modules")):
             module_dir = f"{project_path}/Modules/{module_name}"
             if os.path.isdir(module_dir):
                 module = ArtifactModule.load_from_json(module_dir)
@@ -88,7 +88,7 @@ add_library({module_name} ${{cpp_src}} {project_path}/Build/Intermediate/Modules
                         mf.write(f"target_compile_definitions({module_name} PUBLIC AE_PACKAGED)\n")
                     for include_dir in module.IncludePaths:
                         mf.write(f"target_include_directories({module_name} PUBLIC {include_dir})\n")
-                    for import_module_name in expand_indirect_module_dependencies(project_path, module.ImportModules):
+                    for import_module_name in sorted(expand_indirect_module_dependencies(project_path, module.ImportModules)):
                         import_module = ArtifactModule.load_from_json(f"{project_path}/Modules/{import_module_name}")
                         for include_dir in import_module.ExportIncludePaths:
                             mf.write(f"target_include_directories({module_name} PUBLIC {project_path}/Modules/{import_module_name}/{include_dir})\n")
