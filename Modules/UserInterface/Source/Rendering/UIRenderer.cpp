@@ -102,20 +102,28 @@ void UIRenderer::Render(Surface* InTarget, UINode* InRoot, const Vec2& InViewpor
     memcpy(mapped, &projection, sizeof(Mat4));
     m_ProjectionBuffer->UnmapData();
 
+    InRoot->BindTree();
     InRoot->Layout(UIRectF(Vec2(0.0f), InViewportSize));
     InRoot->UpdateTree(InContext);
 
     UIDrawList drawList;
     InRoot->PaintTree(drawList);
 
-    if (drawList.HasSolid()) {
-        m_SolidVertexBuffer = VertexBuffer::Create(drawList.GetSolidVertices(), drawList.GetSolidIndices());
-        m_SolidPipeline->Bind();
-        m_SolidVertexBuffer->Draw();
+    if (drawList.IsEmpty()) {
+        return;
     }
-    if (drawList.HasText() && m_TextPipelineReady) {
-        m_TextVertexBuffer = VertexBuffer::Create(drawList.GetTextVertices(), drawList.GetTextIndices());
-        m_TextPipeline->Bind();
-        m_TextVertexBuffer->Draw();
+
+    // One shared buffer; draw each batch in paint (tree) order so later nodes layer in front.
+    m_VertexBuffer = VertexBuffer::Create(drawList.GetVertices(), drawList.GetIndices());
+    for (const UIDrawList::Batch& batch : drawList.GetBatches()) {
+        if (batch.Kind == UIDrawList::BatchKind::Text) {
+            if (!m_TextPipelineReady) {
+                continue;
+            }
+            m_TextPipeline->Bind();
+        } else {
+            m_SolidPipeline->Bind();
+        }
+        m_VertexBuffer->Draw(batch.IndexCount, batch.FirstIndex);
     }
 }

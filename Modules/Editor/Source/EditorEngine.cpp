@@ -22,9 +22,11 @@
 #include "Common/UUID.h"
 
 #include "GameFramework/UINode.h"
-#include "GameFramework/UIButton.h"
+#include "GameFramework/UIBuilder.h"
 #include "Assets/Font.h"
 #include "Rendering/UIRenderer.h"
+
+#include <string>
 
 static SharedObjectPtr<Window> s_Window;
 static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
@@ -62,6 +64,9 @@ void EditorEngine::Initialize() {
     BuildDemoUI();
 }
 
+// Demo app-state the declarative UI binds to.
+static int s_Count = 0;
+
 void EditorEngine::BuildDemoUI() {
     // Set the default UI font once (see Content/Fonts/Default.asset)
     UINode::SetDefaultFont(AssetManager::Get().GetAsset<Font>(UUID::FromString("f0e1d2c3-b4a5-4967-8899-aabbccddeeff")));
@@ -69,10 +74,19 @@ void EditorEngine::BuildDemoUI() {
     m_UIRenderer = new UIRenderer();
     m_UIRoot = (new UINode())->Fill();
 
-    UIButton* button = m_UIRoot->Add<UIButton>();
-    button->Center({ 220.0f, 56.0f });
-    button->SetCaption("Click Me 0");
-    button->OnClick = [] { AE_INFO("UI Button clicked!"); };
+    UI::VStack(*m_UIRoot, [](UINode& v) {
+        v.Padding = UIEdges(24.0f);
+        v.Gap = 8.0f;
+
+        UI::Label(v, [] { return "Count: " + std::to_string(s_Count); });
+        UI::Button(v, "Add", [] { s_Count++; });
+        UI::If(v, [] { return s_Count > 3; }, [](UINode& c) {
+            UI::Label(c, [] { return String("Big! (> 3)"); });
+        });
+        UI::ForEach(v, [] { return s_Count; }, [](UINode& item, int i) {
+            UI::Label(item, [i] { return "Item " + std::to_string(i); });
+        });
+    });
 }
 
 void EditorEngine::TickInput(double InDeltaTime) {

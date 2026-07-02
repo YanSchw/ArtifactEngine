@@ -82,6 +82,12 @@ public:
     /** React to input for this node. */
     virtual void OnUIUpdate(const UIFrameContext& InContext) { (void)InContext; }
 
+    /** Declarative data binding: run every frame (before layout) to push current state into fields,
+     *  e.g. `label.Bind = [&]{ label.Text = std::to_string(count); };`. See UIBuilder.h / UIForEach / UIIf. */
+    std::function<void()> Bind;
+    /** Applies this node's binding. Overridden by dynamic containers (UIForEach/UIIf) to reconcile children. */
+    virtual void OnBind() { if (Bind) Bind(); }
+
     // Font used by UILabel/UIButton when they don't specify their own. Set once at startup.
     static void SetDefaultFont(Font* InFont) { s_DefaultFont = InFont; }
     static Font* GetDefaultFont() { return s_DefaultFont; }
@@ -94,13 +100,16 @@ public:
     /** Project a world pixel-space point (post-transform, may have depth) to screen pixels. */
     static Vec2 ProjectToScreen(const Vec3& InWorldPixelPos);
 
-    // Called by UIRenderer each frame.
+    // Called by UIRenderer each frame (BindTree runs first, before Layout).
+    void BindTree();
     void Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorld = Mat4(1.0f));
     void PaintTree(UIDrawList& OutDrawList);
     void UpdateTree(const UIFrameContext& InContext);
 
 protected:
     UIRectF ComputeGeometry(const UIRectF& InParentContentRect) const;
+    // Lay out with an already-resolved geometry (used by split layout, which fills each slot).
+    void LayoutSelf(const UIRectF& InResolvedGeometry, const Mat4& InParentWorld);
     UIRectF m_Geometry;
     Mat4 m_WorldMatrix = Mat4(1.0f);
 

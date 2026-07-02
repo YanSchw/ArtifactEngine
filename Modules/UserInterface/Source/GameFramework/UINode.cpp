@@ -26,7 +26,12 @@ static Mat4 RotationAbout(const Vec2& InPivot, const Vec3& InEulerDegrees) {
 }
 
 void UINode::Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorld) {
-    m_Geometry = ComputeGeometry(InParentContentRect).Deflate(Margin);
+    // Resolve our rect from anchors, then lay out (split children instead fill the slot we hand them).
+    LayoutSelf(ComputeGeometry(InParentContentRect).Deflate(Margin), InParentWorld);
+}
+
+void UINode::LayoutSelf(const UIRectF& InResolvedGeometry, const Mat4& InParentWorld) {
+    m_Geometry = InResolvedGeometry;
 
     // Rotate this node (and, through m_WorldMatrix, its children) about its pivot, on top of the
     // parent's transform. Layout stays axis-aligned; rotation/perspective apply at paint/hit-test.
@@ -43,13 +48,15 @@ void UINode::Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorl
     const UIRectF content = GetContentRect();
 
     if (LayoutMode == UILayoutMode::None || children.IsEmpty()) {
+        // Each child positions itself within our content rect via its own anchors/pivot.
         for (UINode* child : children) {
             child->Layout(content, m_WorldMatrix);
         }
         return;
     }
 
-    // Split: distribute the content rect equally along one axis, separated by Gap.
+    // Split: distribute the content rect equally along one axis (separated by Gap); each child
+    // fills its slot (its anchors are ignored in split mode), inset by its own Margin.
     const int32_t count = children.Size();
     const float totalGap = Gap * (float)(count - 1);
 
@@ -57,14 +64,16 @@ void UINode::Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorl
         const float slotWidth = std::max(0.0f, (content.Size.x - totalGap) / (float)count);
         float x = content.Position.x;
         for (UINode* child : children) {
-            child->Layout(UIRectF(Vec2(x, content.Position.y), Vec2(slotWidth, content.Size.y)), m_WorldMatrix);
+            const UIRectF slot(Vec2(x, content.Position.y), Vec2(slotWidth, content.Size.y));
+            child->LayoutSelf(slot.Deflate(child->Margin), m_WorldMatrix);
             x += slotWidth + Gap;
         }
     } else {
         const float slotHeight = std::max(0.0f, (content.Size.y - totalGap) / (float)count);
         float y = content.Position.y;
         for (UINode* child : children) {
-            child->Layout(UIRectF(Vec2(content.Position.x, y), Vec2(content.Size.x, slotHeight)), m_WorldMatrix);
+            const UIRectF slot(Vec2(content.Position.x, y), Vec2(content.Size.x, slotHeight));
+            child->LayoutSelf(slot.Deflate(child->Margin), m_WorldMatrix);
             y += slotHeight + Gap;
         }
     }
@@ -73,6 +82,19 @@ void UINode::Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorl
 void UINode::Paint(UIDrawList& OutDrawList) {
     if (BackgroundColor.a > 0.0f) {
         OutDrawList.AddRect(m_Geometry, BackgroundColor, m_WorldMatrix);
+    }
+}
+
+void UINode::BindTree() {
+    if (!IsEnabled()) {
+        return;
+    }
+    // Bind/reconcile this node first so containers can add children that also bind this frame.
+    OnBind();
+    for (uint32_t i = 0; i < GetChildCount(); i++) {
+        if (UINode* child = GetChild((int)i)->As<UINode>()) {
+            child->BindTree();
+        }
     }
 }
 

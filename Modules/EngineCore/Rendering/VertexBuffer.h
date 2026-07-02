@@ -11,6 +11,8 @@ public:
 
     void Bind();
     void Draw();
+    /** Draw a sub-range of the index buffer. */
+    void Draw(uint32_t InIndexCount, uint32_t InFirstIndex);
 
     static SharedObjectPtr<VertexBuffer> Create(const Array<struct Vertex>& InVertices, const Array<uint32_t>& InIndices);
 };

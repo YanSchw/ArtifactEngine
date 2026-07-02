@@ -31,8 +31,7 @@ private:
     SharedObjectPtr<UniformBuffer> m_ProjectionBuffer;
     SharedObjectPtr<Pipeline> m_SolidPipeline;
     SharedObjectPtr<Pipeline> m_TextPipeline;
-    SharedObjectPtr<VertexBuffer> m_SolidVertexBuffer;
-    SharedObjectPtr<VertexBuffer> m_TextVertexBuffer;
+    SharedObjectPtr<VertexBuffer> m_VertexBuffer;
 
     bool m_ResourcesReady = false;
     Surface* m_CachedTarget = nullptr;

@@ -16,3 +16,8 @@ void VertexBuffer::Draw() {
     RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BindVertexBuffer, CmdBindVertexBuffer{ this });
     RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::DrawIndexed, CmdDrawIndexed{ GetIndexCount(), 0, 0 });
 }
+
+void VertexBuffer::Draw(uint32_t InIndexCount, uint32_t InFirstIndex) {
+    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BindVertexBuffer, CmdBindVertexBuffer{ this });
+    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::DrawIndexed, CmdDrawIndexed{ InIndexCount, InFirstIndex, 0 });
+}

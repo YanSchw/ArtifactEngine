@@ -1,12 +1,11 @@
 #include "UIDrawList.h"
 #include "Assets/Font.h"
 
-void UIDrawList::AppendQuad(Array<Vertex>& OutVertices, Array<uint32_t>& OutIndices,
-                            const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform) {
+void UIDrawList::AppendQuad(BatchKind InKind, const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform) {
     const Vec2 tl = InRectPx.Min();
     const Vec2 br = InRectPx.Max();
     const Vec3 color = Vec3(InColor.r, InColor.g, InColor.b);
-    const uint32_t base = (uint32_t)OutVertices.Size();
+    const uint32_t base = (uint32_t)m_Vertices.Size();
 
     // Transform each corner into world pixel space (z=0 plane; tilts add depth). The GPU applies the
     // perspective projection. Corner order matches the engine's fullscreen quad winding: TL, BL, BR, TR.
@@ -19,20 +18,30 @@ void UIDrawList::AppendQuad(Array<Vertex>& OutVertices, Array<uint32_t>& OutIndi
     Vertex v2; v2.Position = corner(br.x, br.y); v2.Color = color; v2.TexCoord = Vec2(InUvMax.x, InUvMax.y);
     Vertex v3; v3.Position = corner(br.x, tl.y); v3.Color = color; v3.TexCoord = Vec2(InUvMax.x, InUvMin.y);
 
-    OutVertices.Add(v0); OutVertices.Add(v1); OutVertices.Add(v2); OutVertices.Add(v3);
-    OutIndices.Add(base + 0); OutIndices.Add(base + 1); OutIndices.Add(base + 2);
-    OutIndices.Add(base + 0); OutIndices.Add(base + 2); OutIndices.Add(base + 3);
+    m_Vertices.Add(v0); m_Vertices.Add(v1); m_Vertices.Add(v2); m_Vertices.Add(v3);
+
+    const uint32_t firstIndex = (uint32_t)m_Indices.Size();
+    m_Indices.Add(base + 0); m_Indices.Add(base + 1); m_Indices.Add(base + 2);
+    m_Indices.Add(base + 0); m_Indices.Add(base + 2); m_Indices.Add(base + 3);
+
+    // Extend the current run if it's the same kind, else start a new batch. Preserving paint order
+    // here is what gives correct front-to-back layering across solids and text.
+    if (!m_Batches.IsEmpty() && m_Batches.LastItem().Kind == InKind) {
+        m_Batches.LastItem().IndexCount += 6;
+    } else {
+        m_Batches.Add({ InKind, firstIndex, 6 });
+    }
 }
 
 void UIDrawList::AddRect(const UIRectF& InRectPx, const Vec4& InColor, const Mat4& InTransform) {
     if (InRectPx.Size.x <= 0.0f || InRectPx.Size.y <= 0.0f) {
         return;
     }
-    AppendQuad(m_SolidVertices, m_SolidIndices, InRectPx, Vec2(0.0f), Vec2(0.0f), InColor, InTransform);
+    AppendQuad(BatchKind::Solid, InRectPx, Vec2(0.0f), Vec2(0.0f), InColor, InTransform);
 }
 
 void UIDrawList::AddGlyphQuad(const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform) {
-    AppendQuad(m_TextVertices, m_TextIndices, InRectPx, InUvMin, InUvMax, InColor, InTransform);
+    AppendQuad(BatchKind::Text, InRectPx, InUvMin, InUvMax, InColor, InTransform);
 }
 
 void UIDrawList::AddText(Font* InFont, const String& InText, const Vec2& InTopLeftPx, float InPixelHeight, const Vec4& InColor, const Mat4& InTransform) {
