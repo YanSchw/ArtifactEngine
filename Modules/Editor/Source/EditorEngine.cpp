@@ -17,6 +17,14 @@
 #include "Rendering/Image.h"
 #include "Assets/AssetManager.h"
 #include "InputSystem/InputSystem.h"
+#include "InputSystem/MouseDevice.h"
+#include "InputSystem/MouseCodes.h"
+#include "Common/UUID.h"
+
+#include "GameFramework/UINode.h"
+#include "GameFramework/UIButton.h"
+#include "Assets/Font.h"
+#include "Rendering/UIRenderer.h"
 
 static SharedObjectPtr<Window> s_Window;
 static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
@@ -50,6 +58,21 @@ void EditorEngine::Initialize() {
     fullscreenDesc.Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::ContentDir() + "/Shaders/Passthrough.glsl"));
     fullscreenDesc.ImageBindings.Add({ 16, m_RenderPipeline->GetFinalImageView(), sampler });
     s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
+
+    BuildDemoUI();
+}
+
+void EditorEngine::BuildDemoUI() {
+    // Set the default UI font once (see Content/Fonts/Default.asset)
+    UINode::SetDefaultFont(AssetManager::Get().GetAsset<Font>(UUID::FromString("f0e1d2c3-b4a5-4967-8899-aabbccddeeff")));
+
+    m_UIRenderer = new UIRenderer();
+    m_UIRoot = (new UINode())->Fill();
+
+    UIButton* button = m_UIRoot->Add<UIButton>();
+    button->Center({ 220.0f, 56.0f });
+    button->SetCaption("Click Me 0");
+    button->OnClick = [] { AE_INFO("UI Button clicked!"); };
 }
 
 void EditorEngine::TickInput(double InDeltaTime) {
@@ -70,6 +93,20 @@ bool EditorEngine::MainTick(double InDeltaTime) {
     s_FullScreenPipeline->Bind();
     s_FullScreenQuadVertexBuffer->Draw();
 
+    // UI overlay: composited onto the surface after the scene blit, before the queue is flushed.
+    if (m_UIRenderer && m_UIRoot) {
+        UIFrameContext uiContext;
+        uiContext.DeltaTime = (float)InDeltaTime;
+        if (MouseDevice* mouse = MouseDevice::Instance()) {
+            uiContext.MousePosition = mouse->GetPosition();
+            uiContext.MouseDown = mouse->IsPressed(MouseCode::Left);
+            uiContext.MousePressedThisFrame = mouse->IsDown(MouseCode::Left);
+            uiContext.MouseReleasedThisFrame = mouse->IsUp(MouseCode::Left);
+        }
+        const Vec2 surfaceSize = Vec2((float)s_Window->GetWidth(), (float)s_Window->GetHeight());
+        m_UIRenderer->Render(s_Window.Get(), m_UIRoot, surfaceSize, uiContext);
+    }
+
     RenderingAPI::GetInstance()->Draw();
 
     s_Window->PollEvents();
@@ -77,6 +114,12 @@ bool EditorEngine::MainTick(double InDeltaTime) {
 }
 
 void EditorEngine::Shutdown() {
+    // Tear down the UI (releases its pipelines/buffers) before the surface and RHI go away.
+    delete m_UIRoot;
+    m_UIRoot = nullptr;
+    delete m_UIRenderer;
+    m_UIRenderer = nullptr;
+
     AssetManager::Get().Shutdown();
     s_Window = nullptr;
     RenderingAPI::GetInstance()->CleanUp(true);

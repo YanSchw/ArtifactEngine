@@ -816,18 +816,40 @@ void VulkanAPI::OnWindowSizeChanged() {
     VulkanAPI::CreateCommandBuffers();
 }
 
+// True only when the surface's actual pixel extent differs from the swapchain we built for it.
+// This is the reliable signal for "needs recreation" — unlike the window-resize callback flag,
+// which on macOS/MoltenVK can latch on essentially every frame even when nothing changed.
+static bool HasSurfaceExtentChanged() {
+    VkSurfaceCapabilitiesKHR caps;
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, windowSurface, &caps) != VK_SUCCESS) {
+        return false;
+    }
+    // 0xFFFFFFFF => the extent is chosen by the swapchain, not the surface; nothing to compare.
+    if (caps.currentExtent.width == 0xFFFFFFFF) {
+        return false;
+    }
+    // Zero extent (e.g. minimized) can't produce a valid swapchain; don't spin recreating it.
+    if (caps.currentExtent.width == 0 || caps.currentExtent.height == 0) {
+        return false;
+    }
+    return caps.currentExtent.width != swapChainExtent.width
+        || caps.currentExtent.height != swapChainExtent.height;
+}
+
 void VulkanAPI::Draw() {
     // Acquire image
     uint32_t imageIndex;
     VkResult res = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
-    // Unless surface is out of date right now, defer swap chain recreation until end of this frame
-    if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR) {
-        AE_TRACE("swapchain image fault {0}", (int64_t) res);
+    // Only a genuinely out-of-date swapchain must be recreated before we can draw. VK_SUBOPTIMAL_KHR
+    // means the swapchain still presents fine (just not optimally matched, e.g. HiDPI on MoltenVK);
+    // recreating on it every frame is wasteful and never converges, so we proceed with the frame.
+    if (res == VK_ERROR_OUT_OF_DATE_KHR) {
+        AE_TRACE("swapchain out of date on acquire {0}", (int64_t) res);
         VulkanAPI::OnWindowSizeChanged();
         return;
     }
-    else if (res != VK_SUCCESS) {
+    else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
         AE_ERROR("failed to acquire image");
         exit(1);
     }
@@ -870,10 +892,14 @@ void VulkanAPI::Draw() {
 
     res = vkQueuePresentKHR(presentQueue, &presentInfo);
 
-    if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR || Window::GetInstance()->WasWindowResized()) {
+    // Recreate only when the swapchain is genuinely out of date or the surface's pixel extent
+    // actually changed. VK_SUBOPTIMAL_KHR by itself (common on MoltenVK) is not a reason to rebuild
+    // the swapchain and every pipeline each frame. Clear the resize callback flag either way.
+    Window::GetInstance()->SetResizedFlag(false);
+    if (res == VK_ERROR_OUT_OF_DATE_KHR || HasSurfaceExtentChanged()) {
         VulkanAPI::OnWindowSizeChanged();
     }
-    else if (res != VK_SUCCESS) {
+    else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
         AE_ERROR("failed to submit present command buffer");
         exit(1);
     }

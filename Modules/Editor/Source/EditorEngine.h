@@ -2,6 +2,9 @@
 #include "Core/Engine.h"
 #include "EditorEngine.gen.h"
 
+class UINode;
+class UIRenderer;
+
 class EditorEngine : public Engine {
 public:
     ARTIFACT_CLASS();
@@ -11,4 +14,10 @@ protected:
     virtual bool MainTick(double InDeltaTime) override;
     virtual void TickInput(double InDeltaTime) override;
     virtual void Shutdown() override;
+
+private:
+    void BuildDemoUI();
+
+    UIRenderer* m_UIRenderer = nullptr;
+    UINode* m_UIRoot = nullptr;
 };

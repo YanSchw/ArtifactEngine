@@ -4,6 +4,7 @@
     ],
     "ImportModules": [
         "EngineCore",
-        "GLFW_Surfaces"
+        "GLFW_Surfaces",
+        "UserInterface"
     ]
 }

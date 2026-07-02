@@ -14,6 +14,11 @@ struct PipelineDesc {
     /* Target has to be of class Surface or FrameBuffer */
     SharedObjectPtr<Object> Target = nullptr;
 
+    /* Enable standard alpha blending (src-alpha / one-minus-src-alpha). Off preserves opaque draws. */
+    bool EnableBlending = false;
+    /* Enable depth testing / writing. */
+    bool EnableDepthTest = true;
+
     bool IsFrameBufferTarget() const;
     bool IsSurfaceTarget() const;
 };

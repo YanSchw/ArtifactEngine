@@ -1,0 +1,16 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore",
+        "InputSystem"
+    ],
+    "IncludePaths": [
+        "Source",
+        "ThirdParty"
+    ],
+    "ExportIncludePaths": [
+        "Source"
+    ]
+}
