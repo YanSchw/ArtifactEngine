@@ -16,6 +16,8 @@ public:
 
     GameInstance* GetGameInstance() const;
 
+    virtual void RequestExit(bool InForce);
+
 protected:
     virtual void Initialize() = 0;
     virtual bool MainTick(double InDeltaTime) = 0;
@@ -33,6 +35,8 @@ protected:
     double m_DeltaTime;
     SharedObjectPtr<class RenderPipeline> m_RenderPipeline;
     SharedObjectPtr<class GameInstance> m_GameInstance;
+
+    inline static bool s_IsRunning = true;
 
     friend int ArtifactMain(const Array<String>&);
 };
