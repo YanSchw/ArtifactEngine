@@ -40,13 +40,48 @@ FRAME_INTERVAL = 0.08  # seconds between spinner frames
 HIDE_CURSOR = "\033[?25l"
 SHOW_CURSOR = "\033[?25h"
 CLEAR_TO_END = "\033[0J"   # erase from cursor to end of screen
+CLEAR_LINE = "\033[K"      # erase from cursor to end of the current line
 
-# Encoding used when we re-open the terminal / capture pipe as text streams.
-STDOUT_ENCODING = getattr(sys.__stdout__, "encoding", None) or "utf-8"
+# Synchronized output (DEC private mode 2026): terminals that support it buffer
+# everything between BEGIN/END and repaint the region in a single pass, which
+# removes the flicker Windows consoles otherwise show while the spinner redraws.
+# Terminals without support (e.g. legacy conhost) ignore these sequences.
+BEGIN_SYNC = "\033[?2026h"
+END_SYNC = "\033[?2026l"
 
 # Ensure Windows consoles (cmd.exe / PowerShell) interpret ANSI escapes and
 # colour codes. Safe and idempotent on every platform.
 colorama.just_fix_windows_console()
+
+
+def _force_utf8_io():
+    """Make console I/O UTF-8 so the SDK's Unicode glyphs never crash the tool.
+
+    The spinner (braille frames) and the ✔/✖ summaries are non-ASCII. On a
+    localized Windows install the console code page is typically cp1252, and
+    encoding those characters against cp1252 raises UnicodeEncodeError — which
+    is what made ``artifact build`` die mid-run with no visible error. Switch the
+    console to UTF-8 so the glyphs render, and reconfigure the standard streams
+    with ``errors="replace"`` so that even when output is redirected to a
+    non-UTF-8 pipe an unencodable character degrades to '?' instead of crashing.
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        except Exception:
+            pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
+_force_utf8_io()
+
+# The standard streams, the render dup and the captured pipe are all UTF-8 now.
+STDOUT_ENCODING = "utf-8"
 
 
 def format_duration(seconds: float) -> str:
@@ -224,6 +259,8 @@ class Job:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
             **kwargs,
         )
@@ -303,15 +340,34 @@ class Job:
     # -- fd-level capture --------------------------------------------------
 
     def _install_capture(self):
-        """Redirect the stdout/stderr fds into a pipe drained by the job.
+        """Capture the step's output so nothing leaks onto the live spinner.
 
         A private dup of the original stdout becomes ``self._tty`` (used only
-        for rendering), while fds 1 and 2 are pointed at a pipe whose reader
-        thread feeds every byte — prints and child-process output alike — into
-        the job's log tail.
+        for rendering the spinner). How the step's own output is captured then
+        depends on the platform:
+
+        * On POSIX we redirect fds 1 and 2 into a pipe whose reader thread
+          feeds every byte — prints and child-process output alike — into the
+          job's log tail.
+        * On Windows we must *not* redirect the fds: ``sys.stdout`` there is a
+          console object bound to fd 1, and once fd 1 points at our pipe the
+          Win32 console API can no longer write to it, so the first ``print``
+          the step makes crashes the process (with the error swallowed by the
+          redirected stderr). Every subprocess the SDK runs already captures
+          its own output explicitly, so we only need to funnel Python-level
+          prints — do that by swapping ``sys.stdout``/``sys.stderr`` for stream
+          proxies instead.
         """
         render_fd = os.dup(1)
         self._tty = os.fdopen(render_fd, "w", encoding=STDOUT_ENCODING, errors="replace")
+
+        if sys.platform == "win32":
+            self._saved_stdout = sys.stdout
+            self._saved_stderr = sys.stderr
+            sys.stdout = _StreamProxy(self)
+            sys.stderr = _StreamProxy(self)
+            self._captured = True
+            return
 
         self._saved_fd_stdout = os.dup(1)
         self._saved_fd_stderr = os.dup(2)
@@ -335,6 +391,18 @@ class Job:
     def _remove_capture(self):
         if not self._captured:
             return
+        self._captured = False
+
+        if sys.platform == "win32":
+            # Flush any buffered partial line, then restore the console streams.
+            sys.stdout.flush()
+            sys.stderr.flush()
+            sys.stdout = self._saved_stdout
+            sys.stderr = self._saved_stderr
+            self._saved_stdout = None
+            self._saved_stderr = None
+            return
+
         sys.stdout.flush()
         sys.stderr.flush()
         # Restoring the fds closes the pipe's write ends, so the reader hits EOF.
@@ -342,7 +410,6 @@ class Job:
         os.dup2(self._saved_fd_stderr, 2)
         os.close(self._saved_fd_stdout)
         os.close(self._saved_fd_stderr)
-        self._captured = False
         if self._reader:
             self._reader.join()
 
@@ -394,11 +461,28 @@ class Job:
 
     def _draw(self):
         lines = self._compose()
-        self._erase()
-        self._tty.write("\n".join(lines))
+
+        parts = [BEGIN_SYNC]
+        # Reposition to the top-left of the region drawn last frame instead of
+        # erasing it: overwriting the cells in place (rather than blanking the
+        # region and refilling it) is what keeps the redraw flicker-free.
+        if self._drawn_rows > 0:
+            parts.append("\r")
+            if self._drawn_rows > 1:
+                parts.append(f"\033[{self._drawn_rows - 1}A")
+        # \033[K after each line clears any leftover from a longer previous
+        # frame, so we never have to blank the whole region up front.
+        parts.append("\n".join(line + CLEAR_LINE for line in lines))
+        # If this frame is shorter than the last, erase the now-stale rows below.
+        if self._drawn_rows > len(lines):
+            parts.append(CLEAR_TO_END)
+        parts.append(END_SYNC)
+
+        # A single batched write (one syscall) further reduces tearing on Windows.
+        self._tty.write("".join(parts))
         self._tty.flush()
         # Each composed line is truncated to one terminal row, so the number of
-        # rows we drew equals the number of lines — making erase exact.
+        # rows we drew equals the number of lines — making the next reposition exact.
         self._drawn_rows = len(lines)
 
     def _erase(self):

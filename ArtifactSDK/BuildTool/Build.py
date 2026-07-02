@@ -78,7 +78,7 @@ def _find_vcvarsall():
         [vswhere, "-latest", "-products", "*",
          "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
          "-property", "installationPath"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, errors="replace",
     )
     install_path = result.stdout.strip().splitlines()
     if not install_path:
@@ -103,7 +103,8 @@ def build_environment():
     vcvars = _find_vcvarsall()
     if not vcvars:
         return env  # fall back and let CMake try whatever compiler it finds
-    result = subprocess.run(f'"{vcvars}" x64 && set', capture_output=True, text=True, shell=True)
+    result = subprocess.run(f'"{vcvars}" x64 && set', capture_output=True,
+                            text=True, errors="replace", shell=True)
     for line in result.stdout.splitlines():
         key, sep, value = line.partition("=")
         if sep:
@@ -137,10 +138,11 @@ def build_cmake(job=None):
     else:
         subprocess.run(configure_cmd, check=True, env=env)
         proc = subprocess.run(build_cmd, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, text=True, env=env)
+                              stderr=subprocess.STDOUT, text=True,
+                              encoding="utf-8", errors="replace", env=env)
         returncode, combined = proc.returncode, proc.stdout
 
-    with open("Build/CMakeBuild.log", "w") as log_file:
+    with open("Build/CMakeBuild.log", "w", encoding="utf-8", errors="replace") as log_file:
         log_file.write(combined)
 
     errors, warnings = parse_output(combined)
@@ -182,7 +184,8 @@ def _run_streamed(command, env, job, parse_progress: bool = False):
     progress bar. Returns ``(returncode, combined_output)``.
     """
     proc = subprocess.Popen(command, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, bufsize=1, env=env)
+                            stderr=subprocess.STDOUT, text=True,
+                            encoding="utf-8", errors="replace", bufsize=1, env=env)
     captured = []
     for line in proc.stdout:
         captured.append(line)
