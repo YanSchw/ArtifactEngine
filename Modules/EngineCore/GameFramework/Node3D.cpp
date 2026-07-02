@@ -10,56 +10,53 @@ Node3D* Node3D::GetTransform() {
     return this;
 }
 
+Node3D* Node3D::GetParentTransformChecked() const {
+    // GetParentTransform() only reads the hierarchy; it is non-const purely by convention.
+    return const_cast<Node3D*>(this)->GetParentTransform();
+}
+
+/* ---- Position ---- */
+
 Vec3 Node3D::GetPosition() const {
     return Vec3(GetTransformMatrix()[3]);
 }
 
 Vec3 Node3D::GetLocalPosition() const {
-    return Vec3(m_LocalTransformMatrix[3]);
+    return m_LocalPosition;
 }
 
-void Node3D::SetPosition(const Vec3& InPosition) {
-    const auto& scaled = glm::scale(Mat4(1), GetScale());
-    const auto& rotated = glm::toMat4(GetRotation()) * scaled;
-    m_WorldTransformMatrix = glm::translate(Mat4(1), InPosition) * rotated;
-    TickTransform(true);
+void Node3D::SetPosition(const Vec3& InWorldPosition) {
+    if (Node3D* parent = GetParentTransform()) {
+        m_LocalPosition = Vec3(glm::inverse(parent->GetTransformMatrix()) * Vec4(InWorldPosition, 1.0f));
+    } else {
+        m_LocalPosition = InWorldPosition;
+    }
+    TickTransform();
 }
 
-void Node3D::SetLocalPosition(const Vec3& InPosition) {
-    const auto& scaled = glm::scale(Mat4(1), GetLocalScale());
-    const auto& rotated = glm::toMat4(GetLocalRotation()) * scaled;
-    m_LocalTransformMatrix = glm::translate(Mat4(1), InPosition) * rotated;
-    ReprojectLocalMatrixToWorld();
-    TickTransform(true);
+void Node3D::SetLocalPosition(const Vec3& InLocalPosition) {
+    m_LocalPosition = InLocalPosition;
+    TickTransform();
 }
 
-void Node3D::AddWorldOffset(const Vec3& InOffset) {
-    SetPosition(GetPosition() + InOffset);
+void Node3D::AddWorldOffset(const Vec3& InWorldOffset) {
+    SetPosition(GetPosition() + InWorldOffset);
 }
 
-void Node3D::AddLocalOffset(const Vec3& InOffset) {
-    SetLocalPosition(GetLocalPosition() + InOffset);
+void Node3D::AddLocalOffset(const Vec3& InLocalOffset) {
+    m_LocalPosition += InLocalOffset;
+    TickTransform();
 }
 
+/* ---- Rotation ---- */
 
 Quat Node3D::GetRotation() const {
-    Vec3 scale;
-    glm::quat rotation;
-    Vec3 translation;
-    Vec3 skew;
-    Vec4 perspective;
-    glm::decompose(m_WorldTransformMatrix, scale, rotation, translation, skew, perspective);
-    return rotation;
+    Node3D* parent = GetParentTransformChecked();
+    return parent ? glm::normalize(parent->GetRotation() * m_LocalRotation) : m_LocalRotation;
 }
 
 Quat Node3D::GetLocalRotation() const {
-    Vec3 scale;
-    glm::quat rotation;
-    Vec3 translation;
-    Vec3 skew;
-    Vec4 perspective;
-    glm::decompose(m_LocalTransformMatrix, scale, rotation, translation, skew, perspective);
-    return rotation;
+    return m_LocalRotation;
 }
 
 Vec3 Node3D::GetEulerRotation() const {
@@ -67,153 +64,125 @@ Vec3 Node3D::GetEulerRotation() const {
 }
 
 Vec3 Node3D::GetLocalEulerRotation() const {
-    return glm::degrees(glm::eulerAngles(GetLocalRotation()));
+    return glm::degrees(glm::eulerAngles(m_LocalRotation));
 }
 
-void Node3D::SetRotation(const Quat& InRotation) {
-    const auto& scaled = glm::scale(Mat4(1), GetScale());
-    const auto& rotated = glm::toMat4(InRotation) * scaled;
-    m_WorldTransformMatrix = glm::translate(Mat4(1), GetPosition()) * rotated;
-    TickTransform(true);
+void Node3D::SetRotation(const Quat& InWorldRotation) {
+    if (Node3D* parent = GetParentTransform()) {
+        m_LocalRotation = glm::normalize(glm::inverse(parent->GetRotation()) * InWorldRotation);
+    } else {
+        m_LocalRotation = glm::normalize(InWorldRotation);
+    }
+    TickTransform();
 }
 
-void Node3D::SetLocalRotation(const Quat& InRotation) {
-    const auto& scaled = glm::scale(Mat4(1), GetLocalScale());
-    const auto& rotated = glm::toMat4(InRotation) * scaled;
-    m_LocalTransformMatrix = glm::translate(Mat4(1), GetLocalPosition()) * rotated;
-    ReprojectLocalMatrixToWorld();
-    TickTransform(true);
+void Node3D::SetLocalRotation(const Quat& InLocalRotation) {
+    m_LocalRotation = glm::normalize(InLocalRotation);
+    TickTransform();
 }
 
-void Node3D::SetEulerRotation(const Vec3& InEulerAngles) {
-    SetRotation(Quat(glm::radians(InEulerAngles)));
+void Node3D::SetEulerRotation(const Vec3& InWorldEulerAngles) {
+    SetRotation(Quat(glm::radians(InWorldEulerAngles)));
 }
 
-void Node3D::SetLocalEulerRotation(const Vec3& InEulerAngles) {
-    SetLocalRotation(Quat(glm::radians(InEulerAngles)));
+void Node3D::SetLocalEulerRotation(const Vec3& InLocalEulerAngles) {
+    SetLocalRotation(Quat(glm::radians(InLocalEulerAngles)));
 }
 
-void Node3D::Rotate(const Quat& InQuat) {
-    // TODO: Double check this
-    SetRotation(GetRotation() * InQuat);
+void Node3D::Rotate(const Quat& InDeltaRotation) {
+    // Self-space rotation, matching Unity's Transform.Rotate (Space.Self).
+    SetLocalRotation(m_LocalRotation * InDeltaRotation);
 }
 
-void Node3D::RotateEuler(const Vec3& InEulerAngles) {
-    SetRotation(glm::normalize(GetRotation() * glm::quat(InEulerAngles)));
+void Node3D::RotateEuler(const Vec3& InDeltaEulerAngles) {
+    Rotate(Quat(glm::radians(InDeltaEulerAngles)));
 }
 
 void Node3D::RotateWithAxis(const Vec3& InAxis, float InAngle) {
-    m_WorldTransformMatrix = glm::rotate(m_WorldTransformMatrix, glm::radians(InAngle), InAxis);
-    TickTransform(true);
+    const Quat delta = glm::angleAxis(glm::radians(InAngle), glm::normalize(InAxis));
+    SetLocalRotation(m_LocalRotation * delta);
 }
 
-void Node3D::SetLookDirection(const Vec3& InDirection, const Vec3& InUpDirection) {
-    SetRotation(glm::quatLookAtLH(InDirection, InUpDirection));
+void Node3D::SetLookDirection(const Vec3& InWorldDirection, const Vec3& InWorldUpDirection) {
+    SetRotation(glm::quatLookAtLH(glm::normalize(InWorldDirection), InWorldUpDirection));
 }
+
+/* ---- Scale ---- */
 
 Vec3 Node3D::GetScale() const {
-    Vec3 scale;
-    glm::quat rotation;
-    Vec3 translation;
-    Vec3 skew;
-    Vec4 perspective;
-    glm::decompose(m_WorldTransformMatrix, scale, rotation, translation, skew, perspective);
-    return scale;
+    // Unity-style lossy world scale: component-wise product up the chain.
+    // (Ignores shear introduced by non-uniform parent scale + child rotation.)
+    Node3D* parent = GetParentTransformChecked();
+    return parent ? parent->GetScale() * m_LocalScale : m_LocalScale;
 }
 
 Vec3 Node3D::GetLocalScale() const {
-    Vec3 scale;
-    glm::quat rotation;
-    Vec3 translation;
-    Vec3 skew;
-    Vec4 perspective;
-    glm::decompose(m_LocalTransformMatrix, scale, rotation, translation, skew, perspective);
-    return scale;
+    return m_LocalScale;
 }
 
-void Node3D::SetScale(const Vec3& InScale) {
-    if (InScale.x <= 0.0f || InScale.y <= 0.0f || InScale.z <= 0.0f) return;
-    const auto& scaled = glm::scale(Mat4(1), InScale);
-    const auto& rotated = glm::toMat4(GetRotation()) * scaled;
-    m_WorldTransformMatrix = glm::translate(Mat4(1), GetPosition()) * rotated;
-    TickTransform(true);
+void Node3D::SetScale(const Vec3& InWorldScale) {
+    if (Node3D* parent = GetParentTransform()) {
+        const Vec3 parentScale = parent->GetScale();
+        m_LocalScale = Vec3(
+            parentScale.x != 0.0f ? InWorldScale.x / parentScale.x : InWorldScale.x,
+            parentScale.y != 0.0f ? InWorldScale.y / parentScale.y : InWorldScale.y,
+            parentScale.z != 0.0f ? InWorldScale.z / parentScale.z : InWorldScale.z);
+    } else {
+        m_LocalScale = InWorldScale;
+    }
+    TickTransform();
 }
 
-void Node3D::SetLocalScale(const Vec3& InScale) {
-    if (InScale.x <= 0.0f || InScale.y <= 0.0f || InScale.z <= 0.0f) return;
-    const auto& scaled = glm::scale(Mat4(1), InScale);
-    const auto& rotated = glm::toMat4(GetLocalRotation()) * scaled;
-    m_LocalTransformMatrix = glm::translate(Mat4(1), GetLocalPosition()) * rotated;
-    ReprojectLocalMatrixToWorld();
-    TickTransform(true);
+void Node3D::SetLocalScale(const Vec3& InLocalScale) {
+    m_LocalScale = InLocalScale;
+    TickTransform();
+}
+
+/* ---- Matrices ---- */
+
+Mat4 Node3D::GetLocalTransformMatrix() const {
+    return CalculateTransformMatrix(m_LocalPosition, m_LocalRotation, m_LocalScale);
 }
 
 Mat4 Node3D::GetTransformMatrix() const {
-    return m_WorldTransformMatrix;
+    Node3D* parent = GetParentTransformChecked();
+    return parent ? parent->GetTransformMatrix() * GetLocalTransformMatrix() : GetLocalTransformMatrix();
 }
 
-void Node3D::SetTransformMatrix(const Mat4& mat) {
-    m_WorldTransformMatrix = mat;
-    RecalculateTransformMatrix();
-    TickTransform(true);
-}
-
-void Node3D::RecalculateTransformMatrix() {
-    bool inverseParentTransform = false;
-    /// Source: https://stackoverflow.com/questions/11920866/global-transform-to-local-transform
-    m_LocalTransformMatrix = GetParentTransform() ?
-        ((!inverseParentTransform ? glm::inverse(GetParentTransform()->GetTransformMatrix()) : GetParentTransform()->GetTransformMatrix()) * m_WorldTransformMatrix) :
-        m_WorldTransformMatrix;
-}
-
-void Node3D::ReprojectLocalMatrixToWorld() {
-    if (!GetParentTransform()){
-        m_WorldTransformMatrix = m_LocalTransformMatrix;
-        return;
+void Node3D::SetTransformMatrix(const Mat4& InWorldMatrix) {
+    // Boundary conversion: a raw world matrix is decomposed into local SRT
+    // exactly once, here. Every other accessor stays decomposition-free.
+    Mat4 local = InWorldMatrix;
+    if (Node3D* parent = GetParentTransform()) {
+        local = glm::inverse(parent->GetTransformMatrix()) * InWorldMatrix;
     }
-    m_WorldTransformMatrix = GetParentTransform()->m_WorldTransformMatrix * m_LocalTransformMatrix;
+
+    Vec3 skew;
+    Vec4 perspective;
+    glm::decompose(local, m_LocalScale, m_LocalRotation, m_LocalPosition, skew, perspective);
+    TickTransform();
 }
 
 Mat4 Node3D::CalculateTransformMatrix(const Vec3& InPosition, const Vec3& InEulerAngles, const Vec3& InScale) {
-    const Mat4 rotation = glm::toMat4(Quat({ glm::radians(InEulerAngles.x), glm::radians(InEulerAngles.y), glm::radians(InEulerAngles.z) }));
-    return glm::translate(Mat4(1.0f), { InPosition.x, InPosition.y, InPosition.z })
-        * rotation
-        * glm::scale(Mat4(1.0f), { InScale.x, InScale.y, InScale.z });
+    return CalculateTransformMatrix(InPosition, Quat(glm::radians(InEulerAngles)), InScale);
 }
 
 Mat4 Node3D::CalculateTransformMatrix(const Vec3& InPosition, const Quat& InRotation, const Vec3& InScale) {
-    const Mat4 rot = glm::toMat4(InRotation);
-    return glm::translate(Mat4(1.0f), { InPosition.x, InPosition.y, InPosition.z })
-        * rot
-        * glm::scale(Mat4(1.0f), { InScale.x, InScale.y, InScale.z });
+    return glm::translate(Mat4(1.0f), InPosition)
+        * glm::toMat4(InRotation)
+        * glm::scale(Mat4(1.0f), InScale);
 }
 
 Vec3 Node3D::GetRightVector() const {
-    //const Mat4 inverted = glm::inverse(GetTransformMatrix());
-    const Vec3 right = glm::normalize(Vec3(GetTransformMatrix()[0]));
-    return right;
+    return glm::normalize(Vec3(GetTransformMatrix()[0]));
 }
 
 Vec3 Node3D::GetUpVector() const {
-    //const Mat4 inverted = glm::inverse(GetTransformMatrix());
-    const Vec3 up = glm::normalize(Vec3(GetTransformMatrix()[1]));
-    return up;
+    return glm::normalize(Vec3(GetTransformMatrix()[1]));
 }
 
 Vec3 Node3D::GetForwardVector() const {
-    //const Mat4 inverted = glm::inverse(GetTransformMatrix());
-    const Vec3 forward = glm::normalize(Vec3(GetTransformMatrix()[2]));
-    return forward;
-}
-
-void Node3D::TickTransform(bool InInWorldSpace) {
-    if (!InInWorldSpace) {
-        ReprojectLocalMatrixToWorld();
-    } else{
-        RecalculateTransformMatrix();
-    }
-    Super::TickTransform(InInWorldSpace);
-    RecalculateTransformMatrix();
+    return glm::normalize(Vec3(GetTransformMatrix()[2]));
 }
 
 void Node3D::InitializeNode(World& OutWorld) {

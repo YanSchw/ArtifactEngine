@@ -1,5 +1,6 @@
 #include "Node.h"
 #include "Component.h"
+#include "Node3D.h"
 #include "World.h"
 #include "Core/Log.h"
 
@@ -276,6 +277,16 @@ void Node::ForceSetParent(Node* InParent, bool InKeepWorldTransform, bool InInGa
         OnParentChange(GetParent(), InParent);
     }
 
+    // Capture the world pose *before* the hierarchy changes. World transforms are
+    // derived from the parent chain, so once m_Parent moves the old world pose is
+    // gone. Only meaningful when this node is itself a Node3D; for non-spatial
+    // nodes GetTransform() walks up to a parent we must not touch.
+    Node3D* transform = GetTransform();
+    if (transform != this) {
+        transform = nullptr;
+    }
+    const Mat4 worldBefore = (transform && InKeepWorldTransform) ? transform->GetTransformMatrix() : Mat4(1.0f);
+
     if (GetParent()) {
         GetParent()->m_Children.Remove(this);
     }
@@ -295,13 +306,11 @@ void Node::ForceSetParent(Node* InParent, bool InKeepWorldTransform, bool InInGa
         m_EnabledInHierarchy = m_Enabled;
     }
 
-    /*if (Node3D* transform = GetTransform()) {
-        if (!keepWorldTransform && transform->GetParentTransform()) {
-            transform->m_WorldTransformMatrix = transform->GetParentTransform()->m_WorldTransformMatrix * transform->m_WorldTransformMatrix;
-        }
-
-        transform->RecalculateTransformMatrix();
-    }*/
+    // Keep-world: re-express the captured world pose in the new parent's space.
+    // Keep-local: nothing to do — local SRT is unchanged and world re-derives.
+    if (transform && InKeepWorldTransform) {
+        transform->SetTransformMatrix(worldBefore);
+    }
 }
 
 bool Node::ShouldUpdateInCurrentContext() const {
