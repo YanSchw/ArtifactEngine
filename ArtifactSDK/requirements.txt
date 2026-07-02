@@ -2,3 +2,4 @@ setuptools
 colorama
 pillow
 rich
+ninja

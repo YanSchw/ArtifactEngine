@@ -8,6 +8,7 @@ from BuildTool.Build import build_cmake
 from SDK.Paths import get_engine_path, get_project_path
 from SDK.Platforms import get_current_platform
 from SDK.Util import png_to_ico
+from SDK.Job import Job, JobError
 from Lint.Lint import lint_files
 import os
 import sys
@@ -16,32 +17,34 @@ import shutil
 
 def cmd_build(args):
     try:
-        print("Building the engine...")
         engine_path = get_engine_path()
         project_path = get_project_path()
-        
+
         # Clean build if requested (do this BEFORE generating files)
         clean = getattr(args, 'clean', False)
         if clean:
             build_dir = f"{project_path}/Build"
             if os.path.exists(build_dir):
                 shutil.rmtree(build_dir)
-        
-        generate_cmake(project_path, args)
 
-        # Generate reflection code for classes in Modules
-        header_tool = HeaderTool()
-        header_tool.collect_headers(f"{engine_path}/Modules")
-        header_tool.collect_headers(f"{project_path}/Modules")
-        header_tool.generate()
+        with Job("Generating project files"):
+            generate_cmake(project_path, args)
 
-        png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
-        build_cmake()
+            # Generate reflection code for classes in Modules
+            header_tool = HeaderTool()
+            header_tool.collect_headers(f"{engine_path}/Modules")
+            header_tool.collect_headers(f"{project_path}/Modules")
+            header_tool.generate()
+
+            png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
+
+        with Job("Building", dump_on_error=False) as job:
+            build_cmake(job)
     except KeyboardInterrupt:
         print("Build cancelled by user.")
         sys.exit(1)
-    except Exception as e:
-        raise e
+    except JobError as e:
+        sys.exit(e.returncode)
 
 def cmd_run(args):
     args.target = get_current_platform().name
@@ -64,15 +67,18 @@ def cmd_cook(args):
     cook_dir = f"{project_path}/Build/Intermediate/Cooked"
     os.makedirs(cook_dir, exist_ok=True)
     try:
-        subprocess.run([
-            f"{project_path}/Binaries/Artifact",
-            "-EngineClass=AssetCookerEngine",
-            f"-CookDirectory={cook_dir}",
-        ], check=True)
+        with Job("Cooking") as job:
+            job.run([
+                f"{project_path}/Binaries/Artifact",
+                "-EngineClass=AssetCookerEngine",
+                f"-CookDirectory={cook_dir}",
+            ], check=True,  # non-zero exit fails the job
+               # AssetCooker logs "[current/total] Cooking asset: ..." (see AssetCooker.cpp).
+               progress_pattern=r"\[(\d+)/(\d+)\]")
     except KeyboardInterrupt:
         pass  # Allow graceful exit on Ctrl+C
-    except subprocess.CalledProcessError as e:
-        print(f"Error occurred while running the engine: {e}")
+    except JobError as e:
+        sys.exit(e.returncode)
 
 def cmd_package(args):
     project_path = os.getcwd()
@@ -94,7 +100,8 @@ def cmd_package(args):
     
     if args.target == "MacOS":
         from Package.MacOS import package_for_macos
-        package_for_macos(project_path)
+        with Job("Packaging"):
+            package_for_macos(project_path)
     else:
         print("Only MacOS packaging is implemented so far")
         exit(1)
