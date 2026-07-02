@@ -14,7 +14,15 @@ enum class UpdateFlag : uint8_t {
     LocalUpdate = 2
 };
 
-/** Baseclass for all Nodes in the GameFramework */
+/** Node is the fundamental building block of the scene: every entity that lives
+ *  in a World is a Node or derives from one.
+ *
+ *  Nodes are arranged in a hierarchy, with each Node owning its children and
+ *  passing behaviour and state down to them. A Node has a name, can be enabled
+ *  or disabled, takes part in the gameplay lifecycle while it belongs to a World,
+ *  and can be updated every frame. On its own a Node has no position in space;
+ *  spatial behaviour is added by dedicated subclasses.
+ */
 class Node : public Object {
 public:
     ARTIFACT_CLASS();

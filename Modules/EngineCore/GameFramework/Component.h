@@ -4,10 +4,13 @@
 
 class World;
 
-/** Component is a special kind of Node.
- *  Normal Nodes own their children and control flows from parent to child.
- *  A Component may never have children and will always have a parent;
- *  it may never be just spawned in the World.
+/** Component is a Node that adds behaviour or data to another Node rather than
+ *  standing on its own in the scene.
+ *
+ *  A Component is always attached to a single host Node and stays with it for its
+ *  whole lifetime: it cannot exist independently in a World and is never moved to
+ *  a different host. A Component can restrict which kinds of Node it may attach
+ *  to, allowing behaviour to be composed onto an entity from reusable pieces.
  */
 class Component : public Node {
 public:
