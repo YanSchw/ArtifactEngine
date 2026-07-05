@@ -5,6 +5,7 @@ from colorama import Fore, Style
 from HeaderTool.HeaderTool import HeaderTool
 from BuildTool.Generate import generate_cmake
 from BuildTool.Build import build_cmake
+from BuildTool.IDEGen import generate_ide_project
 from SDK.Paths import get_engine_path, get_project_path
 from SDK.Platforms import get_current_platform
 from SDK.Util import png_to_ico
@@ -15,28 +16,43 @@ import sys
 import subprocess
 import shutil
 
+def _generate(args):
+    engine_path = get_engine_path()
+    project_path = get_project_path()
+
+    # Clean build if requested
+    clean = getattr(args, 'clean', False)
+    if clean:
+        build_dir = f"{project_path}/Build"
+        if os.path.exists(build_dir):
+            shutil.rmtree(build_dir)
+
+    with Job("Generating project files"):
+        generate_cmake(project_path, args)
+
+        # Generate reflection code for classes in Modules
+        header_tool = HeaderTool()
+        header_tool.collect_headers(f"{engine_path}/Modules")
+        header_tool.collect_headers(f"{project_path}/Modules")
+        header_tool.generate()
+
+        png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
+
+    with Job("Generating IDE project files"):
+        generate_ide_project(engine_path, project_path, args)
+
+def cmd_generate(args):
+    try:
+        _generate(args)
+    except KeyboardInterrupt:
+        print("Generation cancelled by user.")
+        sys.exit(1)
+    except JobError as e:
+        sys.exit(e.returncode)
+
 def cmd_build(args):
     try:
-        engine_path = get_engine_path()
-        project_path = get_project_path()
-
-        # Clean build if requested (do this BEFORE generating files)
-        clean = getattr(args, 'clean', False)
-        if clean:
-            build_dir = f"{project_path}/Build"
-            if os.path.exists(build_dir):
-                shutil.rmtree(build_dir)
-
-        with Job("Generating project files"):
-            generate_cmake(project_path, args)
-
-            # Generate reflection code for classes in Modules
-            header_tool = HeaderTool()
-            header_tool.collect_headers(f"{engine_path}/Modules")
-            header_tool.collect_headers(f"{project_path}/Modules")
-            header_tool.generate()
-
-            png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
+        _generate(args)
 
         with Job("Building", dump_on_error=False) as job:
             build_cmake(job)
@@ -135,11 +151,16 @@ def main():
     parser = argparse.ArgumentParser(description="Artifact Engine Build Tool")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    build_parser = subparsers.add_parser("build", help="Build the engine")
-    build_parser.add_argument("--target", choices=["Win64", "MacOS", "Linux"], default=get_current_platform().name, help="Target platform to build for")
-    build_parser.add_argument("--configuration", choices=["Debug", "Dev", "Dist"], default="Dev", help="Build configuration")
-    build_parser.add_argument("--packaged", action="store_true", default=False, help="Whether to build a packaged version (binary may be embedded into an application bundle)")
-    build_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before building")
+    generate_args_parser = argparse.ArgumentParser(add_help=False)
+    generate_args_parser.add_argument("--target", choices=["Win64", "MacOS", "Linux"], default=get_current_platform().name, help="Target platform to generate/build for")
+    generate_args_parser.add_argument("--configuration", choices=["Debug", "Dev", "Dist"], default="Dev", help="Build configuration")
+    generate_args_parser.add_argument("--packaged", action="store_true", default=False, help="Whether to build a packaged version (binary may be embedded into an application bundle)")
+    generate_args_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before generating/building")
+
+    generate_parser = subparsers.add_parser("generate", parents=[generate_args_parser], help="Generate project files (CMake + native IDE project) without building")
+    generate_parser.set_defaults(func=cmd_generate)
+
+    build_parser = subparsers.add_parser("build", parents=[generate_args_parser], help="Build the engine")
     build_parser.set_defaults(func=cmd_build)
 
     run_parser = subparsers.add_parser("run", help="Run the engine")
