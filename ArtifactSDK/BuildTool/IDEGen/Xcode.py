@@ -4,8 +4,17 @@ import sys
 from SDK.Util import smart_open
 
 # Matches BuildTool.Target.TargetType; $CONFIGURATION is the env var Xcode
-# exports for the legacy target's build script.
+# exports for the aggregate target's build script.
 _CONFIGURATIONS = ["Debug", "Dev", "Dist"]
+
+# Kept in sync with SDK.Platforms.get_cpp_platform_macro / BuildTool.Target so
+# the indexer sees the same preprocessor state the real build compiles with.
+_PLATFORM_DEFINES = ["AE_PLATFORM_MACOS"]
+_CONFIG_DEFINES = {
+    "Debug": "AE_TARGET_DEBUG",
+    "Dev": "AE_TARGET_DEV",
+    "Dist": "AE_TARGET_DIST",
+}
 
 _FILE_TYPES = {
     ".cpp": "sourcecode.cpp.cpp",
@@ -14,6 +23,7 @@ _FILE_TYPES = {
     ".h": "sourcecode.c.h",
     ".hpp": "sourcecode.c.h",
     ".inl": "sourcecode.c.h",
+    ".json": "text.json",
 }
 
 
@@ -36,6 +46,11 @@ def _ref(object_id: str, comment: str) -> str:
 
 def _venv_activate_script() -> str:
     return f"{sys.prefix.replace(chr(92), '/')}/bin/activate"
+
+
+def _sh_single_quote(s: str) -> str:
+    """Wrap a string in single quotes, safe for embedding in a shell script."""
+    return "'" + s.replace("'", "'\\''") + "'"
 
 
 class _PBXWriter:
@@ -70,32 +85,113 @@ def _list_field(items: list[str]) -> str:
     return "(\n" + inner + "\n\t\t\t)"
 
 
+def _add_file_ref(writer: _PBXWriter, path: str) -> str:
+    ext = os.path.splitext(path)[1]
+    file_type = _FILE_TYPES.get(ext, "text")
+    file_id = _oid(f"fileref:{path}")
+    name = os.path.basename(path)
+    writer.add("PBXFileReference", file_id, name, _build_body([
+        ("isa", "PBXFileReference"),
+        ("lastKnownFileType", file_type),
+        ("name", _pbx_str(name)),
+        ("path", _pbx_str(path)),
+        ("sourceTree", '"<absolute>"'),
+    ]))
+    return _ref(file_id, name)
+
+
+def _build_group_tree(writer: _PBXWriter, module) -> list[str]:
+    """A PBXGroup subtree mirroring the module's on-disk folders.
+
+    Returns the child refs for the module's own group. Folders sort before files
+    at each level, matching how Xcode presents a normal source tree.
+    """
+    root: dict = {"dirs": {}, "files": []}
+    all_files = sorted(set(module.source_files + module.header_files + module.other_files))
+    for path in all_files:
+        rel = os.path.relpath(path, module.path).replace("\\", "/")
+        parts = rel.split("/")
+        node = root
+        for part in parts[:-1]:
+            node = node["dirs"].setdefault(part, {"dirs": {}, "files": []})
+        node["files"].append(path)
+
+    def emit(node: dict, folder_rel: str) -> list[str]:
+        children = []
+        for dname in sorted(node["dirs"]):
+            child_rel = f"{folder_rel}/{dname}" if folder_rel else dname
+            sub_children = emit(node["dirs"][dname], child_rel)
+            group_id = _oid(f"group:{module.name}:{child_rel}")
+            writer.add("PBXGroup", group_id, dname, _build_body([
+                ("isa", "PBXGroup"),
+                ("children", _list_field(sub_children)),
+                ("name", _pbx_str(dname)),
+                ("sourceTree", '"<group>"'),
+            ]))
+            children.append(_ref(group_id, dname))
+        for path in sorted(node["files"]):
+            children.append(_add_file_ref(writer, path))
+        return children
+
+    return emit(root, "")
+
+
+def _third_party_include_dirs(modules) -> list[str]:
+    """Include dirs for vendored third-party projects the indexer would otherwise miss.
+
+    The real build gets these transitively from each module's AddAdditionalCMakeProjects
+    (and find_package results); the indexer has no CMake, so approximate them:
+    each vendored project's root (glm-style <root>/glm) and its include/ subdir
+    (glfw/spdlog-style), plus the common prefixes where find_package lands system
+    SDKs such as Vulkan.
+    """
+    dirs = []
+    for module in modules:
+        for rel in module.module.AddAdditionalCMakeProjects:
+            proj = f"{module.path}/{rel}"
+            for candidate in (proj, f"{proj}/include"):
+                if os.path.isdir(candidate):
+                    dirs.append(candidate)
+
+    system_prefixes = ["/usr/local/include", "/opt/homebrew/include"]
+    vulkan_sdk = os.environ.get("VULKAN_SDK")
+    if vulkan_sdk:
+        system_prefixes.append(f"{vulkan_sdk}/include")
+    dirs += [p for p in system_prefixes if os.path.isdir(p)]
+
+    seen, unique = set(), []
+    for d in dirs:
+        if d not in seen:
+            seen.add(d)
+            unique.append(d)
+    return unique
+
+
+def _index_build_settings(configuration: str, header_search_paths: list[str], product_name: str) -> list[tuple[str, str]]:
+    """Settings that let Xcode's indexer parse the sources the way the real build does.
+
+    SDKROOT lets clang find the platform/std headers; the standard, defines and
+    header search paths make cross-file symbol resolution match the real build.
+    """
+    defines = _PLATFORM_DEFINES + [_CONFIG_DEFINES[configuration], "$(inherited)"]
+    return [
+        ("ALWAYS_SEARCH_USER_PATHS", "NO"),
+        ("CLANG_CXX_LANGUAGE_STANDARD", '"c++20"'),
+        ("CLANG_CXX_LIBRARY", '"libc++"'),
+        ("GCC_PREPROCESSOR_DEFINITIONS", _list_field([_pbx_str(d) for d in defines])),
+        ("HEADER_SEARCH_PATHS", _list_field([_pbx_str(d) for d in header_search_paths])),
+        ("PRODUCT_NAME", _pbx_str(product_name)),
+        ("SDKROOT", "macosx"),
+        ("SUPPORTED_PLATFORMS", "macosx"),
+    ]
+
+
 def generate_xcode(engine_path: str, project_path: str, modules, args):
     project_name = (project_path.rstrip("/").rsplit("/", 1)[-1]) or "Artifact"
     xcodeproj_dir = f"{project_path}/{project_name}.xcodeproj"
     activate_script = _venv_activate_script()
 
     writer = _PBXWriter()
-
-    module_file_refs: dict[str, list[str]] = {}
-    for module in modules:
-        refs = []
-        for path in module.source_files + module.header_files:
-            ext = os.path.splitext(path)[1]
-            file_type = _FILE_TYPES.get(ext)
-            if not file_type:
-                continue
-            file_id = _oid(f"fileref:{path}")
-            name = os.path.basename(path)
-            writer.add("PBXFileReference", file_id, name, _build_body([
-                ("isa", "PBXFileReference"),
-                ("lastKnownFileType", file_type),
-                ("name", _pbx_str(name)),
-                ("path", _pbx_str(path)),
-                ("sourceTree", '"<absolute>"'),
-            ]))
-            refs.append(_ref(file_id, name))
-        module_file_refs[module.name] = refs
 
     engine_modules = [m for m in modules if m.category == "Engine"]
     project_modules = [m for m in modules if m.category == "Project"]
@@ -104,10 +200,10 @@ def generate_xcode(engine_path: str, project_path: str, modules, args):
         return _oid(f"group:module:{module_name}")
 
     for module in modules:
-        group_id = module_group_id(module.name)
-        writer.add("PBXGroup", group_id, module.name, _build_body([
+        children = _build_group_tree(writer, module)
+        writer.add("PBXGroup", module_group_id(module.name), module.name, _build_body([
             ("isa", "PBXGroup"),
-            ("children", _list_field(module_file_refs[module.name])),
+            ("children", _list_field(children)),
             ("name", _pbx_str(module.name)),
             ("sourceTree", '"<group>"'),
         ]))
@@ -130,7 +226,7 @@ def generate_xcode(engine_path: str, project_path: str, modules, args):
     ]))
     writer.add("PBXGroup", products_group_id, "Products", _build_body([
         ("isa", "PBXGroup"),
-        ("children", _list_field([])),
+        ("children", _list_field([_ref(_oid("product:ArtifactIndex"), "libArtifactIndex.a")])),
         ("name", "Products"),
         ("sourceTree", '"<group>"'),
     ]))
@@ -146,9 +242,7 @@ def generate_xcode(engine_path: str, project_path: str, modules, args):
         ("sourceTree", '"<group>"'),
     ]))
 
-    build_command = f"source '{activate_script}' && artifact build --configuration $CONFIGURATION --target MacOS"
-
-    # Legacy targets don't compile through Xcode, but its indexer still reads HEADER_SEARCH_PATHS.
+    # The indexer reads HEADER_SEARCH_PATHS to resolve includes for every file.
     header_search_paths = []
     seen_dirs = set()
     for module in modules:
@@ -156,16 +250,39 @@ def generate_xcode(engine_path: str, project_path: str, modules, args):
             if d not in seen_dirs:
                 seen_dirs.add(d)
                 header_search_paths.append(d)
+    for d in _third_party_include_dirs(modules):
+        if d not in seen_dirs:
+            seen_dirs.add(d)
+            header_search_paths.append(d)
+
+    
+    generation_path = os.environ.get("PATH", "")
+    script_phase_id = _oid("scriptphase:Artifact")
+    shell_script = (
+        f"source '{activate_script}'\n"
+        f"export PATH={_sh_single_quote(generation_path)}:\"$PATH\"\n"
+        'artifact build --configuration "$CONFIGURATION" --target MacOS --skip-ide-project\n'
+    )
+    writer.add("PBXShellScriptBuildPhase", script_phase_id, "Build Artifact", _build_body([
+        ("isa", "PBXShellScriptBuildPhase"),
+        ("alwaysOutOfDate", "1"),
+        ("buildActionMask", "2147483647"),
+        ("files", _list_field([])),
+        ("inputPaths", _list_field([])),
+        ("name", _pbx_str("Build Artifact")),
+        ("outputPaths", _list_field([])),
+        ("runOnlyForDeploymentPostprocessing", "0"),
+        ("shellPath", "/bin/bash"),
+        ("shellScript", _pbx_str(shell_script)),
+        ("showEnvVarsInLog", "0"),
+    ]))
 
     target_id = _oid("target:Artifact")
     target_config_ids = {c: _oid(f"config:target:{c}") for c in _CONFIGURATIONS}
     for c in _CONFIGURATIONS:
         writer.add("XCBuildConfiguration", target_config_ids[c], c, _build_body([
             ("isa", "XCBuildConfiguration"),
-            ("buildSettings", _build_body([
-                ("PRODUCT_NAME", "Artifact"),
-                ("HEADER_SEARCH_PATHS", _list_field([_pbx_str(d) for d in header_search_paths])),
-            ])),
+            ("buildSettings", _build_body(_index_build_settings(c, header_search_paths, "Artifact"))),
             ("name", c),
         ]))
     target_config_list_id = _oid("configlist:target")
@@ -176,24 +293,82 @@ def generate_xcode(engine_path: str, project_path: str, modules, args):
         ("defaultConfigurationName", "Dev"),
     ]))
 
-    writer.add("PBXLegacyTarget", target_id, "Artifact", _build_body([
-        ("isa", "PBXLegacyTarget"),
-        ("buildArgumentsString", _pbx_str(f'-lc "{build_command}"')),
-        ("buildConfigurationList", _ref(target_config_list_id, 'Build configuration list for PBXLegacyTarget "Artifact"')),
-        ("buildPhases", _list_field([])),
-        ("buildToolPath", "/bin/bash"),
-        ("buildWorkingDirectory", _pbx_str(project_path)),
+    writer.add("PBXAggregateTarget", target_id, "Artifact", _build_body([
+        ("isa", "PBXAggregateTarget"),
+        ("buildConfigurationList", _ref(target_config_list_id, 'Build configuration list for PBXAggregateTarget "Artifact"')),
+        ("buildPhases", _list_field([_ref(script_phase_id, "Build Artifact")])),
         ("dependencies", _list_field([])),
         ("name", "Artifact"),
-        ("passBuildSettingsInEnvironment", "1"),
         ("productName", "Artifact"),
+    ]))
+
+    # A native static-library target that exists purely so Xcode's indexer has
+    # somewhere to hang the sources. Xcode only indexes files that are members of
+    # a target with a compile-sources phase, so the aggregate target above (which
+    # owns no files) yields no intellisense on its own. This target is never in
+    # the scheme's build action, so `artifact build` remains the only real build;
+    # Xcode still indexes it in the background, giving cross-file symbols.
+    index_target_id = _oid("target:ArtifactIndex")
+    index_config_ids = {c: _oid(f"config:index:{c}") for c in _CONFIGURATIONS}
+    for c in _CONFIGURATIONS:
+        writer.add("XCBuildConfiguration", index_config_ids[c], c, _build_body([
+            ("isa", "XCBuildConfiguration"),
+            ("buildSettings", _build_body(_index_build_settings(c, header_search_paths, "ArtifactIndex"))),
+            ("name", c),
+        ]))
+    index_config_list_id = _oid("configlist:index")
+    writer.add("XCConfigurationList", index_config_list_id, None, _build_body([
+        ("isa", "XCConfigurationList"),
+        ("buildConfigurations", _list_field([_ref(index_config_ids[c], c) for c in _CONFIGURATIONS])),
+        ("defaultConfigurationIsVisible", "0"),
+        ("defaultConfigurationName", "Dev"),
+    ]))
+
+    source_build_files = []
+    for module in modules:
+        for path in module.source_files:
+            build_file_id = _oid(f"buildfile:{path}")
+            name = os.path.basename(path)
+            writer.add("PBXBuildFile", build_file_id, f"{name} in Sources", _build_body([
+                ("isa", "PBXBuildFile"),
+                ("fileRef", _ref(_oid(f"fileref:{path}"), name)),
+            ]))
+            source_build_files.append(_ref(build_file_id, f"{name} in Sources"))
+
+    index_sources_phase_id = _oid("sourcesphase:ArtifactIndex")
+    writer.add("PBXSourcesBuildPhase", index_sources_phase_id, "Sources", _build_body([
+        ("isa", "PBXSourcesBuildPhase"),
+        ("buildActionMask", "2147483647"),
+        ("files", _list_field(source_build_files)),
+        ("runOnlyForDeploymentPostprocessing", "0"),
+    ]))
+
+    index_product_id = _oid("product:ArtifactIndex")
+    writer.add("PBXFileReference", index_product_id, "libArtifactIndex.a", _build_body([
+        ("isa", "PBXFileReference"),
+        ("explicitFileType", '"archive.ar"'),
+        ("includeInIndex", "0"),
+        ("path", "libArtifactIndex.a"),
+        ("sourceTree", "BUILT_PRODUCTS_DIR"),
+    ]))
+
+    writer.add("PBXNativeTarget", index_target_id, "ArtifactIndex", _build_body([
+        ("isa", "PBXNativeTarget"),
+        ("buildConfigurationList", _ref(index_config_list_id, 'Build configuration list for PBXNativeTarget "ArtifactIndex"')),
+        ("buildPhases", _list_field([_ref(index_sources_phase_id, "Sources")])),
+        ("buildRules", _list_field([])),
+        ("dependencies", _list_field([])),
+        ("name", "ArtifactIndex"),
+        ("productName", "ArtifactIndex"),
+        ("productReference", _ref(index_product_id, "libArtifactIndex.a")),
+        ("productType", '"com.apple.product-type.library.static"'),
     ]))
 
     project_config_ids = {c: _oid(f"config:project:{c}") for c in _CONFIGURATIONS}
     for c in _CONFIGURATIONS:
         writer.add("XCBuildConfiguration", project_config_ids[c], c, _build_body([
             ("isa", "XCBuildConfiguration"),
-            ("buildSettings", _build_body([])),
+            ("buildSettings", _build_body(_index_build_settings(c, header_search_paths, "Artifact"))),
             ("name", c),
         ]))
     project_config_list_id = _oid("configlist:project")
@@ -217,7 +392,7 @@ def generate_xcode(engine_path: str, project_path: str, modules, args):
         ("productRefGroup", _ref(products_group_id, "Products")),
         ("projectDirPath", '""'),
         ("projectRoot", '""'),
-        ("targets", _list_field([_ref(target_id, "Artifact")])),
+        ("targets", _list_field([_ref(target_id, "Artifact"), _ref(index_target_id, "ArtifactIndex")])),
     ]))
 
     pbxproj = f"""// !$*UTF8*$!
@@ -259,8 +434,8 @@ def _write_scheme(xcodeproj_dir: str, project_path: str, target_id: str):
     """A shared scheme whose Run action launches the built binary directly.
 
     PathRunnable (rather than the usual BuildableProductRunnable) is what lets
-    a legacy/external-build target run an arbitrary executable rather than an
-    Xcode-built product.
+    an aggregate target run an arbitrary executable rather than an Xcode-built
+    product.
     """
     blueprint_name = "Artifact"
     content = f"""<?xml version="1.0" encoding="UTF-8"?>

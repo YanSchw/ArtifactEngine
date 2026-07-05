@@ -38,8 +38,12 @@ def _generate(args):
 
         png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
 
-    with Job("Generating IDE project files"):
-        generate_ide_project(engine_path, project_path, args)
+    # IDE-triggered builds pass --skip-ide-project: regenerating the .xcodeproj /
+    # .vcxproj while the IDE is mid-build rewrites the project file under it,
+    # failing the build phase and invalidating the index.
+    if not getattr(args, "skip_ide_project", False):
+        with Job("Generating IDE project files"):
+            generate_ide_project(engine_path, project_path, args)
 
 def cmd_generate(args):
     try:
@@ -156,6 +160,7 @@ def main():
     generate_args_parser.add_argument("--configuration", choices=["Debug", "Dev", "Dist"], default="Dev", help="Build configuration")
     generate_args_parser.add_argument("--packaged", action="store_true", default=False, help="Whether to build a packaged version (binary may be embedded into an application bundle)")
     generate_args_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before generating/building")
+    generate_args_parser.add_argument("--skip-ide-project", action="store_true", default=False, help="Skip regenerating the native IDE project (used by IDE-triggered builds so the project file isn't rewritten mid-build)")
 
     generate_parser = subparsers.add_parser("generate", parents=[generate_args_parser], help="Generate project files (CMake + native IDE project) without building")
     generate_parser.set_defaults(func=cmd_generate)

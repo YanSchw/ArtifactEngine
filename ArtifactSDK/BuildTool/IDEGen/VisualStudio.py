@@ -40,7 +40,7 @@ def _venv_activate_script() -> str:
 
 
 def _build_command(activate_bat: str, target: str, extra_args: str = "") -> str:
-    return f'call "{activate_bat}" && artifact build --configuration $(Configuration) --target {target}{extra_args}'
+    return f'call "{activate_bat}" && artifact build --configuration $(Configuration) --target {target} --skip-ide-project{extra_args}'
 
 
 def _clean_command(project_path: str) -> str:
