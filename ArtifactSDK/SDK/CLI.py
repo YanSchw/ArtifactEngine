@@ -32,8 +32,8 @@ def _generate(args):
 
         # Generate reflection code for classes in Modules
         header_tool = HeaderTool()
-        header_tool.collect_headers(f"{engine_path}/Modules")
-        header_tool.collect_headers(f"{project_path}/Modules")
+        header_tool.collect_headers(f"{engine_path}/Modules", engine_path)
+        header_tool.collect_headers(f"{project_path}/Modules", project_path)
         header_tool.generate()
 
         png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
@@ -44,6 +44,9 @@ def _generate(args):
     if not getattr(args, "skip_ide_project", False):
         with Job("Generating IDE project files"):
             generate_ide_project(engine_path, project_path, args)
+
+    from SDK.Create import generate_sdk_activation_scripts
+    generate_sdk_activation_scripts(project_path, engine_path)
 
 def cmd_generate(args):
     try:
@@ -151,6 +154,18 @@ def cmd_location(args):
     from SDK.Paths import get_engine_path
     print(get_engine_path())
 
+def cmd_create_project(args):
+    from SDK.Create import create_project
+    create_project(args.name)
+
+def cmd_create_module(args):
+    from SDK.Create import create_module
+    create_module(args.name)
+
+def cmd_create_type(args):
+    from SDK.Create import create_reflected_type
+    create_reflected_type(args.kind, args.name, args.parent, args.module)
+
 def main():
     parser = argparse.ArgumentParser(description="Artifact Engine Build Tool")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -187,6 +202,25 @@ def main():
 
     location_parser = subparsers.add_parser("location", help="Print the engine path to the terminal")
     location_parser.set_defaults(func=cmd_location)
+
+    create_parser = subparsers.add_parser("create", help="Scaffold a project, module, or reflected type")
+    create_subparsers = create_parser.add_subparsers(dest="create_command", required=True)
+
+    create_project_parser = create_subparsers.add_parser("project", help="Create a new project in a subdirectory")
+    create_project_parser.add_argument("name", help="Project name (also the subdirectory it is created in)")
+    create_project_parser.set_defaults(func=cmd_create_project)
+
+    create_module_parser = create_subparsers.add_parser("module", help="Create a new module in the current engine/project")
+    create_module_parser.add_argument("name", help="Module name")
+    create_module_parser.set_defaults(func=cmd_create_module)
+
+    for kind in ("class", "struct", "node", "component"):
+        type_parser = create_subparsers.add_parser(kind, help=f"Create a new reflected {kind}")
+        type_parser.add_argument("name", help=f"{kind.capitalize()} name")
+        if kind != "struct":
+            type_parser.add_argument("parent", nargs="?", default=None, help="Parent class (defaults per kind)")
+        type_parser.add_argument("--module", default=None, help="Module to create the type in (required if ambiguous)")
+        type_parser.set_defaults(func=cmd_create_type, kind=kind, parent=None)
 
     args = parser.parse_args()
     args.func(args)

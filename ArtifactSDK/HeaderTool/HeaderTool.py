@@ -11,17 +11,20 @@ class HeaderTool:
         self.headers_per_module = {} # dict[module_name: str, list[absolute_header_file_path: str]]
         self.types_per_header = {} # dict[header_name: str, list[Enum | Struct | Class]]
         self.visited_header = set()  # set of absolute header file paths to avoid processing the same header multiple times
+        self.module_output_root = {}  # dict[module_name: str, owning_root_dir: str]
+        self.header_output_root = {}  # dict[header_name: str, owning_root_dir: str]
 
-    def collect_headers(self, dir):
+    def collect_headers(self, dir, output_root):
         # if dir is not an absolute path, make it absolute by joining with current working directory
         if not os.path.isabs(dir):
             dir = os.path.join(os.getcwd(), dir)
+        output_root = output_root.replace("\\", "/").rstrip("/")
 
-        # Initialize modules from the Modules directory to ensure all modules are registered, even those without classes or headers.
-        # This allows for empty modules to be reflected and registered properly.
-        for module in os.listdir("./Modules"):
-            if os.path.isdir(f"./Modules/{module}") and module not in self.headers_per_module:
+        # Register every module under the scanned root, so class-less modules are still reflected.
+        for module in os.listdir(dir):
+            if os.path.isdir(f"{dir}/{module}") and module not in self.headers_per_module:
                 self.headers_per_module[module] = []
+                self.module_output_root[module] = output_root
 
         for dirpath, dirnames, filenames in os.walk(dir):
             for filename in filenames:
@@ -34,10 +37,12 @@ class HeaderTool:
                     results = HeaderTool.collect_classes_from_header(header_path)
                     if len(results) > 0:
                         self.headers_per_module[get_module_name_from_path(dirpath)].append(header_path)
-                        if filename.rstrip('hpp').rstrip('.') in self.types_per_header:
+                        header_name = filename.rstrip('hpp').rstrip('.')
+                        if header_name in self.types_per_header:
                             print(f"Error: Duplicate header name {filename} found at {header_path}. This will cause issues with generated code. Consider renaming one of the headers to have a unique name.")
                             sys.exit(1)
-                        self.types_per_header[filename.rstrip('hpp').rstrip('.')] = results
+                        self.types_per_header[header_name] = results
+                        self.header_output_root[header_name] = output_root
 
 
     def generate(self):
@@ -122,7 +127,8 @@ class HeaderTool:
         pass
 
     def generate_reflection_code(self, header: str, types: list[Enum | Struct | Class]):
-        gen_file_path = f"./Build/Intermediate/Classes/{header}.gen.h"
+        output_root = self.header_output_root.get(header, ".")
+        gen_file_path = f"{output_root}/Build/Intermediate/Classes/{header}.gen.h"
         os.makedirs(os.path.dirname(gen_file_path), exist_ok=True)
         with smart_open(gen_file_path, encoding='utf-8') as gen_file:
             gen_file.write('#pragma once\n\n')
@@ -146,7 +152,8 @@ class HeaderTool:
     def generate_module_registration_code(self):
         for module, headers in self.headers_per_module.items():
             unique_headers = sorted(set(headers)) # remove duplicates; sorted so the generated #include order is stable across runs (avoids needless recompiles)
-            with smart_open(f"./Build/Intermediate/Modules/{module}.gen.cpp") as gen_module_file:
+            output_root = self.module_output_root.get(module, ".")
+            with smart_open(f"{output_root}/Build/Intermediate/Modules/{module}.gen.cpp") as gen_module_file:
                 gen_module_file.write('#include <vector>\n#include <string>\n\n')
                 for header in unique_headers:
                     gen_module_file.write(f'#include "{header}"\n')

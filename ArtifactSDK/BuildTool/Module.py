@@ -102,7 +102,7 @@ class ArtifactModule:
         """Write the module metadata back to Module.json."""
         from SDK.Util import smart_open
         module_json_path = os.path.join(self.path, "Module.json")
-        with smart_open(module_json_path, "w") as f:
+        with smart_open(module_json_path) as f:
             dict_data = self.to_dict()
             # remove keys with None values or empty lists for cleaner JSON
             dict_data = {k: v for k, v in dict_data.items() if v is not None and v != []}

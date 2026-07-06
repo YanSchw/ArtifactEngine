@@ -3,11 +3,46 @@ import json
 
 from SDK.Version import VERSION_MAJOR, VERSION_MINOR, get_patch_version
 from SDK.Platforms import PlatformType, get_current_platform, get_cpp_platform_macro
+from SDK.Paths import get_engine_path
 from BuildTool.Target import TargetType, get_cpp_target_macro
 from BuildTool.Module import ArtifactModule
 from SDK.Util import smart_open
 
-def expand_indirect_module_dependencies(project_path: str, import_modules: list[str]) -> set[str]:
+def discover_modules(engine_path: str, project_path: str, target_platform: str):
+    """Every module the build should include, resolved across the engine and the project.
+
+    Returns a list of (name, module_dir, ArtifactModule, owning_root). Engine modules come
+    first; a project module with the same name as an engine one is not overridden (engine-first). 
+    `owning_root` is the engine or project directory the module lives under."""
+    engine_path = engine_path.replace("\\", "/").rstrip("/")
+    project_path = project_path.replace("\\", "/").rstrip("/")
+    same_repo = os.path.normcase(os.path.normpath(engine_path)) == os.path.normcase(os.path.normpath(project_path))
+
+    modules = []
+    seen = set()
+
+    def add(modules_dir: str, owning_root: str):
+        if not os.path.isdir(modules_dir):
+            return
+        for name in sorted(os.listdir(modules_dir)):
+            module_dir = f"{modules_dir}/{name}"
+            if not os.path.isdir(module_dir) or not os.path.exists(f"{module_dir}/Module.json"):
+                continue
+            if name in seen:
+                continue
+            module = ArtifactModule.load_from_json(module_dir)
+            if not module.supports_platform(target_platform):
+                continue
+            seen.add(name)
+            modules.append((name, module_dir, module, owning_root))
+
+    add(f"{engine_path}/Modules", engine_path)
+    if not same_repo:
+        add(f"{project_path}/Modules", project_path)
+
+    return modules
+
+def expand_indirect_module_dependencies(module_dirs: dict[str, str], import_modules: list[str]) -> set[str]:
     to_check = set(import_modules)
     expanded = set()
 
@@ -18,7 +53,10 @@ def expand_indirect_module_dependencies(project_path: str, import_modules: list[
             continue
 
         expanded.add(module_name)
-        module = ArtifactModule.load_from_json(f"{project_path}/Modules/{module_name}")
+        module_dir = module_dirs.get(module_name)
+        if module_dir is None:
+            continue
+        module = ArtifactModule.load_from_json(module_dir)
         for dep in module.ImportModules:
             if dep not in expanded:
                 to_check.add(dep)
@@ -31,6 +69,15 @@ def generate_cmake(project_path: str, args):
     is_packaged = args.packaged if hasattr(args, "packaged") else False
     if project_path == ".":
         project_path = os.getcwd()
+    project_path = project_path.replace("\\", "/").rstrip("/")
+
+    engine_path = get_engine_path().replace("\\", "/").rstrip("/")
+    modules = discover_modules(engine_path, project_path, target_platform)
+    module_dirs = {name: module_dir for name, module_dir, _, _ in modules}
+
+    global_definitions = [get_cpp_platform_macro(get_current_platform()), get_cpp_target_macro(target_configuration)]
+    if is_packaged:
+        global_definitions.append("AE_PACKAGED")
 
     __LinkModules = """#include <vector>
 #include <string>
@@ -57,7 +104,9 @@ if (MSVC)
         WIN32_LEAN_AND_MEAN
     )
 endif()
-                
+
+add_compile_definitions({" ".join(global_definitions)})
+
 add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp)
 
 if (WIN32)
@@ -67,50 +116,46 @@ endif()
 
 """)
         
-        for module_name in sorted(os.listdir(f"{project_path}/Modules")):
-            module_dir = f"{project_path}/Modules/{module_name}"
-            if os.path.isdir(module_dir):
-                module = ArtifactModule.load_from_json(module_dir)
-
-                # if TargetPlatforms is not specified, assume it's supported on all platforms
-                if not module.supports_platform(target_platform):
-                    continue
-
-                with smart_open(f"{project_path}/Modules/{module_name}/CMakeLists.txt") as mf:
-                    cpp_src = 'file(GLOB_RECURSE cpp_src "*.cpp")' if module.SourceDirectories is None else f'file(GLOB_RECURSE cpp_src {" ".join(module.get_source_files_pattern())})'
-                    mf.write(f"""# Generated using Artifact Build Tool for {module_name}
+        for module_name, module_dir, module, owning_root in modules:
+            with smart_open(f"{module_dir}/CMakeLists.txt") as mf:
+                cpp_src = 'file(GLOB_RECURSE cpp_src "*.cpp")' if module.SourceDirectories is None else f'file(GLOB_RECURSE cpp_src {" ".join(module.get_source_files_pattern())})'
+                mf.write(f"""# Generated using Artifact Build Tool for {module_name}
 {cpp_src}
-add_library({module_name} ${{cpp_src}} {project_path}/Build/Intermediate/Modules/{module_name}.gen.cpp)
+add_library({module_name} ${{cpp_src}} {owning_root}/Build/Intermediate/Modules/{module_name}.gen.cpp)
 """)
-                    mf.write(f"target_compile_definitions({module_name} PUBLIC {get_cpp_platform_macro(get_current_platform())})\n")
-                    mf.write(f"target_compile_definitions({module_name} PUBLIC {get_cpp_target_macro(target_configuration)})\n")
-                    if is_packaged:
-                        mf.write(f"target_compile_definitions({module_name} PUBLIC AE_PACKAGED)\n")
-                    for include_dir in module.IncludePaths:
-                        mf.write(f"target_include_directories({module_name} PUBLIC {include_dir})\n")
-                    for import_module_name in sorted(expand_indirect_module_dependencies(project_path, module.ImportModules)):
-                        import_module = ArtifactModule.load_from_json(f"{project_path}/Modules/{import_module_name}")
-                        for include_dir in import_module.ExportIncludePaths:
-                            mf.write(f"target_include_directories({module_name} PUBLIC {project_path}/Modules/{import_module_name}/{include_dir})\n")
-                        for include_dir in import_module.IncludePaths:
-                            mf.write(f"target_include_directories({module_name} PUBLIC {project_path}/Modules/{import_module_name}/{include_dir})\n")
-                    for additional_project in module.AddAdditionalCMakeProjects:
-                        mf.write(f"add_subdirectory({additional_project})\n")
+                for include_dir in module.IncludePaths:
+                    mf.write(f"target_include_directories({module_name} PUBLIC {include_dir})\n")
+                for import_module_name in sorted(expand_indirect_module_dependencies(module_dirs, module.ImportModules)):
+                    import_module_dir = module_dirs.get(import_module_name)
+                    if import_module_dir is None:
+                        continue
+                    import_module = ArtifactModule.load_from_json(import_module_dir)
+                    for include_dir in import_module.ExportIncludePaths:
+                        mf.write(f"target_include_directories({module_name} PUBLIC {import_module_dir}/{include_dir})\n")
+                    for include_dir in import_module.IncludePaths:
+                        mf.write(f"target_include_directories({module_name} PUBLIC {import_module_dir}/{include_dir})\n")
+                for additional_project in module.AddAdditionalCMakeProjects:
+                    mf.write(f"add_subdirectory({additional_project})\n")
 
 
-                    mf.write(f"target_include_directories({module_name} PUBLIC {project_path}/Build/Intermediate/Classes)\n")
+                for classes_root in dict.fromkeys([owning_root, engine_path]):
+                    mf.write(f"target_include_directories({module_name} PUBLIC {classes_root}/Build/Intermediate/Classes)\n")
 
-                    mf.write(f"""
+                mf.write(f"""
 if(MSVC)
   target_compile_options({module_name} PRIVATE /W4) # /WX
 else()
   target_compile_options({module_name} PRIVATE -Wall -Wextra -Wpedantic) # -Werror
 endif()
 """)
-                    __LinkModules += f'    extern void __LinkModule_{module_name}(std::vector<std::string>&); __LinkModule_{module_name}(modules);\n'
+                __LinkModules += f'    extern void __LinkModule_{module_name}(std::vector<std::string>&); __LinkModule_{module_name}(modules);\n'
 
-                f.write(f"add_subdirectory(Modules/{module_name})\n")
-                f.write(f"target_link_libraries(Artifact PUBLIC {module_name})\n")
+            # Engine modules live outside the project tree, so add_subdirectory needs an explicit binary dir.
+            if module_dir.startswith(f"{project_path}/"):
+                f.write(f"add_subdirectory({module_dir[len(project_path) + 1:]})\n")
+            else:
+                f.write(f"add_subdirectory({module_dir} {project_path}/Build/Intermediate/ModuleBuild/{module_name})\n")
+            f.write(f"target_link_libraries(Artifact PUBLIC {module_name})\n")
 
     __LinkModules += "}\n"
     os.makedirs(f"{project_path}/Build/Intermediate/Modules", exist_ok=True)
