@@ -48,11 +48,6 @@ def _venv_activate_script() -> str:
     return f"{sys.prefix.replace(chr(92), '/')}/bin/activate"
 
 
-def _sh_single_quote(s: str) -> str:
-    """Wrap a string in single quotes, safe for embedding in a shell script."""
-    return "'" + s.replace("'", "'\\''") + "'"
-
-
 class _PBXWriter:
     """Accumulates objects per-ISA so sections can be emitted in Xcode's usual order."""
 
@@ -255,12 +250,12 @@ def generate_xcode(engine_path: str, project_path: str, modules, args):
             seen_dirs.add(d)
             header_search_paths.append(d)
 
-    
-    generation_path = os.environ.get("PATH", "")
+    # Xcode runs script phases with a minimal PATH (roughly /usr/bin:/bin). Sourcing
+    # the venv puts artifact, cmake and ninja (all pip deps) on PATH; the compiler
+    # toolchain lives in /usr/bin, which is already on Xcode's PATH.
     script_phase_id = _oid("scriptphase:Artifact")
     shell_script = (
         f"source '{activate_script}'\n"
-        f"export PATH={_sh_single_quote(generation_path)}:\"$PATH\"\n"
         'artifact build --configuration "$CONFIGURATION" --target MacOS --skip-ide-project\n'
     )
     writer.add("PBXShellScriptBuildPhase", script_phase_id, "Build Artifact", _build_body([
