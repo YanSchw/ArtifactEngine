@@ -21,7 +21,7 @@
 #include "InputSystem/MouseCodes.h"
 #include "Common/UUID.h"
 
-#include "GameFramework/UINode.h"
+#include "GameFramework/UICanvas.h"
 #include "GameFramework/UIBuilder.h"
 #include "Assets/Font.h"
 #include "Rendering/UIRenderer.h"
@@ -72,9 +72,12 @@ void EditorEngine::BuildDemoUI() {
     UINode::SetDefaultFont(AssetManager::Get().GetAsset<Font>(UUID::FromString("f0e1d2c3-b4a5-4967-8899-aabbccddeeff")));
 
     m_UIRenderer = new UIRenderer();
-    m_UIRoot = (new UINode())->Fill();
+    m_UICanvas = new UICanvas();
+    // Keep the demo UI proportional to the window: authored at 1280x720, scaled with the viewport.
+    m_UICanvas->ScaleMode = UICanvasScaleMode::ScaleWithScreenSize;
+    m_UICanvas->ReferenceResolution = Vec2(1280.0f, 720.0f);
 
-    UI::VStack(*m_UIRoot, [](UINode& v) {
+    UI::VStack(*m_UICanvas, [](UINode& v) {
         v.Padding = UIEdges(24.0f);
         v.Gap = 8.0f;
 
@@ -107,8 +110,8 @@ bool EditorEngine::MainTick(double InDeltaTime) {
     s_FullScreenPipeline->Bind();
     s_FullScreenQuadVertexBuffer->Draw();
 
-    // UI overlay: composited onto the surface after the scene blit, before the queue is flushed.
-    if (m_UIRenderer && m_UIRoot) {
+    // UI pass: composited onto the surface after the scene blit, before the queue is flushed.
+    if (m_UIRenderer && m_UICanvas) {
         UIFrameContext uiContext;
         uiContext.DeltaTime = (float)InDeltaTime;
         if (MouseDevice* mouse = MouseDevice::Instance()) {
@@ -118,7 +121,7 @@ bool EditorEngine::MainTick(double InDeltaTime) {
             uiContext.MouseReleasedThisFrame = mouse->IsUp(MouseCode::Left);
         }
         const Vec2 surfaceSize = Vec2((float)s_Window->GetWidth(), (float)s_Window->GetHeight());
-        m_UIRenderer->Render(s_Window.Get(), m_UIRoot, surfaceSize, uiContext);
+        m_UIRenderer->Render(s_Window.Get(), m_UICanvas, surfaceSize, uiContext);
     }
 
     RenderingAPI::GetInstance()->Draw();
@@ -129,8 +132,8 @@ bool EditorEngine::MainTick(double InDeltaTime) {
 
 void EditorEngine::Shutdown() {
     // Tear down the UI (releases its pipelines/buffers) before the surface and RHI go away.
-    delete m_UIRoot;
-    m_UIRoot = nullptr;
+    delete m_UICanvas;
+    m_UICanvas = nullptr;
     delete m_UIRenderer;
     m_UIRenderer = nullptr;
 

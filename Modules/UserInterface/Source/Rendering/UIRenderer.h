@@ -10,15 +10,19 @@ class Texture;
 class Pipeline;
 class VertexBuffer;
 class UniformBuffer;
+class UICanvas;
 
-/** Draws a UI tree each frame via two overlay pipelines (solid + SDF text) that target the window
- *  surface with alpha blending on and depth test off. Text uses UINode::GetDefaultFont(). The
- *  engine owns one instance and calls Render() after the scene blit, before RenderingAPI::Draw(). */
+/** Draws a UI canvas each frame via two pipelines (solid + SDF text) that target the window
+ *  surface with alpha blending on and depth test off. The canvas supplies the projection — a
+ *  scaled screen overlay or a camera-projected plane in the world (see UICanvasRenderMode) —
+ *  and the tree under it is laid out, painted and hit-tested in canvas pixels either way.
+ *  Text uses UINode::GetDefaultFont(). The engine owns one instance and calls Render() after
+ *  the scene blit, before RenderingAPI::Draw(). */
 class UIRenderer {
 public:
     UIRenderer() = default;
 
-    void Render(Surface* InTarget, UINode* InRoot, const Vec2& InViewportSize, const UIFrameContext& InContext);
+    void Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InViewportSize, const UIFrameContext& InContext);
 
 private:
     void CreateSharedResources();

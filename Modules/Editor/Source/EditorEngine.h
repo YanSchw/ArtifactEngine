@@ -2,7 +2,7 @@
 #include "Core/Engine.h"
 #include "EditorEngine.gen.h"
 
-class UINode;
+class UICanvas;
 class UIRenderer;
 
 class EditorEngine : public Engine {
@@ -19,5 +19,5 @@ private:
     void BuildDemoUI();
 
     UIRenderer* m_UIRenderer = nullptr;
-    UINode* m_UIRoot = nullptr;
+    UICanvas* m_UICanvas = nullptr;
 };

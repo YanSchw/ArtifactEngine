@@ -18,11 +18,12 @@ struct UIFrameContext {
 /** Base class for all UI. A UINode is a Node with a rect transform: Unity-style anchors/pivot
  *  plus CSS-style margin/padding and optional Split (row/column) child layout. The tree is
  *  re-laid-out and re-painted every frame, so you configure a node by setting its public fields
- *  directly — there are no setters to call.
+ *  directly — there are no setters to call. A tree is rooted in a UICanvas, which defines the
+ *  rect everything lays out in and how it reaches the screen (overlay or in-world).
  *
  *  Setup is meant to be terse:
- *      UINode*   root  = (new UINode())->Fill();       // fills whatever rect it is given
- *      UIButton* btn   = root->Add<UIButton>();        // create + attach a typed child
+ *      UICanvas* canvas = new UICanvas();              // fills the viewport (overlay mode)
+ *      UIButton* btn    = canvas->Add<UIButton>();     // create + attach a typed child
  *      btn->Center({ 220, 56 });                       // fixed size, centered in the parent
  *
  *  Anchors are fractions [0..1] of the parent's content rect. When AnchorMin == AnchorMax the
@@ -70,9 +71,9 @@ public:
     const UIRectF& GetGeometry() const { return m_Geometry; }
     /** Geometry minus padding — where children/content live. */
     UIRectF GetContentRect() const { return m_Geometry.Deflate(Padding); }
-    /** Local pixel-space -> world pixel-space transform (accumulates this node's and ancestors'
-     *  Rotation, in the z=0 plane; tilts push corners into depth). The perspective projection to
-     *  screen happens on the GPU (see UIRenderer). */
+    /** Local pixel-space -> canvas pixel-space transform (accumulates this node's and ancestors'
+     *  Rotation, in the z=0 plane; tilts push corners into depth). The projection to screen
+     *  happens on the GPU (see UICanvas::BuildProjection). */
     const Mat4& GetWorldMatrix() const { return m_WorldMatrix; }
     /** InPoint is in screen pixels; correct under rotation and perspective. */
     bool HitTest(const Vec2& InPoint) const;
@@ -92,13 +93,16 @@ public:
     static void SetDefaultFont(Font* InFont) { s_DefaultFont = InFont; }
     static Font* GetDefaultFont() { return s_DefaultFont; }
 
-    // Perspective distance in pixels used to project tilted UI to screen. Larger = flatter.
-    static void SetPerspective(float InDistancePx) { s_Perspective = InDistancePx; }
+    // Perspective distance in canvas units used to project tilted UI to screen. Larger = flatter.
+    static void SetPerspective(float InDistance) { s_Perspective = InDistance; }
     static float GetPerspective() { return s_Perspective; }
-    // Set by UIRenderer each frame so hit-testing projects exactly like the GPU does.
-    static void SetViewport(float InWidth, float InHeight) { s_ViewportW = InWidth; s_ViewportH = InHeight; }
-    /** Project a world pixel-space point (post-transform, may have depth) to screen pixels. */
-    static Vec2 ProjectToScreen(const Vec3& InWorldPixelPos);
+    // Set by UIRenderer each frame (from UICanvas::BuildProjection) so hit-testing projects
+    // exactly like the GPU does, whatever the canvas render mode.
+    static void SetViewProjection(const Mat4& InProjection, float InViewportW, float InViewportH) {
+        s_ViewProjection = InProjection; s_ViewportW = InViewportW; s_ViewportH = InViewportH;
+    }
+    /** Project a canvas pixel-space point (post-transform, may have depth) to screen pixels. */
+    static Vec2 ProjectToScreen(const Vec3& InCanvasPixelPos);
 
     // Called by UIRenderer each frame (BindTree runs first, before Layout).
     void BindTree();
@@ -115,6 +119,7 @@ protected:
 
     inline static Font* s_DefaultFont = nullptr;
     inline static float s_Perspective = 1000.0f;
+    inline static Mat4 s_ViewProjection = Mat4(1.0f);
     inline static float s_ViewportW = 1.0f;
     inline static float s_ViewportH = 1.0f;
 };

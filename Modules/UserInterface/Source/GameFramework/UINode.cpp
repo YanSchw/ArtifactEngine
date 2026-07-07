@@ -122,14 +122,15 @@ void UINode::UpdateTree(const UIFrameContext& InContext) {
     }
 }
 
-Vec2 UINode::ProjectToScreen(const Vec3& InWorldPixelPos) {
-    // Perspective divide about the viewport centre (CSS-like): factor = P / (P - z).
-    const float halfW = s_ViewportW * 0.5f;
-    const float halfH = s_ViewportH * 0.5f;
-    const float denom = s_Perspective - InWorldPixelPos.z;
-    const float factor = (std::abs(denom) < 1e-3f) ? 1.0f : (s_Perspective / denom);
-    return Vec2(halfW + (InWorldPixelPos.x - halfW) * factor,
-                halfH + (InWorldPixelPos.y - halfH) * factor);
+Vec2 UINode::ProjectToScreen(const Vec3& InCanvasPixelPos) {
+    // Run the same canvas->clip matrix the GPU uses, then map NDC to screen pixels (Vulkan NDC
+    // and the mouse share a top-left origin, so no Y flip).
+    const Vec4 clip = s_ViewProjection * Vec4(InCanvasPixelPos, 1.0f);
+    if (clip.w <= 1e-4f) {
+        return Vec2(-1e6f);  // behind the camera / past the perspective pole: never hit
+    }
+    return Vec2((clip.x / clip.w * 0.5f + 0.5f) * s_ViewportW,
+                (clip.y / clip.w * 0.5f + 0.5f) * s_ViewportH);
 }
 
 // Point-in-convex-quad via consistent edge-cross signs. Corners in order TL, BL, BR, TR.
