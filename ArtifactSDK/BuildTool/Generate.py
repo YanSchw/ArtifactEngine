@@ -44,13 +44,13 @@ def discover_modules(engine_path: str, project_path: str, target_platform: str):
 
 def get_content_mounts(engine_path: str, project_path: str, target_platform: str) -> list[tuple[str, str]]:
     """Content directories to mount by key: EngineContent, ProjectContent, and one per module that
-    declares a ContentDirectory in its Module.json (keyed by module name)."""
+    declares a MountContentDir in its Module.json (keyed by module name)."""
     engine_path = engine_path.replace("\\", "/").rstrip("/")
     project_path = project_path.replace("\\", "/").rstrip("/")
     mounts = [("EngineContent", f"{engine_path}/Content"), ("ProjectContent", f"{project_path}/Content")]
     for module_name, module_dir, module, _ in discover_modules(engine_path, project_path, target_platform):
-        if module.ContentDirectory:
-            mounts.append((module_name, f"{module_dir}/{module.ContentDirectory}"))
+        if module.MountContentDir:
+            mounts.append((module_name, f"{module_dir}/{module.MountContentDir}"))
     return mounts
 
 def expand_indirect_module_dependencies(module_dirs: dict[str, str], import_modules: list[str]) -> set[str]:
