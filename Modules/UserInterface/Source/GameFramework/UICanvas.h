@@ -3,6 +3,7 @@
 #include "UICanvas.gen.h"
 
 class CameraNode;
+class UIDrawList;
 
 /** How a canvas reaches the screen.
  *  Overlay — drawn directly in screen space on top of everything, ignoring any scene camera.
@@ -45,9 +46,15 @@ public:
     Vec3 WorldRotation = Vec3(0.0f);          // degrees, euler (same order as UINode::Rotation)
     CameraNode* Camera = nullptr;             // camera to project through; identity view when null
 
-    /** Effective canvas-pixel -> screen-pixel scale for this viewport (Overlay mode). */
+    // Perspective distance in canvas units for tilted nodes (Overlay mode). Larger = flatter.
+    float Perspective = 1000.0f;
+
+    /** Runs one UI frame — bind, layout, input, paint — filling OutDrawList and returning the
+     *  canvas->clip projection it must be rendered with. Called by UIRenderer. */
+    Mat4 RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList);
+
+private:
     float ComputeScaleFactor(const Vec2& InViewportSize) const;
-    /** The rect the tree lays out in: viewport / scale (Overlay) or CanvasSize (World). */
     UIRectF ComputeCanvasRect(const Vec2& InViewportSize) const;
     /** Canvas pixel space -> clip space; uploaded to the GPU and mirrored by ProjectToScreen. */
     Mat4 BuildProjection(const Vec2& InViewportSize) const;

@@ -1,15 +1,60 @@
 #pragma once
 #include "Common/Types.h"
 
-/** Per-edge insets in pixels — used for CSS-style margin (outer) and padding (inner). */
-struct UIEdges {
+/** A layout scalar: a fraction of the parent's content extent plus a pixel offset, resolved as
+ *  `Fraction * parent + Pixels` (CSS calc-style). Plain floats convert implicitly as pixels, so
+ *  `Size = Vec2(160, 40)` keeps meaning pixels; the `_px` / `_rel` literals compose with +/- :
+ *      node->Size = { 1.0_rel - 40.0_px, 22.0_px };   // parent width minus 40px, 22px tall */
+struct UIValue {
+    float Fraction = 0.0f;
+    float Pixels = 0.0f;
+
+    UIValue() = default;
+    UIValue(float InPixels) : Pixels(InPixels) { }
+    UIValue(float InFraction, float InPixels) : Fraction(InFraction), Pixels(InPixels) { }
+
+    static UIValue Px(float InPixels) { return UIValue(0.0f, InPixels); }
+    static UIValue Rel(float InFraction) { return UIValue(InFraction, 0.0f); }
+
+    /** This value in pixels, given the parent's extent along the same axis. */
+    float Resolve(float InParentExtent) const { return Fraction * InParentExtent + Pixels; }
+
+    UIValue operator+(const UIValue& InOther) const { return UIValue(Fraction + InOther.Fraction, Pixels + InOther.Pixels); }
+    UIValue operator-(const UIValue& InOther) const { return UIValue(Fraction - InOther.Fraction, Pixels - InOther.Pixels); }
+    UIValue operator-() const { return UIValue(-Fraction, -Pixels); }
+};
+
+inline UIValue operator""_px(long double InPixels) { return UIValue::Px((float)InPixels); }
+inline UIValue operator""_px(unsigned long long InPixels) { return UIValue::Px((float)InPixels); }
+inline UIValue operator""_rel(long double InFraction) { return UIValue::Rel((float)InFraction); }
+inline UIValue operator""_rel(unsigned long long InFraction) { return UIValue::Rel((float)InFraction); }
+
+/** A 2D layout vector whose X and Y are each a UIValue — the type behind Position and Size.
+ *  Mixing units per axis is the point: `{ 1.0_rel, 22.0_px }`. Converts implicitly from Vec2
+ *  (both axes pixels). */
+struct UIVec2 {
+    UIValue X;
+    UIValue Y;
+
+    UIVec2() = default;
+    UIVec2(const UIValue& InX, const UIValue& InY) : X(InX), Y(InY) { }
+    UIVec2(const Vec2& InPixels) : X(InPixels.x), Y(InPixels.y) { }
+
+    /** Both axes in pixels, given the parent's content size. */
+    Vec2 Resolve(const Vec2& InParentSize) const {
+        return Vec2(X.Resolve(InParentSize.x), Y.Resolve(InParentSize.y));
+    }
+};
+
+/** Per-edge insets in pixels, shrinking the rect a node's children lay out in. */
+struct UIPadding {
     float Left = 0.0f, Top = 0.0f, Right = 0.0f, Bottom = 0.0f;
 
-    UIEdges() = default;
-    UIEdges(float InAll) : Left(InAll), Top(InAll), Right(InAll), Bottom(InAll) { }
-    UIEdges(float InHorizontal, float InVertical)
+    UIPadding() = default;
+    UIPadding(float InAll) : Left(InAll), Top(InAll), Right(InAll), Bottom(InAll) { }
+    UIPadding(float InHorizontal, float InVertical)
         : Left(InHorizontal), Top(InVertical), Right(InHorizontal), Bottom(InVertical) { }
-    UIEdges(float InLeft, float InTop, float InRight, float InBottom)
+    UIPadding(float InLeft, float InTop, float InRight, float InBottom)
         : Left(InLeft), Top(InTop), Right(InRight), Bottom(InBottom) { }
 
     float Horizontal() const { return Left + Right; }
@@ -34,15 +79,11 @@ struct UIRectF {
             && InPoint.y >= Position.y && InPoint.y <= Position.y + Size.y;
     }
 
-    /** This rect shrunk inward by the given edges (never negative size). */
-    UIRectF Deflate(const UIEdges& InEdges) const {
+    /** This rect shrunk inward by the given padding (never negative size). */
+    UIRectF Deflate(const UIPadding& InPadding) const {
         return UIRectF(
-            Position + Vec2(InEdges.Left, InEdges.Top),
-            Vec2(std::max(0.0f, Size.x - InEdges.Horizontal()), std::max(0.0f, Size.y - InEdges.Vertical()))
+            Position + Vec2(InPadding.Left, InPadding.Top),
+            Vec2(std::max(0.0f, Size.x - InPadding.Horizontal()), std::max(0.0f, Size.y - InPadding.Vertical()))
         );
     }
 };
-
-/** How a node arranges its children: None = each child via its own anchors; SplitX/SplitY =
- *  distribute the content rect as a row / column. */
-enum class UILayoutMode : uint8_t { None = 0, SplitX = 1, SplitY = 2 };

@@ -1,4 +1,5 @@
 #include "UICanvas.h"
+#include "Rendering/UIDrawList.h"
 #include "GameFramework/CameraNode.h"
 #include <algorithm>
 #include <cmath>
@@ -60,5 +61,16 @@ Mat4 UICanvas::BuildProjection(const Vec2& InViewportSize) const {
     // Overlay: project canvas units straight to the viewport; the scale is implicit in the
     // canvas rect being viewport / scale. Perspective (for tilted nodes) is in canvas units.
     const UIRectF rect = ComputeCanvasRect(InViewportSize);
-    return BuildOverlayProjection(rect.Size.x, rect.Size.y, GetPerspective());
+    return BuildOverlayProjection(rect.Size.x, rect.Size.y, Perspective);
+}
+
+Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList) {
+    const Mat4 projection = BuildProjection(InViewportSize);
+    SetViewProjection(projection, InViewportSize.x, InViewportSize.y);
+
+    BindTree();
+    Layout(ComputeCanvasRect(InViewportSize));
+    UpdateTree(InContext);
+    PaintTree(OutDrawList);
+    return projection;
 }

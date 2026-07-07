@@ -83,19 +83,12 @@ void UIRenderer::Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InVie
         m_CachedHeight = height;
     }
 
-    // Upload the canvas projection for this frame; keep hit-testing in sync with it.
-    const Mat4 projection = InCanvas->BuildProjection(InViewportSize);
-    UINode::SetViewProjection(projection, InViewportSize.x, InViewportSize.y);
+    // The canvas runs the frame (bind/layout/input/paint) and hands back the projection to draw with.
+    UIDrawList drawList;
+    const Mat4 projection = InCanvas->RunFrame(InViewportSize, InContext, drawList);
     void* mapped = m_ProjectionBuffer->MapData(sizeof(Mat4), 0);
     memcpy(mapped, &projection, sizeof(Mat4));
     m_ProjectionBuffer->UnmapData();
-
-    InCanvas->BindTree();
-    InCanvas->Layout(InCanvas->ComputeCanvasRect(InViewportSize));
-    InCanvas->UpdateTree(InContext);
-
-    UIDrawList drawList;
-    InCanvas->PaintTree(drawList);
 
     if (drawList.IsEmpty()) {
         return;

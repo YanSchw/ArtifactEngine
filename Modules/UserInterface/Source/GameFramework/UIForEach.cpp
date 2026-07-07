@@ -1,9 +1,5 @@
 #include "UIForEach.h"
 
-UIForEach::UIForEach() {
-    LayoutMode = UILayoutMode::SplitY; // vertical list by default; set SplitX for a row
-}
-
 void UIForEach::OnBind() {
     UINode::OnBind();
 
@@ -12,7 +8,7 @@ void UIForEach::OnBind() {
 
     // Grow: build new item roots once (their live values come from Bind lambdas inside BuildItem).
     while (have < want) {
-        UINode* item = Add<UINode>();
+        UINode* item = Add<UINode>()->Fill();
         if (BuildItem) {
             BuildItem(*item, have);
         }

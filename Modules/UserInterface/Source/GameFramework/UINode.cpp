@@ -3,15 +3,10 @@
 #include <cmath>
 
 UIRectF UINode::ComputeGeometry(const UIRectF& InParentContentRect) const {
-    const Vec2 parentMin = InParentContentRect.Min();
+    // Place the node so its Pivot lands on Anchor + Position within the parent's content rect.
     const Vec2 parentSize = InParentContentRect.Size;
-
-    const Vec2 anchorRefMin = parentMin + AnchorMin * parentSize;
-    const Vec2 anchorRefMax = parentMin + AnchorMax * parentSize;
-    const Vec2 anchorRefSize = anchorRefMax - anchorRefMin;
-
-    const Vec2 size = anchorRefSize + SizeDelta;
-    const Vec2 pivotPos = anchorRefMin + Pivot * anchorRefSize + AnchoredPosition;
+    const Vec2 size = Size.Resolve(parentSize);
+    const Vec2 pivotPos = InParentContentRect.Min() + Anchor * parentSize + Position.Resolve(parentSize);
     return UIRectF(pivotPos - Pivot * size, size);
 }
 
@@ -26,57 +21,30 @@ static Mat4 RotationAbout(const Vec2& InPivot, const Vec3& InEulerDegrees) {
 }
 
 void UINode::Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorld) {
-    // Resolve our rect from anchors, then lay out (split children instead fill the slot we hand them).
-    LayoutSelf(ComputeGeometry(InParentContentRect).Deflate(Margin), InParentWorld);
-}
-
-void UINode::LayoutSelf(const UIRectF& InResolvedGeometry, const Mat4& InParentWorld) {
-    m_Geometry = InResolvedGeometry;
+    m_Geometry = ComputeGeometry(InParentContentRect);
 
     // Rotate this node (and, through m_WorldMatrix, its children) about its pivot, on top of the
     // parent's transform. Layout stays axis-aligned; rotation/perspective apply at paint/hit-test.
     const Vec2 pivotPx = m_Geometry.Min() + Pivot * m_Geometry.Size;
     m_WorldMatrix = InParentWorld * RotationAbout(pivotPx, Rotation);
 
+    LayoutChildren(GetContentRect());
+}
+
+void UINode::LayoutChildren(const UIRectF& InContent) {
+    for (UINode* child : CollectUIChildren()) {
+        child->Layout(InContent, m_WorldMatrix);
+    }
+}
+
+Array<UINode*> UINode::CollectUIChildren() const {
     Array<UINode*> children;
     for (uint32_t i = 0; i < GetChildCount(); i++) {
         if (UINode* child = GetChild((int)i)->As<UINode>()) {
             children.Add(child);
         }
     }
-
-    const UIRectF content = GetContentRect();
-
-    if (LayoutMode == UILayoutMode::None || children.IsEmpty()) {
-        // Each child positions itself within our content rect via its own anchors/pivot.
-        for (UINode* child : children) {
-            child->Layout(content, m_WorldMatrix);
-        }
-        return;
-    }
-
-    // Split: distribute the content rect equally along one axis (separated by Gap); each child
-    // fills its slot (its anchors are ignored in split mode), inset by its own Margin.
-    const int32_t count = children.Size();
-    const float totalGap = Gap * (float)(count - 1);
-
-    if (LayoutMode == UILayoutMode::SplitX) {
-        const float slotWidth = std::max(0.0f, (content.Size.x - totalGap) / (float)count);
-        float x = content.Position.x;
-        for (UINode* child : children) {
-            const UIRectF slot(Vec2(x, content.Position.y), Vec2(slotWidth, content.Size.y));
-            child->LayoutSelf(slot.Deflate(child->Margin), m_WorldMatrix);
-            x += slotWidth + Gap;
-        }
-    } else {
-        const float slotHeight = std::max(0.0f, (content.Size.y - totalGap) / (float)count);
-        float y = content.Position.y;
-        for (UINode* child : children) {
-            const UIRectF slot(Vec2(content.Position.x, y), Vec2(content.Size.x, slotHeight));
-            child->LayoutSelf(slot.Deflate(child->Margin), m_WorldMatrix);
-            y += slotHeight + Gap;
-        }
-    }
+    return children;
 }
 
 void UINode::Paint(UIDrawList& OutDrawList) {

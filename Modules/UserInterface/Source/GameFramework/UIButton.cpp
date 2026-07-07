@@ -3,7 +3,7 @@
 #include "Rendering/UIDrawList.h"
 
 UIButton::UIButton() {
-    SizeDelta = Vec2(160.0f, 40.0f);
+    Size = Vec2(160.0f, 40.0f);
 }
 
 void UIButton::SetCaption(const String& InText) {

@@ -1,16 +1,17 @@
 #pragma once
 #include "UINode.h"
+#include "UIVStack.h"
+#include "UIHStack.h"
 #include "UILabel.h"
 #include "UIButton.h"
 #include "UIForEach.h"
 #include "UIIf.h"
-#include "Common/Array.h"
 
 /** Declarative, container-lambda helpers for building UI. Each helper creates a child on the given
  *  parent, configures it, and returns a reference so you can tweak it further. Data binding is via
  *  lambdas re-evaluated every frame (see UINode::Bind); For/If reconcile structure automatically.
  *
- *      UI::VStack(*root, [](UINode& v) {
+ *      UI::VStack(*root, [](UIStack& v) {
  *          UI::Label(v, [] { return "Count: " + std::to_string(count); });
  *          UI::Button(v, "Add", [] { count++; });
  *          UI::If(v, [] { return count > 3; }, [](UINode& c) { UI::Label(c, [] { return String("Big!"); }); });
@@ -41,10 +42,9 @@ inline UIButton& Button(UINode& InParent, const String& InCaption, std::function
 }
 
 /** A container that fills its slot and stacks children vertically (top to bottom). */
-inline UINode& VStack(UINode& InParent, const std::function<void(UINode&)>& InBody) {
-    UINode* stack = InParent.Add<UINode>();
+inline UIVStack& VStack(UINode& InParent, const std::function<void(UIStack&)>& InBody) {
+    UIVStack* stack = InParent.Add<UIVStack>();
     stack->Fill();
-    stack->LayoutMode = UILayoutMode::SplitY;
     if (InBody) {
         InBody(*stack);
     }
@@ -52,10 +52,9 @@ inline UINode& VStack(UINode& InParent, const std::function<void(UINode&)>& InBo
 }
 
 /** A container that fills its slot and stacks children horizontally (left to right). */
-inline UINode& HStack(UINode& InParent, const std::function<void(UINode&)>& InBody) {
-    UINode* stack = InParent.Add<UINode>();
+inline UIHStack& HStack(UINode& InParent, const std::function<void(UIStack&)>& InBody) {
+    UIHStack* stack = InParent.Add<UIHStack>();
     stack->Fill();
-    stack->LayoutMode = UILayoutMode::SplitX;
     if (InBody) {
         InBody(*stack);
     }
@@ -69,14 +68,6 @@ inline UIForEach& ForEach(UINode& InParent, std::function<int()> InCount, std::f
     list->Count = std::move(InCount);
     list->BuildItem = std::move(InBuildItem);
     return *list;
-}
-
-/** Sugar over ForEach bound to an Array<T> getter. Call with an explicit type: UI::ForEach<T>(...). */
-template<typename T>
-inline UIForEach& ForEach(UINode& InParent, std::function<const Array<T>&()> InItems, std::function<void(UINode&, const T&, int)> InBuildItem) {
-    return ForEach(InParent,
-        [InItems] { return InItems().Size(); },
-        [InItems, build = std::move(InBuildItem)](UINode& item, int i) { build(item, InItems()[i], i); });
 }
 
 /** Conditional content: InBuild runs once; the subtree is shown only while InCond() is true. */

@@ -77,8 +77,8 @@ void EditorEngine::BuildDemoUI() {
     m_UICanvas->ScaleMode = UICanvasScaleMode::ScaleWithScreenSize;
     m_UICanvas->ReferenceResolution = Vec2(1280.0f, 720.0f);
 
-    UI::VStack(*m_UICanvas, [](UINode& v) {
-        v.Padding = UIEdges(24.0f);
+    UI::VStack(*m_UICanvas, [](UIStack& v) {
+        v.Padding = UIPadding(24.0f);
         v.Gap = 8.0f;
 
         UI::Label(v, [] { return "Count: " + std::to_string(s_Count); });

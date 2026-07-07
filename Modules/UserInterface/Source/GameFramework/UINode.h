@@ -15,7 +15,7 @@ struct UIFrameContext {
     float DeltaTime = 0.0f;
 };
 
-/** Base class for all UI. A UINode is a Node with a rect transform: Unity-style anchors/pivot
+/** Base class for all UI. A UINode is a Node with a rect transform (Anchor/Pivot/Position/Size)
  *  plus CSS-style margin/padding and optional Split (row/column) child layout. The tree is
  *  re-laid-out and re-painted every frame, so you configure a node by setting its public fields
  *  directly — there are no setters to call. A tree is rooted in a UICanvas, which defines the
@@ -26,43 +26,39 @@ struct UIFrameContext {
  *      UIButton* btn    = canvas->Add<UIButton>();     // create + attach a typed child
  *      btn->Center({ 220, 56 });                       // fixed size, centered in the parent
  *
- *  Anchors are fractions [0..1] of the parent's content rect. When AnchorMin == AnchorMax the
- *  node has a fixed size (SizeDelta) positioned at that anchor; when they differ it stretches to
- *  span the anchors and SizeDelta grows/shrinks that span. Pivot is the node's own reference
- *  point (0.5,0.5 = center). Padding shrinks the rect its children live in; Margin insets the
- *  node within its own slot. Set LayoutMode to SplitX/SplitY to auto-arrange children as a
- *  row/column (with Gap between them) instead of anchoring each individually.
+ *  The rect model: Anchor is the reference point in the parent's content rect (fractions [0..1]),
+ *  Pivot is the node's own reference point (0.5,0.5 = center), and the node is placed so its
+ *  Pivot lands on Anchor + Position. Position and Size are unit-aware (UIValue: fraction of the
+ *  parent + pixels, composable with +/-), which covers fixed, stretched and mixed layouts alike:
+ *      node->Size = { 1.0_rel - 40.0_px, 22.0_px };   // parent width minus 40px, 22px tall
+ *  Padding shrinks the rect its children live in.
  *
  *  Subclasses override Paint() to draw and OnUIUpdate() to react to input. */
 class UINode : public Node {
 public:
     ARTIFACT_CLASS();
 
-    // Layout — set directly; recomputed every frame.
-    Vec2 AnchorMin = Vec2(0.0f);
-    Vec2 AnchorMax = Vec2(0.0f);
+    // Layout — set directly; recomputed every frame. Defaults center the node in its parent.
+    Vec2 Anchor = Vec2(0.5f);
     Vec2 Pivot = Vec2(0.5f);
     Vec3 Rotation = Vec3(0.0f);           // degrees, euler: X/Y tilt into the screen (perspective), Z spins. About Pivot.
-    Vec2 AnchoredPosition = Vec2(0.0f);
-    Vec2 SizeDelta = Vec2(100.0f);
-    UIEdges Margin;
-    UIEdges Padding;
-    UILayoutMode LayoutMode = UILayoutMode::None;
-    float Gap = 0.0f;
+    UIVec2 Position;
+    UIVec2 Size = Vec2(100.0f);
+    UIPadding Padding;
     Vec4 BackgroundColor = Vec4(0.0f);   // painted only when alpha > 0
 
     /** Create a child of type T, attach it, and return it typed. */
     template<typename T>
     T* Add() { return CreateChild(T::StaticClass())->template As<T>(); }
 
-    /** Preset: stretch to fill the parent's content rect (optionally inset by margin). Returns this. */
-    UINode* Fill(const UIEdges& InMargin = UIEdges()) {
-        AnchorMin = Vec2(0.0f); AnchorMax = Vec2(1.0f); SizeDelta = Vec2(0.0f); Margin = InMargin;
+    /** Preset: stretch to fill the parent's content rect. Returns this. */
+    UINode* Fill() {
+        Anchor = Pivot = Vec2(0.0f); Position = Vec2(0.0f); Size = { 1.0_rel, 1.0_rel };
         return this;
     }
-    /** Preset: fixed size, centered in the parent. Returns this. */
-    UINode* Center(const Vec2& InSize) {
-        AnchorMin = AnchorMax = Pivot = Vec2(0.5f); AnchoredPosition = Vec2(0.0f); SizeDelta = InSize;
+    /** Preset: fixed size (per-axis pixels or relative), centered in the parent. Returns this. */
+    UINode* Center(const UIVec2& InSize) {
+        Anchor = Pivot = Vec2(0.5f); Position = Vec2(0.0f); Size = InSize;
         return this;
     }
 
@@ -93,32 +89,36 @@ public:
     static void SetDefaultFont(Font* InFont) { s_DefaultFont = InFont; }
     static Font* GetDefaultFont() { return s_DefaultFont; }
 
-    // Perspective distance in canvas units used to project tilted UI to screen. Larger = flatter.
-    static void SetPerspective(float InDistance) { s_Perspective = InDistance; }
-    static float GetPerspective() { return s_Perspective; }
-    // Set by UIRenderer each frame (from UICanvas::BuildProjection) so hit-testing projects
-    // exactly like the GPU does, whatever the canvas render mode.
+protected:
+    // The frame passes, walked by UICanvas::RunFrame (bind -> layout -> input -> paint).
+    void BindTree();
+    void Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorld = Mat4(1.0f));
+    void PaintTree(UIDrawList& OutDrawList);
+    void UpdateTree(const UIFrameContext& InContext);
+
+    // Set by UICanvas each frame so hit-testing projects exactly like the GPU does,
+    // whatever the canvas render mode.
     static void SetViewProjection(const Mat4& InProjection, float InViewportW, float InViewportH) {
         s_ViewProjection = InProjection; s_ViewportW = InViewportW; s_ViewportH = InViewportH;
     }
     /** Project a canvas pixel-space point (post-transform, may have depth) to screen pixels. */
     static Vec2 ProjectToScreen(const Vec3& InCanvasPixelPos);
 
-    // Called by UIRenderer each frame (BindTree runs first, before Layout).
-    void BindTree();
-    void Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorld = Mat4(1.0f));
-    void PaintTree(UIDrawList& OutDrawList);
-    void UpdateTree(const UIFrameContext& InContext);
+    /** Lay out this node's children within the given content rect. The base hands every child
+     *  the whole rect (each positions itself via its own Anchor/Position/Size); UIStack
+     *  overrides this to arrange them into a row/column. */
+    virtual void LayoutChildren(const UIRectF& InContent);
+    /** For LayoutChildren overrides: recurse into one child with the rect it should lay out in. */
+    static void LayoutChild(UINode& InChild, const UIRectF& InRect, const Mat4& InParentWorld) {
+        InChild.Layout(InRect, InParentWorld);
+    }
+    Array<UINode*> CollectUIChildren() const;
 
-protected:
     UIRectF ComputeGeometry(const UIRectF& InParentContentRect) const;
-    // Lay out with an already-resolved geometry (used by split layout, which fills each slot).
-    void LayoutSelf(const UIRectF& InResolvedGeometry, const Mat4& InParentWorld);
     UIRectF m_Geometry;
     Mat4 m_WorldMatrix = Mat4(1.0f);
 
     inline static Font* s_DefaultFont = nullptr;
-    inline static float s_Perspective = 1000.0f;
     inline static Mat4 s_ViewProjection = Mat4(1.0f);
     inline static float s_ViewportW = 1.0f;
     inline static float s_ViewportH = 1.0f;
