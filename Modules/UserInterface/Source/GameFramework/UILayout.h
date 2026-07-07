@@ -46,19 +46,16 @@ struct UIVec2 {
     }
 };
 
-/** Per-edge insets in pixels, shrinking the rect a node's children lay out in. */
+/** Per-edge insets shrinking the rect a node's children lay out in. */
 struct UIPadding {
-    float Left = 0.0f, Top = 0.0f, Right = 0.0f, Bottom = 0.0f;
+    UIValue Left, Top, Right, Bottom;
 
     UIPadding() = default;
-    UIPadding(float InAll) : Left(InAll), Top(InAll), Right(InAll), Bottom(InAll) { }
-    UIPadding(float InHorizontal, float InVertical)
+    UIPadding(const UIValue& InAll) : Left(InAll), Top(InAll), Right(InAll), Bottom(InAll) { }
+    UIPadding(const UIValue& InHorizontal, const UIValue& InVertical)
         : Left(InHorizontal), Top(InVertical), Right(InHorizontal), Bottom(InVertical) { }
-    UIPadding(float InLeft, float InTop, float InRight, float InBottom)
+    UIPadding(const UIValue& InLeft, const UIValue& InTop, const UIValue& InRight, const UIValue& InBottom)
         : Left(InLeft), Top(InTop), Right(InRight), Bottom(InBottom) { }
-
-    float Horizontal() const { return Left + Right; }
-    float Vertical() const { return Top + Bottom; }
 };
 
 /** A rectangle in screen pixels, top-left origin (+X right, +Y down). Position is the top-left. */
@@ -79,11 +76,15 @@ struct UIRectF {
             && InPoint.y >= Position.y && InPoint.y <= Position.y + Size.y;
     }
 
-    /** This rect shrunk inward by the given padding (never negative size). */
+    /** This rect shrunk inward by the given padding */
     UIRectF Deflate(const UIPadding& InPadding) const {
+        const float left = InPadding.Left.Resolve(Size.x);
+        const float right = InPadding.Right.Resolve(Size.x);
+        const float top = InPadding.Top.Resolve(Size.y);
+        const float bottom = InPadding.Bottom.Resolve(Size.y);
         return UIRectF(
-            Position + Vec2(InPadding.Left, InPadding.Top),
-            Vec2(std::max(0.0f, Size.x - InPadding.Horizontal()), std::max(0.0f, Size.y - InPadding.Vertical()))
+            Position + Vec2(left, top),
+            Vec2(std::max(0.0f, Size.x - left - right), std::max(0.0f, Size.y - top - bottom))
         );
     }
 };
