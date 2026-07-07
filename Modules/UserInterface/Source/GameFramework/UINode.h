@@ -38,14 +38,21 @@ class UINode : public Node {
 public:
     ARTIFACT_CLASS();
 
-    // Layout — set directly; recomputed every frame. Defaults center the node in its parent.
+    // Layout
+    /* Reference point in the parent's content rect, fractions 0..1 (0,0 = top-left, 1,1 = bottom-right). */
     Vec2 Anchor = Vec2(0.5f);
+    /* The node's own reference point, fractions 0..1 of its rect; it is placed so Pivot lands on Anchor + Position. */
     Vec2 Pivot = Vec2(0.5f);
-    Vec3 Rotation = Vec3(0.0f);           // degrees, euler: X/Y tilt into the screen (perspective), Z spins. About Pivot.
+    /* Euler degrees about Pivot: X/Y tilt into the screen (perspective), Z spins flat. */
+    Vec3 Rotation = Vec3(0.0f);
+    /* Offset of Pivot from Anchor. */
     UIVec2 Position;
+    /* Extent of the rect. */
     UIVec2 Size = Vec2(100.0f);
+    /* Per-edge inset shrinking the rect children lay out in. */
     UIPadding Padding;
-    Vec4 BackgroundColor = Vec4(0.0f);   // painted only when alpha > 0
+    /* RGBA 0..1; painted only when alpha > 0. */
+    Vec4 BackgroundColor = Vec4(0.0f);
 
     /** Create a child of type T, attach it, and return it typed. */
     template<typename T>
