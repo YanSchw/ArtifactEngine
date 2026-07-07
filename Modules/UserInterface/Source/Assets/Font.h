@@ -2,6 +2,7 @@
 #include "Assets/Asset.h"
 #include "Object/Pointer.h"
 #include "Common/Types.h"
+#include "Common/Array.h"
 #include "Common/Map.h"
 #include "Font.gen.h"
 
@@ -48,7 +49,9 @@ public:
     virtual bool IsLoaded() const override;
 
 private:
-    void BuildAtlas(const byte* InTtfData);
+    /** Rasterizes the SDF atlas into OutAtlasPixels and fills the glyph table and font metrics. */
+    bool BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels);
+    void CreateAtlasTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight);
 
     PROPERTY()
     String m_FontPath;

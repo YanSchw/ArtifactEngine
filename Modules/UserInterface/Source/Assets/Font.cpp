@@ -24,6 +24,37 @@ Font::Font() {
 }
 
 void Font::Load() {
+#if defined(AE_PACKAGED)
+    uint32_t atlasWidth = 0, atlasHeight = 0;
+    int32_t glyphCount = 0;
+    {
+        ChunkReader chunkReader = GetChunkedBinary()->GetChunk(1);
+        chunkReader >> atlasWidth;
+        chunkReader >> atlasHeight;
+        chunkReader >> m_BasePixelHeight;
+        chunkReader >> m_AscentPx;
+        chunkReader >> m_DescentPx;
+        chunkReader >> m_LineGapPx;
+        chunkReader >> glyphCount;
+    }
+    {
+        ChunkReader chunkReader = GetChunkedBinary()->GetChunk(2);
+        for (int32_t i = 0; i < glyphCount; i++) {
+            uint32_t codepoint = 0;
+            GlyphInfo glyph;
+            chunkReader >> codepoint;
+            chunkReader >> glyph;
+            m_Glyphs[codepoint] = glyph;
+        }
+    }
+    {
+        ChunkReader chunkReader = GetChunkedBinary()->GetChunk(3);
+        Array<byte> atlas;
+        atlas.Resize((size_t)atlasWidth * atlasHeight * 4);
+        chunkReader.ReadBytes(atlas.Data(), atlas.Size());
+        CreateAtlasTexture(atlas.Data(), atlasWidth, atlasHeight);
+    }
+#else
     const String path = EngineConfig::ResolveContentPath(m_FontPath);
     SharedObjectPtr<ByteString> bytes = FileIO::ReadFileToBytes(path);
     if (!bytes || bytes->GetSizeInBytes() == 0) {
@@ -31,15 +62,19 @@ void Font::Load() {
         return;
     }
 
-    BuildAtlas(bytes->GetData());
+    Array<byte> atlas;
+    if (BuildAtlasData(bytes->GetData(), atlas)) {
+        CreateAtlasTexture(atlas.Data(), s_AtlasWidth, s_AtlasHeight);
+    }
+#endif
 }
 
-void Font::BuildAtlas(const byte* InTtfData) {
+bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
     stbtt_fontinfo font;
     const int offset = stbtt_GetFontOffsetForIndex(InTtfData, 0);
     if (!stbtt_InitFont(&font, InTtfData, offset)) {
-        AE_ERROR("Font::BuildAtlas failed to initialize stb_truetype font");
-        return;
+        AE_ERROR("Font::BuildAtlasData failed to initialize stb_truetype font");
+        return false;
     }
 
     const float scale = stbtt_ScaleForPixelHeight(&font, m_BasePixelHeight);
@@ -51,7 +86,7 @@ void Font::BuildAtlas(const byte* InTtfData) {
     m_LineGapPx = (float)lineGap * scale;
 
     // Transparent RGBA atlas; glyphs write white RGB + SDF alpha.
-    Array<byte> atlas;
+    Array<byte>& atlas = OutAtlasPixels;
     atlas.Resize((size_t)s_AtlasWidth * s_AtlasHeight * 4);
     memset(atlas.Data(), 0, atlas.Size());
 
@@ -96,7 +131,7 @@ void Font::BuildAtlas(const byte* InTtfData) {
                 penX += (uint32_t)w + 1;
                 rowHeight = std::max(rowHeight, (uint32_t)h);
             } else {
-                AE_WARN("Font::BuildAtlas ran out of atlas space at codepoint {0}", cp);
+                AE_WARN("Font::BuildAtlasData ran out of atlas space at codepoint {0}", cp);
             }
         }
 
@@ -107,13 +142,17 @@ void Font::BuildAtlas(const byte* InTtfData) {
         m_Glyphs[cp] = glyph;
     }
 
+    return true;
+}
+
+void Font::CreateAtlasTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight) {
     TextureDesc desc;
-    desc.Width = s_AtlasWidth;
-    desc.Height = s_AtlasHeight;
+    desc.Width = InWidth;
+    desc.Height = InHeight;
     desc.Format = ImageFormat::RGBA8;
     desc.Usage = ImageUsage::Sampled;
     desc.GenerateMips = false;
-    m_AtlasTexture = Texture::Create(atlas.Data(), s_AtlasWidth, s_AtlasHeight, 4, desc);
+    m_AtlasTexture = Texture::Create(InPixels, InWidth, InHeight, 4, desc);
 }
 
 bool Font::GetGlyph(uint32_t InCodepoint, GlyphInfo& OutGlyph) {
@@ -147,6 +186,43 @@ void Font::Unload() {
 
 void Font::Cook(ChunkedBinary& OutChunkedBinary) {
     Super::Cook(OutChunkedBinary);
+
+    const String path = EngineConfig::ResolveContentPath(m_FontPath);
+    SharedObjectPtr<ByteString> bytes = FileIO::ReadFileToBytes(path);
+    if (!bytes || bytes->GetSizeInBytes() == 0) {
+        AE_ERROR("Font::Cook failed to read font file '{0}'", path);
+        return;
+    }
+
+    Array<byte> atlas;
+    if (!BuildAtlasData(bytes->GetData(), atlas)) {
+        return;
+    }
+
+    {
+        ChunkWriter chunkWriter;
+        chunkWriter << s_AtlasWidth;
+        chunkWriter << s_AtlasHeight;
+        chunkWriter << m_BasePixelHeight;
+        chunkWriter << m_AscentPx;
+        chunkWriter << m_DescentPx;
+        chunkWriter << m_LineGapPx;
+        chunkWriter << (int32_t)m_Glyphs.Size();
+        OutChunkedBinary.AddChunk(1, chunkWriter);
+    }
+    {
+        ChunkWriter chunkWriter;
+        for (const auto& [codepoint, glyph] : m_Glyphs) {
+            chunkWriter << codepoint;
+            chunkWriter << glyph;
+        }
+        OutChunkedBinary.AddChunk(2, chunkWriter);
+    }
+    {
+        ChunkWriter chunkWriter;
+        chunkWriter.WriteBytes(atlas.Data(), atlas.Size());
+        OutChunkedBinary.AddChunk(3, chunkWriter);
+    }
 }
 
 bool Font::IsLoaded() const {
