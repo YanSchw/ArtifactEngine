@@ -48,9 +48,7 @@ Array<UINode*> UINode::CollectUIChildren() const {
 }
 
 void UINode::Paint(UIDrawList& OutDrawList) {
-    if (BackgroundColor.a > 0.0f) {
-        OutDrawList.AddRect(m_Geometry, BackgroundColor, m_WorldMatrix);
-    }
+    (void)OutDrawList;
 }
 
 void UINode::BindTree() {

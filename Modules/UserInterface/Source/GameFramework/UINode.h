@@ -51,8 +51,6 @@ public:
     UIVec2 Size = Vec2(100.0f);
     /* Per-edge inset shrinking the rect children lay out in. */
     UIPadding Padding;
-    /* RGBA 0..1; painted only when alpha > 0. */
-    Vec4 BackgroundColor = Vec4(0.0f);
 
     /** Create a child of type T, attach it, and return it typed. */
     template<typename T>
@@ -81,7 +79,7 @@ public:
     /** InPoint is in screen pixels; correct under rotation and perspective. */
     bool HitTest(const Vec2& InPoint) const;
 
-    /** Draw this node. Base paints BackgroundColor when opaque; call it from overrides for the bg. */
+    /** Draw this node. */
     virtual void Paint(UIDrawList& OutDrawList);
     /** React to input for this node. */
     virtual void OnUIUpdate(const UIFrameContext& InContext) { (void)InContext; }
