@@ -9,7 +9,7 @@ static Array<VulkanShader*> s_Shaders;
 static String GetGlslShaderCompilerPath() {
     if (EngineConfig::IsPackagedBuild()) {
         if (Platform::CurrentPlatform() == PlatformType::Win64) {
-            return "glslangValidator.exe";
+            return std::format("\"{0}\\glslangValidator.exe\"", Platform::GetResourceDirectory());
         } else if (Platform::CurrentPlatform() == PlatformType::MacOS) {
             // Bundled alongside the app's resources (see Package/MacOS.py).
             return std::format("\"{0}/glslangValidator\"", Platform::GetResourceDirectory());

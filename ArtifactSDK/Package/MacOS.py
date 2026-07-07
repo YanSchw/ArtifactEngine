@@ -217,4 +217,4 @@ def package_for_macos(project_path):
     sign_app()
     verify()
 
-    print(f"\n✅ App created: {APP_PATH}")
+    print(f"\n✔ App created: {APP_PATH}")

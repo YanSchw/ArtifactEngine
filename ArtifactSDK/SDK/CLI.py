@@ -125,8 +125,12 @@ def cmd_package(args):
         from Package.MacOS import package_for_macos
         with Job("Packaging"):
             package_for_macos(project_path)
+    elif args.target == "Win64":
+        from Package.Win64 import package_for_win64
+        with Job("Packaging"):
+            package_for_win64(project_path)
     else:
-        print("Only MacOS packaging is implemented so far")
+        print("Only MacOS and Win64 packaging are implemented so far")
         exit(1)
 
 def cmd_lint(args):

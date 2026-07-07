@@ -123,6 +123,7 @@ add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.
 if (WIN32)
     set(APP_ICON_RESOURCE "{project_path}/Build/Intermediate/Resources/Win64IconResource.rc")
     target_sources(Artifact PRIVATE ${{APP_ICON_RESOURCE}})
+{"    set_target_properties(Artifact PROPERTIES WIN32_EXECUTABLE TRUE)" if is_packaged else ""}
 endif()
 
 """)
