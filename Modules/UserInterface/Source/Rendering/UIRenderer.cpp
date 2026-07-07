@@ -28,8 +28,8 @@ static Mat4 BuildUIProjection(float InWidth, float InHeight, float InPerspective
 }
 
 void UIRenderer::CreateSharedResources() {
-    m_SolidShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::ContentDir() + "/Shaders/UISolid.glsl"));
-    m_TextShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::ContentDir() + "/Shaders/UIText.glsl"));
+    m_SolidShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/UISolid.glsl"));
+    m_TextShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/UIText.glsl"));
 
     SamplerDesc samplerDesc;
     samplerDesc.MinFilter = FilterMode::Linear;

@@ -5,6 +5,13 @@ import subprocess
 from pathlib import Path
 import plistlib
 
+from SDK.Paths import get_engine_path
+from BuildTool.Generate import get_content_mounts
+
+# Non-cooked content copied raw into the bundle, by extension.
+# Cooked assets are handled separately.
+CONTENT_WHITELIST = [".glsl"]
+
 APP_NAME = "Artifact"
 BINARY_PATH = Path("Binaries/Artifact")  # your compiled binary
 OUTPUT_DIR = Path("Dist")
@@ -31,12 +38,24 @@ def copy_binary():
     shutil.copy2(BINARY_PATH, dest)
     os.chmod(dest, 0o755)
 
-def copy_content():
-    content_src = Path("Content")
+def copy_content(project_path):
+    # Packaged builds collapse every content mount into one resource dir
     content_dest = APP_PATH / "Contents/Resources/Content"
     if content_dest.exists():
         shutil.rmtree(content_dest)
-    shutil.copytree(content_src, content_dest)
+    content_dest.mkdir(parents=True, exist_ok=True)
+
+    for _key, mount_dir in get_content_mounts(get_engine_path(), project_path, "MacOS"):
+        mount_path = Path(mount_dir)
+        if not mount_path.is_dir():
+            continue
+        for src in mount_path.rglob("*"):
+            if src.is_file() and src.suffix in CONTENT_WHITELIST:
+                dest = content_dest / src.relative_to(mount_path)
+                if dest.exists():
+                    continue
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest)
 
     # copy cooked assets into content_dest
     cooked_src = OUTPUT_DIR / "Cooked"
@@ -191,7 +210,7 @@ def package_for_macos(project_path):
     make_icns(Path(f"{project_path}/Content/Icons/Icon.png"),  APP_PATH / "Contents/Resources/app.icns")
 
     copy_binary()
-    copy_content()
+    copy_content(project_path)
     copy_dependencies()
     create_plist()
     fix_linkage()   # must run after binaries are in place and before signing (it invalidates sigs)

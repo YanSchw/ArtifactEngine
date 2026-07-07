@@ -23,7 +23,7 @@ void Texture2D::Load() {
     delete[] pixels;
 #else
     int width, height, channels;
-    String path = EngineConfig::ContentDir() + m_TexturePath;
+    String path = EngineConfig::ResolveContentPath(m_TexturePath);
     stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
     channels = 4;
     m_Texture = Texture::Create(pixels, width, height, channels);
@@ -39,7 +39,7 @@ void Texture2D::Cook(ChunkedBinary& OutChunkedBinary) {
     Super::Cook(OutChunkedBinary);
 
     int width, height, channels;
-    String path = EngineConfig::ContentDir() + m_TexturePath;
+    String path = EngineConfig::ResolveContentPath(m_TexturePath);
     stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
     channels = 4;
 

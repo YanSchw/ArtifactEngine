@@ -2,6 +2,8 @@
 #include "Object/Object.h"
 #include "Object/Pointer.h"
 #include "Common/Types.h"
+#include "Common/Array.h"
+#include "Common/Map.h"
 #include "EngineConfig.gen.h"
 
 class EngineConfig : public Object {
@@ -17,14 +19,21 @@ public:
 
     static Class EngineClass();
     static Class RenderPipelineClass();
-    static String ContentDir() { return s_ContentDir; }
+
+    static void MountContent(const String& InKey, const String& InDir);
+    static String GetEngineContentDir();
+    static String GetProjectContentDir();
+    static String GetContentDir(const String& InKey);
+    static String ResolveContentPath(const String& InRelativePath);
+    static Array<String> GetContentMountDirs();
 
 private:
     static void Initialize(const Array<String>& InArgs);
     static void LoadConfigVars(const Array<String>& InArgs);
     static void ResolvePaths();
 
-    inline static String s_ContentDir = String("Content");
+    inline static Map<String, String> s_ContentMounts;
+    inline static Array<String> s_ContentMountKeys; // registration order, for deterministic search
 
     friend int ArtifactMain(const Array<String>& InArgs);
 };

@@ -32,7 +32,7 @@ void Mesh::Load() {
 #else
     Array<Vertex> vertices;
     Array<uint32_t> indices;
-    String path = EngineConfig::ContentDir() + m_MeshPath;
+    String path = EngineConfig::ResolveContentPath(m_MeshPath);
 
     Array<Class> meshLoaderClasses = Class::GetSubclassesOf(MeshLoader::StaticClass());
     AE_ASSERT(meshLoaderClasses.Size() > 1, "No MeshLoader classes found!");
@@ -55,7 +55,7 @@ void Mesh::Cook(ChunkedBinary& OutChunkedBinary) {
 
     Array<Vertex> vertices;
     Array<uint32_t> indices;
-    String path = EngineConfig::ContentDir() + m_MeshPath;
+    String path = EngineConfig::ResolveContentPath(m_MeshPath);
 
     Array<Class> meshLoaderClasses = Class::GetSubclassesOf(MeshLoader::StaticClass());
     AE_ASSERT(meshLoaderClasses.Size() > 1, "No MeshLoader classes found!");

@@ -52,7 +52,7 @@ void GameEngine::Initialize() {
 
     PipelineDesc fullscreenDesc;
     fullscreenDesc.Target = s_Window;
-    fullscreenDesc.Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::ContentDir() + "/Shaders/Passthrough.glsl"));
+    fullscreenDesc.Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Passthrough.glsl"));
     fullscreenDesc.ImageBindings.Add({ 16, m_RenderPipeline->GetFinalImageView(), sampler });
     s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
 

@@ -1,11 +1,14 @@
 #include "EngineConfig.h"
 
 #include <filesystem>
+#include <vector>
+#include <utility>
 #include "Log.h"
 #include "Object/Pointer.h"
 #include "Common/ConfigVar.h"
 #include "Common/UUID.h"
 #include "Platform/Platform.h"
+#include "Platform/FileIO.h"
 
 static Map<String, ConfigVar> s_ConfigVars;
 
@@ -55,31 +58,77 @@ bool EngineConfig::SetConfigVar(const String& InName, const String& InValue) {
 }
 
 void EngineConfig::ResolvePaths() {
-    AE_INFO("Resolving Paths from CWD: {0}", std::filesystem::current_path().string());
-
-#if defined(AE_PACKAGED)
-    // In package builds use the Platform API
-    s_ContentDir = Platform::GetContentDirectory();
-#else
-    // In non-package builds mount the Content dir from the CWD
-    auto contentDirPath = std::filesystem::current_path();
-    auto root = contentDirPath.root_path();
-    while (true) {
-        if (std::filesystem::is_directory(contentDirPath / "Content")) {
-            s_ContentDir = (contentDirPath / "Content").string();
-            break;
-        }
-
-        if (contentDirPath == root) {
-            AE_ASSERT(false, "Content directory not found!");
-            break;
-        }
-
-        contentDirPath = contentDirPath.parent_path();
+#if !defined(AE_PACKAGED)
+    // In non-package builds mount the Content dirs
+    std::vector<std::pair<std::string, std::string>> mounts;
+    extern void __MountContentDirs(std::vector<std::pair<std::string, std::string>>& outMounts);
+    __MountContentDirs(mounts);
+    for (const auto& [key, dir] : mounts) {
+        MountContent(String(key), String(dir));
     }
 #endif
+}
 
-    AE_INFO("Resolved Content Directory: {0}", s_ContentDir);
+void EngineConfig::MountContent(const String& InKey, const String& InDir) {
+    AE_INFO("Mounted content '{0}' -> {1}", InKey, InDir);
+    if (!s_ContentMounts.ContainsKey(InKey)) {
+        s_ContentMountKeys.Add(InKey);
+    }
+    s_ContentMounts[InKey] = InDir;
+}
+
+String EngineConfig::GetEngineContentDir() {
+    return GetContentDir("EngineContent");
+}
+
+String EngineConfig::GetProjectContentDir() {
+    if (!s_ContentMounts.ContainsKey("ProjectContent")) {
+        return GetEngineContentDir();
+    }
+    return GetContentDir("ProjectContent");
+}
+
+String EngineConfig::GetContentDir(const String& InKey) {
+    if (IsPackagedBuild()) {
+        return Platform::GetContentDirectory();
+    }
+    if (s_ContentMounts.ContainsKey(InKey)) {
+        return s_ContentMounts[InKey];
+    }
+    AE_ERROR("No content mounted for key '{0}'", InKey);
+    return "";
+}
+
+Array<String> EngineConfig::GetContentMountDirs() {
+    Array<String> dirs;
+    if (IsPackagedBuild()) {
+        dirs.Add(Platform::GetContentDirectory());
+        return dirs;
+    }
+    for (const String& key : s_ContentMountKeys) {
+        // Distinct keys can map to the same dir;
+        // keep the list unique so files aren't scanned/resolved twice.
+        const String& dir = s_ContentMounts[key];
+        if (!dirs.Contains(dir)) {
+            dirs.Add(dir);
+        }
+    }
+    return dirs;
+}
+
+String EngineConfig::ResolveContentPath(const String& InRelativePath) {
+    Array<String> dirs = GetContentMountDirs();
+    for (const String& dir : dirs) {
+        String candidate = dir + InRelativePath;
+        if (FileIO::FileExists(candidate)) {
+            return candidate;
+        }
+    }
+    // Fall back to the first mount so callers still get a usable path (e.g. for error messages).
+    if (dirs.Size() > 0) {
+        return dirs[0] + InRelativePath;
+    }
+    return InRelativePath;
 }
 
 bool EngineConfig::IsPackagedBuild() {

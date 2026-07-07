@@ -19,6 +19,7 @@ class ArtifactModule:
         IncludePaths: Optional[List[str]] = None,
         ExportIncludePaths: Optional[List[str]] = None,
         AddAdditionalCMakeProjects: Optional[List[str]] = None,
+        ContentDirectory: Optional[str] = None,
     ):
         """
         Initialize an ArtifactModule with metadata.
@@ -32,6 +33,7 @@ class ArtifactModule:
             IncludePaths: Include directories for this module
             ExportIncludePaths: Include directories exported to dependents
             AddAdditionalCMakeProjects: Additional CMake projects to include
+            ContentDirectory: Module-local content directory to mount at runtime (relative to the module)
         """
         self.name = name
         self.path = path
@@ -41,6 +43,7 @@ class ArtifactModule:
         self.IncludePaths = IncludePaths if IncludePaths is not None else []
         self.ExportIncludePaths = ExportIncludePaths if ExportIncludePaths is not None else []
         self.AddAdditionalCMakeProjects = AddAdditionalCMakeProjects if AddAdditionalCMakeProjects is not None else []
+        self.ContentDirectory = ContentDirectory
 
     @classmethod
     def load_from_json(cls, module_path: str) -> "ArtifactModule":
@@ -77,6 +80,7 @@ class ArtifactModule:
             IncludePaths=data.get("IncludePaths", None),
             ExportIncludePaths=data.get("ExportIncludePaths", None),
             AddAdditionalCMakeProjects=data.get("AddAdditionalCMakeProjects", None),
+            ContentDirectory=data.get("ContentDirectory", None),
         )
 
     def supports_platform(self, platform: str) -> bool:
@@ -96,6 +100,7 @@ class ArtifactModule:
             "IncludePaths": self.IncludePaths,
             "ExportIncludePaths": self.ExportIncludePaths,
             "AddAdditionalCMakeProjects": self.AddAdditionalCMakeProjects,
+            "ContentDirectory": self.ContentDirectory,
         }
     
     def write_to_json(self):

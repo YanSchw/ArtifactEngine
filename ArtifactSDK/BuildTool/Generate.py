@@ -42,6 +42,17 @@ def discover_modules(engine_path: str, project_path: str, target_platform: str):
 
     return modules
 
+def get_content_mounts(engine_path: str, project_path: str, target_platform: str) -> list[tuple[str, str]]:
+    """Content directories to mount by key: EngineContent, ProjectContent, and one per module that
+    declares a ContentDirectory in its Module.json (keyed by module name)."""
+    engine_path = engine_path.replace("\\", "/").rstrip("/")
+    project_path = project_path.replace("\\", "/").rstrip("/")
+    mounts = [("EngineContent", f"{engine_path}/Content"), ("ProjectContent", f"{project_path}/Content")]
+    for module_name, module_dir, module, _ in discover_modules(engine_path, project_path, target_platform):
+        if module.ContentDirectory:
+            mounts.append((module_name, f"{module_dir}/{module.ContentDirectory}"))
+    return mounts
+
 def expand_indirect_module_dependencies(module_dirs: dict[str, str], import_modules: list[str]) -> set[str]:
     to_check = set(import_modules)
     expanded = set()
@@ -158,11 +169,22 @@ endif()
             f.write(f"target_link_libraries(Artifact PUBLIC {module_name})\n")
 
     __LinkModules += "}\n"
+
+    # Content directories are mounted by key at runtime (non-packaged).
+    content_mounts = get_content_mounts(engine_path, project_path, target_platform)
+
+    __MountContent = "#include <vector>\n#include <string>\n#include <utility>\n\n#if !defined(AE_PACKAGED)\n\n"
+    __MountContent += "void __MountContentDirs(std::vector<std::pair<std::string, std::string>>& mounts) {\n"
+    for key, directory in content_mounts:
+        escaped = directory.replace("\\", "\\\\")
+        __MountContent += f'    mounts.push_back({{"{key}", "{escaped}"}});\n'
+    __MountContent += "}\n#endif\n"
+
     os.makedirs(f"{project_path}/Build/Intermediate/Modules", exist_ok=True)
     with smart_open(f"{project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp") as f:
         f.write(__LinkModules)
+        f.write("\n" + __MountContent)
         f.write(f"""
-
 int __VERSION_MAJOR() {{ return {VERSION_MAJOR}; }}
 int __VERSION_MINOR() {{ return {VERSION_MINOR}; }}
 int __VERSION_PATCH() {{ return {get_patch_version() if get_patch_version() is not None else '-1'}; }}

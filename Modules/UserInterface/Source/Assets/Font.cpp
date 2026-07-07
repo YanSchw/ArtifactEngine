@@ -24,7 +24,7 @@ Font::Font() {
 }
 
 void Font::Load() {
-    const String path = EngineConfig::ContentDir() + m_FontPath;
+    const String path = EngineConfig::ResolveContentPath(m_FontPath);
     SharedObjectPtr<ByteString> bytes = FileIO::ReadFileToBytes(path);
     if (!bytes || bytes->GetSizeInBytes() == 0) {
         AE_ERROR("Font::Load failed to read font file '{0}'", path);

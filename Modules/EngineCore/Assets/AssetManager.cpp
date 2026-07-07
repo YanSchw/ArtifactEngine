@@ -36,7 +36,7 @@ void AssetManager::Initialize(bool InLoadAssets) {
 
     if (EngineConfig::IsPackagedBuild()) {
         // In packaged builds, we load asset metadata from the "AssetIndex" that lists all assets and their UUIDs.
-        auto assetIndexBinary = ChunkedBinary::LoadFromFile(EngineConfig::ContentDir() + "/AssetIndex");
+        auto assetIndexBinary = ChunkedBinary::LoadFromFile(EngineConfig::ResolveContentPath("/AssetIndex"));
         AE_ASSERT(assetIndexBinary, "Failed to load AssetIndex!");
         auto assetIndexChunk0 = assetIndexBinary->GetChunk(0);
         auto assetIndexChunk1 = assetIndexBinary->GetChunk(1);
@@ -108,7 +108,10 @@ AssetManager::~AssetManager() {
 void AssetManager::HotLoadAssets() {
     AE_ASSERT(!EngineConfig::IsPackagedBuild(), "Hot loading is only supported in non-packaged builds!");
 
-    Array<String> contentFiles = FileIO::ListFilesInDirectory(EngineConfig::ContentDir(), true);
+    Array<String> contentFiles;
+    for (const String& mountDir : EngineConfig::GetContentMountDirs()) {
+        contentFiles += FileIO::ListFilesInDirectory(mountDir, true);
+    }
     Map<Asset*, String> jsonStrings;
     for (const String& filePath : contentFiles) {
         String extension = std::filesystem::path(filePath).extension().string();

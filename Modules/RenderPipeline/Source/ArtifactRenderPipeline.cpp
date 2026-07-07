@@ -90,7 +90,7 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     frameBufferDesc.DepthAttachment = depthImageView;
     s_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
 
-    s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::ContentDir() + "/Shaders/Shader.glsl"));
+    s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Shader.glsl"));
     SamplerDesc samplerDesc;
     samplerDesc.MagFilter = FilterMode::Nearest;
     samplerDesc.MinFilter = FilterMode::Nearest;
