@@ -1,5 +1,6 @@
 #pragma once
 #include "UINode.h"
+#include "Object/Pointer.h"
 #include "UICanvas.gen.h"
 
 class CameraNode;
@@ -19,12 +20,7 @@ enum class UICanvasRenderMode : uint8_t { Overlay = 0, World = 1 };
 enum class UICanvasScaleMode : uint8_t { ConstantPixelSize = 0, ScaleWithScreenSize = 1 };
 
 /** The root of a UI tree: every UINode you want rendered lives under a canvas, and the canvas
- *  rect is the area its children lay out in. Hand it to UIRenderer::Render() each frame.
- *
- *  The canvas owns the mapping from canvas pixel space to the screen: in Overlay mode that is
- *  the (optionally scaled) pixel projection; in World mode it is a plane transform through the
- *  scene camera, so the same UI tree becomes a 3D object. Children never notice the difference —
- *  they lay out, paint and hit-test in canvas pixels either way. */
+ *  rect is the area its children lay out in. Hand it to UIRenderer::Render() each frame. */
 class UICanvas : public UINode {
 public:
     ARTIFACT_CLASS();
@@ -49,6 +45,11 @@ public:
     // Perspective distance in canvas units for tilted nodes (Overlay mode). Larger = flatter.
     float Perspective = 1000.0f;
 
+    UIInputMode InputMode = UIInputMode::Cursor;
+
+    UINode* GetFocusedNode() const { return m_FocusedNode.Get(); }
+    void SetFocus(UINode* InNode);
+
     /** Runs one UI frame — bind, layout, input, paint — filling OutDrawList and returning the
      *  canvas->clip projection it must be rendered with. Called by UIRenderer. */
     Mat4 RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList);
@@ -58,4 +59,17 @@ private:
     UIRectF ComputeCanvasRect(const Vec2& InViewportSize) const;
     /** Canvas pixel space -> clip space; uploaded to the GPU and mirrored by ProjectToScreen. */
     Mat4 BuildProjection(const Vec2& InViewportSize) const;
+
+    void RouteInput(const UIFrameContext& InContext);
+    void RouteCursor(const UIFrameContext& InContext);
+    void RouteFocus(const UIFrameContext& InContext);
+    void SetHovered(UINode* InNode);
+    /** Topmost enabled node under the point in paint order (respecting ClipChildren). */
+    static UINode* HitTestTopmost(UINode* InNode, const Vec2& InPoint, bool InInteractableOnly);
+    UINode* FindNavTarget(UINode* InFrom, UINavDirection InDirection) const;
+
+    WeakObjectPtr<UINode> m_HoveredNode;
+    WeakObjectPtr<UINode> m_CapturedNode;
+    WeakObjectPtr<UINode> m_FocusedNode;
+    Vec2 m_LastCursor = Vec2(0.0f);
 };

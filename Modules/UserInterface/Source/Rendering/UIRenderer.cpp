@@ -18,6 +18,7 @@
 void UIRenderer::CreateSharedResources() {
     m_SolidShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetContentDir("UserInterface") + "/Shaders/UISolid.glsl"));
     m_TextShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetContentDir("UserInterface") + "/Shaders/UIText.glsl"));
+    m_ImageShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetContentDir("UserInterface") + "/Shaders/UIImage.glsl"));
 
     SamplerDesc samplerDesc;
     samplerDesc.MinFilter = FilterMode::Linear;
@@ -38,6 +39,8 @@ void UIRenderer::CreateSharedResources() {
 }
 
 void UIRenderer::CreatePipelines(Surface* InTarget) {
+    m_ImagePipelines = Map<Texture*, SharedObjectPtr<Pipeline>>();
+
     PipelineDesc solidDesc;
     solidDesc.Target = (Object*)InTarget;
     solidDesc.Shader = m_SolidShader;
@@ -102,9 +105,34 @@ void UIRenderer::Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InVie
                 continue;
             }
             m_TextPipeline->Bind();
+        } else if (batch.Kind == UIDrawList::BatchKind::Image) {
+            Pipeline* pipeline = GetImagePipeline(batch.Tex);
+            if (!pipeline) {
+                continue;
+            }
+            pipeline->Bind();
         } else {
             m_SolidPipeline->Bind();
         }
         m_VertexBuffer->Draw(batch.IndexCount, batch.FirstIndex);
     }
+}
+
+Pipeline* UIRenderer::GetImagePipeline(Texture* InTexture) {
+    if (!InTexture || !m_CachedTarget) {
+        return nullptr;
+    }
+    if (m_ImagePipelines.ContainsKey(InTexture)) {
+        return m_ImagePipelines[InTexture].Get();
+    }
+    PipelineDesc imageDesc;
+    imageDesc.Target = (Object*)m_CachedTarget;
+    imageDesc.Shader = m_ImageShader;
+    imageDesc.EnableBlending = true;
+    imageDesc.EnableDepthTest = false;
+    imageDesc.Buffers.Add(m_ProjectionBuffer);
+    imageDesc.ImageBindings.Add({ 16, InTexture->GetDefaultView(), m_Sampler });
+    SharedObjectPtr<Pipeline> pipeline = Pipeline::Create(imageDesc);
+    m_ImagePipelines[InTexture] = pipeline;
+    return pipeline.Get();
 }

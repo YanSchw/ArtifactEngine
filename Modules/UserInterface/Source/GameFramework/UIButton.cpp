@@ -4,6 +4,7 @@
 
 UIButton::UIButton() {
     Size = Vec2(160.0f, 40.0f);
+    Interactable = true;
 }
 
 void UIButton::SetCaption(const String& InText) {
@@ -17,24 +18,7 @@ void UIButton::SetCaption(const String& InText) {
     m_Label->Text = InText;
 }
 
-void UIButton::OnUIUpdate(const UIFrameContext& InContext) {
-    m_Hovered = HitTest(InContext.MousePosition);
-
-    if (m_Hovered && InContext.MousePressedThisFrame) {
-        m_Pressed = true;
-    }
-    if (InContext.MouseReleasedThisFrame) {
-        if (m_Pressed && m_Hovered && OnClick) {
-            OnClick();
-        }
-        m_Pressed = false;
-    }
-    if (!InContext.MouseDown) {
-        m_Pressed = false;
-    }
-}
-
 void UIButton::Paint(UIDrawList& OutDrawList) {
-    const Vec4 color = (m_Pressed && m_Hovered) ? PressedColor : (m_Hovered ? HoverColor : NormalColor);
+    const Vec4 color = (IsPressed() && IsHovered()) ? PressedColor : (IsHovered() ? HoverColor : NormalColor);
     OutDrawList.AddRect(m_Geometry, color, m_WorldMatrix);
 }

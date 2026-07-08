@@ -69,11 +69,18 @@ void UINode::PaintTree(UIDrawList& OutDrawList) {
         return;
     }
     Paint(OutDrawList);
+    if (ClipChildren) {
+        OutDrawList.PushClipRect(GetContentRect());
+    }
     for (uint32_t i = 0; i < GetChildCount(); i++) {
         if (UINode* child = GetChild((int)i)->As<UINode>()) {
             child->PaintTree(OutDrawList);
         }
     }
+    if (ClipChildren) {
+        OutDrawList.PopClipRect();
+    }
+    PaintOverlay(OutDrawList);
 }
 
 void UINode::UpdateTree(const UIFrameContext& InContext) {
@@ -114,16 +121,20 @@ static bool PointInQuad(const Vec2& InP, const Vec2 InCorners[4]) {
 }
 
 bool UINode::HitTest(const Vec2& InPoint) const {
-    const Vec2 mn = m_Geometry.Min();
-    const Vec2 mx = m_Geometry.Max();
-    const Vec3 local[4] = {
-        Vec3(mn.x, mn.y, 0.0f), Vec3(mn.x, mx.y, 0.0f),
-        Vec3(mx.x, mx.y, 0.0f), Vec3(mx.x, mn.y, 0.0f)
+    return HitTestRect(m_Geometry, InPoint);
+}
+
+Vec2 UINode::LocalToScreen(const Vec2& InLocalPoint) const {
+    const Vec4 world = m_WorldMatrix * Vec4(InLocalPoint, 0.0f, 1.0f);
+    return ProjectToScreen(Vec3(world.x, world.y, world.z));
+}
+
+bool UINode::HitTestRect(const UIRectF& InRect, const Vec2& InPoint) const {
+    const Vec2 mn = InRect.Min();
+    const Vec2 mx = InRect.Max();
+    const Vec2 corners[4] = {
+        LocalToScreen(Vec2(mn.x, mn.y)), LocalToScreen(Vec2(mn.x, mx.y)),
+        LocalToScreen(Vec2(mx.x, mx.y)), LocalToScreen(Vec2(mx.x, mn.y))
     };
-    Vec2 corners[4];
-    for (int i = 0; i < 4; i++) {
-        const Vec4 world = m_WorldMatrix * Vec4(local[i], 1.0f);
-        corners[i] = ProjectToScreen(Vec3(world.x, world.y, world.z));
-    }
     return PointInQuad(InPoint, corners);
 }

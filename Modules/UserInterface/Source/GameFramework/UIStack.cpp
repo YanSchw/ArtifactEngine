@@ -11,8 +11,6 @@ void UIStack::LayoutChildren(const UIRectF& InContent) {
     const float contentExtent = horizontal ? InContent.Size.x : InContent.Size.y;
     const float gap = std::max(0.0f, Gap.Resolve(contentExtent));
 
-    // Fixed pixel extents are honored as-is; fractions are flex weights over what remains
-    // after the fixed parts and gaps.
     float fixedTotal = 0.0f;
     float weightSum = 0.0f;
     for (UINode* child : children) {

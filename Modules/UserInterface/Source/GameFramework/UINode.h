@@ -1,19 +1,11 @@
 #pragma once
 #include "GameFramework/Node.h"
 #include "UILayout.h"
+#include "UIInput.h"
 #include "UINode.gen.h"
 
 class UIDrawList;
 class Font;
-
-/** Per-frame input passed down the UI tree during the interaction pass (see OnUIUpdate). */
-struct UIFrameContext {
-    Vec2 MousePosition = Vec2(0.0f);      // pixels, top-left origin
-    bool MouseDown = false;               // left button held
-    bool MousePressedThisFrame = false;   // left button pressed this frame
-    bool MouseReleasedThisFrame = false;  // left button released this frame
-    float DeltaTime = 0.0f;
-};
 
 /** Base class for all UI. A UINode is a Node with a rect transform (Anchor/Pivot/Position/Size)
  *  plus CSS-style margin/padding and optional Split (row/column) child layout. The tree is
@@ -33,7 +25,7 @@ struct UIFrameContext {
  *      node->Size = { 1.0_rel - 40.0_px, 22.0_px };   // parent width minus 40px, 22px tall
  *  Padding shrinks the rect its children live in.
  *
- *  Subclasses override Paint() to draw and OnUIUpdate() to react to input. */
+ *  Subclasses override Paint() to draw and the On* event virtuals to handle input. */
 class UINode : public Node {
 public:
     ARTIFACT_CLASS();
@@ -51,6 +43,10 @@ public:
     UIVec2 Size = Vec2(100.0f);
     /* Per-edge inset shrinking the rect children lay out in. */
     UIPadding Padding;
+    /* Takes part in input routing: hover/press/click under the cursor, focusable in Focus mode. */
+    bool Interactable = false;
+    /* Clip children (painting and hit-testing) to this node's content rect. */
+    bool ClipChildren = false;
 
     /** Create a child of type T, attach it, and return it typed. */
     template<typename T>
@@ -79,52 +75,69 @@ public:
     /** InPoint is in screen pixels; correct under rotation and perspective. */
     bool HitTest(const Vec2& InPoint) const;
 
-    /** Draw this node. */
     virtual void Paint(UIDrawList& OutDrawList);
-    /** React to input for this node. */
+    /** Per-frame tick; input arrives via the event virtuals below instead. */
     virtual void OnUIUpdate(const UIFrameContext& InContext) { (void)InContext; }
 
-    /** Declarative data binding: run every frame (before layout) to push current state into fields,
-     *  e.g. `label.Bind = [&]{ label.Text = std::to_string(count); };`. See UIBuilder.h / UIForEach / UIIf. */
+    bool IsHovered() const { return m_Hovered; }
+    bool IsPressed() const { return m_Pressed; }
+    bool IsFocused() const { return m_Focused; }
+
+    /** Input events from the canvas router (see UICanvas::InputMode). A pressed node captures the
+     *  pointer until release; OnScroll and OnNavBack bubble up until a handler returns true. */
+    virtual void OnHoverChanged(bool InHovered) { (void)InHovered; }
+    virtual void OnPressed(const Vec2& InCursorPos) { (void)InCursorPos; }
+    virtual void OnReleased(bool InInside) { (void)InInside; }
+    virtual void OnClick() { }
+    virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) { (void)InCursorPos; (void)InDelta; }
+    virtual bool OnScroll(const Vec2& InDelta) { (void)InDelta; return false; }
+    virtual void OnFocusChanged(bool InFocused) { (void)InFocused; }
+    virtual bool OnNavBack() { return false; }
+
+    /** Runs every frame before layout to push current state into fields */
     std::function<void()> Bind;
-    /** Applies this node's binding. Overridden by dynamic containers (UIForEach/UIIf) to reconcile children. */
+    /** Overridden by dynamic containers (UIForEach/UIIf) to reconcile children. */
     virtual void OnBind() { if (Bind) Bind(); }
 
-    // Font used by UILabel/UIButton when they don't specify their own. Set once at startup.
     static void SetDefaultFont(Font* InFont) { s_DefaultFont = InFont; }
     static Font* GetDefaultFont() { return s_DefaultFont; }
 
 protected:
-    // The frame passes, walked by UICanvas::RunFrame (bind -> layout -> input -> paint).
+    // Frame passes, walked by UICanvas::RunFrame (bind -> layout -> input -> paint).
     void BindTree();
     void Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorld = Mat4(1.0f));
     void PaintTree(UIDrawList& OutDrawList);
     void UpdateTree(const UIFrameContext& InContext);
 
-    // Set by UICanvas each frame so hit-testing projects exactly like the GPU does,
-    // whatever the canvas render mode.
+    // Set by UICanvas each frame so hit-testing projects exactly like the GPU.
     static void SetViewProjection(const Mat4& InProjection, float InViewportW, float InViewportH) {
         s_ViewProjection = InProjection; s_ViewportW = InViewportW; s_ViewportH = InViewportH;
     }
-    /** Project a canvas pixel-space point (post-transform, may have depth) to screen pixels. */
     static Vec2 ProjectToScreen(const Vec3& InCanvasPixelPos);
+    Vec2 LocalToScreen(const Vec2& InLocalPoint) const;
 
-    /** Lay out this node's children within the given content rect. The base hands every child
-     *  the whole rect (each positions itself via its own Anchor/Position/Size); UIStack
-     *  overrides this to arrange them into a row/column. */
+    /** Lay out children within the content rect. Base gives each child the whole rect. */
     virtual void LayoutChildren(const UIRectF& InContent);
-    /** For LayoutChildren overrides: recurse into one child with the rect it should lay out in. */
     static void LayoutChild(UINode& InChild, const UIRectF& InRect, const Mat4& InParentWorld) {
         InChild.Layout(InRect, InParentWorld);
     }
     Array<UINode*> CollectUIChildren() const;
 
+    /** Paint after all children, outside any clip. */
+    virtual void PaintOverlay(UIDrawList& OutDrawList) { (void)OutDrawList; }
+    bool HitTestRect(const UIRectF& InRect, const Vec2& InPoint) const;
+
     UIRectF ComputeGeometry(const UIRectF& InParentContentRect) const;
     UIRectF m_Geometry;
     Mat4 m_WorldMatrix = Mat4(1.0f);
+    bool m_Hovered = false;
+    bool m_Pressed = false;
+    bool m_Focused = false;
 
     inline static Font* s_DefaultFont = nullptr;
     inline static Mat4 s_ViewProjection = Mat4(1.0f);
     inline static float s_ViewportW = 1.0f;
     inline static float s_ViewportH = 1.0f;
+
+    friend class UICanvas;
 };

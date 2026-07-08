@@ -22,7 +22,11 @@
 #include "Common/UUID.h"
 
 #include "GameFramework/UICanvas.h"
+#include "GameFramework/UIImage.h"
+#include "GameFramework/UIScrollArea.h"
 #include "GameFramework/UIBuilder.h"
+#include "InputSystem/KeyboardDevice.h"
+#include "InputSystem/KeyCodes.h"
 #include "Assets/Font.h"
 #include "Rendering/UIRenderer.h"
 
@@ -82,11 +86,24 @@ void EditorEngine::BuildDemoUI() {
         v.Gap = 8.0f;
 
         UI::Label(v, [] { return "Count: " + std::to_string(s_Count); });
-        UI::Button(v, "Add", [] { s_Count++; });
+        UI::Button(v, "Add", [] { s_Count++; }).Fill();
+
+        // Radial progress: sweeps a full circle as the count approaches 10.
+        UIImage* progress = v.Add<UIImage>();
+        progress->Size = Vec2(32.0f, 32.0f);
+        progress->FillMethod = UIImageFill::Radial;
+        progress->Tint = Vec4(0.30f, 0.75f, 0.40f, 1.0f);
+        progress->Bind = [progress] { progress->FillAmount = (float)(s_Count % 10) / 10.0f; };
+
         UI::If(v, [] { return s_Count > 3; }, [](UINode& c) {
             UI::Label(c, [] { return String("Big! (> 3)"); });
         });
-        UI::ForEach(v, [] { return s_Count; }, [](UINode& item, int i) {
+
+        // Scrollable list: fixed 24px rows overflow the area and clip; wheel scrolls it.
+        UIScrollArea* scroll = v.Add<UIScrollArea>();
+        scroll->Fill();
+        UI::ForEach(*scroll, [] { return s_Count; }, [](UINode& item, int i) {
+            item.Size = { 1.0_rel, 24.0_px };
             UI::Label(item, [i] { return "Item " + std::to_string(i); });
         });
     });
@@ -115,10 +132,20 @@ bool EditorEngine::MainTick(double InDeltaTime) {
         UIFrameContext uiContext;
         uiContext.DeltaTime = (float)InDeltaTime;
         if (MouseDevice* mouse = MouseDevice::Instance()) {
-            uiContext.MousePosition = mouse->GetPosition();
-            uiContext.MouseDown = mouse->IsPressed(MouseCode::Left);
-            uiContext.MousePressedThisFrame = mouse->IsDown(MouseCode::Left);
-            uiContext.MouseReleasedThisFrame = mouse->IsUp(MouseCode::Left);
+            uiContext.CursorPosition = mouse->GetPosition();
+            uiContext.CursorDown = mouse->IsPressed(MouseCode::Left);
+            uiContext.CursorPressedThisFrame = mouse->IsDown(MouseCode::Left);
+            uiContext.CursorReleasedThisFrame = mouse->IsUp(MouseCode::Left);
+            uiContext.ScrollDelta = mouse->GetScrollDelta();
+        }
+        if (KeyboardDevice* keyboard = KeyboardDevice::Instance()) {
+            uiContext.NavUp = keyboard->IsDown(KeyCode::Up);
+            uiContext.NavDown = keyboard->IsDown(KeyCode::Down);
+            uiContext.NavLeft = keyboard->IsDown(KeyCode::Left);
+            uiContext.NavRight = keyboard->IsDown(KeyCode::Right);
+            uiContext.NavSelectPressed = keyboard->IsDown(KeyCode::Enter);
+            uiContext.NavSelectReleased = keyboard->IsUp(KeyCode::Enter);
+            uiContext.NavBack = keyboard->IsDown(KeyCode::Escape);
         }
         const Vec2 surfaceSize = Vec2((float)s_Window->GetWidth(), (float)s_Window->GetHeight());
         m_UIRenderer->Render(s_Window.Get(), m_UICanvas, surfaceSize, uiContext);

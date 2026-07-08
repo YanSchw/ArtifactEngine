@@ -4,31 +4,32 @@
 #include "GameFramework/UILayout.h"
 
 class Font;
+class Texture;
 
-/** Accumulates a frame of UI geometry into a single vertex/index buffer, split into ordered
- *  *batches* (runs of the same kind) so draw order follows the paint (tree) order — a later node
- *  renders in front of an earlier one, even when solids and text interleave. Solid runs draw with
- *  the solid pipeline, Text runs with the SDF-text pipeline; both share this one buffer.
- *
- *  Geometry is added in pixels; the world transform maps it into world pixel space and the GPU does
- *  the perspective projection. Widgets fill this via their Paint() override. */
+/** Accumulates a frame of UI geometry into one vertex/index buffer, split into ordered batches
+ *  so draw order follows paint order. */
 class UIDrawList {
 public:
-    enum class BatchKind : uint8_t { Solid, Text };
+    enum class BatchKind : uint8_t { Solid, Text, Image };
 
     struct Batch {
         BatchKind Kind;
         uint32_t FirstIndex;
         uint32_t IndexCount;
+        Texture* Tex;  // Image batches only; the painting node keeps it alive over the frame
     };
 
     UIDrawList() = default;
 
-    // InTransform maps local pixel geometry into world pixel space (z=0 plane; tilts add depth).
     void AddRect(const UIRectF& InRectPx, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f));
     void AddGlyphQuad(const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f));
-    /** Lay out and append a run of text; InTopLeftPx is the top-left of the text box. */
     void AddText(Font* InFont, const String& InText, const Vec2& InTopLeftPx, float InPixelHeight, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f));
+    /** Null texture falls back to a solid rect. */
+    void AddImageRect(const UIRectF& InRectPx, const Vec4& InColor, Texture* InTexture, const Mat4& InTransform = Mat4(1.0f), const Vec2& InUvMin = Vec2(0.0f), const Vec2& InUvMax = Vec2(1.0f));
+    void AddImageTriangle(const Vec2 InPoints[3], const Vec2 InUvs[3], const Vec4& InColor, Texture* InTexture, const Mat4& InTransform = Mat4(1.0f));
+
+    void PushClipRect(const UIRectF& InRectPx);
+    void PopClipRect();
 
     const Array<Vertex>& GetVertices() const { return m_Vertices; }
     const Array<uint32_t>& GetIndices() const { return m_Indices; }
@@ -36,10 +37,12 @@ public:
     bool IsEmpty() const { return m_Indices.IsEmpty(); }
 
 private:
-    // Appends a quad, extending the current batch if its kind matches or starting a new one.
-    void AppendQuad(BatchKind InKind, const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform);
+    void AppendQuad(BatchKind InKind, const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform, Texture* InTexture);
+    Vertex MakeVertex(const Vec2& InPos, const Vec2& InUv, const Vec3& InColor, const Mat4& InTransform) const;
+    void ExtendBatch(BatchKind InKind, Texture* InTexture, uint32_t InFirstIndex, uint32_t InIndexCount);
 
     Array<Vertex> m_Vertices;
     Array<uint32_t> m_Indices;
     Array<Batch> m_Batches;
+    Array<UIRectF> m_ClipStack;
 };

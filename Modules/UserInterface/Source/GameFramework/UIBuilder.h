@@ -37,7 +37,7 @@ inline UILabel& Label(UINode& InParent, std::function<String()> InText) {
 inline UIButton& Button(UINode& InParent, const String& InCaption, std::function<void()> InOnClick) {
     UIButton* button = InParent.Add<UIButton>();
     button->SetCaption(InCaption);
-    button->OnClick = std::move(InOnClick);
+    button->Clicked = std::move(InOnClick);
     return *button;
 }
 

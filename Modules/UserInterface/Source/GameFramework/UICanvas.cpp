@@ -70,7 +70,216 @@ Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InCont
 
     BindTree();
     Layout(ComputeCanvasRect(InViewportSize));
+    RouteInput(InContext);
     UpdateTree(InContext);
     PaintTree(OutDrawList);
     return projection;
+}
+
+void UICanvas::SetFocus(UINode* InNode) {
+    UINode* previous = m_FocusedNode.Get();
+    if (previous == InNode) {
+        return;
+    }
+    if (previous) {
+        previous->m_Focused = false;
+        previous->OnFocusChanged(false);
+    }
+    m_FocusedNode = InNode;
+    if (InNode) {
+        InNode->m_Focused = true;
+        InNode->OnFocusChanged(true);
+    }
+}
+
+void UICanvas::SetHovered(UINode* InNode) {
+    UINode* previous = m_HoveredNode.Get();
+    if (previous == InNode) {
+        return;
+    }
+    if (previous) {
+        previous->m_Hovered = false;
+        previous->OnHoverChanged(false);
+    }
+    m_HoveredNode = InNode;
+    if (InNode) {
+        InNode->m_Hovered = true;
+        InNode->OnHoverChanged(true);
+    }
+}
+
+UINode* UICanvas::HitTestTopmost(UINode* InNode, const Vec2& InPoint, bool InInteractableOnly) {
+    if (!InNode->IsEnabled()) {
+        return nullptr;
+    }
+    // Later-painted children are on top, so search children (reverse) before self.
+    if (!InNode->ClipChildren || InNode->HitTestRect(InNode->GetContentRect(), InPoint)) {
+        for (int i = (int)InNode->GetChildCount() - 1; i >= 0; i--) {
+            if (UINode* child = InNode->GetChild(i)->As<UINode>()) {
+                if (UINode* hit = HitTestTopmost(child, InPoint, InInteractableOnly)) {
+                    return hit;
+                }
+            }
+        }
+    }
+    if ((!InInteractableOnly || InNode->Interactable) && InNode->HitTest(InPoint)) {
+        return InNode;
+    }
+    return nullptr;
+}
+
+void UICanvas::RouteInput(const UIFrameContext& InContext) {
+    if (InputMode == UIInputMode::Cursor) {
+        RouteCursor(InContext);
+    } else {
+        RouteFocus(InContext);
+    }
+}
+
+void UICanvas::RouteCursor(const UIFrameContext& InContext) {
+    const Vec2 cursor = InContext.CursorPosition;
+    UINode* hit = HitTestTopmost(this, cursor, true);
+
+    // A captured node keeps hover even when the cursor leaves it.
+    SetHovered(m_CapturedNode.Get() ? m_CapturedNode.Get() : hit);
+
+    if (InContext.CursorPressedThisFrame && hit) {
+        m_CapturedNode = hit;
+        SetFocus(hit);
+        hit->m_Pressed = true;
+        hit->OnPressed(cursor);
+    }
+
+    if (UINode* captured = m_CapturedNode.Get()) {
+        if (cursor != m_LastCursor) {
+            captured->OnDrag(cursor, cursor - m_LastCursor);
+        }
+        if (InContext.CursorReleasedThisFrame) {
+            const bool inside = captured->HitTest(cursor);
+            captured->m_Pressed = false;
+            captured->OnReleased(inside);
+            if (inside) {
+                captured->OnClick();
+            }
+            m_CapturedNode = nullptr;
+        }
+    }
+
+    if (InContext.ScrollDelta != Vec2(0.0f)) {
+        // Bubble up from the innermost node under the cursor until one consumes it.
+        for (Node* node = HitTestTopmost(this, cursor, false); node; node = node->GetParent()) {
+            UINode* uiNode = node->As<UINode>();
+            if (uiNode && uiNode->OnScroll(InContext.ScrollDelta)) {
+                break;
+            }
+        }
+    }
+
+    m_LastCursor = cursor;
+}
+
+// All enabled interactable nodes below InNode, skipping subtrees hidden by a clipping ancestor.
+static void CollectFocusable(UINode* InNode, const UIRectF* InClip, Array<UINode*>& OutNodes) {
+    if (!InNode->IsEnabled()) {
+        return;
+    }
+    const UIRectF& geometry = InNode->GetGeometry();
+    const bool visible = !InClip
+        || (geometry.Max().x > InClip->Min().x && geometry.Min().x < InClip->Max().x
+         && geometry.Max().y > InClip->Min().y && geometry.Min().y < InClip->Max().y);
+    if (visible && InNode->Interactable) {
+        OutNodes.Add(InNode);
+    }
+    UIRectF clipStorage;
+    const UIRectF* childClip = InClip;
+    if (InNode->ClipChildren) {
+        clipStorage = InNode->GetContentRect();  // nested clips are not intersected here
+        childClip = &clipStorage;
+    }
+    for (uint32_t i = 0; i < InNode->GetChildCount(); i++) {
+        if (UINode* child = InNode->GetChild((int)i)->As<UINode>()) {
+            CollectFocusable(child, childClip, OutNodes);
+        }
+    }
+}
+
+UINode* UICanvas::FindNavTarget(UINode* InFrom, UINavDirection InDirection) const {
+    Array<UINode*> candidates;
+    CollectFocusable(const_cast<UICanvas*>(this), nullptr, candidates);
+    if (candidates.IsEmpty()) {
+        return nullptr;
+    }
+    if (!InFrom) {
+        return candidates[0];
+    }
+
+    static const Vec2 s_Directions[4] = { Vec2(0, -1), Vec2(0, 1), Vec2(-1, 0), Vec2(1, 0) };
+    const Vec2 direction = s_Directions[(int)InDirection];
+    const Vec2 from = InFrom->GetGeometry().Center();
+
+    // Nearest candidate ahead in the nav direction, penalizing sideways offset.
+    UINode* best = nullptr;
+    float bestScore = 0.0f;
+    for (UINode* candidate : candidates) {
+        if (candidate == InFrom) {
+            continue;
+        }
+        const Vec2 delta = candidate->GetGeometry().Center() - from;
+        const float ahead = delta.x * direction.x + delta.y * direction.y;
+        if (ahead <= 0.001f) {
+            continue;
+        }
+        const Vec2 side = delta - direction * ahead;
+        const float score = ahead + 2.0f * std::abs(side.x + side.y);
+        if (!best || score < bestScore) {
+            best = candidate;
+            bestScore = score;
+        }
+    }
+    return best;
+}
+
+void UICanvas::RouteFocus(const UIFrameContext& InContext) {
+    UINode* focused = m_FocusedNode.Get();
+
+    const bool navPressed = InContext.NavUp || InContext.NavDown || InContext.NavLeft || InContext.NavRight;
+    if (!focused && (navPressed || InContext.NavSelectPressed)) {
+        SetFocus(FindNavTarget(nullptr, UINavDirection::Down));
+        focused = m_FocusedNode.Get();
+        SetHovered(focused);
+        return;  // first input just establishes focus
+    }
+
+    if (navPressed) {
+        UINavDirection direction = UINavDirection::Down;
+        if (InContext.NavUp) direction = UINavDirection::Up;
+        else if (InContext.NavLeft) direction = UINavDirection::Left;
+        else if (InContext.NavRight) direction = UINavDirection::Right;
+        if (UINode* target = FindNavTarget(focused, direction)) {
+            SetFocus(target);
+            focused = target;
+        }
+    }
+
+    SetHovered(focused);
+
+    if (focused) {
+        if (InContext.NavSelectPressed) {
+            focused->m_Pressed = true;
+            focused->OnPressed(focused->GetGeometry().Center());  // no pointer in Focus mode
+        }
+        if (InContext.NavSelectReleased && focused->IsPressed()) {
+            focused->m_Pressed = false;
+            focused->OnReleased(true);
+            focused->OnClick();
+        }
+        if (InContext.NavBack) {
+            for (Node* node = focused; node; node = node->GetParent()) {
+                UINode* uiNode = node->As<UINode>();
+                if (uiNode && uiNode->OnNavBack()) {
+                    break;
+                }
+            }
+        }
+    }
 }
