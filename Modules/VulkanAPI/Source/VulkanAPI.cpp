@@ -3,6 +3,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <cstring>
 #include <algorithm>
 #include <chrono>
 #include <functional>
@@ -931,7 +932,7 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
 
                     for (size_t i = 0; i < framebuffer->GetColorAttachmentCount(); i++) {
                         VulkanHelpers::TransitionImage(InCmdBuffer,
-                            framebuffer->GetDesc().ColorAttachments[i]->GetDesc().Image->As<VulkanImage>()->GetVkImage(),
+                            framebuffer->GetDesc().ColorAttachments[i]->GetDesc().ImagePtr->As<VulkanImage>()->GetVkImage(),
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT);
@@ -939,7 +940,7 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
 
                     if (depthAttachmentInfo.imageView) {
                         VulkanHelpers::TransitionImage(InCmdBuffer,
-                            framebuffer->GetDesc().DepthAttachment->GetDesc().Image->As<VulkanImage>()->GetVkImage(),
+                            framebuffer->GetDesc().DepthAttachment->GetDesc().ImagePtr->As<VulkanImage>()->GetVkImage(),
                             VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_ASPECT_DEPTH_BIT);

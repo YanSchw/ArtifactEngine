@@ -3,6 +3,8 @@
 
 #include "Serialization/ThirdParty/stb_image/stb_image.h"
 
+#include <cstring>
+
 static Array<VulkanTexture*> s_Textures;
 
 VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InTextureDesc, VulkanAPI& InVulkanAPI) {
@@ -23,7 +25,7 @@ VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InText
         m_Image = SharedObjectPtr<Image>(new VulkanImage(imageDesc, *m_VulkanAPI));
 
         ImageViewDesc viewDesc;
-        viewDesc.Image = m_Image;
+        viewDesc.ImagePtr = m_Image;
         viewDesc.Format = ImageFormat::RGBA8;
         viewDesc.Aspect = ImageAspect::Color;
 
@@ -125,7 +127,7 @@ VulkanTexture::VulkanTexture(const String& InFilePath, const TextureDesc& InText
 
     // Create image view
     ImageViewDesc viewDesc;
-    viewDesc.Image = m_Image;
+    viewDesc.ImagePtr = m_Image;
     viewDesc.Format = ImageFormat::RGBA8;
     viewDesc.Aspect = ImageAspect::Color;
 
@@ -147,7 +149,7 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
         m_Image = SharedObjectPtr<Image>(new VulkanImage(imageDesc, *m_VulkanAPI));
 
         ImageViewDesc viewDesc;
-        viewDesc.Image = m_Image;
+        viewDesc.ImagePtr = m_Image;
         viewDesc.Format = ImageFormat::RGBA8;
         viewDesc.Aspect = ImageAspect::Color;
 
@@ -244,7 +246,7 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
 
     // Create image view
     ImageViewDesc viewDesc;
-    viewDesc.Image = m_Image;
+    viewDesc.ImagePtr = m_Image;
     viewDesc.Format = ImageFormat::RGBA8;
     viewDesc.Aspect = ImageAspect::Color;
 

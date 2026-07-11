@@ -1,6 +1,8 @@
 #include "Buffer.h"
 #include "RenderingAPI.h"
 
+#include <cstring>
+
 SharedObjectPtr<UniformBuffer> UniformBuffer::Create(uint32_t InBinding, size_t InSize) {
     AE_ASSERT(RenderingAPI::GetInstance(), "No rendering API instance found!");
     return RenderingAPI::GetInstance()->CreateUniformBuffer(InBinding, InSize);

@@ -67,7 +67,7 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     imageDesc.Usage = ImageUsage::ColorAttachment | ImageUsage::Sampled;
     auto image = Image::Create(imageDesc);
     ImageViewDesc imageViewDesc;
-    imageViewDesc.Image = image;
+    imageViewDesc.ImagePtr = image;
     imageViewDesc.Format = ImageFormat::RGBA8;
     auto imageView = ImageView::Create(imageViewDesc);
 
@@ -79,7 +79,7 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     auto depthImage = Image::Create(depthImageDesc);
 
     ImageViewDesc depthImageViewDesc;
-    depthImageViewDesc.Image = depthImage;
+    depthImageViewDesc.ImagePtr = depthImage;
     depthImageViewDesc.Format = ImageFormat::Depth32F;
     auto depthImageView = ImageView::Create(depthImageViewDesc);
 

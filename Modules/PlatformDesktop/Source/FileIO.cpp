@@ -1,6 +1,7 @@
 #include "Platform/FileIO.h"
 #include <fstream>
 #include <vector>
+#include <cstring>
 
 String FileIO::ReadFileToString(const String& InFilePath) {
     std::ifstream file(InFilePath, std::ios::in | std::ios::binary);

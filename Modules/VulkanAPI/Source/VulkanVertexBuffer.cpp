@@ -1,5 +1,7 @@
 #include "VulkanVertexBuffer.h"
 
+#include <cstring>
+
 extern VkBool32 GetMemoryType(uint32_t typeBits, VkFlags properties, uint32_t* typeIndex);
 
 static Array<VulkanVertexBuffer*> s_VertexBuffers;

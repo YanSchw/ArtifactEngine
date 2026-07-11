@@ -127,7 +127,10 @@ if (WIN32)
 endif()
 
 """)
-        
+        f.write("if (UNIX AND NOT APPLE)\n")
+        f.write('    target_link_libraries(Artifact PUBLIC "-Wl,--start-group")\n')
+        f.write("endif()\n\n")
+
         for module_name, module_dir, module, owning_root in modules:
             with smart_open(f"{module_dir}/CMakeLists.txt") as mf:
                 cpp_src = 'file(GLOB_RECURSE cpp_src "*.cpp")' if module.SourceDirectories is None else f'file(GLOB_RECURSE cpp_src {" ".join(module.get_source_files_pattern())})'
@@ -138,6 +141,8 @@ add_library({module_name} ${{cpp_src}} {owning_root}/Build/Intermediate/Modules/
                 for include_dir in module.IncludePaths:
                     mf.write(f"target_include_directories({module_name} PUBLIC {include_dir})\n")
                 for import_module_name in sorted(expand_indirect_module_dependencies(module_dirs, module.ImportModules)):
+                    if import_module_name == module_name:
+                        continue
                     import_module_dir = module_dirs.get(import_module_name)
                     if import_module_dir is None:
                         continue
@@ -146,6 +151,9 @@ add_library({module_name} ${{cpp_src}} {owning_root}/Build/Intermediate/Modules/
                         mf.write(f"target_include_directories({module_name} PUBLIC {import_module_dir}/{include_dir})\n")
                     for include_dir in import_module.IncludePaths:
                         mf.write(f"target_include_directories({module_name} PUBLIC {import_module_dir}/{include_dir})\n")
+                    # Declaring the link dependency lets CMake compute correct
+                    # static-library link order/repetition, instead of relying on alphabetical add_subdirectory order.
+                    mf.write(f"target_link_libraries({module_name} PUBLIC {import_module_name})\n")
                 for additional_project in module.AddAdditionalCMakeProjects:
                     mf.write(f"add_subdirectory({additional_project})\n")
 
@@ -168,6 +176,10 @@ endif()
             else:
                 f.write(f"add_subdirectory({module_dir} {project_path}/Build/Intermediate/ModuleBuild/{module_name})\n")
             f.write(f"target_link_libraries(Artifact PUBLIC {module_name})\n")
+
+        f.write("\nif (UNIX AND NOT APPLE)\n")
+        f.write('    target_link_libraries(Artifact PUBLIC "-Wl,--end-group")\n')
+        f.write("endif()\n")
 
     __LinkModules += "}\n"
 

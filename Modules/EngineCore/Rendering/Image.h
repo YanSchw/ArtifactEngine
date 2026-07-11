@@ -72,7 +72,7 @@ protected:
 };
 
 struct ImageViewDesc {
-    SharedObjectPtr<Image> Image;
+    SharedObjectPtr<Image> ImagePtr;
 
     ImageViewType ViewType = ImageViewType::Type2D;
     ImageFormat Format = ImageFormat::RGBA8;

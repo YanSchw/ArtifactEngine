@@ -1,6 +1,8 @@
 #include "Shader.h"
 #include "RenderingAPI.h"
 
+#include <cstring>
+
 SharedObjectPtr<Shader> Shader::Create(const String& InShaderSource) {
     AE_ASSERT(RenderingAPI::GetInstance(), "No rendering API instance found!");
     return RenderingAPI::GetInstance()->CreateShader(InShaderSource);

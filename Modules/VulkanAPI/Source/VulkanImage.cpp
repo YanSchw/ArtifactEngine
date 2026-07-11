@@ -84,7 +84,7 @@ VulkanImageView::VulkanImageView(const ImageViewDesc& InImageViewDesc, VulkanAPI
 
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = static_cast<VulkanImage*>(InImageViewDesc.Image.Get())->GetVkImage();
+    viewInfo.image = static_cast<VulkanImage*>(InImageViewDesc.ImagePtr.Get())->GetVkImage();
     viewInfo.viewType = ImageViewTypeToVkImageViewType(InImageViewDesc.ViewType);
     viewInfo.format = VulkanHelpers::ImageFormatToVkFormat(InImageViewDesc.Format);
     viewInfo.subresourceRange.aspectMask = ImageAspectToVkImageAspect(InImageViewDesc.Aspect);
