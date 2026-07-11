@@ -254,7 +254,15 @@ void VulkanPipeline::CreateVertexDescriptions() {
     size_t offset = 0;
     for (size_t i = 0; i < m_Desc.VertexLayout.Size(); i++) {
         ShaderDataType type = m_Desc.VertexLayout[i];
-        if (type == ShaderDataType::Float3) {
+        if (type == ShaderDataType::Float4) {
+            VkVertexInputAttributeDescription attributeDescription = {};
+            attributeDescription.binding = 0;
+            attributeDescription.location = (uint32_t)i;
+            attributeDescription.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            attributeDescription.offset = offset;
+            m_VertexAttributeDescriptions.push_back(attributeDescription);
+            offset += sizeof(float) * 4;
+        } else if (type == ShaderDataType::Float3) {
             VkVertexInputAttributeDescription attributeDescription = {};
             attributeDescription.binding = 0;
             attributeDescription.location = (uint32_t)i;

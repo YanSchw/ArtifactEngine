@@ -2,18 +2,17 @@
 #version 450
 
 layout(location = 0) in vec3 a_Position;
-layout(location = 1) in vec3 a_Color;
+layout(location = 1) in vec4 a_Color;
 layout(location = 2) in vec2 a_UV;
 
 layout(location = 1) out vec4 v_Color;
 layout(location = 2) out vec2 v_UV;
 
-// Projects canvas pixel-space to clip space (see UICanvas::BuildProjection).
 layout(binding = 0) uniform UIProjection { mat4 u_Projection; };
 
 void main() {
     gl_Position = u_Projection * vec4(a_Position, 1.0);
-    v_Color = vec4(a_Color, 1.0);
+    v_Color = a_Color;
     v_UV = a_UV;
 }
 
@@ -27,6 +26,5 @@ layout(location = 2) in vec2 v_UV;
 layout(binding = 16) uniform sampler2D u_Texture;
 
 void main() {
-    vec4 tex = texture(u_Texture, v_UV);
-    outColor = vec4(tex.rgb * v_Color.rgb, tex.a);
+    outColor = texture(u_Texture, v_UV) * v_Color;
 }

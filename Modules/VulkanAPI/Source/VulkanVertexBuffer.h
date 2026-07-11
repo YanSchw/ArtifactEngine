@@ -10,7 +10,7 @@ class VulkanVertexBuffer : public VertexBuffer {
 public:
     ARTIFACT_CLASS();
 
-    VulkanVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices, VulkanAPI& InVulkanAPI);
+    VulkanVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices, VulkanAPI& InVulkanAPI);
     virtual ~VulkanVertexBuffer();
     virtual uint32_t GetIndexCount() const override;
 

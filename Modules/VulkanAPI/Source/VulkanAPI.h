@@ -43,7 +43,7 @@ public:
     uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     virtual class RenderCommandQueue& GetRenderQueue() override;
-    virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) override;
+    virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices) override;
     virtual SharedObjectPtr<class Shader> CreateShader(const String& InShaderSource) override;
     virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) override;
     virtual void InvalidateAllPipelines() override;

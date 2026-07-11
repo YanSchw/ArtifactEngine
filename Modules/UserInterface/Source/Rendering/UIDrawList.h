@@ -1,6 +1,6 @@
 #pragma once
 #include "Common/Types.h"
-#include "Rendering/Vertex.h"
+#include "UIVertex.h"
 #include "GameFramework/UILayout.h"
 
 class Font;
@@ -31,17 +31,17 @@ public:
     void PushClipRect(const UIRectF& InRectPx);
     void PopClipRect();
 
-    const Array<Vertex>& GetVertices() const { return m_Vertices; }
+    const Array<UIVertex>& GetVertices() const { return m_Vertices; }
     const Array<uint32_t>& GetIndices() const { return m_Indices; }
     const Array<Batch>& GetBatches() const { return m_Batches; }
     bool IsEmpty() const { return m_Indices.IsEmpty(); }
 
 private:
     void AppendQuad(BatchKind InKind, const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform, Texture* InTexture);
-    Vertex MakeVertex(const Vec2& InPos, const Vec2& InUv, const Vec3& InColor, const Mat4& InTransform) const;
+    UIVertex MakeVertex(const Vec2& InPos, const Vec2& InUv, const Vec4& InColor, const Mat4& InTransform) const;
     void ExtendBatch(BatchKind InKind, Texture* InTexture, uint32_t InFirstIndex, uint32_t InIndexCount);
 
-    Array<Vertex> m_Vertices;
+    Array<UIVertex> m_Vertices;
     Array<uint32_t> m_Indices;
     Array<Batch> m_Batches;
     Array<UIRectF> m_ClipStack;

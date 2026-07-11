@@ -1060,9 +1060,9 @@ RenderCommandQueue& VulkanAPI::GetRenderQueue() {
     return m_RenderQueue;
 }
 
-SharedObjectPtr<VertexBuffer> VulkanAPI::CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) {
+SharedObjectPtr<VertexBuffer> VulkanAPI::CreateVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices) {
     Window::GetInstance()->SetResizedFlag(true);
-    return new VulkanVertexBuffer(InVertices, InIndices, *this);
+    return new VulkanVertexBuffer(InVertexData, InVertexByteSize, InIndices, *this);
 }
 
 SharedObjectPtr<Shader> VulkanAPI::CreateShader(const String& InShaderSource) {

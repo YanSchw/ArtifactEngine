@@ -4,9 +4,9 @@ extern VkBool32 GetMemoryType(uint32_t typeBits, VkFlags properties, uint32_t* t
 
 static Array<VulkanVertexBuffer*> s_VertexBuffers;
 
-VulkanVertexBuffer::VulkanVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices, VulkanAPI& InVulkanAPI) {
+VulkanVertexBuffer::VulkanVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices, VulkanAPI& InVulkanAPI) {
     s_VertexBuffers.Add(this);
-    uint32_t verticesSize = (uint32_t)(InVertices.Size() * sizeof(InVertices[0]));
+    uint32_t verticesSize = InVertexByteSize;
     uint32_t indicesSize = (uint32_t)(InIndices.Size() * sizeof(InIndices[0]));
     m_IndexCount = (uint32_t)InIndices.Size();
 
@@ -49,7 +49,7 @@ VulkanVertexBuffer::VulkanVertexBuffer(const Array<Vertex>& InVertices, const Ar
     vkAllocateMemory(InVulkanAPI.GetDevice(), &memAlloc, nullptr, &stagingBuffers.vertices.memory);
 
     vkMapMemory(InVulkanAPI.GetDevice(), stagingBuffers.vertices.memory, 0, verticesSize, 0, &data);
-    memcpy(data, &InVertices[0], verticesSize);
+    memcpy(data, InVertexData, verticesSize);
     vkUnmapMemory(InVulkanAPI.GetDevice(), stagingBuffers.vertices.memory);
     vkBindBufferMemory(InVulkanAPI.GetDevice(), stagingBuffers.vertices.buffer, stagingBuffers.vertices.memory, 0);
 

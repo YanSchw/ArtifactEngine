@@ -2,9 +2,9 @@
 #include "Assets/Font.h"
 #include <algorithm>
 
-Vertex UIDrawList::MakeVertex(const Vec2& InPos, const Vec2& InUv, const Vec3& InColor, const Mat4& InTransform) const {
+UIVertex UIDrawList::MakeVertex(const Vec2& InPos, const Vec2& InUv, const Vec4& InColor, const Mat4& InTransform) const {
     const Vec4 p = InTransform * Vec4(InPos.x, InPos.y, 0.0f, 1.0f);
-    Vertex v;
+    UIVertex v;
     v.Position = Vec3(p.x, p.y, p.z);
     v.Color = InColor;
     v.TexCoord = InUv;
@@ -45,14 +45,13 @@ void UIDrawList::AppendQuad(BatchKind InKind, const UIRectF& InRectPx, const Vec
         mx = cmx;
     }
 
-    const Vec3 color = Vec3(InColor.r, InColor.g, InColor.b);
     const uint32_t base = (uint32_t)m_Vertices.Size();
 
     // Winding must match the fullscreen quad (TL, BL, BR, TR) or backface culling drops it.
-    m_Vertices.Add(MakeVertex(Vec2(mn.x, mn.y), Vec2(uvMin.x, uvMin.y), color, InTransform));
-    m_Vertices.Add(MakeVertex(Vec2(mn.x, mx.y), Vec2(uvMin.x, uvMax.y), color, InTransform));
-    m_Vertices.Add(MakeVertex(Vec2(mx.x, mx.y), Vec2(uvMax.x, uvMax.y), color, InTransform));
-    m_Vertices.Add(MakeVertex(Vec2(mx.x, mn.y), Vec2(uvMax.x, uvMin.y), color, InTransform));
+    m_Vertices.Add(MakeVertex(Vec2(mn.x, mn.y), Vec2(uvMin.x, uvMin.y), InColor, InTransform));
+    m_Vertices.Add(MakeVertex(Vec2(mn.x, mx.y), Vec2(uvMin.x, uvMax.y), InColor, InTransform));
+    m_Vertices.Add(MakeVertex(Vec2(mx.x, mx.y), Vec2(uvMax.x, uvMax.y), InColor, InTransform));
+    m_Vertices.Add(MakeVertex(Vec2(mx.x, mn.y), Vec2(uvMax.x, uvMin.y), InColor, InTransform));
 
     const uint32_t firstIndex = (uint32_t)m_Indices.Size();
     m_Indices.Add(base + 0); m_Indices.Add(base + 1); m_Indices.Add(base + 2);
@@ -90,10 +89,9 @@ void UIDrawList::AddImageTriangle(const Vec2 InPoints[3], const Vec2 InUvs[3], c
         }
     }
 
-    const Vec3 color = Vec3(InColor.r, InColor.g, InColor.b);
     const uint32_t base = (uint32_t)m_Vertices.Size();
     for (int i = 0; i < 3; i++) {
-        m_Vertices.Add(MakeVertex(InPoints[i], InUvs[i], color, InTransform));
+        m_Vertices.Add(MakeVertex(InPoints[i], InUvs[i], InColor, InTransform));
     }
     const uint32_t firstIndex = (uint32_t)m_Indices.Size();
     m_Indices.Add(base + 0); m_Indices.Add(base + 1); m_Indices.Add(base + 2);

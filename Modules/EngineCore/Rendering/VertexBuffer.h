@@ -15,4 +15,5 @@ public:
     void Draw(uint32_t InIndexCount, uint32_t InFirstIndex);
 
     static SharedObjectPtr<VertexBuffer> Create(const Array<struct Vertex>& InVertices, const Array<uint32_t>& InIndices);
+    static SharedObjectPtr<VertexBuffer> Create(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices);
 };

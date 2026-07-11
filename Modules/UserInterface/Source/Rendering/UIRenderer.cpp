@@ -44,6 +44,7 @@ void UIRenderer::CreatePipelines(Surface* InTarget) {
     PipelineDesc solidDesc;
     solidDesc.Target = (Object*)InTarget;
     solidDesc.Shader = m_SolidShader;
+    solidDesc.VertexLayout = UIVertex::GetLayout();
     solidDesc.EnableBlending = true;
     solidDesc.EnableDepthTest = false;
     solidDesc.Buffers.Add(m_ProjectionBuffer);
@@ -56,6 +57,7 @@ void UIRenderer::CreatePipelines(Surface* InTarget) {
         PipelineDesc textDesc;
         textDesc.Target = (Object*)InTarget;
         textDesc.Shader = m_TextShader;
+        textDesc.VertexLayout = UIVertex::GetLayout();
         textDesc.EnableBlending = true;
         textDesc.EnableDepthTest = false;
         textDesc.Buffers.Add(m_ProjectionBuffer);
@@ -98,7 +100,7 @@ void UIRenderer::Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InVie
     }
 
     // One shared buffer; draw each batch in paint (tree) order so later nodes layer in front.
-    m_VertexBuffer = VertexBuffer::Create(drawList.GetVertices(), drawList.GetIndices());
+    m_VertexBuffer = VertexBuffer::Create(&drawList.GetVertices()[0], (uint32_t)(drawList.GetVertices().Size() * sizeof(UIVertex)), drawList.GetIndices());
     for (const UIDrawList::Batch& batch : drawList.GetBatches()) {
         if (batch.Kind == UIDrawList::BatchKind::Text) {
             if (!m_TextPipelineReady) {
@@ -128,6 +130,7 @@ Pipeline* UIRenderer::GetImagePipeline(Texture* InTexture) {
     PipelineDesc imageDesc;
     imageDesc.Target = (Object*)m_CachedTarget;
     imageDesc.Shader = m_ImageShader;
+    imageDesc.VertexLayout = UIVertex::GetLayout();
     imageDesc.EnableBlending = true;
     imageDesc.EnableDepthTest = false;
     imageDesc.Buffers.Add(m_ProjectionBuffer);

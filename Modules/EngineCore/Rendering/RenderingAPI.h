@@ -18,7 +18,7 @@ public:
     virtual void CleanUp(bool InShouldDestroy) = 0;
 
     virtual class RenderCommandQueue& GetRenderQueue() = 0;
-    virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) = 0;
+    virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices) = 0;
     virtual SharedObjectPtr<class Shader> CreateShader(const String& InShaderSource) = 0;
     virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) = 0;
     virtual void InvalidateAllPipelines() = 0;
