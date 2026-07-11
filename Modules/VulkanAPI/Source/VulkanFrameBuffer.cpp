@@ -24,7 +24,7 @@ std::vector<VkRenderingAttachmentInfo> VulkanFrameBuffer::GetColorAttachmentInfo
         attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         attachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachmentInfo.clearValue.color = { 0.1f, 0.1f, 0.1f, 1.0f };
+        attachmentInfo.clearValue.color = { m_Desc.ClearColor.r, m_Desc.ClearColor.g, m_Desc.ClearColor.b, m_Desc.ClearColor.a };
         attachmentInfos.push_back(attachmentInfo);
     }
     return attachmentInfos;

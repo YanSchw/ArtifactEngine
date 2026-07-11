@@ -1161,6 +1161,81 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             break;
         }
 
+        case WM_NCCALCSIZE:
+        {
+            // Client-drawn title bar: reclaim the caption area while keeping
+            // the resize frame, snapping and animations of WS_CAPTION
+            if (window->decorated && !window->titlebar && wParam == TRUE)
+            {
+                NCCALCSIZE_PARAMS* params = (NCCALCSIZE_PARAMS*) lParam;
+                const LONG top = params->rgrc[0].top;
+                const LRESULT result = DefWindowProcW(hWnd, uMsg, wParam, lParam);
+                if (result != 0)
+                    return result;
+
+                params->rgrc[0].top = top;
+                if (IsZoomed(hWnd))
+                {
+                    params->rgrc[0].top += GetSystemMetrics(SM_CYSIZEFRAME) +
+                                           GetSystemMetrics(SM_CXPADDEDBORDER);
+                }
+
+                return 0;
+            }
+
+            break;
+        }
+
+        case WM_NCHITTEST:
+        {
+            if (window->decorated && !window->titlebar)
+            {
+                POINT pos = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+                ScreenToClient(hWnd, &pos);
+
+                RECT area;
+                GetClientRect(hWnd, &area);
+
+                if (window->resizable && !IsZoomed(hWnd))
+                {
+                    const int borderX = GetSystemMetrics(SM_CXSIZEFRAME) +
+                                        GetSystemMetrics(SM_CXPADDEDBORDER);
+                    const int borderY = GetSystemMetrics(SM_CYSIZEFRAME) +
+                                        GetSystemMetrics(SM_CXPADDEDBORDER);
+                    const BOOL onLeft = pos.x < borderX;
+                    const BOOL onRight = pos.x >= area.right - borderX;
+                    const BOOL onTop = pos.y < borderY;
+                    const BOOL onBottom = pos.y >= area.bottom - borderY;
+
+                    if (onTop && onLeft)
+                        return HTTOPLEFT;
+                    if (onTop && onRight)
+                        return HTTOPRIGHT;
+                    if (onBottom && onLeft)
+                        return HTBOTTOMLEFT;
+                    if (onBottom && onRight)
+                        return HTBOTTOMRIGHT;
+                    if (onTop)
+                        return HTTOP;
+                    if (onBottom)
+                        return HTBOTTOM;
+                    if (onLeft)
+                        return HTLEFT;
+                    if (onRight)
+                        return HTRIGHT;
+                }
+
+                int hit = 0;
+                _glfwInputTitlebarHitTest(window, pos.x, pos.y, &hit);
+                if (hit)
+                    return HTCAPTION;
+
+                return HTCLIENT;
+            }
+
+            break;
+        }
+
         case WM_DWMCOMPOSITIONCHANGED:
         case WM_DWMCOLORIZATIONCOLORCHANGED:
         {

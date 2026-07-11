@@ -18,6 +18,8 @@ struct FrameBufferDesc {
 
     PROPERTY()
     SharedObjectPtr<ImageView> DepthAttachment;
+
+    Vec4 ClearColor = Vec4(0.1f, 0.1f, 0.1f, 1.0f);
 };
 
 class FrameBuffer : public Object {

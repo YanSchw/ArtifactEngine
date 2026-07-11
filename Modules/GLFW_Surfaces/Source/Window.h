@@ -1,5 +1,6 @@
 #pragma once
 #include "Rendering/Surface.h"
+#include "Common/Types.h"
 #include "Window.gen.h"
 
 struct WindowParams {
@@ -7,12 +8,15 @@ struct WindowParams {
     uint32_t Width;
     uint32_t Height;
     bool Fullscreen = false;
+    /* Strips the native title bar (keeping resize frame, snapping and animations) so the
+     * application can draw its own chrome. */
+    bool EditorStyle = false;
 };
 
 class Window : public Surface {
 public:
     ARTIFACT_CLASS();
-private:
+protected:
     Window(const WindowParams& InParams);
 public:
     virtual ~Window();
@@ -26,6 +30,16 @@ public:
 
     bool ShouldClose() const;
     void PollEvents();
+
+    void Minimize();
+    void ToggleMaximize();
+    bool IsMaximized() const;
+    void Close();
+
+    /** Whether a client-area point (window coordinates) lies in the draggable region of an
+     *  application-drawn title bar. Queried by the platform for EditorStyle windows; the OS
+     *  then handles dragging, snapping and double-click itself. */
+    virtual bool HitTestTitleBar(const Vec2& InPoint) const { (void)InPoint; return false; }
 
     // Lock + hide the cursor for relative mouse look (GLFW_CURSOR_DISABLED),
     // or restore the normal visible cursor.

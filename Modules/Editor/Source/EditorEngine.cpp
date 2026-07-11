@@ -3,7 +3,8 @@
 #include "Platform/Platform.h"
 #include "Platform/FileIO.h"
 
-#include "Window.h"
+#include "EditorWindow.h"
+#include "Tabs/SceneEditorTab.h"
 #include "Core/EngineConfig.h"
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/RenderingAPI.h"
@@ -19,25 +20,20 @@
 #include "InputSystem/InputSystem.h"
 #include "InputSystem/MouseDevice.h"
 #include "InputSystem/MouseCodes.h"
+#include "InputSystem/KeyboardDevice.h"
+#include "InputSystem/KeyCodes.h"
 #include "Common/UUID.h"
 
 #include "GameFramework/UICanvas.h"
-#include "GameFramework/UIImage.h"
-#include "GameFramework/UIScrollArea.h"
-#include "GameFramework/UIBuilder.h"
-#include "InputSystem/KeyboardDevice.h"
-#include "InputSystem/KeyCodes.h"
 #include "Assets/Font.h"
 #include "Rendering/UIRenderer.h"
 
-#include <string>
-
-static SharedObjectPtr<Window> s_Window;
+static SharedObjectPtr<EditorWindow> s_Window;
 static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
 static SharedObjectPtr<VertexBuffer> s_FullScreenQuadVertexBuffer;
 
 void EditorEngine::Initialize() {
-    s_Window = Window::Create(WindowParams{ "Artifact Editor", 1280, 720 });
+    s_Window = EditorWindow::Create(WindowParams{ "Artifact Editor", 1280, 720 });
     AE_ASSERT(s_Window);
 
     Object::Create(Platform::GetDefaultRenderingAPIClass());
@@ -65,48 +61,11 @@ void EditorEngine::Initialize() {
     fullscreenDesc.ImageBindings.Add({ 16, m_RenderPipeline->GetFinalImageView(), sampler });
     s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
 
-    BuildDemoUI();
-}
-
-// Demo app-state the declarative UI binds to.
-static int s_Count = 0;
-
-void EditorEngine::BuildDemoUI() {
     // Set the default UI font once (see Content/Fonts/Default.asset)
     UINode::SetDefaultFont(AssetManager::Get().GetAsset<Font>(UUID::FromString("f0e1d2c3-b4a5-4967-8899-aabbccddeeff")));
 
     m_UIRenderer = new UIRenderer();
-    m_UICanvas = new UICanvas();
-    // Keep the demo UI proportional to the window: authored at 1280x720, scaled with the viewport.
-    m_UICanvas->ScaleMode = UICanvasScaleMode::ScaleWithScreenSize;
-    m_UICanvas->ReferenceResolution = Vec2(1280.0f, 720.0f);
-
-    UI::VStack(*m_UICanvas, [](UIStack& v) {
-        v.Padding = UIPadding(24.0f);
-        v.Gap = 8.0f;
-
-        UI::Label(v, [] { return "Count: " + std::to_string(s_Count); });
-        UI::Button(v, "Add", [] { s_Count++; }).Fill();
-
-        // Radial progress: sweeps a full circle as the count approaches 10.
-        UIImage* progress = v.Add<UIImage>();
-        progress->Size = Vec2(32.0f, 32.0f);
-        progress->FillMethod = UIImageFill::Radial;
-        progress->Tint = Vec4(0.30f, 0.75f, 0.40f, 1.0f);
-        progress->Bind = [progress] { progress->FillAmount = (float)(s_Count % 10) / 10.0f; };
-
-        UI::If(v, [] { return s_Count > 3; }, [](UINode& c) {
-            UI::Label(c, [] { return String("Big! (> 3)"); });
-        });
-
-        // Scrollable list: fixed 24px rows overflow the area and clip; wheel scrolls it.
-        UIScrollArea* scroll = v.Add<UIScrollArea>();
-        scroll->Fill();
-        UI::ForEach(*scroll, [] { return s_Count; }, [](UINode& item, int i) {
-            item.Size = { 1.0_rel, 24.0_px };
-            UI::Label(item, [i] { return "Item " + std::to_string(i); });
-        });
-    });
+    s_Window->OpenTab<SceneEditorTab>();
 }
 
 void EditorEngine::TickInput(double InDeltaTime) {
@@ -127,8 +86,9 @@ bool EditorEngine::MainTick(double InDeltaTime) {
     s_FullScreenPipeline->Bind();
     s_FullScreenQuadVertexBuffer->Draw();
 
-    // UI pass: composited onto the surface after the scene blit, before the queue is flushed.
-    if (m_UIRenderer && m_UICanvas) {
+    // Editor UI pass: composited onto the surface after the scene blit, before the queue flush.
+    if (m_UIRenderer) {
+        s_Window->SetFrameSeconds(InDeltaTime);
         UIFrameContext uiContext;
         uiContext.DeltaTime = (float)InDeltaTime;
         if (MouseDevice* mouse = MouseDevice::Instance()) {
@@ -148,7 +108,7 @@ bool EditorEngine::MainTick(double InDeltaTime) {
             uiContext.NavBack = keyboard->IsDown(KeyCode::Escape);
         }
         const Vec2 surfaceSize = Vec2((float)s_Window->GetWidth(), (float)s_Window->GetHeight());
-        m_UIRenderer->Render(s_Window.Get(), m_UICanvas, surfaceSize, uiContext);
+        m_UIRenderer->Render(s_Window.Get(), s_Window->GetCanvas(), surfaceSize, uiContext);
     }
 
     RenderingAPI::GetInstance()->Draw();
@@ -158,9 +118,7 @@ bool EditorEngine::MainTick(double InDeltaTime) {
 }
 
 void EditorEngine::Shutdown() {
-    // Tear down the UI (releases its pipelines/buffers) before the surface and RHI go away.
-    delete m_UICanvas;
-    m_UICanvas = nullptr;
+    // Tear down the UI renderer (releases its pipelines/buffers) before the surface and RHI go away.
     delete m_UIRenderer;
     m_UIRenderer = nullptr;
 

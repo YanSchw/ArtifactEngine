@@ -88,6 +88,7 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     frameBufferDesc.Height = InHeight;
     frameBufferDesc.ColorAttachments.Add(imageView);
     frameBufferDesc.DepthAttachment = depthImageView;
+    frameBufferDesc.ClearColor = Vec4(0.08f, 0.09f, 0.11f, 1.0f);
     s_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
 
     s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Shader.glsl"));
@@ -109,13 +110,12 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
         Invalidate(InParams.Width, InParams.Height);
     }
 
+    UpdateUniformData(InParams);
+    s_Pipeline->Bind();
     if (InParams.m_World == nullptr) {
-        AE_WARN("ArtifactRenderPipeline cannot be invoked without a world");
         return;
     }
 
-    UpdateUniformData(InParams);
-    s_Pipeline->Bind();
     for (Node* node : InParams.m_World->GetAllNodes()) {
         if (StaticMeshNode* staticMesh = node->As<StaticMeshNode>()) {
             RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData, CmdSetShaderData{ staticMesh->GetPerMeshShaderData() });

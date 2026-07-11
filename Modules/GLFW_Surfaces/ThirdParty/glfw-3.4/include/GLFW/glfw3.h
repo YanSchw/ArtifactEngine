@@ -941,6 +941,16 @@ extern "C" {
  */
 #define GLFW_POSITION_Y             0x0002000F
 
+/*! @brief Native title bar window hint and attribute.
+ *
+ *  Artifact Engine extension.  When set to `GLFW_FALSE` on a decorated window,
+ *  the platform title bar is removed while the resize frame, snapping and
+ *  window animations are kept; the application draws its own title bar inside
+ *  the client area and reports the draggable region via
+ *  @ref glfwSetTitlebarHitTestCallback.
+ */
+#define GLFW_TITLEBAR               0x00020010
+
 /*! @brief Framebuffer bit depth hint.
  *
  *  Framebuffer bit depth [hint](@ref GLFW_RED_BITS).
@@ -1736,6 +1746,26 @@ typedef void (* GLFWwindowiconifyfun)(GLFWwindow* window, int iconified);
  *  @ingroup window
  */
 typedef void (* GLFWwindowmaximizefun)(GLFWwindow* window, int maximized);
+
+/*! @brief The function pointer type for title bar hit tests.
+ *
+ *  Artifact Engine extension.  This is the function pointer type for title bar
+ *  hit tests.  A title bar hit test function has the following signature:
+ *  @code
+ *  void function_name(GLFWwindow* window, int xpos, int ypos, int* hit)
+ *  @endcode
+ *
+ *  @param[in] window The window being queried.
+ *  @param[in] xpos The x-coordinate, in client-area coordinates, of the cursor.
+ *  @param[in] ypos The y-coordinate, in client-area coordinates, of the cursor.
+ *  @param[out] hit Set to a non-zero value if the point lies in the
+ *  application-drawn title bar drag region.
+ *
+ *  @sa glfwSetTitlebarHitTestCallback
+ *
+ *  @ingroup window
+ */
+typedef void (* GLFWtitlebarhittestfun)(GLFWwindow* window, int xpos, int ypos, int* hit);
 
 /*! @brief The function pointer type for framebuffer size callbacks.
  *
@@ -4433,6 +4463,26 @@ GLFWAPI GLFWwindowiconifyfun glfwSetWindowIconifyCallback(GLFWwindow* window, GL
  *  @ingroup window
  */
 GLFWAPI GLFWwindowmaximizefun glfwSetWindowMaximizeCallback(GLFWwindow* window, GLFWwindowmaximizefun callback);
+
+/*! @brief Sets the title bar hit test callback for the specified window.
+ *
+ *  Artifact Engine extension.  This function sets the title bar hit test
+ *  callback of the specified window, which is called when the platform needs
+ *  to know whether a point in the client area belongs to the application-drawn
+ *  title bar drag region.  It is only used for windows created with the
+ *  @ref GLFW_TITLEBAR hint set to `GLFW_FALSE`.
+ *
+ *  @param[in] window The window whose callback to set.
+ *  @param[in] callback The new callback, or `NULL` to remove the currently set
+ *  callback.
+ *  @return The previously set callback, or `NULL` if no callback was set or the
+ *  library had not been [initialized](@ref intro_init).
+ *
+ *  @thread_safety This function must only be called from the main thread.
+ *
+ *  @ingroup window
+ */
+GLFWAPI GLFWtitlebarhittestfun glfwSetTitlebarHitTestCallback(GLFWwindow* window, GLFWtitlebarhittestfun callback);
 
 /*! @brief Sets the framebuffer resize callback for the specified window.
  *

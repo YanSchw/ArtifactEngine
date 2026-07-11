@@ -627,7 +627,7 @@ static GLFWbool createNativeWindow(_GLFWwindow* window,
                  _glfw.x11.context,
                  (XPointer) window);
 
-    if (!wndconfig->decorated)
+    if (!wndconfig->decorated || !wndconfig->titlebar)
         _glfwSetWindowDecoratedX11(window, GLFW_FALSE);
 
     if (_glfw.x11.NET_WM_STATE && !window->monitor)
@@ -1356,6 +1356,59 @@ static void processEvent(XEvent *event)
         case ButtonPress:
         {
             const int mods = translateState(event->xbutton.state);
+
+            if (event->xbutton.button == Button1 &&
+                window->decorated && !window->titlebar &&
+                _glfw.x11.NET_WM_MOVERESIZE && !window->monitor)
+            {
+                // _NET_WM_MOVERESIZE directions: 0..7 clockwise from top-left,
+                // 8 is move
+                int direction = -1;
+                int width, height;
+                _glfwGetWindowSizeX11(window, &width, &height);
+
+                if (window->resizable)
+                {
+                    const int border = 8;
+                    const GLFWbool left = event->xbutton.x < border;
+                    const GLFWbool right = event->xbutton.x >= width - border;
+                    const GLFWbool top = event->xbutton.y < border;
+                    const GLFWbool bottom = event->xbutton.y >= height - border;
+
+                    if (top && left)          direction = 0;
+                    else if (top && right)    direction = 2;
+                    else if (bottom && right) direction = 4;
+                    else if (bottom && left)  direction = 6;
+                    else if (top)             direction = 1;
+                    else if (right)           direction = 3;
+                    else if (bottom)          direction = 5;
+                    else if (left)            direction = 7;
+                }
+
+                if (direction < 0)
+                {
+                    int hit = 0;
+                    _glfwInputTitlebarHitTest(window,
+                                              event->xbutton.x,
+                                              event->xbutton.y,
+                                              &hit);
+                    if (hit)
+                        direction = 8;
+                }
+
+                if (direction >= 0)
+                {
+                    XUngrabPointer(_glfw.x11.display, CurrentTime);
+                    sendEventToWM(window,
+                                  _glfw.x11.NET_WM_MOVERESIZE,
+                                  event->xbutton.x_root,
+                                  event->xbutton.y_root,
+                                  direction,
+                                  Button1,
+                                  1);
+                    return;
+                }
+            }
 
             if (event->xbutton.button == Button1)
                 _glfwInputMouseClick(window, GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS, mods);

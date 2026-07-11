@@ -29,6 +29,7 @@ Window::Window(const WindowParams& InParams) {
     // Set GLFW window hints for Vulkan
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_TITLEBAR, InParams.EditorStyle ? GLFW_FALSE : GLFW_TRUE);
 
     m_Params = InParams;
     // TODO: Window SHARED CONTEXT
@@ -38,7 +39,15 @@ Window::Window(const WindowParams& InParams) {
         glfwTerminate();
         return;
     }
+    glfwSetWindowUserPointer(m_Window, this);
     glfwSetWindowSizeCallback(m_Window, OnWindowResized);
+
+    if (m_Params.EditorStyle) {
+        glfwSetTitlebarHitTestCallback(m_Window, [](GLFWwindow* InWindow, int InX, int InY, int* OutHit) {
+            Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow));
+            *OutHit = (self && self->HitTestTitleBar(Vec2((float)InX, (float)InY))) ? 1 : 0;
+        });
+    }
 
     // Spin up the global input devices the first time a window is created.
     static bool s_InputDevicesCreated = false;
@@ -82,6 +91,26 @@ bool Window::ShouldClose() const {
 
 void Window::PollEvents() {
     glfwPollEvents();
+}
+
+void Window::Minimize() {
+    glfwIconifyWindow(m_Window);
+}
+
+void Window::ToggleMaximize() {
+    if (IsMaximized()) {
+        glfwRestoreWindow(m_Window);
+    } else {
+        glfwMaximizeWindow(m_Window);
+    }
+}
+
+bool Window::IsMaximized() const {
+    return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED) == GLFW_TRUE;
+}
+
+void Window::Close() {
+    glfwSetWindowShouldClose(m_Window, GLFW_TRUE);
 }
 
 void Window::SetCursorLocked(bool InLocked) {

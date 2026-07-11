@@ -569,6 +569,8 @@ static void detectEWMH(void)
 
     _glfw.x11.NET_WM_STATE =
         getAtomIfSupported(supportedAtoms, atomCount, "_NET_WM_STATE");
+    _glfw.x11.NET_WM_MOVERESIZE =
+        getAtomIfSupported(supportedAtoms, atomCount, "_NET_WM_MOVERESIZE");
     _glfw.x11.NET_WM_STATE_ABOVE =
         getAtomIfSupported(supportedAtoms, atomCount, "_NET_WM_STATE_ABOVE");
     _glfw.x11.NET_WM_STATE_FULLSCREEN =

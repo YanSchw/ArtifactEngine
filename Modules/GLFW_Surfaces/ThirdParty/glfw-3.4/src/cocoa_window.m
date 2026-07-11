@@ -403,6 +403,25 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 
 - (void)mouseDown:(NSEvent *)event
 {
+    if (window->decorated && !window->titlebar)
+    {
+        const NSRect contentRect = [window->ns.view frame];
+        const NSPoint pos = [event locationInWindow];
+        int hit = 0;
+        _glfwInputTitlebarHitTest(window,
+                                  (int) pos.x,
+                                  (int) (contentRect.size.height - pos.y),
+                                  &hit);
+        if (hit)
+        {
+            if ([event clickCount] == 2)
+                [window->ns.object zoom:nil];
+            else
+                [window->ns.object performWindowDragWithEvent:event];
+            return;
+        }
+    }
+
     _glfwInputMouseClick(window,
                          GLFW_MOUSE_BUTTON_LEFT,
                          GLFW_PRESS,
@@ -820,6 +839,9 @@ static GLFWbool createNativeWindow(_GLFWwindow* window,
 
         if (window->resizable)
             styleMask |= NSWindowStyleMaskResizable;
+
+        if (!window->titlebar)
+            styleMask |= NSWindowStyleMaskFullSizeContentView;
     }
 
     window->ns.object = [[GLFWWindow alloc]
@@ -838,6 +860,12 @@ static GLFWbool createNativeWindow(_GLFWwindow* window,
         [window->ns.object setLevel:NSMainMenuWindowLevel + 1];
     else
     {
+        if (window->decorated && !window->titlebar)
+        {
+            [window->ns.object setTitlebarAppearsTransparent:YES];
+            [window->ns.object setTitleVisibility:NSWindowTitleHidden];
+        }
+
         if (wndconfig->xpos == GLFW_ANY_POSITION ||
             wndconfig->ypos == GLFW_ANY_POSITION)
         {

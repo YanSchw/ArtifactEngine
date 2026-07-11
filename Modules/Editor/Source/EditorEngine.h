@@ -2,7 +2,6 @@
 #include "Core/Engine.h"
 #include "EditorEngine.gen.h"
 
-class UICanvas;
 class UIRenderer;
 
 class EditorEngine : public Engine {
@@ -16,8 +15,5 @@ protected:
     virtual void Shutdown() override;
 
 private:
-    void BuildDemoUI();
-
     UIRenderer* m_UIRenderer = nullptr;
-    UICanvas* m_UICanvas = nullptr;
 };
