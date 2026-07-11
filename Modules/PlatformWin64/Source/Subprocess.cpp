@@ -30,7 +30,8 @@ SubprocessResult Subprocess::Run(const String& InCommand) {
     si.cb = sizeof(STARTUPINFOA);
     si.hStdOutput = outWrite;
     si.hStdError  = errWrite;
-    si.dwFlags |= STARTF_USESTDHANDLES;
+    si.dwFlags |= STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
 
     PROCESS_INFORMATION pi{};
 
@@ -42,7 +43,7 @@ SubprocessResult Subprocess::Run(const String& InCommand) {
             NULL,
             NULL,
             TRUE,
-            0,
+            CREATE_NO_WINDOW,
             NULL,
             NULL,
             &si,
