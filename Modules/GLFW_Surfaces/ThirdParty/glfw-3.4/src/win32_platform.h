@@ -116,6 +116,9 @@
 #ifndef OCR_HAND
  #define OCR_HAND 32649
 #endif
+#ifndef SM_CXPADDEDBORDER
+ #define SM_CXPADDEDBORDER 92
+#endif
 
 #if WINVER < 0x0601
 typedef struct

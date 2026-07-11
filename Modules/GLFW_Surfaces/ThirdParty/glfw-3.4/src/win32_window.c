@@ -1154,8 +1154,10 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
         case WM_NCPAINT:
         {
             // Prevent title bar from being drawn after restoring a minimized
-            // undecorated window
-            if (!window->decorated)
+            // undecorated window, and for decorated windows with a
+            // client-drawn title bar (the native caption area is reclaimed
+            // by WM_NCCALCSIZE but DefWindowProc would still paint it here)
+            if (!window->decorated || !window->titlebar)
                 return TRUE;
 
             break;
