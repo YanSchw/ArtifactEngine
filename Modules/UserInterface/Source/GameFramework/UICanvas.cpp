@@ -68,10 +68,15 @@ Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InCont
     const Mat4 projection = BuildProjection(InViewportSize);
     SetViewProjection(projection, InViewportSize.x, InViewportSize.y);
 
+    const UIRectF canvasRect = ComputeCanvasRect(InViewportSize);
+
     BindTree();
-    Layout(ComputeCanvasRect(InViewportSize));
+    Layout(canvasRect);
     RouteInput(InContext);
     UpdateTree(InContext);
+    // A click or update handler can add or remove children
+    // re-layout so Paint below never renders a node that hasn't been laid out yet.
+    Layout(canvasRect);
     PaintTree(OutDrawList);
     return projection;
 }
