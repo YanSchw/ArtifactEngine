@@ -1165,21 +1165,34 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
         case WM_NCCALCSIZE:
         {
-            // Client-drawn title bar: reclaim the caption area while keeping
-            // the resize frame, snapping and animations of WS_CAPTION
+            // Client-drawn title bar: reclaim the entire non-client area (caption
+            // *and* resize-frame border) so the client rect spans the whole window;
+            // WM_NCHITTEST below does its own border hit-testing within that area
+            // to keep the resize frame, snapping and animations of WS_CAPTION.
             if (window->decorated && !window->titlebar && wParam == TRUE)
             {
                 NCCALCSIZE_PARAMS* params = (NCCALCSIZE_PARAMS*) lParam;
-                const LONG top = params->rgrc[0].top;
+                const RECT requested = params->rgrc[0];
                 const LRESULT result = DefWindowProcW(hWnd, uMsg, wParam, lParam);
                 if (result != 0)
                     return result;
 
-                params->rgrc[0].top = top;
+                params->rgrc[0] = requested;
                 if (IsZoomed(hWnd))
                 {
-                    params->rgrc[0].top += GetSystemMetrics(SM_CYSIZEFRAME) +
-                                           GetSystemMetrics(SM_CXPADDEDBORDER);
+                    // A maximized window's rect extends past the monitor's visible
+                    // area on every side by the (normally invisible) resize-frame
+                    // border, so the OS can clip it flush with the screen edges.
+                    // Since we reclaimed the whole rect above, pull all four sides
+                    // back in by that border amount or content gets clipped off-screen.
+                    const int frameX = GetSystemMetrics(SM_CXSIZEFRAME) +
+                                        GetSystemMetrics(SM_CXPADDEDBORDER);
+                    const int frameY = GetSystemMetrics(SM_CYSIZEFRAME) +
+                                        GetSystemMetrics(SM_CXPADDEDBORDER);
+                    params->rgrc[0].left   += frameX;
+                    params->rgrc[0].top    += frameY;
+                    params->rgrc[0].right  -= frameX;
+                    params->rgrc[0].bottom -= frameY;
                 }
 
                 return 0;
