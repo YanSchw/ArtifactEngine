@@ -7,6 +7,8 @@
 #include <schannel.h>
 #include <string>
 
+#undef ERROR // windows.h/wingdi.h defines ERROR as 0, which clashes with LogLevel::ERROR
+
 #pragma comment(lib, "secur32.lib")
 #pragma comment(lib, "crypt32.lib")
 
