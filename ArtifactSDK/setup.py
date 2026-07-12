@@ -9,7 +9,7 @@ def parse_requirements(filename):
     return [line.strip() for line in lines if line.strip() and not line.startswith("#")]
 
 setup(
-    name="artifact-buildtool",
+    name="artifact-sdk",
     version=get_version_string(),
     packages=find_packages(),
     install_requires=parse_requirements('requirements.txt'),
