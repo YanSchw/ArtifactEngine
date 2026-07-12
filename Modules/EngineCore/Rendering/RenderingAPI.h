@@ -17,6 +17,10 @@ public:
     virtual void Draw() = 0;
     virtual void CleanUp(bool InShouldDestroy) = 0;
 
+    /** Releases everything the backend holds for the given presentation surface (its swapchain
+     *  etc.). A Surface calls this before it is destroyed; unknown surfaces are a no-op. */
+    virtual void DestroySurfaceResources(class Surface* InSurface) { (void)InSurface; }
+
     virtual class RenderCommandQueue& GetRenderQueue() = 0;
     virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices) = 0;
     virtual SharedObjectPtr<class Shader> CreateShader(const String& InShaderSource) = 0;

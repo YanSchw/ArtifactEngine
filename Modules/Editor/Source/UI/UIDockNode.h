@@ -35,6 +35,7 @@ public:
     void AdjustSplit(const Vec2& InCursorDelta);
 
     UIDockNode* FindLeafAt(const Vec2& InPoint);
+    UIDockNode* FindFirstLeaf() { return IsLeaf() ? this : m_ChildA->FindFirstLeaf(); }
     UIRectF GetHeaderRect() const;
 
     virtual void Paint(UIDrawList& OutDrawList) override;

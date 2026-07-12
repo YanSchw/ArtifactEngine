@@ -56,28 +56,37 @@ VkBool32 debugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT o
 
 
 static VkInstance instance;
-static VkSurfaceKHR windowSurface;
 static VkPhysicalDevice physicalDevice;
 static VkDevice device;
 static VkDebugReportCallbackEXT callback;
 static VkQueue graphicsQueue;
 static VkQueue presentQueue;
 static VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
-static VkSemaphore imageAvailableSemaphore;
-static VkSemaphore renderingFinishedSemaphore;
 
 static VkDescriptorPool descriptorPool;
 
+struct VulkanSwapchainData {
+    Surface* Target = nullptr;
+    VkSurfaceKHR WindowSurface = VK_NULL_HANDLE;
+    VkSwapchainKHR SwapChain = VK_NULL_HANDLE;
+    VkExtent2D Extent = { 0, 0 };
+    std::vector<VkImage> Images;
+    std::vector<VkImageView> ImageViews;
+    VkSemaphore ImageAvailable = VK_NULL_HANDLE;
+    VkSemaphore RenderingFinished = VK_NULL_HANDLE;
+    uint32_t ImageIndex = 0;
+    bool Acquired = false;
+};
+static std::vector<VulkanSwapchainData*> swapchains;
+
+// Shared across all swapchains: pipelines are built once against this format, and viewport /
+// scissor are dynamic state, so surface-targeting pipelines work for every window.
 VkExtent2D swapChainExtent = {1280, 720};
-VkFormat swapChainFormat;
-VkSwapchainKHR oldSwapChain;
-VkSwapchainKHR swapChain;
-std::vector<VkImage> swapChainImages;
-std::vector<VkImageView> swapChainImageViews;
-std::vector<VkFramebuffer> swapChainFramebuffers;
+VkFormat swapChainFormat = VK_FORMAT_UNDEFINED;
 
 static VkCommandPool commandPool;
-static std::vector<VkCommandBuffer> graphicsCommandBuffers;
+static VkCommandBuffer graphicsCommandBuffer = VK_NULL_HANDLE;
+static VkFence frameFence = VK_NULL_HANDLE;
 
 static uint32_t graphicsQueueFamily;
 static uint32_t presentQueueFamily;
@@ -126,18 +135,204 @@ VkSurfaceFormatKHR ChooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& av
     return availableFormats[0];
 }
 
-VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities) {
-    if (surfaceCapabilities.currentExtent.width == -1) {
-        VkExtent2D swapChainExtent = {};
+VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities, Surface* target) {
+    if (surfaceCapabilities.currentExtent.width == 0xFFFFFFFF) {
+        VkExtent2D extent = {};
 
-        swapChainExtent.width = std::min(std::max(Window::GetInstance()->GetWidth(), surfaceCapabilities.minImageExtent.width), surfaceCapabilities.maxImageExtent.width);
-        swapChainExtent.height = std::min(std::max(Window::GetInstance()->GetHeight(), surfaceCapabilities.minImageExtent.height), surfaceCapabilities.maxImageExtent.height);
+        extent.width = std::min(std::max(target->GetWidth(), surfaceCapabilities.minImageExtent.width), surfaceCapabilities.maxImageExtent.width);
+        extent.height = std::min(std::max(target->GetHeight(), surfaceCapabilities.minImageExtent.height), surfaceCapabilities.maxImageExtent.height);
 
-        return swapChainExtent;
+        return extent;
     }
     else {
         return surfaceCapabilities.currentExtent;
     }
+}
+
+VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> presentModes);
+
+static VulkanSwapchainData* FindSwapchainData(const Surface* InTarget) {
+    for (VulkanSwapchainData* data : swapchains) {
+        if (data->Target == InTarget) {
+            return data;
+        }
+    }
+    return nullptr;
+}
+
+static void CreateSwapchainForData(VulkanSwapchainData& data) {
+    VkSurfaceCapabilitiesKHR surfaceCapabilities;
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, data.WindowSurface, &surfaceCapabilities) != VK_SUCCESS) {
+        AE_ERROR("failed to acquire presentation surface capabilities");
+        exit(1);
+    }
+
+    uint32_t formatCount;
+    if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, data.WindowSurface, &formatCount, nullptr) != VK_SUCCESS || formatCount == 0) {
+        AE_ERROR("failed to get number of supported surface formats");
+        exit(1);
+    }
+    std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
+    if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, data.WindowSurface, &formatCount, surfaceFormats.data()) != VK_SUCCESS) {
+        AE_ERROR("failed to get supported surface formats");
+        exit(1);
+    }
+
+    uint32_t presentModeCount;
+    if (vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, data.WindowSurface, &presentModeCount, nullptr) != VK_SUCCESS || presentModeCount == 0) {
+        AE_ERROR("failed to get number of supported presentation modes");
+        exit(1);
+    }
+    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+    if (vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, data.WindowSurface, &presentModeCount, presentModes.data()) != VK_SUCCESS) {
+        AE_ERROR("failed to get supported presentation modes");
+        exit(1);
+    }
+
+    uint32_t imageCount = surfaceCapabilities.minImageCount + 1;
+    if (surfaceCapabilities.maxImageCount != 0 && imageCount > surfaceCapabilities.maxImageCount) {
+        imageCount = surfaceCapabilities.maxImageCount;
+    }
+
+    const VkSurfaceFormatKHR surfaceFormat = ChooseSurfaceFormat(surfaceFormats);
+    if (swapChainFormat == VK_FORMAT_UNDEFINED) {
+        swapChainFormat = surfaceFormat.format;
+    } else if (surfaceFormat.format != swapChainFormat) {
+        AE_WARN("swapchain format mismatch across windows ({0} vs {1})", (int)surfaceFormat.format, (int)swapChainFormat);
+    }
+
+    data.Extent = ChooseSwapExtent(surfaceCapabilities, data.Target);
+    if (!swapchains.empty() && swapchains[0] == &data) {
+        swapChainExtent = data.Extent;
+    }
+
+    VkSurfaceTransformFlagBitsKHR surfaceTransform;
+    if (surfaceCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
+        surfaceTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    } else {
+        surfaceTransform = surfaceCapabilities.currentTransform;
+    }
+
+    VkSwapchainCreateInfoKHR createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = data.WindowSurface;
+    createInfo.minImageCount = imageCount;
+    createInfo.imageFormat = surfaceFormat.format;
+    createInfo.imageColorSpace = surfaceFormat.colorSpace;
+    createInfo.imageExtent = data.Extent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    createInfo.queueFamilyIndexCount = 0;
+    createInfo.pQueueFamilyIndices = nullptr;
+    createInfo.preTransform = surfaceTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.presentMode = ChoosePresentMode(presentModes);
+    createInfo.clipped = VK_TRUE;
+    createInfo.oldSwapchain = data.SwapChain;
+
+    VkSwapchainKHR newSwapChain;
+    if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &newSwapChain) != VK_SUCCESS) {
+        AE_ERROR("failed to create swap chain");
+        exit(1);
+    }
+
+    for (VkImageView imageView : data.ImageViews) {
+        vkDestroyImageView(device, imageView, nullptr);
+    }
+    data.ImageViews.clear();
+    if (data.SwapChain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(device, data.SwapChain, nullptr);
+    }
+    data.SwapChain = newSwapChain;
+
+    uint32_t actualImageCount = 0;
+    if (vkGetSwapchainImagesKHR(device, data.SwapChain, &actualImageCount, nullptr) != VK_SUCCESS || actualImageCount == 0) {
+        AE_ERROR("failed to acquire number of swap chain images");
+        exit(1);
+    }
+    data.Images.resize(actualImageCount);
+    if (vkGetSwapchainImagesKHR(device, data.SwapChain, &actualImageCount, data.Images.data()) != VK_SUCCESS) {
+        AE_ERROR("failed to acquire swap chain images");
+        exit(1);
+    }
+
+    data.ImageViews.resize(data.Images.size());
+    for (size_t i = 0; i < data.Images.size(); i++) {
+        VkImageViewCreateInfo viewInfo = {};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = data.Images[i];
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = swapChainFormat;
+        viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(device, &viewInfo, nullptr, &data.ImageViews[i]) != VK_SUCCESS) {
+            AE_ERROR("failed to create image view for swap chain image #{0}", i);
+            exit(1);
+        }
+    }
+}
+
+static void CreateSwapchainResources(VulkanSwapchainData& data) {
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &data.ImageAvailable) != VK_SUCCESS ||
+        vkCreateSemaphore(device, &semaphoreInfo, nullptr, &data.RenderingFinished) != VK_SUCCESS) {
+        AE_ERROR("failed to create semaphores");
+        exit(1);
+    }
+    CreateSwapchainForData(data);
+}
+
+static VulkanSwapchainData* GetOrCreateSwapchainData(Surface* InTarget) {
+    if (VulkanSwapchainData* existing = FindSwapchainData(InTarget)) {
+        return existing;
+    }
+
+    Window* window = InTarget->As<Window>();
+    AE_ASSERT(window, "surface render targets must be windows");
+
+    VulkanSwapchainData* data = new VulkanSwapchainData();
+    data->Target = InTarget;
+    if (glfwCreateWindowSurface(instance, window->GetNativeWindow(), NULL, &data->WindowSurface) != VK_SUCCESS) {
+        AE_ERROR("failed to create window surface!");
+        exit(1);
+    }
+    swapchains.push_back(data);
+    CreateSwapchainResources(*data);
+    return data;
+}
+
+static void DestroySwapchainData(VulkanSwapchainData& data) {
+    for (VkImageView imageView : data.ImageViews) {
+        vkDestroyImageView(device, imageView, nullptr);
+    }
+    data.ImageViews.clear();
+    if (data.SwapChain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(device, data.SwapChain, nullptr);
+    }
+    if (data.ImageAvailable != VK_NULL_HANDLE) {
+        vkDestroySemaphore(device, data.ImageAvailable, nullptr);
+    }
+    if (data.RenderingFinished != VK_NULL_HANDLE) {
+        vkDestroySemaphore(device, data.RenderingFinished, nullptr);
+    }
+    if (data.WindowSurface != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(instance, data.WindowSurface, nullptr);
+    }
+}
+
+static void RecreateSwapchain(VulkanSwapchainData& data) {
+    vkDeviceWaitIdle(device);
+    CreateSwapchainForData(data);
 }
 
 VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> presentModes) {
@@ -152,8 +347,6 @@ VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> presentMo
 }
 
 void VulkanAPI::Initialize() {
-    oldSwapChain = VK_NULL_HANDLE;
-
     VulkanAPI::CreateInstance();
     VulkanAPI::CreateDebugCallback();
     VulkanAPI::CreateWindowSurface();
@@ -161,27 +354,18 @@ void VulkanAPI::Initialize() {
     VulkanAPI::CheckSwapChainSupport();
     VulkanAPI::FindQueueFamilies();
     VulkanAPI::CreateLogicalDevice();
-    VulkanAPI::CreateSemaphores();
     VulkanAPI::CreateCommandPool();
-    VulkanAPI::CreateSwapChain();
-    VulkanAPI::CreateImageViews();
     VulkanAPI::CreateDescriptorPool();
+    CreateSwapchainResources(*swapchains[0]);
     VulkanAPI::CreateCommandBuffers();
 }
 
 void VulkanAPI::CleanUp(bool fullClean) {
     vkDeviceWaitIdle(device);
 
-    vkFreeCommandBuffers(device, commandPool, (uint32_t)graphicsCommandBuffers.size(), graphicsCommandBuffers.data());
-
-    for (size_t i = 0; i < swapChainImages.size(); i++) {
-        vkDestroyImageView(device, swapChainImageViews[i], nullptr);
-    }
-
     if (fullClean) {
-        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-        vkDestroySemaphore(device, renderingFinishedSemaphore, nullptr);
-
+        vkFreeCommandBuffers(device, commandPool, 1, &graphicsCommandBuffer);
+        vkDestroyFence(device, frameFence, nullptr);
         vkDestroyCommandPool(device, commandPool, nullptr);
 
         VulkanPipeline::DestroyAll();
@@ -200,12 +384,13 @@ void VulkanAPI::CleanUp(bool fullClean) {
         // Buffers must be destroyed after no command buffers are referring to them anymore
         VulkanVertexBuffer::DestroyAll();
 
-        // Note: implicitly destroys images (in fact, we're not allowed to do that explicitly)
-        vkDestroySwapchainKHR(device, swapChain, nullptr);
+        for (VulkanSwapchainData* data : swapchains) {
+            DestroySwapchainData(*data);
+            delete data;
+        }
+        swapchains.clear();
 
         vkDestroyDevice(device, nullptr);
-
-        vkDestroySurfaceKHR(instance, windowSurface, nullptr);
 
         if (ENABLE_DEBUGGING) {
             PFN_vkDestroyDebugReportCallbackEXT DestroyDebugReportCallback = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
@@ -214,6 +399,17 @@ void VulkanAPI::CleanUp(bool fullClean) {
 
         vkDestroyInstance(instance, nullptr);
     }
+}
+
+void VulkanAPI::DestroySurfaceResources(Surface* InSurface) {
+    VulkanSwapchainData* data = FindSwapchainData(InSurface);
+    if (!data) {
+        return;
+    }
+    vkDeviceWaitIdle(device);
+    DestroySwapchainData(*data);
+    swapchains.erase(std::find(swapchains.begin(), swapchains.end(), data));
+    delete data;
 }
 
 // In a packaged macOS .app the MoltenVK driver and its ICD manifest are bundled inside the app
@@ -312,10 +508,13 @@ void VulkanAPI::CreateInstance() {
 }
 
 void VulkanAPI::CreateWindowSurface() {
-    if (glfwCreateWindowSurface(instance, Window::GetGLFWwindow(), NULL, &windowSurface) != VK_SUCCESS) {
+    VulkanSwapchainData* data = new VulkanSwapchainData();
+    data->Target = Window::GetInstance();
+    if (glfwCreateWindowSurface(instance, Window::GetGLFWwindow(), NULL, &data->WindowSurface) != VK_SUCCESS) {
         AE_ERROR("failed to create window surface!");
         exit(1);
     }
+    swapchains.push_back(data);
 
     AE_INFO("created window surface");
 }
@@ -404,7 +603,7 @@ void VulkanAPI::FindQueueFamilies() {
 
     for (uint32_t i = 0; i < queueFamilyCount; i++) {
         VkBool32 presentSupport = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, windowSurface, &presentSupport);
+        vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, swapchains[0]->WindowSurface, &presentSupport);
 
         if (queueFamilies[i].queueCount > 0 && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             graphicsQueueFamily = i;
@@ -524,20 +723,6 @@ void VulkanAPI::CreateDebugCallback() {
     }
 }
 
-void VulkanAPI::CreateSemaphores() {
-    VkSemaphoreCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    if (vkCreateSemaphore(device, &createInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(device, &createInfo, nullptr, &renderingFinishedSemaphore) != VK_SUCCESS) {
-        AE_ERROR("failed to create semaphores");
-        exit(1);
-    }
-    else {
-        AE_INFO("created semaphores");
-    }
-}
-
 void VulkanAPI::CreateCommandPool() {
     // Create graphics command pool
     VkCommandPoolCreateInfo poolCreateInfo = {};
@@ -551,147 +736,6 @@ void VulkanAPI::CreateCommandPool() {
     else {
         AE_INFO("created command pool for graphics queue family");
     }
-}
-
-void VulkanAPI::CreateSwapChain() {
-    // Find surface capabilities
-    VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, windowSurface, &surfaceCapabilities) != VK_SUCCESS) {
-        AE_ERROR("failed to acquire presentation surface capabilities");
-        exit(1);
-    }
-
-    // Find supported surface formats
-    uint32_t formatCount;
-    if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, windowSurface, &formatCount, nullptr) != VK_SUCCESS || formatCount == 0) {
-        AE_ERROR("failed to get number of supported surface formats");
-        exit(1);
-    }
-
-    std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
-    if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, windowSurface, &formatCount, surfaceFormats.data()) != VK_SUCCESS) {
-        AE_ERROR("failed to get supported surface formats");
-        exit(1);
-    }
-
-    // Find supported present modes
-    uint32_t presentModeCount;
-    if (vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, windowSurface, &presentModeCount, nullptr) != VK_SUCCESS || presentModeCount == 0) {
-        AE_ERROR("failed to get number of supported presentation modes");
-        exit(1);
-    }
-
-    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    if (vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, windowSurface, &presentModeCount, presentModes.data()) != VK_SUCCESS) {
-        AE_ERROR("failed to get supported presentation modes");
-        exit(1);
-    }
-
-    // Determine number of images for swap chain
-    uint32_t imageCount = surfaceCapabilities.minImageCount + 1;
-    if (surfaceCapabilities.maxImageCount != 0 && imageCount > surfaceCapabilities.maxImageCount) {
-        imageCount = surfaceCapabilities.maxImageCount;
-    }
-
-    AE_INFO("using {0} images for swap chain", imageCount);
-
-    // Select a surface format
-    VkSurfaceFormatKHR surfaceFormat = ChooseSurfaceFormat(surfaceFormats);
-
-    // Select swap chain size
-    swapChainExtent = ChooseSwapExtent(surfaceCapabilities);
-
-    // Determine transformation to use (preferring no transform)
-    VkSurfaceTransformFlagBitsKHR surfaceTransform;
-    if (surfaceCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
-        surfaceTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    }
-    else {
-        surfaceTransform = surfaceCapabilities.currentTransform;
-    }
-
-    // Choose presentation mode (preferring MAILBOX ~= triple buffering)
-    VkPresentModeKHR presentMode = ChoosePresentMode(presentModes);
-
-    // Finally, create the swap chain
-    VkSwapchainCreateInfoKHR createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = windowSurface;
-    createInfo.minImageCount = imageCount;
-    createInfo.imageFormat = surfaceFormat.format;
-    createInfo.imageColorSpace = surfaceFormat.colorSpace;
-    createInfo.imageExtent = swapChainExtent;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    createInfo.queueFamilyIndexCount = 0;
-    createInfo.pQueueFamilyIndices = nullptr;
-    createInfo.preTransform = surfaceTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;
-    createInfo.oldSwapchain = oldSwapChain;
-
-    if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
-        AE_ERROR("failed to create swap chain");
-        exit(1);
-    } else {
-        AE_INFO("created swap chain");
-    }
-
-    if (oldSwapChain != VK_NULL_HANDLE) {
-        vkDestroySwapchainKHR(device, oldSwapChain, nullptr);
-    }
-    oldSwapChain = swapChain;
-
-    swapChainFormat = surfaceFormat.format;
-
-    // Store the images used by the swap chain
-    // Note: these are the images that swap chain image indices refer to
-    // Note: actual number of images may differ from requested number, since it's a lower bound
-    uint32_t actualImageCount = 0;
-    if (vkGetSwapchainImagesKHR(device, swapChain, &actualImageCount, nullptr) != VK_SUCCESS || actualImageCount == 0) {
-        AE_ERROR("failed to acquire number of swap chain images");
-        exit(1);
-    }
-
-    swapChainImages.resize(actualImageCount);
-
-    if (vkGetSwapchainImagesKHR(device, swapChain, &actualImageCount, swapChainImages.data()) != VK_SUCCESS) {
-        AE_ERROR("failed to acquire swap chain images");
-        exit(1);
-    }
-
-    AE_INFO("acquired swap chain images");
-}
-
-void VulkanAPI::CreateImageViews() {
-    swapChainImageViews.resize(swapChainImages.size());
-
-    // Create an image view for every image in the swap chain
-    for (size_t i = 0; i < swapChainImages.size(); i++) {
-        VkImageViewCreateInfo createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = swapChainImages[i];
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = swapChainFormat;
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1;
-
-        if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
-            AE_ERROR("failed to create image view for swap chain image #{0}", i);
-            exit(1);
-        }
-    }
-
-    AE_INFO("created image views for swap chain images");
 }
 
 void VulkanAPI::CreateDescriptorPool() {
@@ -716,113 +760,34 @@ void VulkanAPI::CreateDescriptorPool() {
 }
 
 void VulkanAPI::CreateCommandBuffers() {
-    // Allocate graphics command buffers
-    graphicsCommandBuffers.resize(swapChainImages.size());
-
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = (uint32_t)swapChainImages.size();
+    allocInfo.commandBufferCount = 1;
 
-    if (vkAllocateCommandBuffers(device, &allocInfo, graphicsCommandBuffers.data()) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(device, &allocInfo, &graphicsCommandBuffer) != VK_SUCCESS) {
         AE_ERROR("failed to allocate graphics command buffers");
         exit(1);
     }
-    else {
-        AE_INFO("allocated graphics command buffers");
-    }
-}
 
-void VulkanAPI::UpdateCommandBuffer(size_t i) {
-    // Reset the command buffer to allow re-recording
-    vkResetCommandBuffer(graphicsCommandBuffers[i], 0);
-
-    // Begin recording the command buffer
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-
-    vkBeginCommandBuffer(graphicsCommandBuffers[i], &beginInfo);
-
-    // Prepare subresource range for barriers
-    VkImageSubresourceRange subResourceRange = {};
-    subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subResourceRange.baseMipLevel = 0;
-    subResourceRange.levelCount = 1;
-    subResourceRange.baseArrayLayer = 0;
-    subResourceRange.layerCount = 1;
-
-    // Barrier to transition image layout for drawing
-    VkImageMemoryBarrier presentToDrawBarrier = {};
-    presentToDrawBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    presentToDrawBarrier.srcAccessMask = 0;
-    presentToDrawBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    presentToDrawBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    presentToDrawBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    if (presentQueueFamily != graphicsQueueFamily) {
-        presentToDrawBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        presentToDrawBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    } else {
-        presentToDrawBarrier.srcQueueFamilyIndex = presentQueueFamily;
-        presentToDrawBarrier.dstQueueFamilyIndex = graphicsQueueFamily;
-    }
-
-    presentToDrawBarrier.image = swapChainImages[i];
-    presentToDrawBarrier.subresourceRange = subResourceRange;
-
-    vkCmdPipelineBarrier(graphicsCommandBuffers[i], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
-
-
-    // Record the render commands using RenderCommandQueue
-    VulkanAPI::Get().RecordCommandBuffer(VulkanAPI::Get().GetRenderQueue(), graphicsCommandBuffers[i], i);
-
-    // Barrier if present and graphics queue families differ
-    if (presentQueueFamily != graphicsQueueFamily) {
-        VkImageMemoryBarrier drawToPresentBarrier = {};
-        drawToPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        drawToPresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        drawToPresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-        drawToPresentBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        drawToPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        drawToPresentBarrier.srcQueueFamilyIndex = graphicsQueueFamily;
-        drawToPresentBarrier.dstQueueFamilyIndex = presentQueueFamily;
-        drawToPresentBarrier.image = swapChainImages[i];
-        drawToPresentBarrier.subresourceRange = subResourceRange;
-
-        vkCmdPipelineBarrier(graphicsCommandBuffers[i], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &drawToPresentBarrier);
-    }
-
-    // End recording the command buffer
-    if (vkEndCommandBuffer(graphicsCommandBuffers[i]) != VK_SUCCESS) {
-        AE_ERROR("failed to record command buffer");
+    VkFenceCreateInfo fenceInfo = {};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    if (vkCreateFence(device, &fenceInfo, nullptr, &frameFence) != VK_SUCCESS) {
+        AE_ERROR("failed to create frame fence");
         exit(1);
     }
 
-    // Clear the render queue after recording
-    VulkanAPI::Get().GetRenderQueue().Clear();
+    AE_INFO("allocated graphics command buffers");
 }
 
-void VulkanAPI::OnWindowSizeChanged() {
-    //windowResized = false;
-    Window::GetInstance()->SetResizedFlag(false);
-
-    // Only recreate objects that are affected by framebuffer size changes
-    RenderingAPI::GetInstance()->CleanUp(false);
-
-    VulkanAPI::CreateSwapChain();
-    VulkanAPI::CreateImageViews();
-    Pipeline::InvalidateAll();
-    VulkanAPI::CreateCommandBuffers();
-}
-
-// True only when the surface's actual pixel extent differs from the swapchain we built for it.
+// True only when the surface's actual pixel extent differs from the swapchain built for it.
 // This is the reliable signal for "needs recreation" — unlike the window-resize callback flag,
 // which on macOS/MoltenVK can latch on essentially every frame even when nothing changed.
-static bool HasSurfaceExtentChanged() {
+static bool HasSurfaceExtentChanged(const VulkanSwapchainData& data) {
     VkSurfaceCapabilitiesKHR caps;
-    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, windowSurface, &caps) != VK_SUCCESS) {
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, data.WindowSurface, &caps) != VK_SUCCESS) {
         return false;
     }
     // 0xFFFFFFFF => the extent is chosen by the swapchain, not the surface; nothing to compare.
@@ -833,80 +798,145 @@ static bool HasSurfaceExtentChanged() {
     if (caps.currentExtent.width == 0 || caps.currentExtent.height == 0) {
         return false;
     }
-    return caps.currentExtent.width != swapChainExtent.width
-        || caps.currentExtent.height != swapChainExtent.height;
+    return caps.currentExtent.width != data.Extent.width
+        || caps.currentExtent.height != data.Extent.height;
 }
 
 void VulkanAPI::Draw() {
-    // Acquire image
-    uint32_t imageIndex;
-    VkResult res = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    std::vector<VulkanSwapchainData*> targets;
+    for (const RenderCommand& cmd : m_RenderQueue.commands) {
+        if (cmd.Type != RenderCommandType::BeginRenderPass) {
+            continue;
+        }
+        const auto& data = std::get<CmdBeginRenderPass>(cmd.Data);
+        Object* targetObject = data.Target.Get();
+        Surface* surface = targetObject ? targetObject->As<Surface>() : nullptr;
+        if (!surface) {
+            continue;
+        }
+        VulkanSwapchainData* swapchain = GetOrCreateSwapchainData(surface);
+        if (std::find(targets.begin(), targets.end(), swapchain) == targets.end()) {
+            targets.push_back(swapchain);
+        }
+    }
 
-    // Only a genuinely out-of-date swapchain must be recreated before we can draw. VK_SUBOPTIMAL_KHR
-    // means the swapchain still presents fine (just not optimally matched, e.g. HiDPI on MoltenVK);
-    // recreating on it every frame is wasteful and never converges, so we proceed with the frame.
-    if (res == VK_ERROR_OUT_OF_DATE_KHR) {
-        AE_TRACE("swapchain out of date on acquire {0}", (int64_t) res);
-        VulkanAPI::OnWindowSizeChanged();
+    if (targets.empty()) {
+        m_RenderQueue.Clear();
         return;
     }
-    else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
-        AE_ERROR("failed to acquire image");
-        exit(1);
+
+    for (VulkanSwapchainData* swapchain : targets) {
+        swapchain->Acquired = false;
+        VkResult res = vkAcquireNextImageKHR(device, swapchain->SwapChain, UINT64_MAX, swapchain->ImageAvailable, VK_NULL_HANDLE, &swapchain->ImageIndex);
+
+        // Only a genuinely out-of-date swapchain must be recreated before we can draw.
+        // VK_SUBOPTIMAL_KHR still presents fine; recreating on it never converges on MoltenVK.
+        if (res == VK_ERROR_OUT_OF_DATE_KHR) {
+            AE_TRACE("swapchain out of date on acquire");
+            RecreateSwapchain(*swapchain);
+            m_RenderQueue.Clear();
+            return;
+        }
+        else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
+            AE_ERROR("failed to acquire image");
+            exit(1);
+        }
+        swapchain->Acquired = true;
     }
 
-    // Update the command buffer for the acquired swap chain image with the current render queue
-    VulkanAPI::UpdateCommandBuffer(imageIndex);
+    vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device, 1, &frameFence);
 
-    // Wait for image to be available and draw
+    vkResetCommandBuffer(graphicsCommandBuffer, 0);
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    vkBeginCommandBuffer(graphicsCommandBuffer, &beginInfo);
+
+    VkImageSubresourceRange subResourceRange = {};
+    subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subResourceRange.baseMipLevel = 0;
+    subResourceRange.levelCount = 1;
+    subResourceRange.baseArrayLayer = 0;
+    subResourceRange.layerCount = 1;
+
+    for (VulkanSwapchainData* swapchain : targets) {
+        VkImageMemoryBarrier presentToDrawBarrier = {};
+        presentToDrawBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        presentToDrawBarrier.srcAccessMask = 0;
+        presentToDrawBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        presentToDrawBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        presentToDrawBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        presentToDrawBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        presentToDrawBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        presentToDrawBarrier.image = swapchain->Images[swapchain->ImageIndex];
+        presentToDrawBarrier.subresourceRange = subResourceRange;
+
+        vkCmdPipelineBarrier(graphicsCommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
+    }
+
+    RecordCommandBuffer(m_RenderQueue, graphicsCommandBuffer);
+
+    if (vkEndCommandBuffer(graphicsCommandBuffer) != VK_SUCCESS) {
+        AE_ERROR("failed to record command buffer");
+        exit(1);
+    }
+    m_RenderQueue.Clear();
+
+    std::vector<VkSemaphore> waitSemaphores;
+    std::vector<VkPipelineStageFlags> waitStages;
+    std::vector<VkSemaphore> signalSemaphores;
+    for (VulkanSwapchainData* swapchain : targets) {
+        waitSemaphores.push_back(swapchain->ImageAvailable);
+        waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        signalSemaphores.push_back(swapchain->RenderingFinished);
+    }
+
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
-
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &renderingFinishedSemaphore;
-
-    // This is the stage where the queue should wait on the semaphore
-    VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    submitInfo.pWaitDstStageMask = &waitDstStageMask;
-
+    submitInfo.waitSemaphoreCount = (uint32_t)waitSemaphores.size();
+    submitInfo.pWaitSemaphores = waitSemaphores.data();
+    submitInfo.pWaitDstStageMask = waitStages.data();
+    submitInfo.signalSemaphoreCount = (uint32_t)signalSemaphores.size();
+    submitInfo.pSignalSemaphores = signalSemaphores.data();
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &graphicsCommandBuffers[imageIndex];
+    submitInfo.pCommandBuffers = &graphicsCommandBuffer;
 
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, frameFence) != VK_SUCCESS) {
         AE_ERROR("failed to submit draw command buffer");
         exit(1);
     }
 
-    // Present drawn image
-    // Note: semaphore here is not strictly necessary, because commands are processed in submission order within a single queue
+    std::vector<VkSwapchainKHR> presentSwapchains;
+    std::vector<uint32_t> presentImageIndices;
+    std::vector<VkResult> presentResults(targets.size(), VK_SUCCESS);
+    for (VulkanSwapchainData* swapchain : targets) {
+        presentSwapchains.push_back(swapchain->SwapChain);
+        presentImageIndices.push_back(swapchain->ImageIndex);
+    }
+
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &renderingFinishedSemaphore;
+    presentInfo.waitSemaphoreCount = (uint32_t)signalSemaphores.size();
+    presentInfo.pWaitSemaphores = signalSemaphores.data();
+    presentInfo.swapchainCount = (uint32_t)presentSwapchains.size();
+    presentInfo.pSwapchains = presentSwapchains.data();
+    presentInfo.pImageIndices = presentImageIndices.data();
+    presentInfo.pResults = presentResults.data();
 
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &swapChain;
-    presentInfo.pImageIndices = &imageIndex;
-
-    res = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-    // Recreate only when the swapchain is genuinely out of date or the surface's pixel extent
-    // actually changed. VK_SUBOPTIMAL_KHR by itself (common on MoltenVK) is not a reason to rebuild
-    // the swapchain and every pipeline each frame. Clear the resize callback flag either way.
-    Window::GetInstance()->SetResizedFlag(false);
-    if (res == VK_ERROR_OUT_OF_DATE_KHR || HasSurfaceExtentChanged()) {
-        VulkanAPI::OnWindowSizeChanged();
-    }
-    else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
+    const VkResult presentRes = vkQueuePresentKHR(presentQueue, &presentInfo);
+    if (presentRes != VK_SUCCESS && presentRes != VK_SUBOPTIMAL_KHR && presentRes != VK_ERROR_OUT_OF_DATE_KHR) {
         AE_ERROR("failed to submit present command buffer");
         exit(1);
     }
+
+    for (size_t i = 0; i < targets.size(); i++) {
+        if (presentResults[i] == VK_ERROR_OUT_OF_DATE_KHR || HasSurfaceExtentChanged(*targets[i])) {
+            RecreateSwapchain(*targets[i]);
+        }
+    }
 }
 
-void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer, uint32_t InImageIndex) {
+void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer) {
     bool hasRenderPassBegun = false;
     VulkanPipeline* currentPipeline = nullptr;
 
@@ -947,10 +977,19 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                     }
 
                     vkCmdBeginRendering(InCmdBuffer, &renderingInfo);
+
+                    const VkExtent2D extent = { framebuffer->GetDesc().Width, framebuffer->GetDesc().Height };
+                    VkViewport viewport = { 0.0f, 0.0f, (float)extent.width, (float)extent.height, 0.0f, 1.0f };
+                    VkRect2D scissor = { { 0, 0 }, extent };
+                    vkCmdSetViewport(InCmdBuffer, 0, 1, &viewport);
+                    vkCmdSetScissor(InCmdBuffer, 0, 1, &scissor);
                 } else if (Surface* surface = data.Target ? data.Target->As<Surface>() : nullptr) {
+                    VulkanSwapchainData* swapchain = FindSwapchainData(surface);
+                    AE_ASSERT(swapchain && swapchain->Acquired, "surface target has no acquired swapchain image");
+
                     VkRenderingAttachmentInfo swapchainColorAttachment{};
                     swapchainColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-                    swapchainColorAttachment.imageView = swapChainImageViews[InImageIndex];
+                    swapchainColorAttachment.imageView = swapchain->ImageViews[swapchain->ImageIndex];
                     swapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     swapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
                     swapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -958,13 +997,18 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
 
                     VkRenderingInfo renderingInfo{};
                     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-                    renderingInfo.renderArea = { 0, 0, swapChainExtent.width, swapChainExtent.height };
+                    renderingInfo.renderArea = { 0, 0, swapchain->Extent.width, swapchain->Extent.height };
                     renderingInfo.layerCount = 1;
                     renderingInfo.colorAttachmentCount = 1;
                     renderingInfo.pColorAttachments = &swapchainColorAttachment;
                     renderingInfo.pDepthAttachment = nullptr;
 
                     vkCmdBeginRendering(InCmdBuffer, &renderingInfo);
+
+                    VkViewport viewport = { 0.0f, 0.0f, (float)swapchain->Extent.width, (float)swapchain->Extent.height, 0.0f, 1.0f };
+                    VkRect2D scissor = { { 0, 0 }, swapchain->Extent };
+                    vkCmdSetViewport(InCmdBuffer, 0, 1, &viewport);
+                    vkCmdSetScissor(InCmdBuffer, 0, 1, &scissor);
                 } else {
                     AE_ASSERT(false, "unsupported render target type");
                 }
@@ -1062,7 +1106,6 @@ RenderCommandQueue& VulkanAPI::GetRenderQueue() {
 }
 
 SharedObjectPtr<VertexBuffer> VulkanAPI::CreateVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices) {
-    Window::GetInstance()->SetResizedFlag(true);
     return new VulkanVertexBuffer(InVertexData, InVertexByteSize, InIndices, *this);
 }
 

@@ -1,6 +1,8 @@
 #include "UIDockArea.h"
 #include "EditorStyle.h"
 #include "Tabs/MinorTab.h"
+#include "Tabs/MajorTab.h"
+#include "EditorWindow.h"
 #include "Assets/Font.h"
 #include "Rendering/UIDrawList.h"
 
@@ -11,7 +13,12 @@ UIDockArea::UIDockArea() {
 
 UIDockNode* UIDockArea::Dock(MinorTab* InTab, UIDockSlot InSlot, UIDockNode* InTarget, float InShare) {
     UIDockNode* target = InTarget ? InTarget : m_Root;
-    if (InSlot == UIDockSlot::Center || (target->IsLeaf() && target->GetTabs().IsEmpty())) {
+    if (InSlot == UIDockSlot::Center) {
+        target = target->FindFirstLeaf();
+        target->AddTab(InTab);
+        return target;
+    }
+    if (target->IsLeaf() && target->GetTabs().IsEmpty()) {
         target->AddTab(InTab);
         return target;
     }
@@ -44,25 +51,50 @@ void UIDockArea::EndTabDrag() {
     UIDockSlot slot = UIDockSlot::Center;
     UIRectF preview;
     if (!ResolveDropTarget(m_DragCursor, target, slot, preview)) {
+        if (!GetGeometry().Contains(m_DragCursor)) {
+            FloatDraggedTab(tab, source);
+        }
         return;
     }
     if (target == source && source->GetTabs().Size() == 1) {
         return;
     }
 
-    source->RemoveTab(tab);
-    if (source->GetTabs().IsEmpty()) {
-        // Collapse the emptied leaf: its parent split absorbs the sibling. The absorb deletes
-        // the sibling's shell, so a drop targeted at it is retargeted to the surviving parent.
-        if (UIDockNode* parent = source->GetParent() ? source->GetParent()->As<UIDockNode>() : nullptr) {
-            UIDockNode* kept = (parent->GetChildA() == source) ? parent->GetChildB() : parent->GetChildA();
-            parent->AbsorbChild(kept);
-            if (target == kept || target == source) {
-                target = parent;
-            }
+    DetachTab(tab, source, target);
+    Dock(tab, slot, target, 0.5f);
+}
+
+void UIDockArea::DetachTab(MinorTab* InTab, UIDockNode* InSource, UIDockNode*& InOutTarget) {
+    InSource->RemoveTab(InTab);
+    if (!InSource->GetTabs().IsEmpty()) {
+        return;
+    }
+    // Collapse the emptied leaf: its parent split absorbs the sibling. The absorb deletes
+    // the sibling's shell, so a drop targeted at it is retargeted to the surviving parent.
+    if (UIDockNode* parent = InSource->GetParent() ? InSource->GetParent()->As<UIDockNode>() : nullptr) {
+        UIDockNode* kept = (parent->GetChildA() == InSource) ? parent->GetChildB() : parent->GetChildA();
+        parent->AbsorbChild(kept);
+        if (InOutTarget == kept || InOutTarget == InSource) {
+            InOutTarget = parent;
         }
     }
-    Dock(tab, slot, target, 0.5f);
+}
+
+void UIDockArea::FloatDraggedTab(MinorTab* InTab, UIDockNode* InSource) {
+    MajorTab* majorTab = nullptr;
+    for (Node* node = GetParent(); node; node = node->GetParent()) {
+        if ((majorTab = node->As<MajorTab>())) {
+            break;
+        }
+    }
+    if (!majorTab || !majorTab->GetOwnerWindow()) {
+        return;
+    }
+
+    UIDockNode* unusedTarget = nullptr;
+    DetachTab(InTab, InSource, unusedTarget);
+    const Vec2 screenPos = majorTab->GetOwnerWindow()->GetPosition() + m_DragCursor;
+    majorTab->FloatTab(InTab, screenPos);
 }
 
 bool UIDockArea::ResolveDropTarget(const Vec2& InPoint, UIDockNode*& OutNode, UIDockSlot& OutSlot, UIRectF& OutPreview) const {

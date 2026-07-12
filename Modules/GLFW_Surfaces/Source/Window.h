@@ -1,6 +1,7 @@
 #pragma once
 #include "Rendering/Surface.h"
 #include "Common/Types.h"
+#include "Common/Array.h"
 #include "Window.gen.h"
 
 struct WindowParams {
@@ -34,7 +35,24 @@ public:
     void Minimize();
     void ToggleMaximize();
     bool IsMaximized() const;
+    bool IsMinimized() const;
     void Close();
+
+    void Show();
+    void Hide();
+    bool IsVisible() const;
+    bool IsFocused() const;
+    void Focus();
+
+    Vec2 GetPosition() const;
+    void SetPosition(const Vec2& InScreenPos);
+
+    Vec2 GetCursorPosition() const;
+    bool IsMouseButtonDown(int32_t InButton) const;
+    void AccumulateScroll(const Vec2& InDelta) { m_ScrollAccum += InDelta; }
+    /** Scroll accumulated on this window since the last call. */
+    Vec2 ConsumeScrollDelta();
+    static Vec2 ConsumeGlobalScrollDelta();
 
     /** Whether a client-area point (window coordinates) lies in the draggable region of an
      *  application-drawn title bar. Queried by the platform for EditorStyle windows; the OS
@@ -48,9 +66,14 @@ public:
 
     static SharedObjectPtr<Window> Create(const WindowParams& InParams);
     static Window* GetInstance();
+    static Window* GetFocusedWindow();
+    /** The focused window's GLFW handle (primary window when none is focused). */
     static struct GLFWwindow* GetGLFWwindow();
+    struct GLFWwindow* GetNativeWindow() const { return m_Window; }
 private:
     WindowParams m_Params;
     struct GLFWwindow* m_Window = nullptr;
     bool m_CursorLocked = false;
+    bool m_Resized = false;
+    Vec2 m_ScrollAccum = Vec2(0.0f);
 };

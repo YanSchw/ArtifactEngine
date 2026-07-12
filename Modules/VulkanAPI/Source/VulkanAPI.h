@@ -19,19 +19,15 @@ public:
     static void CheckSwapChainSupport();
     static void FindQueueFamilies();
     static void CreateLogicalDevice();
-    static void CreateSemaphores();
     static void CreateCommandPool();
-    static void CreateSwapChain();
-    static void CreateImageViews();
     static void CreateDescriptorPool();
     static void CreateCommandBuffers();
-    static void UpdateCommandBuffer(size_t i);
 
-    void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer, uint32_t InImageIndex);
+    void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer);
 
     virtual void CleanUp(bool fullClean) override;
+    virtual void DestroySurfaceResources(class Surface* InSurface) override;
 
-    static void OnWindowSizeChanged();
     virtual void Draw() override;
 
     VkDevice GetDevice() const;

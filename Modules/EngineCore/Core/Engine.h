@@ -15,6 +15,7 @@ public:
     static Engine& Get();
 
     GameInstance* GetGameInstance() const;
+    class RenderPipeline* GetRenderPipeline() const { return m_RenderPipeline.Get(); }
 
     virtual void RequestExit(bool InForce);
 

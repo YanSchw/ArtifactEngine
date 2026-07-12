@@ -36,6 +36,8 @@ protected:
 
 private:
     bool ResolveDropTarget(const Vec2& InPoint, UIDockNode*& OutNode, UIDockSlot& OutSlot, UIRectF& OutPreview) const;
+    void DetachTab(MinorTab* InTab, UIDockNode* InSource, UIDockNode*& InOutTarget);
+    void FloatDraggedTab(MinorTab* InTab, UIDockNode* InSource);
 
     UIDockNode* m_Root = nullptr;
     MinorTab* m_DraggedTab = nullptr;

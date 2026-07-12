@@ -1,5 +1,6 @@
 #include "Window.h"
 #include "Core/Log.h"
+#include "Rendering/RenderingAPI.h"
 
 #include "GLFWKeyboardDevice.h"
 #include "GLFWMouseDevice.h"
@@ -10,13 +11,23 @@
 #include <GLFW/glfw3.h>
 
 static Window* s_Instance = nullptr;
-static bool s_WindowResized = false;
+static Array<Window*> s_AllWindows;
+static Vec2 s_GlobalScrollAccum = Vec2(0.0f);
+
 static void OnWindowResized(GLFWwindow* InWindow, int InWidth, int InHeight) {
-    s_WindowResized = true;
+    if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
+        self->SetResizedFlag(true);
+    }
 }
 
+static void OnWindowScroll(GLFWwindow* InWindow, double InOffsetX, double InOffsetY);
+
 Window::Window(const WindowParams& InParams) {
-    s_Instance = this;
+    if (!s_Instance) {
+        s_Instance = this;
+    }
+    s_AllWindows.Add(this);
+
     if (!glfwInit()) {
         AE_ERROR("Failed to initialize GLFW");
         return;
@@ -26,21 +37,19 @@ Window::Window(const WindowParams& InParams) {
         return;
     }
 
-    // Set GLFW window hints for Vulkan
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     glfwWindowHint(GLFW_TITLEBAR, InParams.EditorStyle ? GLFW_FALSE : GLFW_TRUE);
 
     m_Params = InParams;
-    // TODO: Window SHARED CONTEXT
     m_Window = glfwCreateWindow(m_Params.Width, m_Params.Height, m_Params.Title.c_str(), nullptr, nullptr);
     if (!m_Window) {
         AE_ERROR("Failed to create GLFW window");
-        glfwTerminate();
         return;
     }
     glfwSetWindowUserPointer(m_Window, this);
     glfwSetWindowSizeCallback(m_Window, OnWindowResized);
+    glfwSetScrollCallback(m_Window, OnWindowScroll);
 
     if (m_Params.EditorStyle) {
         glfwSetTitlebarHitTestCallback(m_Window, [](GLFWwindow* InWindow, int InX, int InY, int* OutHit) {
@@ -58,9 +67,28 @@ Window::Window(const WindowParams& InParams) {
         InputSystem::Get().AddDevice(new GLFWGamepadDevice());
     }
 }
+
 Window::~Window() {
-    // Destructor implementation
-    AE_INFO("Destroying window");
+    s_AllWindows.Remove(this);
+    if (s_Instance == this) {
+        s_Instance = s_AllWindows.IsEmpty() ? nullptr : s_AllWindows[0];
+    }
+    if (m_Window) {
+        // The swapchain and VkSurface must go before their GLFW window.
+        if (RenderingAPI::GetInstance()) {
+            RenderingAPI::GetInstance()->DestroySurfaceResources(this);
+        }
+        AE_INFO("Destroying GLFW window");
+        glfwDestroyWindow(m_Window);
+        m_Window = nullptr;
+    }
+}
+
+static void OnWindowScroll(GLFWwindow* InWindow, double InOffsetX, double InOffsetY) {
+    s_GlobalScrollAccum += Vec2((float)InOffsetX, (float)InOffsetY);
+    if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
+        self->AccumulateScroll(Vec2((float)InOffsetX, (float)InOffsetY));
+    }
 }
 
 void Window::TickWindow() {
@@ -78,11 +106,11 @@ uint32_t Window::GetHeight() const {
 }
 
 void Window::SetResizedFlag(bool InFlag) {
-    s_WindowResized = InFlag;
+    m_Resized = InFlag;
 }
 
 bool Window::WasWindowResized() const {
-    return s_WindowResized;
+    return m_Resized;
 }
 
 bool Window::ShouldClose() const {
@@ -109,8 +137,64 @@ bool Window::IsMaximized() const {
     return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED) == GLFW_TRUE;
 }
 
+bool Window::IsMinimized() const {
+    return glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED) == GLFW_TRUE;
+}
+
 void Window::Close() {
     glfwSetWindowShouldClose(m_Window, GLFW_TRUE);
+}
+
+void Window::Show() {
+    glfwShowWindow(m_Window);
+}
+
+void Window::Hide() {
+    glfwHideWindow(m_Window);
+}
+
+bool Window::IsVisible() const {
+    return glfwGetWindowAttrib(m_Window, GLFW_VISIBLE) == GLFW_TRUE;
+}
+
+bool Window::IsFocused() const {
+    return glfwGetWindowAttrib(m_Window, GLFW_FOCUSED) == GLFW_TRUE;
+}
+
+void Window::Focus() {
+    glfwFocusWindow(m_Window);
+}
+
+Vec2 Window::GetPosition() const {
+    int x, y;
+    glfwGetWindowPos(m_Window, &x, &y);
+    return Vec2((float)x, (float)y);
+}
+
+void Window::SetPosition(const Vec2& InScreenPos) {
+    glfwSetWindowPos(m_Window, (int)InScreenPos.x, (int)InScreenPos.y);
+}
+
+Vec2 Window::GetCursorPosition() const {
+    double x, y;
+    glfwGetCursorPos(m_Window, &x, &y);
+    return Vec2((float)x, (float)y);
+}
+
+bool Window::IsMouseButtonDown(int32_t InButton) const {
+    return glfwGetMouseButton(m_Window, InButton) == GLFW_PRESS;
+}
+
+Vec2 Window::ConsumeScrollDelta() {
+    const Vec2 delta = m_ScrollAccum;
+    m_ScrollAccum = Vec2(0.0f);
+    return delta;
+}
+
+Vec2 Window::ConsumeGlobalScrollDelta() {
+    const Vec2 delta = s_GlobalScrollAccum;
+    s_GlobalScrollAccum = Vec2(0.0f);
+    return delta;
 }
 
 void Window::SetCursorLocked(bool InLocked) {
@@ -135,6 +219,18 @@ Window* Window::GetInstance() {
     return s_Instance;
 }
 
+Window* Window::GetFocusedWindow() {
+    for (Window* window : s_AllWindows) {
+        if (window->m_Window && window->IsFocused()) {
+            return window;
+        }
+    }
+    return nullptr;
+}
+
 GLFWwindow* Window::GetGLFWwindow() {
-    return Window::GetInstance()->m_Window;
+    if (Window* focused = GetFocusedWindow()) {
+        return focused->m_Window;
+    }
+    return s_Instance ? s_Instance->m_Window : nullptr;
 }

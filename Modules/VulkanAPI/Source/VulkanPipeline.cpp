@@ -10,11 +10,6 @@ static Array<VulkanPipeline*> s_Pipelines;
 
 extern VkExtent2D swapChainExtent;
 extern VkFormat swapChainFormat;
-extern VkSwapchainKHR oldSwapChain;
-extern VkSwapchainKHR swapChain;
-extern std::vector<VkImage> swapChainImages;
-extern std::vector<VkImageView> swapChainImageViews;
-extern std::vector<VkFramebuffer> swapChainFramebuffers;
 
 static VkFormat ImageFormatToVkFormat(ImageFormat format) {
     switch (format) {
@@ -181,6 +176,13 @@ void VulkanPipeline::Invalidate() {
     colorBlendCreateInfo.blendConstants[2] = 0.0f;
     colorBlendCreateInfo.blendConstants[3] = 0.0f;
 
+    // Viewport and scissor are dynamic so one pipeline serves every window size.
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
+    dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicStateCreateInfo.dynamicStateCount = 2;
+    dynamicStateCreateInfo.pDynamicStates = dynamicStates;
+
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = m_Desc.EnableDepthTest ? VK_TRUE : VK_FALSE;
@@ -232,6 +234,7 @@ void VulkanPipeline::Invalidate() {
     pipelineCreateInfo.pMultisampleState = &multisampleCreateInfo;
     pipelineCreateInfo.pColorBlendState = &colorBlendCreateInfo;
     pipelineCreateInfo.pDepthStencilState = &depthStencil;
+    pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
     pipelineCreateInfo.layout = m_PipelineLayout;
     pipelineCreateInfo.renderPass = VK_NULL_HANDLE;
     pipelineCreateInfo.subpass = 0;

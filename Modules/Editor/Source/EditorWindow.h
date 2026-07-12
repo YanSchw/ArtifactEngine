@@ -1,15 +1,14 @@
 #pragma once
-#include "Window.h"
-#include "GameFramework/UINode.h"
+#include "ThemedWindow.h"
 #include "EditorWindow.gen.h"
 
-class UICanvas;
 class UIStack;
-class UIQuad;
 class MajorTab;
+class Pipeline;
+class VertexBuffer;
 
 /** The editor's main window. */
-class EditorWindow : public Window {
+class EditorWindow : public ThemedWindow {
 public:
     ARTIFACT_CLASS();
 protected:
@@ -18,8 +17,6 @@ public:
     virtual ~EditorWindow();
 
     static SharedObjectPtr<EditorWindow> Create(WindowParams InParams);
-
-    UICanvas* GetCanvas() const { return m_Canvas; }
 
     template<typename T>
     T* OpenTab() {
@@ -31,24 +28,34 @@ public:
     MajorTab* GetActiveTab() const { return m_ActiveTab; }
     const Array<MajorTab*>& GetOpenTabs() const { return m_OpenTabs; }
 
-    void SetFrameSeconds(double InSeconds) { m_FrameSeconds = InSeconds; }
+    void BeginTabHandleDrag(MajorTab* InTab);
+    void UpdateTabHandleDrag(const Vec2& InCursorPos);
+    void EndTabHandleDrag(MajorTab* InTab);
+    bool IsDraggingTabHandle() const { return m_DraggingTabHandle; }
 
-    virtual bool HitTestTitleBar(const Vec2& InPoint) const override;
+    static void MoveTab(MajorTab* InTab, EditorWindow* InFrom, EditorWindow* InTo);
+
+protected:
+    virtual void PreUIRender(double InDeltaTime) override;
+    virtual void ReleaseResources() override;
 
 private:
-    void BuildChrome();
+    void BuildEditorChrome();
     void RegisterTab(MajorTab* InTab);
     void RebuildToolBar();
     void RebuildTabBar();
 
-    UICanvas* m_Canvas = nullptr;
-    UIQuad* m_TitleBar = nullptr;
     UIStack* m_ToolBarContent = nullptr;
     UINode* m_TabHost = nullptr;
     UIStack* m_TabBar = nullptr;
-    Array<UINode*> m_TitleBarButtons;
 
     Array<MajorTab*> m_OpenTabs;
     MajorTab* m_ActiveTab = nullptr;
-    double m_FrameSeconds = 0.0;
+    bool m_ChromeDirty = false;
+
+    bool m_DraggingTabHandle = false;
+    Vec2 m_TabHandleDragCursor = Vec2(0.0f);
+
+    SharedObjectPtr<Pipeline> m_ScenePipeline;
+    SharedObjectPtr<VertexBuffer> m_SceneQuad;
 };
