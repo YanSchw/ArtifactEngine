@@ -1,6 +1,8 @@
 #include "UIDrawList.h"
 #include "Assets/Font.h"
 #include <algorithm>
+#include <cmath>
+#include <numbers>
 
 UIVertex UIDrawList::MakeVertex(const Vec2& InPos, const Vec2& InUv, const Vec4& InColor, const Mat4& InTransform) const {
     const Vec4 p = InTransform * Vec4(InPos.x, InPos.y, 0.0f, 1.0f);
@@ -97,6 +99,188 @@ void UIDrawList::AddImageTriangle(const Vec2 InPoints[3], const Vec2 InUvs[3], c
     m_Indices.Add(base + 0); m_Indices.Add(base + 1); m_Indices.Add(base + 2);
 
     ExtendBatch(InTexture ? BatchKind::Image : BatchKind::Solid, InTexture, firstIndex, 3);
+}
+
+void UIDrawList::AppendConvexPoly(const Vec2* InPoints, int32_t InCount, const Vec4& InColorTop, const Vec4& InColorBottom, const Mat4& InTransform) {
+    constexpr int32_t MaxPoints = 64;
+    if (InCount < 3 || InCount > MaxPoints - 4) {
+        return;
+    }
+
+    // Gradient extent is taken from the unclipped polygon, so clipping never shifts the colors.
+    float gradientMinY = InPoints[0].y;
+    float gradientMaxY = InPoints[0].y;
+    for (int32_t i = 1; i < InCount; i++) {
+        gradientMinY = std::min(gradientMinY, InPoints[i].y);
+        gradientMaxY = std::max(gradientMaxY, InPoints[i].y);
+    }
+    const float gradientSpan = std::max(gradientMaxY - gradientMinY, 0.0001f);
+
+    // Exact clip via Sutherland-Hodgman: each clip-rect edge can add at most one vertex,
+    // and a convex polygon stays convex, so a fan triangulation remains valid.
+    Vec2 buffers[2][MaxPoints];
+    const Vec2* points = InPoints;
+    int32_t count = InCount;
+
+    if (!m_ClipStack.IsEmpty()) {
+        const UIRectF& clip = m_ClipStack.LastItem();
+        const float bounds[4] = { clip.Min().x, clip.Max().x, clip.Min().y, clip.Max().y };
+        for (int32_t edge = 0; edge < 4; edge++) {
+            const int32_t axis = edge / 2;         // 0 = x, 1 = y
+            const bool keepGreater = (edge % 2) == 0;
+            Vec2* out = buffers[edge % 2];
+            int32_t outCount = 0;
+            for (int32_t i = 0; i < count; i++) {
+                const Vec2& a = points[i];
+                const Vec2& b = points[(i + 1) % count];
+                const float da = keepGreater ? (a[axis] - bounds[edge]) : (bounds[edge] - a[axis]);
+                const float db = keepGreater ? (b[axis] - bounds[edge]) : (bounds[edge] - b[axis]);
+                if (da >= 0.0f) {
+                    out[outCount++] = a;
+                }
+                if ((da >= 0.0f) != (db >= 0.0f)) {
+                    out[outCount++] = a + (b - a) * (da / (da - db));
+                }
+            }
+            points = out;
+            count = outCount;
+            if (count < 3) {
+                return;
+            }
+        }
+    }
+
+    const uint32_t base = (uint32_t)m_Vertices.Size();
+    for (int32_t i = 0; i < count; i++) {
+        const Vec4 color = glm::mix(InColorTop, InColorBottom, (points[i].y - gradientMinY) / gradientSpan);
+        m_Vertices.Add(MakeVertex(points[i], Vec2(0.0f), color, InTransform));
+    }
+    const uint32_t firstIndex = (uint32_t)m_Indices.Size();
+    for (int32_t i = 1; i < count - 1; i++) {
+        m_Indices.Add(base); m_Indices.Add(base + i); m_Indices.Add(base + i + 1);
+    }
+    ExtendBatch(BatchKind::Solid, nullptr, firstIndex, (uint32_t)(count - 2) * 3);
+}
+
+void UIDrawList::AddConvexPolyFilled(const Vec2* InPoints, int32_t InCount, const Vec4& InColor, const Mat4& InTransform) {
+    AppendConvexPoly(InPoints, InCount, InColor, InColor, InTransform);
+}
+
+void UIDrawList::AddRoundedRect(const UIRectF& InRectPx, const Vec4& InColor, float InRadius, const Mat4& InTransform) {
+    AddRoundedRectEx(InRectPx, InColor, InColor, InRadius, InRadius, InRadius, InRadius, InTransform);
+}
+
+void UIDrawList::AddRoundedRectEx(const UIRectF& InRectPx, const Vec4& InColorTop, const Vec4& InColorBottom,
+                                  float InRadiusTL, float InRadiusTR, float InRadiusBR, float InRadiusBL, const Mat4& InTransform) {
+    const Vec2 mn = InRectPx.Min();
+    const Vec2 mx = InRectPx.Max();
+    if (mx.x <= mn.x || mx.y <= mn.y) {
+        return;
+    }
+
+    const float maxRadius = std::min(InRectPx.Size.x, InRectPx.Size.y) * 0.5f;
+    const float halfPi = std::numbers::pi_v<float> * 0.5f;
+    // Corners in AddRect's winding (TL, BL, BR, TR); every arc sweeps -90 degrees so the
+    // perimeter keeps a consistent rotational direction.
+    const float radii[4] = {
+        std::clamp(InRadiusTL, 0.0f, maxRadius), std::clamp(InRadiusBL, 0.0f, maxRadius),
+        std::clamp(InRadiusBR, 0.0f, maxRadius), std::clamp(InRadiusTR, 0.0f, maxRadius)
+    };
+    const Vec2 sharpCorners[4] = { mn, Vec2(mn.x, mx.y), mx, Vec2(mx.x, mn.y) };
+    const Vec2 arcCenters[4] = {
+        mn + Vec2(radii[0], radii[0]),
+        Vec2(mn.x + radii[1], mx.y - radii[1]),
+        mx - Vec2(radii[2], radii[2]),
+        Vec2(mx.x - radii[3], mn.y + radii[3])
+    };
+    const float startAngles[4] = { -halfPi, std::numbers::pi_v<float>, halfPi, 0.0f };
+
+    Vec2 points[40];
+    int32_t count = 0;
+    for (int32_t corner = 0; corner < 4; corner++) {
+        if (radii[corner] <= 0.5f) {
+            points[count++] = sharpCorners[corner];
+            continue;
+        }
+        const int32_t segments = std::clamp((int32_t)(radii[corner] * 0.5f), 2, 8);
+        for (int32_t i = 0; i <= segments; i++) {
+            const float angle = startAngles[corner] - halfPi * (float)i / (float)segments;
+            points[count++] = arcCenters[corner] + Vec2(std::cos(angle), std::sin(angle)) * radii[corner];
+        }
+    }
+    AppendConvexPoly(points, count, InColorTop, InColorBottom, InTransform);
+}
+
+void UIDrawList::AddLine(const Vec2& InA, const Vec2& InB, float InThickness, const Vec4& InColor, const Mat4& InTransform) {
+    const Vec2 delta = InB - InA;
+    const float length = glm::length(delta);
+    if (length < 0.001f || InThickness <= 0.0f) {
+        return;
+    }
+    const Vec2 dir = delta / length;
+    const Vec2 n = Vec2(-dir.y, dir.x) * (InThickness * 0.5f);
+    const Vec2 quad[4] = { InA - n, InA + n, InB + n, InB - n };
+    AddConvexPolyFilled(quad, 4, InColor, InTransform);
+}
+
+void UIDrawList::AddCubicBezier(const Vec2& InStart, const Vec2& InControlA, const Vec2& InControlB, const Vec2& InEnd,
+                                float InThickness, const Vec4& InColorA, const Vec4& InColorB, int32_t InSegments, const Mat4& InTransform) {
+    if (InSegments <= 0) {
+        const float netLength = glm::length(InControlA - InStart) + glm::length(InControlB - InControlA) + glm::length(InEnd - InControlB);
+        InSegments = (int32_t)std::clamp(netLength / 12.0f, 8.0f, 48.0f);
+    }
+
+    const auto evaluate = [&](float t) {
+        const float u = 1.0f - t;
+        return InStart * (u * u * u) + InControlA * (3.0f * u * u * t) + InControlB * (3.0f * u * t * t) + InEnd * (t * t * t);
+    };
+
+    // Segments are extended by half a thickness on each end so the joints of adjacent
+    // segments overlap instead of leaving wedge-shaped cracks.
+    const float capExtent = InThickness * 0.45f;
+    Vec2 previous = InStart;
+    for (int32_t i = 1; i <= InSegments; i++) {
+        const float t = (float)i / (float)InSegments;
+        const Vec2 current = evaluate(t);
+        const Vec2 delta = current - previous;
+        const float length = glm::length(delta);
+        if (length > 0.001f) {
+            const Vec2 dir = delta / length;
+            const Vec4 color = glm::mix(InColorA, InColorB, (t + (float)(i - 1) / (float)InSegments) * 0.5f);
+            AddLine(previous - dir * capExtent, current + dir * capExtent, InThickness, color, InTransform);
+        }
+        previous = current;
+    }
+}
+
+void UIDrawList::AddCircle(const Vec2& InCenter, float InRadius, const Vec4& InColor, int32_t InSegments, const Mat4& InTransform) {
+    constexpr int32_t MaxSegments = 48;
+    InSegments = std::clamp(InSegments, 3, MaxSegments);
+    Vec2 points[MaxSegments];
+    for (int32_t i = 0; i < InSegments; i++) {
+        // Clockwise (negative angle step) to match AddRect's winding.
+        const float angle = -(float)i / (float)InSegments * 2.0f * std::numbers::pi_v<float>;
+        points[i] = InCenter + Vec2(std::cos(angle), std::sin(angle)) * InRadius;
+    }
+    AddConvexPolyFilled(points, InSegments, InColor, InTransform);
+}
+
+void UIDrawList::AddRing(const Vec2& InCenter, float InRadius, float InThickness, const Vec4& InColor, int32_t InSegments, const Mat4& InTransform) {
+    InSegments = std::clamp(InSegments, 3, 48);
+    const float innerRadius = std::max(0.0f, InRadius - InThickness);
+    Vec2 previousOuter, previousInner;
+    for (int32_t i = 0; i <= InSegments; i++) {
+        const float angle = -(float)i / (float)InSegments * 2.0f * std::numbers::pi_v<float>;
+        const Vec2 unit = Vec2(std::cos(angle), std::sin(angle));
+        const Vec2 outer = InCenter + unit * InRadius;
+        const Vec2 inner = InCenter + unit * innerRadius;
+        if (i > 0) {
+            const Vec2 quad[4] = { previousOuter, outer, inner, previousInner };
+            AddConvexPolyFilled(quad, 4, InColor, InTransform);
+        }
+        previousOuter = outer;
+        previousInner = inner;
+    }
 }
 
 void UIDrawList::PushClipRect(const UIRectF& InRectPx) {

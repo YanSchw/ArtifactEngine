@@ -27,6 +27,19 @@ void JsonSerializer::DeserializeObject(Object* OutObject, const String& InJsonSt
     DeserializeType(OutObject, OutObject->GetClass().Name, j);
 }
 
+Object* JsonSerializer::DeserializeNewObject(const String& InJsonString) {
+    json j = json::parse(InJsonString, nullptr, false);
+    if (j.is_discarded() || !j.contains("$type") || !j["$type"].is_string()) {
+        return nullptr;
+    }
+
+    Object* object = Object::Create(Class(j["$type"].get<String>()));
+    if (object) {
+        DeserializeType(object, object->GetClass().Name, j);
+    }
+    return object;
+}
+
 String JsonSerializer::SerializeStruct(const void* InStruct, const Struct& InStructType) {
     json j = json::object();
     j = SerializeType((void*)InStruct, InStructType.Name);

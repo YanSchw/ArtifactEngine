@@ -2,6 +2,7 @@
 #include "OutlinerTab.h"
 #include "DetailsTab.h"
 #include "ViewportTab.h"
+#include "GraphEditorTab.h"
 #include "UI/UIDockArea.h"
 #include "UI/EditorStyle.h"
 #include "GameFramework/UIBuilder.h"
@@ -12,6 +13,7 @@ SceneEditorTab::SceneEditorTab() {
     area->DockNew<ViewportTab>(UIDockSlot::Center);
     OutlinerTab* outliner = area->DockNew<OutlinerTab>(UIDockSlot::Left, nullptr, 0.24f);
     area->DockNew<DetailsTab>(UIDockSlot::Bottom, outliner->GetDockNode(), 0.45f);
+    area->DockNew<GraphEditorTab>(UIDockSlot::Bottom, nullptr, 0.42f);
 }
 
 void SceneEditorTab::BuildToolBar(UINode& InToolBar) {
