@@ -19,6 +19,7 @@ class ArtifactModule:
         IncludePaths: Optional[List[str]] = None,
         ExportIncludePaths: Optional[List[str]] = None,
         AddAdditionalCMakeProjects: Optional[List[str]] = None,
+        LinkLibraries: Optional[List[str]] = None,
         MountContentDir: Optional[str] = None,
     ):
         """
@@ -33,6 +34,7 @@ class ArtifactModule:
             IncludePaths: Include directories for this module
             ExportIncludePaths: Include directories exported to dependents
             AddAdditionalCMakeProjects: Additional CMake projects to include
+            LinkLibraries: System link libraries/flags passed straight to the linker
             MountContentDir: Module-local content directory to mount at runtime (relative to the module)
         """
         self.name = name
@@ -43,6 +45,7 @@ class ArtifactModule:
         self.IncludePaths = IncludePaths if IncludePaths is not None else []
         self.ExportIncludePaths = ExportIncludePaths if ExportIncludePaths is not None else []
         self.AddAdditionalCMakeProjects = AddAdditionalCMakeProjects if AddAdditionalCMakeProjects is not None else []
+        self.LinkLibraries = LinkLibraries if LinkLibraries is not None else []
         self.MountContentDir = MountContentDir
 
     @classmethod
@@ -80,6 +83,7 @@ class ArtifactModule:
             IncludePaths=data.get("IncludePaths", None),
             ExportIncludePaths=data.get("ExportIncludePaths", None),
             AddAdditionalCMakeProjects=data.get("AddAdditionalCMakeProjects", None),
+            LinkLibraries=data.get("LinkLibraries", None),
             MountContentDir=data.get("MountContentDir", None),
         )
 
@@ -100,6 +104,7 @@ class ArtifactModule:
             "IncludePaths": self.IncludePaths,
             "ExportIncludePaths": self.ExportIncludePaths,
             "AddAdditionalCMakeProjects": self.AddAdditionalCMakeProjects,
+            "LinkLibraries": self.LinkLibraries,
             "MountContentDir": self.MountContentDir,
         }
     

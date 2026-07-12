@@ -3,7 +3,12 @@
         "Source"
     ],
     "ImportModules": [
-        "EngineCore"
+        "EngineCore",
+        "Networking"
+    ],
+    "LinkLibraries": [
+        "-lssl",
+        "-lcrypto"
     ],
     "TargetPlatforms": [
         "Linux"

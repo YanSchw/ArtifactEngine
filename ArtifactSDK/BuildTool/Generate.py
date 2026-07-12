@@ -156,6 +156,8 @@ add_library({module_name} ${{cpp_src}} {owning_root}/Build/Intermediate/Modules/
                     mf.write(f"target_link_libraries({module_name} PUBLIC {import_module_name})\n")
                 for additional_project in module.AddAdditionalCMakeProjects:
                     mf.write(f"add_subdirectory({additional_project})\n")
+                for link_library in module.LinkLibraries:
+                    mf.write(f'target_link_libraries({module_name} PUBLIC "{link_library}")\n')
 
 
                 for classes_root in dict.fromkeys([owning_root, engine_path]):
