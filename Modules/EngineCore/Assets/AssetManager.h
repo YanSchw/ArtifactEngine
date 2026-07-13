@@ -1,5 +1,6 @@
 #pragma once
 #include "Object/Object.h"
+#include "Object/Pointer.h"
 #include "Common/UUID.h"
 #include "Common/Map.h"
 #include "AssetManager.gen.h"
@@ -33,7 +34,7 @@ private:
     Array<Asset*> GetAllAssets() const;
 
 private:
-    Map<UUID, Asset*> m_Assets;
+    Map<UUID, SharedObjectPtr<Asset>> m_Assets;
 
     friend class AssetCookerEngine;
 };

@@ -28,6 +28,11 @@ public:
     void AddImageRect(const UIRectF& InRectPx, const Vec4& InColor, Texture* InTexture, const Mat4& InTransform = Mat4(1.0f), const Vec2& InUvMin = Vec2(0.0f), const Vec2& InUvMax = Vec2(1.0f));
     void AddImageTriangle(const Vec2 InPoints[3], const Vec2 InUvs[3], const Vec4& InColor, Texture* InTexture, const Mat4& InTransform = Mat4(1.0f));
 
+    /** Pre-tessellated solid triangles. Coarse clip: dropped only when the whole mesh AABB misses the clip rect. */
+    void AddTriangles(const Vec2* InPositions, const Vec4* InColors, int32_t InVertexCount,
+                      const uint32_t* InIndices, int32_t InIndexCount, const Vec4& InTint,
+                      const Vec2& InTopLeftPx, const Vec2& InScale, const Mat4& InTransform = Mat4(1.0f));
+
     /** Solid convex polygon, exactly clipped against the top clip rect. Points must follow the
      *  same winding as AddRect's corners (TL, BL, BR, TR). */
     void AddConvexPolyFilled(const Vec2* InPoints, int32_t InCount, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f));

@@ -101,6 +101,38 @@ void UIDrawList::AddImageTriangle(const Vec2 InPoints[3], const Vec2 InUvs[3], c
     ExtendBatch(InTexture ? BatchKind::Image : BatchKind::Solid, InTexture, firstIndex, 3);
 }
 
+void UIDrawList::AddTriangles(const Vec2* InPositions, const Vec4* InColors, int32_t InVertexCount,
+                              const uint32_t* InIndices, int32_t InIndexCount, const Vec4& InTint,
+                              const Vec2& InTopLeftPx, const Vec2& InScale, const Mat4& InTransform) {
+    if (InVertexCount <= 0 || InIndexCount <= 0) {
+        return;
+    }
+
+    if (!m_ClipStack.IsEmpty()) {
+        Vec2 mn = InTopLeftPx + InPositions[0] * InScale;
+        Vec2 mx = mn;
+        for (int32_t i = 1; i < InVertexCount; i++) {
+            const Vec2 p = InTopLeftPx + InPositions[i] * InScale;
+            mn = glm::min(mn, p);
+            mx = glm::max(mx, p);
+        }
+        const UIRectF& clip = m_ClipStack.LastItem();
+        if (mx.x <= clip.Min().x || mn.x >= clip.Max().x || mx.y <= clip.Min().y || mn.y >= clip.Max().y) {
+            return;
+        }
+    }
+
+    const uint32_t base = (uint32_t)m_Vertices.Size();
+    for (int32_t i = 0; i < InVertexCount; i++) {
+        m_Vertices.Add(MakeVertex(InTopLeftPx + InPositions[i] * InScale, Vec2(0.0f), InColors[i] * InTint, InTransform));
+    }
+    const uint32_t firstIndex = (uint32_t)m_Indices.Size();
+    for (int32_t i = 0; i < InIndexCount; i++) {
+        m_Indices.Add(base + InIndices[i]);
+    }
+    ExtendBatch(BatchKind::Solid, nullptr, firstIndex, (uint32_t)InIndexCount);
+}
+
 void UIDrawList::AppendConvexPoly(const Vec2* InPoints, int32_t InCount, const Vec4& InColorTop, const Vec4& InColorBottom, const Mat4& InTransform) {
     constexpr int32_t MaxPoints = 64;
     if (InCount < 3 || InCount > MaxPoints - 4) {

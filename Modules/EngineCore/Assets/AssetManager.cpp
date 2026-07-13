@@ -56,7 +56,7 @@ void AssetManager::Initialize(bool InLoadAssets) {
         for (auto& [id, asset] : m_Assets) {
             // Load asset data from chunk 0
             auto assetDataChunk = asset->GetChunkedBinary()->GetChunk(0);
-            BinarySerializer::DeserializeObject(asset, assetDataChunk.GetByteString());
+            BinarySerializer::DeserializeObject(asset.Get(), assetDataChunk.GetByteString());
         }
     } else {
         // In non-packaged builds, we can scan the Content directory for assets and load their metadata.
@@ -158,7 +158,7 @@ Asset* AssetManager::GetAsset(const UUID& InId) {
     if (!m_Assets.ContainsKey(InId))
         return nullptr;
 
-    return m_Assets.At(InId);
+    return m_Assets.At(InId).Get();
 }
 
 void AssetManager::AssetStreamingThreadFunc() {
@@ -196,7 +196,7 @@ void AssetManager::AssetStreamingThreadFunc() {
 Array<Asset*> AssetManager::GetAllAssets() const {
     Array<Asset*> assets;
     for (const auto& [id, asset] : m_Assets) {
-        assets.Add(asset);
+        assets.Add(asset.Get());
     }
     return assets;
 }
