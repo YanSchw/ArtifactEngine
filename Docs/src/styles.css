@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #0b0e11;
+  --color-ink-900: #0f1317;
+  --color-ink-800: #141a20;
+  --color-ink-700: #1b232c;
+  --color-ink-600: #242e39;
+  --color-line: #27313d;
+  --color-mist-500: #7d8b9d;
+  --color-mist-400: #93a1b1;
+  --color-mist-300: #aab7c4;
+  --color-mist-200: #c4cfda;
+  --color-mist-100: #dbe4ec;
+  --color-accent-600: #0e9bdc;
+  --color-accent-500: #26bbff;
+  --color-accent-400: #57cbff;
+  --color-accent-300: #8adcff;
+  --color-teal-500: #14b8a6;
+  --color-teal-400: #2fd6c3;
+
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+body {
+  @apply bg-ink-950 text-mist-200 font-sans antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent-500) 30%, transparent);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 5px;
+  border: 2px solid var(--color-ink-950);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- Rendered markdown ---- */
+
+.prose-doc {
+  @apply text-[0.95rem] leading-7 text-mist-200;
+}
+.prose-doc > :first-child {
+  @apply mt-0;
+}
+.prose-doc h1 {
+  @apply mt-10 mb-4 text-3xl font-bold tracking-tight text-white;
+}
+.prose-doc h2 {
+  @apply mt-10 mb-4 text-2xl font-bold tracking-tight text-white;
+}
+.prose-doc h3 {
+  @apply mt-8 mb-3 text-lg font-semibold text-white;
+}
+.prose-doc h4 {
+  @apply mt-6 mb-2 text-base font-semibold text-mist-100;
+}
+.prose-doc p {
+  @apply my-4;
+}
+.prose-doc a {
+  @apply text-accent-400 no-underline underline-offset-4 hover:underline;
+}
+.prose-doc strong {
+  @apply font-semibold text-mist-100;
+}
+.prose-doc ul {
+  @apply my-4 list-disc space-y-1.5 pl-6 marker:text-mist-500;
+}
+.prose-doc ol {
+  @apply my-4 list-decimal space-y-1.5 pl-6 marker:text-mist-500;
+}
+.prose-doc code {
+  @apply rounded bg-ink-700/70 px-1.5 py-0.5 font-mono text-[0.85em] text-accent-300;
+}
+.prose-doc pre {
+  @apply my-5 overflow-x-auto rounded-lg border border-line bg-ink-900 p-4 leading-6;
+}
+.prose-doc pre code {
+  @apply block bg-transparent p-0 text-[0.85rem] text-mist-200;
+}
+.prose-doc blockquote {
+  @apply my-5 rounded-r-lg border-l-2 border-teal-400 bg-ink-800/60 py-2 pr-3 pl-4 text-mist-300;
+}
+.prose-doc blockquote p {
+  @apply my-1;
+}
+.prose-doc hr {
+  @apply my-8 border-line;
+}
+.prose-doc table {
+  @apply my-5 w-full border-collapse text-sm;
+}
+.prose-doc th {
+  @apply border-b border-line bg-ink-800 px-4 py-2.5 text-left font-semibold text-mist-100;
+}
+.prose-doc td {
+  @apply border-b border-line/60 px-4 py-2.5 align-top;
+}
+.prose-doc img {
+  @apply max-w-full rounded-lg border border-line;
+}
+
+.prose-doc .heading-anchor {
+  @apply ml-2 text-mist-500 no-underline opacity-0 transition-opacity;
+}
+.prose-doc h1:hover .heading-anchor,
+.prose-doc h2:hover .heading-anchor,
+.prose-doc h3:hover .heading-anchor,
+.prose-doc h4:hover .heading-anchor {
+  @apply opacity-100;
+}
+
+/* ---- highlight.js (theme-matched) ---- */
+
+.hljs-comment,
+.hljs-quote {
+  color: #64748b;
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-meta {
+  color: #c792ea;
+}
+.hljs-string,
+.hljs-attr {
+  color: #9ece8c;
+}
+.hljs-number,
+.hljs-literal {
+  color: #f2af6d;
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-type {
+  color: #57cbff;
+}
+.hljs-built_in,
+.hljs-symbol {
+  color: #2fd6c3;
+}
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params {
+  color: #dbe4ec;
+}

@@ -1,0 +1,153 @@
+<div class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+  @if (type(); as t) {
+    <nav class="mb-6 flex flex-wrap items-center gap-1.5 text-xs text-mist-500">
+      <a routerLink="/" class="hover:text-accent-400">Documentation</a>
+      <span>/</span>
+      <a routerLink="/api" class="hover:text-accent-400">API Reference</a>
+      <span>/</span>
+      <a [routerLink]="['/api/modules', t.module]" class="hover:text-accent-400">{{ t.module }}</a>
+      <span>/</span>
+      <span class="text-mist-300">{{ t.name }}</span>
+    </nav>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <h1 class="font-mono text-3xl font-bold tracking-tight text-white sm:text-4xl">{{ t.name }}</h1>
+      <docs-kind-badge [kind]="t.kind" />
+    </div>
+
+    @if (t.description) {
+      <p class="mt-4 max-w-3xl leading-7 text-mist-300">{{ t.description }}</p>
+    }
+
+    <div class="mt-8 overflow-x-auto rounded-lg border border-line">
+      <table class="w-full border-collapse text-sm">
+        <tbody>
+          <tr class="border-b border-line/60">
+            <td class="w-40 bg-ink-800/60 px-4 py-2.5 font-medium text-mist-400 italic">Name</td>
+            <td class="px-4 py-2.5 font-mono text-mist-100">{{ t.name }}</td>
+          </tr>
+          <tr class="border-b border-line/60">
+            <td class="bg-ink-800/60 px-4 py-2.5 font-medium text-mist-400 italic">Kind</td>
+            <td class="px-4 py-2.5 text-mist-100">{{ t.kind }}</td>
+          </tr>
+          <tr class="border-b border-line/60">
+            <td class="bg-ink-800/60 px-4 py-2.5 font-medium text-mist-400 italic">Module</td>
+            <td class="px-4 py-2.5">
+              <a [routerLink]="['/api/modules', t.module]" class="font-mono text-accent-400 hover:underline">{{ t.module }}</a>
+            </td>
+          </tr>
+          <tr>
+            <td class="bg-ink-800/60 px-4 py-2.5 font-medium text-mist-400 italic">Header File</td>
+            <td class="px-4 py-2.5 font-mono text-xs break-all text-mist-200">/{{ t.header }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="mt-12 mb-4 text-2xl font-bold text-white">Syntax</h2>
+    <pre class="overflow-x-auto rounded-lg border border-line bg-ink-900 p-4 font-mono text-[0.85rem] leading-6"><code [innerHTML]="syntax()"></code></pre>
+
+    @if (notesMarkdown(); as notes) {
+      <h2 class="mt-12 mb-4 text-2xl font-bold text-white">Remarks</h2>
+      <docs-markdown [markdown]="notes" />
+    }
+
+    @if (t.kind === 'class' && inheritance().length > 0) {
+      <h2 class="mt-12 mb-4 text-2xl font-bold text-white">Inheritance Hierarchy</h2>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        @for (ancestor of inheritance().slice().reverse(); track ancestor.name) {
+          @if (ancestor.known) {
+            <a [routerLink]="['/api/types', ancestor.name]" class="font-mono text-accent-400 hover:underline">{{ ancestor.name }}</a>
+          } @else {
+            <span class="font-mono text-mist-300">{{ ancestor.name }}</span>
+          }
+          <svg class="h-3.5 w-3.5 text-mist-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M5 12h14m-6-6 6 6-6 6" />
+          </svg>
+        }
+        <span class="font-mono font-semibold text-white">{{ t.name }}</span>
+      </div>
+    }
+
+    @if (derived().length > 0) {
+      <h2 class="mt-12 mb-4 text-2xl font-bold text-white">Derived {{ t.kind === 'class' ? 'Classes' : 'Types' }}</h2>
+      <ul class="space-y-1.5 text-sm">
+        @for (child of derived(); track child.name) {
+          <li class="flex flex-wrap items-baseline gap-x-3">
+            <a [routerLink]="['/api/types', child.name]" class="font-mono text-accent-400 hover:underline">{{ child.name }}</a>
+            @if (child.description) {
+              <span class="text-mist-400">{{ child.description }}</span>
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    @if (t.properties && t.properties.length > 0) {
+      <h2 class="mt-12 mb-4 text-2xl font-bold text-white">Properties</h2>
+      <p class="mb-4 text-sm text-mist-400">
+        Reflected <code class="rounded bg-ink-700 px-1.5 py-0.5 font-mono text-xs text-accent-300">PROPERTY()</code>
+        members — serialized and editable in the editor.
+      </p>
+      <div class="overflow-x-auto rounded-lg border border-line">
+        <table class="w-full border-collapse text-sm">
+          <thead>
+            <tr class="bg-ink-800 text-left">
+              <th class="px-4 py-2.5 font-semibold text-mist-100">Type</th>
+              <th class="px-4 py-2.5 font-semibold text-mist-100">Name</th>
+              <th class="px-4 py-2.5 font-semibold text-mist-100">Default</th>
+              <th class="hidden px-4 py-2.5 font-semibold text-mist-100 md:table-cell">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (property of t.properties; track property.name) {
+              <tr class="border-t border-line/60 hover:bg-ink-800/60">
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-teal-400">
+                  @if (linkableType(property.type); as target) {
+                    <a [routerLink]="['/api/types', target]" class="hover:underline">{{ property.type }}</a>
+                  } @else {
+                    {{ property.type }}
+                  }
+                </td>
+                <td class="px-4 py-2.5 font-mono text-mist-100">{{ property.name }}</td>
+                <td class="px-4 py-2.5 font-mono text-xs text-mist-400">{{ property.default ?? '—' }}</td>
+                <td class="hidden px-4 py-2.5 text-mist-400 md:table-cell">{{ property.description ?? '' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (t.kind === 'enum' && t.values && t.values.length > 0) {
+      <h2 class="mt-12 mb-4 text-2xl font-bold text-white">Values</h2>
+      <div class="overflow-x-auto rounded-lg border border-line">
+        <table class="w-full border-collapse text-sm">
+          <thead>
+            <tr class="bg-ink-800 text-left">
+              <th class="px-4 py-2.5 font-semibold text-mist-100">Name</th>
+              <th class="px-4 py-2.5 font-semibold text-mist-100">Value</th>
+              <th class="hidden px-4 py-2.5 font-semibold text-mist-100 md:table-cell">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (value of t.values; track value.name) {
+              <tr class="border-t border-line/60 hover:bg-ink-800/60">
+                <td class="px-4 py-2.5 font-mono text-mist-100">{{ value.name }}</td>
+                <td class="px-4 py-2.5 font-mono text-xs text-mist-300">{{ value.value }}</td>
+                <td class="hidden px-4 py-2.5 text-mist-400 md:table-cell">{{ value.description ?? '' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  } @else if (!docs.loading()) {
+    <h1 class="text-3xl font-bold text-white">Type not found</h1>
+    <p class="mt-4 text-mist-300">
+      No reflected type named <code class="rounded bg-ink-700 px-1.5 py-0.5 font-mono text-sm">{{ name() }}</code> exists.
+      Run <code class="rounded bg-ink-700 px-1.5 py-0.5 font-mono text-sm">artifact docs</code> to refresh the API data.
+    </p>
+    <a routerLink="/api" class="mt-6 inline-block text-accent-400 hover:underline">Back to API reference</a>
+  }
+</div>

@@ -1,0 +1,113 @@
+<header class="sticky top-0 z-40 border-b border-line bg-ink-950/90 backdrop-blur">
+  <div class="mx-auto flex h-14 max-w-screen-2xl items-center gap-3 px-4 sm:px-6">
+    <button
+      type="button"
+      class="rounded-md p-2 text-mist-300 hover:bg-ink-700 hover:text-white lg:hidden"
+      (click)="sidebarOpen.set(!sidebarOpen())"
+      aria-label="Toggle navigation"
+    >
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        @if (sidebarOpen()) {
+          <path d="M6 6l12 12M18 6L6 18" />
+        } @else {
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        }
+      </svg>
+    </button>
+
+    <a routerLink="/" class="flex items-center">
+      <img src="artifact-logo.svg" alt="Artifact Engine" class="h-4 w-auto sm:h-5" />
+    </a>
+
+    <nav class="ml-6 hidden items-center gap-1 text-sm md:flex">
+      <a
+        routerLink="/"
+        routerLinkActive="text-white bg-ink-700"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="rounded-md px-3 py-1.5 text-mist-300 hover:text-white"
+      >Documentation</a>
+      <a
+        routerLink="/api"
+        routerLinkActive="text-white bg-ink-700"
+        class="rounded-md px-3 py-1.5 text-mist-300 hover:text-white"
+      >API Reference</a>
+    </nav>
+
+    <div class="ml-auto flex items-center gap-3">
+      @if (docs.engineVersion()) {
+        <span class="hidden rounded-full border border-line bg-ink-800 px-2.5 py-1 text-xs font-medium text-mist-300 sm:inline-block">
+          v{{ docs.engineVersion() }}
+        </span>
+      }
+      <a
+        href="https://github.com/YanSchw/ArtifactEngine"
+        target="_blank"
+        rel="noopener"
+        class="text-mist-400 hover:text-white"
+        aria-label="GitHub"
+      >
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.15c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11.1 11.1 0 0 1 5.78 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.66.41.35.77 1.05.77 2.12v3.15c0 .3.21.67.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
+        </svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="mx-auto flex max-w-screen-2xl">
+  @if (sidebarOpen()) {
+    <div class="fixed inset-0 z-20 bg-black/60 lg:hidden" (click)="sidebarOpen.set(false)" aria-hidden="true"></div>
+  }
+
+  <aside
+    class="fixed top-14 bottom-0 left-0 z-30 w-72 -translate-x-full overflow-y-auto border-r border-line bg-ink-900 px-4 py-6 transition-transform lg:sticky lg:z-0 lg:h-[calc(100dvh-3.5rem)] lg:shrink-0 lg:translate-x-0 lg:bg-transparent"
+    [class.translate-x-0]="sidebarOpen()"
+  >
+    <nav class="space-y-8 text-sm">
+      <div>
+        <p class="mb-2 px-2 text-xs font-semibold tracking-widest text-mist-500 uppercase">Guides</p>
+        <ul class="space-y-0.5">
+          @for (guide of docs.guides(); track guide.slug) {
+            <li>
+              <a
+                [routerLink]="['/guides', guide.slug]"
+                routerLinkActive="!text-white bg-ink-700 border-teal-400"
+                class="block rounded-r-md border-l-2 border-transparent px-3 py-1.5 text-mist-300 hover:bg-ink-800 hover:text-white"
+              >{{ guide.title }}</a>
+            </li>
+          }
+        </ul>
+      </div>
+
+      <div>
+        <p class="mb-2 px-2 text-xs font-semibold tracking-widest text-mist-500 uppercase">API Reference</p>
+        <ul class="space-y-0.5">
+          <li>
+            <a
+              routerLink="/api"
+              routerLinkActive="!text-white bg-ink-700 border-teal-400"
+              [routerLinkActiveOptions]="{ exact: true }"
+              class="block rounded-r-md border-l-2 border-transparent px-3 py-1.5 text-mist-300 hover:bg-ink-800 hover:text-white"
+            >All Types</a>
+          </li>
+          @for (module of docs.modules(); track module.name) {
+            <li>
+              <a
+                [routerLink]="['/api/modules', module.name]"
+                routerLinkActive="!text-white bg-ink-700 border-teal-400"
+                class="flex items-center justify-between rounded-r-md border-l-2 border-transparent px-3 py-1.5 text-mist-300 hover:bg-ink-800 hover:text-white"
+              >
+                <span class="font-mono text-[0.8rem]">{{ module.name }}</span>
+                <span class="text-xs text-mist-500">{{ module.types.length }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="min-w-0 flex-1">
+    <router-outlet />
+  </main>
+</div>

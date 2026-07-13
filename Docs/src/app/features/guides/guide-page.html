@@ -1,0 +1,46 @@
+<div class="mx-auto flex max-w-6xl gap-10 px-4 py-10 sm:px-6">
+  <article class="min-w-0 flex-1">
+    <nav class="mb-6 flex items-center gap-1.5 text-xs text-mist-500">
+      <a routerLink="/" class="hover:text-accent-400">Documentation</a>
+      <span>/</span>
+      <span class="text-mist-300">{{ guide()?.title ?? slug() }}</span>
+    </nav>
+
+    @if (loading()) {
+      <div class="animate-pulse space-y-4">
+        <div class="h-9 w-2/3 rounded bg-ink-700"></div>
+        <div class="h-4 w-full rounded bg-ink-800"></div>
+        <div class="h-4 w-5/6 rounded bg-ink-800"></div>
+      </div>
+    } @else if (missing()) {
+      <h1 class="text-3xl font-bold text-white">Guide not found</h1>
+      <p class="mt-4 text-mist-300">
+        No guide exists at <code class="rounded bg-ink-700 px-1.5 py-0.5 font-mono text-sm">guides/{{ slug() }}.md</code>.
+      </p>
+      <a routerLink="/" class="mt-6 inline-block text-accent-400 hover:underline">Back to documentation</a>
+    } @else if (rendered(); as content) {
+      <div class="prose-doc" [innerHTML]="content.html"></div>
+    }
+  </article>
+
+  @if (rendered(); as content) {
+    @if (content.toc.length > 1) {
+      <aside class="sticky top-20 hidden w-56 shrink-0 self-start xl:block">
+        <p class="mb-3 text-xs font-semibold tracking-widest text-mist-500 uppercase">On this page</p>
+        <ul class="space-y-2 border-l border-line text-sm">
+          @for (entry of content.toc; track entry.id) {
+            <li>
+              <a
+                [routerLink]="[]"
+                [fragment]="entry.id"
+                class="-ml-px block border-l border-transparent py-0.5 text-mist-400 hover:border-teal-400 hover:text-white"
+                [class.pl-3]="entry.level === 2"
+                [class.pl-6]="entry.level === 3"
+              >{{ entry.text }}</a>
+            </li>
+          }
+        </ul>
+      </aside>
+    }
+  }
+</div>

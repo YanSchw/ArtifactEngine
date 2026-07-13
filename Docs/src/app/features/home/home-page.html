@@ -1,0 +1,71 @@
+<div class="bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,#0f3d40_0%,#0d2228_45%,transparent_100%)]">
+  <div class="mx-auto max-w-5xl px-4 pt-16 pb-12 sm:px-6 sm:pt-24 sm:pb-16">
+    <p class="mb-3 text-xs font-semibold tracking-[0.25em] text-teal-400 uppercase">Artifact Engine</p>
+    <h1 class="max-w-2xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
+      Build games with a modern C++20 engine
+    </h1>
+    <p class="mt-4 max-w-2xl text-lg leading-8 text-mist-300">
+      Guides, tutorials and a full API reference for every reflected class, struct, enum and
+      module of Artifact Engine — generated straight from the source.
+    </p>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a
+        routerLink="/guides/getting-started"
+        class="rounded-md bg-accent-500 px-5 py-2.5 text-sm font-semibold text-ink-950 hover:bg-accent-400"
+      >Get Started</a>
+      <a
+        routerLink="/api"
+        class="rounded-md border border-line bg-ink-800/80 px-5 py-2.5 text-sm font-semibold text-mist-100 hover:border-mist-500 hover:text-white"
+      >API Reference</a>
+    </div>
+  </div>
+</div>
+
+<div class="mx-auto max-w-5xl px-4 pb-20 sm:px-6">
+  <h2 class="mb-5 text-xl font-bold text-white">Guides</h2>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    @for (guide of docs.guides(); track guide.slug) {
+      <a
+        [routerLink]="['/guides', guide.slug]"
+        class="group rounded-xl border border-line bg-ink-800/60 p-5 transition-colors hover:border-teal-500/60 hover:bg-ink-800"
+      >
+        <h3 class="font-semibold text-mist-100 group-hover:text-teal-400">{{ guide.title }}</h3>
+        <p class="mt-2 text-sm leading-6 text-mist-400">{{ guide.summary }}</p>
+      </a>
+    }
+  </div>
+
+  <h2 class="mt-14 mb-5 text-xl font-bold text-white">API Reference</h2>
+  <div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div class="rounded-xl border border-line bg-ink-800/60 p-5">
+      <p class="text-3xl font-bold text-white">{{ docs.modules().length }}</p>
+      <p class="mt-1 text-sm text-mist-400">Modules</p>
+    </div>
+    <div class="rounded-xl border border-line bg-ink-800/60 p-5">
+      <p class="text-3xl font-bold text-accent-400">{{ classCount() }}</p>
+      <p class="mt-1 text-sm text-mist-400">Classes</p>
+    </div>
+    <div class="rounded-xl border border-line bg-ink-800/60 p-5">
+      <p class="text-3xl font-bold text-teal-400">{{ structCount() }}</p>
+      <p class="mt-1 text-sm text-mist-400">Structs</p>
+    </div>
+    <div class="rounded-xl border border-line bg-ink-800/60 p-5">
+      <p class="text-3xl font-bold text-purple-300">{{ enumCount() }}</p>
+      <p class="mt-1 text-sm text-mist-400">Enums</p>
+    </div>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    @for (module of docs.modules(); track module.name) {
+      <a
+        [routerLink]="['/api/modules', module.name]"
+        class="group rounded-xl border border-line bg-ink-800/60 p-5 transition-colors hover:border-accent-500/60 hover:bg-ink-800"
+      >
+        <h3 class="font-mono text-sm font-semibold text-mist-100 group-hover:text-accent-400">{{ module.name }}</h3>
+        <p class="mt-2 text-sm text-mist-400">
+          {{ module.types.length }} reflected {{ module.types.length === 1 ? 'type' : 'types' }}
+        </p>
+      </a>
+    }
+  </div>
+</div>

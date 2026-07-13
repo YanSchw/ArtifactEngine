@@ -133,16 +133,32 @@ def cmd_package(args):
         print("Only MacOS and Win64 packaging are implemented so far")
         exit(1)
 
-def cmd_lint(args):
+def cmd_docs(args):
+    from DocsGen.DocsGen import generate_docs_json
+    engine_path = get_engine_path()
+    project_path = get_project_path()
+    output_dir = args.output or f"{project_path}/Docs/public/generated"
+    try:
+        with Job("Generating API docs"):
+            output_path = generate_docs_json(engine_path, project_path, output_dir)
+        print(f"API docs written to {output_path}")
+    except JobError as e:
+        sys.exit(e.returncode)
+
+LINT_EXCLUDED_DIRS = {"node_modules", "venv", "dist", ".git", ".angular"}
+
+def _collect_lint_files(root_path):
     files = []
-    for root, dirs, filenames in os.walk(get_engine_path()):
+    for root, dirs, filenames in os.walk(root_path):
+        dirs[:] = [d for d in dirs if d not in LINT_EXCLUDED_DIRS]
         for name in filenames:
             if name.endswith((".cpp", ".h")):
                 files.append(os.path.join(root, name))
-    for root, dirs, filenames in os.walk(get_project_path()):
-        for name in filenames:
-            if name.endswith((".cpp", ".h")):
-                files.append(os.path.join(root, name))
+    return files
+
+def cmd_lint(args):
+    files = _collect_lint_files(get_engine_path())
+    files += _collect_lint_files(get_project_path())
     lint_errors = lint_files(files, fix=args.fix)
     if lint_errors > 0:
         print(f"{Fore.RED}Found {lint_errors} linting errors!{Style.RESET_ALL}")
@@ -196,6 +212,10 @@ def main():
 
     package_parser = subparsers.add_parser("package", help="Package project")
     package_parser.set_defaults(func=cmd_package)
+
+    docs_parser = subparsers.add_parser("docs", help="Dump reflection data (classes, structs, enums, modules) as JSON for the Docs frontend")
+    docs_parser.add_argument("--output", default=None, help="Output directory (defaults to <project>/Docs/public/generated)")
+    docs_parser.set_defaults(func=cmd_docs)
 
     lint_parser = subparsers.add_parser("lint", help="Lint C++/Header files")
     lint_parser.add_argument("--fix", action="store_true", default=False, help="Automatically fix fixable lint errors in place")

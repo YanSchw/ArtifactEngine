@@ -1,0 +1,88 @@
+<div class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+  <nav class="mb-6 flex items-center gap-1.5 text-xs text-mist-500">
+    <a routerLink="/" class="hover:text-accent-400">Documentation</a>
+    <span>/</span>
+    <a routerLink="/api" class="hover:text-accent-400">API Reference</a>
+    <span>/</span>
+    <span class="text-mist-300">{{ name() }}</span>
+  </nav>
+
+  @if (module(); as mod) {
+    <p class="mb-1 text-xs font-semibold tracking-widest text-teal-400 uppercase">Module</p>
+    <h1 class="font-mono text-3xl font-bold tracking-tight text-white sm:text-4xl">{{ mod.name }}</h1>
+
+    <div class="mt-8 grid gap-4 sm:grid-cols-2">
+      <div class="rounded-xl border border-line bg-ink-800/60 p-5">
+        <h2 class="mb-3 text-sm font-semibold text-mist-100">Imports</h2>
+        @if (mod.importModules.length > 0) {
+          <ul class="flex flex-wrap gap-2">
+            @for (imported of mod.importModules; track imported) {
+              <li>
+                <a
+                  [routerLink]="['/api/modules', imported]"
+                  class="inline-block rounded border border-line bg-ink-700 px-2.5 py-1 font-mono text-xs text-accent-300 hover:border-accent-500/60"
+                >{{ imported }}</a>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="text-sm text-mist-500">No module imports.</p>
+        }
+      </div>
+      <div class="rounded-xl border border-line bg-ink-800/60 p-5">
+        <h2 class="mb-3 text-sm font-semibold text-mist-100">Imported by</h2>
+        @if (importedBy().length > 0) {
+          <ul class="flex flex-wrap gap-2">
+            @for (dependent of importedBy(); track dependent.name) {
+              <li>
+                <a
+                  [routerLink]="['/api/modules', dependent.name]"
+                  class="inline-block rounded border border-line bg-ink-700 px-2.5 py-1 font-mono text-xs text-accent-300 hover:border-accent-500/60"
+                >{{ dependent.name }}</a>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="text-sm text-mist-500">Not imported by any module.</p>
+        }
+      </div>
+    </div>
+
+    @if (mod.mountContentDir) {
+      <p class="mt-4 text-sm text-mist-400">
+        Mounts content directory
+        <code class="rounded bg-ink-700 px-1.5 py-0.5 font-mono text-xs text-accent-300">Modules/{{ mod.name }}/{{ mod.mountContentDir }}</code>
+      </p>
+    }
+
+    @for (group of typeGroups(); track group.kind) {
+      <h2 class="mt-12 mb-4 flex items-center gap-3 text-xl font-bold text-white capitalize">
+        {{ group.kind === 'class' ? 'Classes' : group.kind === 'struct' ? 'Structs' : 'Enums' }}
+        <span class="text-sm font-normal text-mist-500">{{ group.types.length }}</span>
+      </h2>
+      <div class="overflow-x-auto rounded-lg border border-line">
+        <table class="w-full border-collapse text-sm">
+          <tbody>
+            @for (type of group.types; track type.name) {
+              <tr class="border-t border-line/60 first:border-t-0 hover:bg-ink-800/60">
+                <td class="w-64 px-4 py-2.5">
+                  <a [routerLink]="['/api/types', type.name]" class="font-mono text-accent-400 hover:underline">{{ type.name }}</a>
+                </td>
+                <td class="w-20 px-4 py-2.5"><docs-kind-badge [kind]="type.kind" /></td>
+                <td class="hidden px-4 py-2.5 text-mist-400 md:table-cell">{{ type.description ?? '' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @empty {
+      <p class="mt-12 text-mist-500">This module has no reflected types.</p>
+    }
+  } @else if (!docs.loading()) {
+    <h1 class="text-3xl font-bold text-white">Module not found</h1>
+    <p class="mt-4 text-mist-300">
+      No module named <code class="rounded bg-ink-700 px-1.5 py-0.5 font-mono text-sm">{{ name() }}</code> exists.
+    </p>
+    <a routerLink="/api" class="mt-6 inline-block text-accent-400 hover:underline">Back to API reference</a>
+  }
+</div>

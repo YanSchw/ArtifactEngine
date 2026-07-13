@@ -1,0 +1,17 @@
+[
+  {
+    "slug": "getting-started",
+    "title": "Getting Started",
+    "summary": "Install the Artifact SDK, create your first project and run the editor."
+  },
+  {
+    "slug": "building",
+    "title": "Building",
+    "summary": "The artifact CLI: build targets, configurations, cooking and packaging."
+  },
+  {
+    "slug": "code-style",
+    "title": "Code Style",
+    "summary": "Conventions for engine and project C++ code — naming, containers, logging."
+  }
+]
