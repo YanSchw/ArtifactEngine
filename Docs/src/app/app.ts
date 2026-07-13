@@ -3,6 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { ApiDocsService } from './core/api-docs.service';
+import { ThemeService } from './core/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -11,6 +12,7 @@ import { ApiDocsService } from './core/api-docs.service';
 })
 export class App {
   protected readonly docs = inject(ApiDocsService);
+  protected readonly theme = inject(ThemeService);
   protected readonly sidebarOpen = signal(false);
 
   constructor() {

@@ -7,6 +7,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Documentation for Artifact Engine — guides and C++ API reference.">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <script>
+    (function () {
+      var stored = localStorage.getItem('theme');
+      var theme = stored === 'light' || stored === 'dark'
+        ? stored
+        : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
 </head>
 <body>
   <app-root></app-root>

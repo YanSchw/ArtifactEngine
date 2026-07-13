@@ -23,9 +23,58 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
+:root {
+  color-scheme: dark;
+  --hero-glow-a: #0f3d40;
+  --hero-glow-b: #0d2228;
+  --hl-comment: #64748b;
+  --hl-keyword: #c792ea;
+  --hl-string: #9ece8c;
+  --hl-number: #f2af6d;
+  --hl-title: #57cbff;
+  --hl-builtin: #2fd6c3;
+  --hl-variable: #dbe4ec;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-ink-950: #f6f8fa;
+  --color-ink-900: #eef1f5;
+  --color-ink-800: #e7ebf0;
+  --color-ink-700: #dde3ea;
+  --color-ink-600: #c8d1da;
+  --color-line: #d8dee6;
+  --color-mist-500: #64748b;
+  --color-mist-400: #556374;
+  --color-mist-300: #475565;
+  --color-mist-200: #333f4d;
+  --color-mist-100: #24303d;
+  --color-white: #101820;
+  --color-accent-600: #086599;
+  --color-accent-500: #0a79b6;
+  --color-accent-400: #0a83c6;
+  --color-accent-300: #056a9b;
+  --color-teal-500: #0d9488;
+  --color-teal-400: #0c7f74;
+  --color-purple-300: #7c3aed;
+  --hero-glow-a: #c9e8e6;
+  --hero-glow-b: #e3eff2;
+  --hl-comment: #6a737d;
+  --hl-keyword: #a626a4;
+  --hl-string: #50a14f;
+  --hl-number: #b76b01;
+  --hl-title: #0a72a8;
+  --hl-builtin: #0d9488;
+  --hl-variable: #383f4a;
+}
+
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 5rem;
+}
+
+:root[data-theme="light"] .site-logo {
+  filter: invert(1);
 }
 
 body {
@@ -129,34 +178,34 @@ body {
 
 .hljs-comment,
 .hljs-quote {
-  color: #64748b;
+  color: var(--hl-comment);
   font-style: italic;
 }
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-meta {
-  color: #c792ea;
+  color: var(--hl-keyword);
 }
 .hljs-string,
 .hljs-attr {
-  color: #9ece8c;
+  color: var(--hl-string);
 }
 .hljs-number,
 .hljs-literal {
-  color: #f2af6d;
+  color: var(--hl-number);
 }
 .hljs-title,
 .hljs-title.class_,
 .hljs-title.function_,
 .hljs-type {
-  color: #57cbff;
+  color: var(--hl-title);
 }
 .hljs-built_in,
 .hljs-symbol {
-  color: #2fd6c3;
+  color: var(--hl-builtin);
 }
 .hljs-variable,
 .hljs-template-variable,
 .hljs-params {
-  color: #dbe4ec;
+  color: var(--hl-variable);
 }

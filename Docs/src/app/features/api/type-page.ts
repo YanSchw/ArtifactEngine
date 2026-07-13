@@ -48,7 +48,9 @@ export class TypePage {
   private declarationOf(type: ApiType): string {
     switch (type.kind) {
       case 'class':
-        return `class ${type.name} : public ${type.parent} {\n    ARTIFACT_CLASS();\n};`;
+        return type.parent
+          ? `class ${type.name} : public ${type.parent} {\n    ARTIFACT_CLASS();\n};`
+          : `class ${type.name} {\n};`;
       case 'struct':
         return `struct ${type.name} {\n    ARTIFACT_STRUCT();\n};`;
       case 'enum':
