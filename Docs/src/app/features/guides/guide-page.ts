@@ -4,10 +4,11 @@ import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { ApiDocsService } from '../../core/api-docs.service';
 import { MarkdownService } from '../../core/markdown.service';
+import { CopyCodeDirective } from '../../shared/copy-code.directive';
 
 @Component({
   selector: 'docs-guide-page',
-  imports: [RouterLink],
+  imports: [RouterLink, CopyCodeDirective],
   templateUrl: './guide-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

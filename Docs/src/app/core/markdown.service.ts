@@ -26,6 +26,11 @@ export interface RenderedMarkdown {
   toc: TocEntry[];
 }
 
+const COPY_ICON =
+  '<svg class="copy-icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const CHECK_ICON =
+  '<svg class="copy-icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"/></svg>';
+
 @Injectable({ providedIn: 'root' })
 export class MarkdownService {
   private readonly sanitizer = inject(DomSanitizer);
@@ -66,6 +71,20 @@ export class MarkdownService {
       if (language && hljs.getLanguage(language)) {
         block.innerHTML = hljs.highlight(block.textContent ?? '', { language }).value;
       }
+    }
+
+    for (const pre of container.querySelectorAll<HTMLElement>('pre')) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'code-block';
+      pre.parentNode?.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'copy-btn';
+      button.setAttribute('aria-label', 'Copy code');
+      button.innerHTML = COPY_ICON + CHECK_ICON;
+      wrapper.appendChild(button);
     }
 
     return {

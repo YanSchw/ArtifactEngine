@@ -4,10 +4,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { ApiDocsService } from './core/api-docs.service';
 import { ThemeService } from './core/theme.service';
+import { GlobalSearch } from './shared/global-search';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, GlobalSearch],
   templateUrl: './app.html',
 })
 export class App {

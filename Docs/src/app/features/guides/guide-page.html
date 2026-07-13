@@ -19,7 +19,7 @@
       </p>
       <a routerLink="/" class="mt-6 inline-block text-accent-400 hover:underline">Back to documentation</a>
     } @else if (rendered(); as content) {
-      <div class="prose-doc" [innerHTML]="content.html"></div>
+      <div class="prose-doc" [innerHTML]="content.html" docsCopyCode></div>
     }
   </article>
 

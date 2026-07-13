@@ -168,6 +168,31 @@ def _collect_types_from_header(header_path: str, module: str, repo_root: str) ->
     return types
 
 
+OBJECT_HEADER = 'Modules/EngineCore/Object/Object.h'
+
+OBJECT_DESCRIPTION = (
+    'The reflected base class every ARTIFACT_CLASS() type ultimately derives from. '
+    'Objects are constructed by class identity, cast type-safely with Cast<T>(), and '
+    'owned through SharedObjectPtr<T>.'
+)
+
+
+def _inject_object_type(modules: list[dict], types: list[dict]) -> None:
+    if any(t['name'] == 'Object' for t in types):
+        return
+    types.append({
+        'kind': 'class',
+        'name': 'Object',
+        'module': 'EngineCore',
+        'header': OBJECT_HEADER,
+        'description': OBJECT_DESCRIPTION,
+    })
+    for module in modules:
+        if module['name'] == 'EngineCore' and 'Object' not in module['types']:
+            module['types'] = sorted(module['types'] + ['Object'])
+            break
+
+
 def _collect_module(modules_root: str, module: str, repo_root: str) -> tuple[dict, list[dict]]:
     module_dir = os.path.join(modules_root, module)
     module_json_path = os.path.join(module_dir, 'Module.json')
@@ -218,6 +243,7 @@ def generate_docs_json(engine_path: str, project_path: str, output_dir: str) -> 
             modules.append(module_entry)
             types.extend(module_types)
 
+    _inject_object_type(modules, types)
     types.sort(key=lambda t: t['name'].lower())
     api = {
         'engineVersion': get_version_string(),
