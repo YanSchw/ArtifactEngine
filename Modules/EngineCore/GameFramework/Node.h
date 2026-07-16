@@ -52,6 +52,8 @@ public:
 
     bool IsInitialized() const;
     bool IsEnabled() const;
+    /** This node's own enabled flag, ignoring disabled ancestors (IsEnabled() reflects those). */
+    bool IsSelfEnabled() const;
     void SetEnabled(bool InEnabled);
     bool WasBeginPlayCalled() const;
     bool IsPendingKill() const;
@@ -65,6 +67,7 @@ public:
     Node* GetChildByName(const String& InName, bool InIncludeSelf = false);
     Node* GetChildByClass(const Class& InClass, bool InIncludeSelf = false);
     int32_t GetSiblingIndex() const;
+    void SetSiblingIndex(int32_t InIndex);
     uint32_t GetChildCount() const;
     bool HasChildren() const;
 

@@ -2,6 +2,8 @@
 #include "Rendering/Surface.h"
 #include "Common/Types.h"
 #include "Common/Array.h"
+#include "Common/String.h"
+#include "InputSystem/CursorIcon.h"
 #include "Window.gen.h"
 
 struct WindowParams {
@@ -54,6 +56,10 @@ public:
     Vec2 ConsumeScrollDelta();
     static Vec2 ConsumeGlobalScrollDelta();
 
+    void AccumulateTextInput(uint32_t InCodepoint);
+    /** Characters typed on this window since the last call, layout- and modifier-resolved. */
+    String ConsumeTextInput();
+
     /** Whether a client-area point (window coordinates) lies in the draggable region of an
      *  application-drawn title bar. Queried by the platform for EditorStyle windows; the OS
      *  then handles dragging, snapping and double-click itself. */
@@ -63,6 +69,9 @@ public:
     // or restore the normal visible cursor.
     void SetCursorLocked(bool InLocked);
     bool IsCursorLocked() const;
+
+    /** Pointer shape shown while the cursor is over this window. */
+    void SetCursorIcon(CursorIcon InIcon);
 
     static SharedObjectPtr<Window> Create(const WindowParams& InParams);
     static Window* GetInstance();
@@ -76,4 +85,6 @@ private:
     bool m_CursorLocked = false;
     bool m_Resized = false;
     Vec2 m_ScrollAccum = Vec2(0.0f);
+    String m_TextInputAccum;
+    CursorIcon m_CursorIcon = CursorIcon::Arrow;
 };

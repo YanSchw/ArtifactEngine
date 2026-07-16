@@ -96,6 +96,10 @@ bool Node::IsEnabled() const {
     return m_EnabledInHierarchy;
 }
 
+bool Node::IsSelfEnabled() const {
+    return m_Enabled;
+}
+
 void Node::SetEnabled(bool InEnabled) {
     m_Enabled = InEnabled;
     m_EnabledInHierarchy = InEnabled ? (GetParent() ? GetParent()->m_EnabledInHierarchy : InEnabled) : false;
@@ -203,6 +207,24 @@ int32_t Node::GetSiblingIndex() const {
     }
 
     AE_ASSERT(false, "Node is not a child of another Node, but should be!");
+}
+
+void Node::SetSiblingIndex(int32_t InIndex) {
+    if (!GetParent()) {
+        return;
+    }
+    Array<Node*>& siblings = GetParent()->m_Children;
+    const int32_t current = siblings.IndexOf(this);
+    if (current < 0) {
+        return;
+    }
+    const int32_t last = siblings.Size() - 1;
+    const int32_t clamped = InIndex < 0 ? 0 : (InIndex > last ? last : InIndex);
+    if (clamped == current) {
+        return;
+    }
+    siblings.RemoveAt(current);
+    siblings.Insert(clamped, this);
 }
 
 uint32_t Node::GetChildCount() const {

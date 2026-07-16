@@ -134,6 +134,7 @@ UINode* UICanvas::HitTestTopmost(UINode* InNode, const Vec2& InPoint, bool InInt
 }
 
 void UICanvas::RouteInput(const UIFrameContext& InContext) {
+    m_DesiredCursor = CursorIcon::Arrow;
     if (InputMode == UIInputMode::Cursor) {
         RouteCursor(InContext);
     } else {
@@ -148,11 +149,13 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
     // A captured node keeps hover even when the cursor leaves it.
     SetHovered(m_CapturedNode.Get() ? m_CapturedNode.Get() : hit);
 
-    if (InContext.CursorPressedThisFrame && hit) {
-        m_CapturedNode = hit;
-        SetFocus(hit);
-        hit->m_Pressed = true;
-        hit->OnPressed(cursor);
+    if (InContext.CursorPressedThisFrame) {
+        SetFocus(hit);  // a press on empty space clears focus, blurring any focused field
+        if (hit) {
+            m_CapturedNode = hit;
+            hit->m_Pressed = true;
+            hit->OnPressed(cursor);
+        }
     }
 
     if (UINode* captured = m_CapturedNode.Get()) {
@@ -178,6 +181,11 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
                 break;
             }
         }
+    }
+
+    // The captured node keeps its cursor for the whole drag, even off the node.
+    if (UINode* cursorNode = m_CapturedNode.Get() ? m_CapturedNode.Get() : hit) {
+        m_DesiredCursor = cursorNode->Cursor;
     }
 
     m_LastCursor = cursor;

@@ -1,4 +1,5 @@
 #include "UINode.h"
+#include "UICanvas.h"
 #include "Rendering/UIDrawList.h"
 #include <cmath>
 
@@ -91,6 +92,29 @@ void UINode::UpdateTree(const UIFrameContext& InContext) {
     for (uint32_t i = 0; i < GetChildCount(); i++) {
         if (UINode* child = GetChild((int)i)->As<UINode>()) {
             child->UpdateTree(InContext);
+        }
+    }
+}
+
+UICanvas* UINode::GetCanvas() const {
+    for (Node* node = const_cast<UINode*>(this); node; node = node->GetParent()) {
+        if (UICanvas* canvas = node->As<UICanvas>()) {
+            return canvas;
+        }
+    }
+    return nullptr;
+}
+
+void UINode::RequestFocus() {
+    if (UICanvas* canvas = GetCanvas()) {
+        canvas->SetFocus(this);
+    }
+}
+
+void UINode::ReleaseFocus() {
+    if (m_Focused) {
+        if (UICanvas* canvas = GetCanvas()) {
+            canvas->SetFocus(nullptr);
         }
     }
 }

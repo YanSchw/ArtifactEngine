@@ -1,5 +1,6 @@
 #pragma once
 #include "Common/Types.h"
+#include "Common/String.h"
 
 /** Cursor: drives a pointer over Interactable nodes
  *  Focus: keeps one node focused and moves it with Nav* inputs. */
@@ -22,6 +23,10 @@ struct UIFrameContext {
     bool NavSelectPressed = false;
     bool NavSelectReleased = false;
     bool NavBack = false;
+
+    /** Characters typed this frame, already layout- and modifier-resolved by the OS. Consumed by
+     *  text-editing nodes while they hold focus. */
+    String TextInput;
 
     float DeltaTime = 0.0f;
 };

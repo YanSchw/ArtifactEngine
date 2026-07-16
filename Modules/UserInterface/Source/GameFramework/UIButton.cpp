@@ -5,6 +5,7 @@
 UIButton::UIButton() {
     Size = Vec2(160.0f, 40.0f);
     Interactable = true;
+    Cursor = CursorIcon::Hand;
 }
 
 void UIButton::SetCaption(const String& InText) {

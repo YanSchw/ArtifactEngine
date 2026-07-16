@@ -6,6 +6,7 @@
 #include "GLFWMouseDevice.h"
 #include "GLFWGamepadDevice.h"
 #include "InputSystem/InputSystem.h"
+#include "InputSystem/Clipboard.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -21,6 +22,7 @@ static void OnWindowResized(GLFWwindow* InWindow, int InWidth, int InHeight) {
 }
 
 static void OnWindowScroll(GLFWwindow* InWindow, double InOffsetX, double InOffsetY);
+static void OnWindowChar(GLFWwindow* InWindow, unsigned int InCodepoint);
 
 Window::Window(const WindowParams& InParams) {
     if (!s_Instance) {
@@ -50,6 +52,7 @@ Window::Window(const WindowParams& InParams) {
     glfwSetWindowUserPointer(m_Window, this);
     glfwSetWindowSizeCallback(m_Window, OnWindowResized);
     glfwSetScrollCallback(m_Window, OnWindowScroll);
+    glfwSetCharCallback(m_Window, OnWindowChar);
 
     if (m_Params.EditorStyle) {
         glfwSetTitlebarHitTestCallback(m_Window, [](GLFWwindow* InWindow, int InX, int InY, int* OutHit) {
@@ -65,6 +68,13 @@ Window::Window(const WindowParams& InParams) {
         InputSystem::Get().AddDevice(new GLFWKeyboardDevice());
         InputSystem::Get().AddDevice(new GLFWMouseDevice());
         InputSystem::Get().AddDevice(new GLFWGamepadDevice());
+
+        Clipboard::SetBackend(
+            [] {
+                const char* text = glfwGetClipboardString(nullptr);
+                return String(text ? text : "");
+            },
+            [](const String& InText) { glfwSetClipboardString(nullptr, InText.c_str()); });
     }
 }
 
@@ -89,6 +99,26 @@ static void OnWindowScroll(GLFWwindow* InWindow, double InOffsetX, double InOffs
     if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
         self->AccumulateScroll(Vec2((float)InOffsetX, (float)InOffsetY));
     }
+}
+
+static void OnWindowChar(GLFWwindow* InWindow, unsigned int InCodepoint) {
+    if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
+        self->AccumulateTextInput((uint32_t)InCodepoint);
+    }
+}
+
+void Window::AccumulateTextInput(uint32_t InCodepoint) {
+    // The UI font atlas only covers printable ASCII; other codepoints are dropped here rather
+    // than degrading into per-byte garbage in UTF-8-unaware text handling downstream.
+    if (InCodepoint >= 32 && InCodepoint < 127) {
+        m_TextInputAccum += (char)InCodepoint;
+    }
+}
+
+String Window::ConsumeTextInput() {
+    String text = m_TextInputAccum;
+    m_TextInputAccum.clear();
+    return text;
 }
 
 void Window::TickWindow() {
@@ -209,6 +239,41 @@ void Window::SetCursorLocked(bool InLocked) {
 
 bool Window::IsCursorLocked() const {
     return m_CursorLocked;
+}
+
+// Standard cursors are created once per process and shared by every window; GLFW frees them in
+// glfwTerminate. A null cursor (unsupported shape on this platform) falls back to the arrow.
+static GLFWcursor* GetStandardCursor(CursorIcon InIcon) {
+    static GLFWcursor* s_Cursors[16] = {};
+    const int index = (int)InIcon;
+    if (index <= 0 || index >= 16) {
+        return nullptr;  // Arrow: glfwSetCursor(nullptr) restores the default
+    }
+    if (!s_Cursors[index]) {
+        int shape = GLFW_ARROW_CURSOR;
+        switch (InIcon) {
+            case CursorIcon::Text: shape = GLFW_IBEAM_CURSOR; break;
+            case CursorIcon::Hand: shape = GLFW_POINTING_HAND_CURSOR; break;
+            case CursorIcon::Crosshair: shape = GLFW_CROSSHAIR_CURSOR; break;
+            case CursorIcon::ResizeH: shape = GLFW_RESIZE_EW_CURSOR; break;
+            case CursorIcon::ResizeV: shape = GLFW_RESIZE_NS_CURSOR; break;
+            case CursorIcon::ResizeNWSE: shape = GLFW_RESIZE_NWSE_CURSOR; break;
+            case CursorIcon::ResizeNESW: shape = GLFW_RESIZE_NESW_CURSOR; break;
+            case CursorIcon::ResizeAll: shape = GLFW_RESIZE_ALL_CURSOR; break;
+            case CursorIcon::NotAllowed: shape = GLFW_NOT_ALLOWED_CURSOR; break;
+            default: break;
+        }
+        s_Cursors[index] = glfwCreateStandardCursor(shape);
+    }
+    return s_Cursors[index];
+}
+
+void Window::SetCursorIcon(CursorIcon InIcon) {
+    if (m_CursorIcon == InIcon) {
+        return;
+    }
+    m_CursorIcon = InIcon;
+    glfwSetCursor(m_Window, GetStandardCursor(InIcon));
 }
 
 SharedObjectPtr<Window> Window::Create(const WindowParams& InParams) {

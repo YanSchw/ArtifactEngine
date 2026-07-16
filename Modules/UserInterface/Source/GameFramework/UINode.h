@@ -2,6 +2,7 @@
 #include "GameFramework/Node.h"
 #include "UILayout.h"
 #include "UIInput.h"
+#include "InputSystem/CursorIcon.h"
 #include "UINode.gen.h"
 
 class UIDrawList;
@@ -45,6 +46,8 @@ public:
     UIPadding Padding;
     /* Takes part in input routing: hover/press/click under the cursor, focusable in Focus mode. */
     bool Interactable = false;
+    /* Pointer shape shown while this node is the topmost interactable hit (or holds the pointer capture). */
+    CursorIcon Cursor = CursorIcon::Arrow;
     /* Clip children (painting and hit-testing) to this node's content rect. */
     bool ClipChildren = false;
 
@@ -82,6 +85,13 @@ public:
     bool IsHovered() const { return m_Hovered; }
     bool IsPressed() const { return m_Pressed; }
     bool IsFocused() const { return m_Focused; }
+
+    /** The canvas this node is rooted in, or null while detached. */
+    class UICanvas* GetCanvas() const;
+    /** Move the owning canvas's keyboard focus to this node. */
+    void RequestFocus();
+    /** Clear the owning canvas's focus if this node holds it. */
+    void ReleaseFocus();
 
     /** Input events from the canvas router (see UICanvas::InputMode). A pressed node captures the
      *  pointer until release; OnScroll and OnNavBack bubble up until a handler returns true. */

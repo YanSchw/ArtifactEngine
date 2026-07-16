@@ -50,6 +50,9 @@ public:
     UINode* GetFocusedNode() const { return m_FocusedNode.Get(); }
     void SetFocus(UINode* InNode);
 
+    /** Pointer shape requested by the topmost hit (or captured) node this frame. */
+    CursorIcon GetDesiredCursor() const { return m_DesiredCursor; }
+
     /** Runs one UI frame — bind, layout, input, paint — filling OutDrawList and returning the
      *  canvas->clip projection it must be rendered with. Called by UIRenderer. */
     Mat4 RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList);
@@ -72,4 +75,5 @@ private:
     WeakObjectPtr<UINode> m_CapturedNode;
     WeakObjectPtr<UINode> m_FocusedNode;
     Vec2 m_LastCursor = Vec2(0.0f);
+    CursorIcon m_DesiredCursor = CursorIcon::Arrow;
 };
