@@ -9,5 +9,6 @@
         "EngineCore",
         "GLFW_Surfaces",
         "UserInterface"
-    ]
+    ],
+    "MountContentDir": "Content"
 }

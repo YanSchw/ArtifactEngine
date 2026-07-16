@@ -66,6 +66,7 @@ void UIDockNode::BecomeSplit(UIDockSlot InSlot, UIDockNode* InInserted, float In
     InInserted->SetParent(this);
     m_Splitter = Add<UIDockSplitter>();
     m_SplitHorizontal = (InSlot == UIDockSlot::Left || InSlot == UIDockSlot::Right);
+    m_Splitter->Cursor = m_SplitHorizontal ? CursorIcon::ResizeH : CursorIcon::ResizeV;
     const bool insertedFirst = (InSlot == UIDockSlot::Left || InSlot == UIDockSlot::Top);
     m_ChildA = insertedFirst ? InInserted : moved;
     m_ChildB = insertedFirst ? moved : InInserted;

@@ -91,6 +91,7 @@ void ThemedWindow::BuildFrameContext(UIFrameContext& OutContext, double InDeltaT
     OutContext.CursorPressedThisFrame = OutContext.CursorDown && !m_WasCursorDown;
     OutContext.CursorReleasedThisFrame = !OutContext.CursorDown && m_WasCursorDown;
     OutContext.ScrollDelta = ConsumeScrollDelta();
+    OutContext.TextInput = ConsumeTextInput();
     m_WasCursorDown = OutContext.CursorDown;
 
     if (IsFocused()) {
@@ -121,6 +122,7 @@ void ThemedWindow::RenderWindow(double InDeltaTime) {
     BuildFrameContext(context, InDeltaTime);
     const Vec2 surfaceSize = Vec2((float)GetWidth(), (float)GetHeight());
     m_UIRenderer->Render(this, m_Canvas, surfaceSize, context);
+    SetCursorIcon(m_Canvas->GetDesiredCursor());
 }
 
 bool ThemedWindow::HitTestTitleBar(const Vec2& InPoint) const {
