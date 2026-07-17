@@ -16,6 +16,7 @@ public:
     const Vec2& GetContentSize() const { return m_ContentSize; }
 
     virtual bool OnScroll(const Vec2& InDelta) override;
+    virtual bool HitTestOverlay(const Vec2& InPoint) const override;
     virtual void OnPressed(const Vec2& InCursorPos) override;
     virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
     virtual void OnReleased(bool InInside) override;

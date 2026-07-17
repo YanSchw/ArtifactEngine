@@ -135,6 +135,9 @@ protected:
 
     /** Paint after all children, outside any clip. */
     virtual void PaintOverlay(UIDrawList& OutDrawList) { (void)OutDrawList; }
+    /** Hit-test what PaintOverlay draws; since overlays paint above all children, a hit here
+     *  beats any child in input routing. */
+    virtual bool HitTestOverlay(const Vec2& InPoint) const { (void)InPoint; return false; }
     bool HitTestRect(const UIRectF& InRect, const Vec2& InPoint) const;
 
     UIRectF ComputeGeometry(const UIRectF& InParentContentRect) const;

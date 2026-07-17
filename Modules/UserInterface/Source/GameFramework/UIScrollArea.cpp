@@ -105,6 +105,19 @@ float UIScrollArea::ScreenPosToLocalAxis(const Vec2& InScreenPos, const UIRectF&
     return (InAxis == 0 ? a.x : a.y) + t * (InAxis == 0 ? (b.x - a.x) : (b.y - a.y));
 }
 
+bool UIScrollArea::HitTestOverlay(const Vec2& InPoint) const {
+    if (ScrollbarColor.a <= 0.0f) {
+        return false;
+    }
+    const UIRectF content = GetContentRect();
+    const UIRectF vThumb = ComputeVerticalThumbRect(content);
+    if (vThumb.Size.y > 0.0f && HitTestRect(vThumb, InPoint)) {
+        return true;
+    }
+    const UIRectF hThumb = ComputeHorizontalThumbRect(content);
+    return hThumb.Size.x > 0.0f && HitTestRect(hThumb, InPoint);
+}
+
 void UIScrollArea::OnPressed(const Vec2& InCursorPos) {
     const UIRectF content = GetContentRect();
     const UIRectF vThumb = ComputeVerticalThumbRect(content);

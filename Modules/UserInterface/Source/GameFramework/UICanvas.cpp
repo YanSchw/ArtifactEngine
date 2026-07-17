@@ -117,6 +117,10 @@ UINode* UICanvas::HitTestTopmost(UINode* InNode, const Vec2& InPoint, bool InInt
     if (!InNode->IsEnabled()) {
         return nullptr;
     }
+    // Overlays paint above every child, so they hit first.
+    if ((!InInteractableOnly || InNode->Interactable) && InNode->HitTestOverlay(InPoint)) {
+        return InNode;
+    }
     // Later-painted children are on top, so search children (reverse) before self.
     if (!InNode->ClipChildren || InNode->HitTestRect(InNode->GetContentRect(), InPoint)) {
         for (int i = (int)InNode->GetChildCount() - 1; i >= 0; i--) {
