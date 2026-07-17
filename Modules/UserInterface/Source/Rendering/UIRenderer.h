@@ -36,7 +36,7 @@ private:
     SharedObjectPtr<Pipeline> m_SolidPipeline;
     SharedObjectPtr<Pipeline> m_TextPipeline;
     Map<Texture*, SharedObjectPtr<Pipeline>> m_ImagePipelines;
-    SharedObjectPtr<VertexBuffer> m_VertexBuffer;
+    SharedObjectPtr<VertexBuffer> m_DynamicVertexBuffer;
 
     bool m_ResourcesReady = false;
     Surface* m_CachedTarget = nullptr;

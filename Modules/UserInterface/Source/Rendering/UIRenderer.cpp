@@ -99,8 +99,12 @@ void UIRenderer::Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InVie
         return;
     }
 
-    // One shared buffer; draw each batch in paint (tree) order so later nodes layer in front.
-    m_VertexBuffer = VertexBuffer::Create(&drawList.GetVertices()[0], (uint32_t)(drawList.GetVertices().Size() * sizeof(UIVertex)), drawList.GetIndices());
+    if (!m_DynamicVertexBuffer) {
+        m_DynamicVertexBuffer = VertexBuffer::CreateDynamic();
+    }
+    m_DynamicVertexBuffer->Update(&drawList.GetVertices()[0], (uint32_t)(drawList.GetVertices().Size() * sizeof(UIVertex)), drawList.GetIndices());
+
+    // Draw each batch in paint (tree) order so later nodes layer in front.
     for (const UIDrawList::Batch& batch : drawList.GetBatches()) {
         if (batch.Kind == UIDrawList::BatchKind::Text) {
             if (!m_TextPipelineReady) {
@@ -116,7 +120,7 @@ void UIRenderer::Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InVie
         } else {
             m_SolidPipeline->Bind();
         }
-        m_VertexBuffer->Draw(batch.IndexCount, batch.FirstIndex);
+        m_DynamicVertexBuffer->Draw(batch.IndexCount, batch.FirstIndex);
     }
 }
 

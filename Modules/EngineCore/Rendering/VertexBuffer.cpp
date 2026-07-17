@@ -12,6 +12,11 @@ SharedObjectPtr<VertexBuffer> VertexBuffer::Create(const void* InVertexData, uin
     return RenderingAPI::GetInstance()->CreateVertexBuffer(InVertexData, InVertexByteSize, InIndices);
 }
 
+SharedObjectPtr<VertexBuffer> VertexBuffer::CreateDynamic() {
+    AE_ASSERT(RenderingAPI::GetInstance(), "No rendering API instance found!");
+    return RenderingAPI::GetInstance()->CreateDynamicVertexBuffer();
+}
+
 void VertexBuffer::Bind() {
     RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BindVertexBuffer, CmdBindVertexBuffer{ this });
 }

@@ -1109,6 +1109,10 @@ SharedObjectPtr<VertexBuffer> VulkanAPI::CreateVertexBuffer(const void* InVertex
     return new VulkanVertexBuffer(InVertexData, InVertexByteSize, InIndices, *this);
 }
 
+SharedObjectPtr<VertexBuffer> VulkanAPI::CreateDynamicVertexBuffer() {
+    return new VulkanVertexBuffer(*this);
+}
+
 SharedObjectPtr<Shader> VulkanAPI::CreateShader(const String& InShaderSource) {
     return new VulkanShader(InShaderSource, *this);
 }
