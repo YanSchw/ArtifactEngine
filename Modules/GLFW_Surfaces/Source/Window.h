@@ -34,7 +34,7 @@ public:
 
     bool ShouldClose() const;
     static void PollEvents();
-    
+
     static void SetRefreshCallback(const std::function<void()>& InCallback);
 
     void Minimize();
