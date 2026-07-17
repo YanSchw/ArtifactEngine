@@ -91,7 +91,6 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     frameBufferDesc.ClearColor = Vec4(0.08f, 0.09f, 0.11f, 1.0f);
     s_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
 
-    s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Shader.glsl"));
     SamplerDesc samplerDesc;
     samplerDesc.MagFilter = FilterMode::Nearest;
     samplerDesc.MinFilter = FilterMode::Nearest;
@@ -138,6 +137,7 @@ SharedObjectPtr<class ImageView> ArtifactRenderPipeline::GetFinalImageView() con
 }
 
 ArtifactRenderPipeline::ArtifactRenderPipeline() {
+    s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Shader.glsl"));
     Invalidate(100, 100);
 }
 
