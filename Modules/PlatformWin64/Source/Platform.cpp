@@ -23,3 +23,6 @@ String Platform::GetResourceDirectory() {
 String Platform::GetContentDirectory() {
     return (std::filesystem::path(GetResourceDirectory()) / "Content").string();
 }
+
+void Platform::SetApplicationIcon(const String&) {
+}

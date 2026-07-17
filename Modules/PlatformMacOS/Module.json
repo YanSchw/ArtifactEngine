@@ -8,7 +8,9 @@
     ],
     "LinkLibraries": [
         "-framework Security",
-        "-framework CoreFoundation"
+        "-framework CoreFoundation",
+        "-framework AppKit",
+        "-lobjc"
     ],
     "TargetPlatforms": [
         "MacOS"

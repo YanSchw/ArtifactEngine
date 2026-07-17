@@ -132,7 +132,7 @@ def fix_linkage():
     if "/usr/local/lib" in otool:
         print("⚠️ Executable still references /usr/local/lib after relinking")
 
-def create_plist():
+def create_plist(app_path: Path):
     plist = {
         "CFBundleName": APP_NAME,
         "CFBundleDisplayName": APP_NAME,
@@ -145,7 +145,7 @@ def create_plist():
         "LSMinimumSystemVersion": "10.13",
     }
 
-    with open(APP_PATH / "Contents/Info.plist", "wb") as f:
+    with open(app_path / "Contents/Info.plist", "wb") as f:
         plistlib.dump(plist, f)
 
 def sign_app():
@@ -202,6 +202,38 @@ def make_icns(png_path: Path, output_icns: Path):
 
     shutil.rmtree(iconset_dir)
 
+def make_dev_icns(project_path):
+    """Keep Build/Intermediate/Resources/app.icns in sync with the project icon PNG.
+
+    Lives next to the Win64 .ico so it survives the Binaries/ wipe every build starts with,
+    and sips/iconutil only run when the PNG actually changes."""
+    icon_png = Path(project_path) / "Content/Icons/Icon.png"
+    icns = Path(project_path) / "Build/Intermediate/Resources/app.icns"
+    if not icon_png.exists():
+        return
+    if not icns.exists() or icon_png.stat().st_mtime > icns.stat().st_mtime:
+        icns.parent.mkdir(parents=True, exist_ok=True)
+        make_icns(icon_png, icns)
+
+def create_dev_bundle(project_path):
+    """Thin .app shim around Binaries/Artifact for unpackaged dev builds.
+    The shim's executable is a symlink to the real binary."""
+    app_path = Path(project_path) / "Binaries" / f"{APP_NAME}.app"
+    (app_path / "Contents/MacOS").mkdir(parents=True, exist_ok=True)
+    (app_path / "Contents/Resources").mkdir(parents=True, exist_ok=True)
+
+    exe_link = app_path / "Contents/MacOS" / EXECUTABLE_NAME
+    if not exe_link.is_symlink():
+        if exe_link.exists():
+            exe_link.unlink()
+        exe_link.symlink_to(Path("../../../" + EXECUTABLE_NAME))
+
+    icns = Path(project_path) / "Build/Intermediate/Resources/app.icns"
+    if icns.exists():
+        shutil.copy2(icns, app_path / "Contents/Resources/app.icns")
+
+    create_plist(app_path)
+
 def package_for_macos(project_path):
     if APP_PATH.exists():
         shutil.rmtree(APP_PATH)
@@ -212,7 +244,7 @@ def package_for_macos(project_path):
     copy_binary()
     copy_content(project_path)
     copy_dependencies()
-    create_plist()
+    create_plist(APP_PATH)
     fix_linkage()   # must run after binaries are in place and before signing (it invalidates sigs)
     sign_app()
     verify()

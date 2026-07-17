@@ -7,7 +7,7 @@ from BuildTool.Generate import generate_cmake
 from BuildTool.Build import build_cmake
 from BuildTool.IDEGen import generate_ide_project
 from SDK.Paths import get_engine_path, get_project_path
-from SDK.Platforms import get_current_platform
+from SDK.Platforms import get_current_platform, PlatformType
 from SDK.Util import png_to_ico
 from SDK.Job import Job, JobError
 from Lint.Lint import lint_files
@@ -38,6 +38,10 @@ def _generate(args):
 
         png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
 
+        if get_current_platform() == PlatformType.MacOS:
+            from Package.MacOS import make_dev_icns
+            make_dev_icns(project_path)
+
     # IDE-triggered builds pass --skip-ide-project: regenerating the .xcodeproj /
     # .vcxproj while the IDE is mid-build rewrites the project file under it,
     # failing the build phase and invalidating the index.
@@ -63,6 +67,10 @@ def cmd_build(args):
 
         with Job("Building", dump_on_error=False) as job:
             build_cmake(job)
+
+        if get_current_platform() == PlatformType.MacOS:
+            from Package.MacOS import create_dev_bundle
+            create_dev_bundle(get_project_path())
     except KeyboardInterrupt:
         print("Build cancelled by user.")
         sys.exit(1)
@@ -74,8 +82,16 @@ def cmd_run(args):
     args.configuration = "Dev"  # Always run the Dev configuration for better debugging experience
     cmd_build(args)  # Ensure the engine is built before running
     project_path = os.getcwd()
+    binary = f"{project_path}/Binaries/Artifact"
+
+    # MacOS only:
+    # Launching through the .app shim gives the process a bundle identity, so the
+    # Dock and Cmd-Tab switcher show the project icon instead of the generic binary one.
+    bundled = f"{project_path}/Binaries/Artifact.app/Contents/MacOS/Artifact"
+    if get_current_platform() == PlatformType.MacOS and os.path.exists(bundled):
+        binary = bundled
     try:
-        subprocess.run([f"{project_path}/Binaries/Artifact"], check=True)
+        subprocess.run([binary], check=True)
     except KeyboardInterrupt:
         pass  # Allow graceful exit on Ctrl+C
     except subprocess.CalledProcessError as e:
