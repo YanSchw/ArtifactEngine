@@ -39,6 +39,7 @@ public:
     inline static const Vec4 Button = HexColor(0x2E2E2E);
     inline static const Vec4 ButtonHover = HexColor(0x3A3A3A);
     inline static const Vec4 ButtonPressed = HexColor(0x232323);
+    inline static const Vec4 FieldBorder = HexColor(0x3A3A3A);
     inline static const Vec4 CaptionHover = Vec4(1.0f, 1.0f, 1.0f, 0.07f);
     inline static const Vec4 CaptionCloseHover = HexColor(0xC42B1C);
     inline static const Vec4 DropPreview = HexColor(0x26BBFF, 0.28f);
