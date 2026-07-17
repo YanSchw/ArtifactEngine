@@ -28,7 +28,7 @@ public:
     void AddImageRect(const UIRectF& InRectPx, const Vec4& InColor, Texture* InTexture, const Mat4& InTransform = Mat4(1.0f), const Vec2& InUvMin = Vec2(0.0f), const Vec2& InUvMax = Vec2(1.0f));
     void AddImageTriangle(const Vec2 InPoints[3], const Vec2 InUvs[3], const Vec4& InColor, Texture* InTexture, const Mat4& InTransform = Mat4(1.0f));
 
-    /** Pre-tessellated solid triangles. Coarse clip: dropped only when the whole mesh AABB misses the clip rect. */
+    /** Pre-tessellated solid triangles, exactly clipped against the top clip rect. */
     void AddTriangles(const Vec2* InPositions, const Vec4* InColors, int32_t InVertexCount,
                       const uint32_t* InIndices, int32_t InIndexCount, const Vec4& InTint,
                       const Vec2& InTopLeftPx, const Vec2& InScale, const Mat4& InTransform = Mat4(1.0f));

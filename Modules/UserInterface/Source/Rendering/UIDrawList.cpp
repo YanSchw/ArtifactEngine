@@ -78,27 +78,78 @@ void UIDrawList::AddImageRect(const UIRectF& InRectPx, const Vec4& InColor, Text
     AppendQuad(BatchKind::Image, InRectPx, InUvMin, InUvMax, InColor, InTransform, InTexture);
 }
 
+namespace {
+struct UIClipVertex {
+    Vec2 Pos;
+    Vec4 Color;
+    Vec2 Uv;
+};
+
+/** Sutherland-Hodgman clip of one triangle against an axis-aligned rect, interpolating color
+ *  and UV along the cut edges. Each rect edge can add at most one vertex, so OutPoints holds
+ *  at most 7; returns the vertex count (0 when fully outside). Convexity and winding are
+ *  preserved, so a fan triangulation of the result stays valid. */
+int32_t ClipTriangleToRect(const UIClipVertex InTriangle[3], const UIRectF& InClip, UIClipVertex OutPoints[7]) {
+    const float bounds[4] = { InClip.Min().x, InClip.Max().x, InClip.Min().y, InClip.Max().y };
+    UIClipVertex buffers[2][7];
+    const UIClipVertex* points = InTriangle;
+    int32_t count = 3;
+    for (int32_t edge = 0; edge < 4; edge++) {
+        const int32_t axis = edge / 2;         // 0 = x, 1 = y
+        const bool keepGreater = (edge % 2) == 0;
+        UIClipVertex* out = (edge == 3) ? OutPoints : buffers[edge % 2];
+        int32_t outCount = 0;
+        for (int32_t i = 0; i < count; i++) {
+            const UIClipVertex& a = points[i];
+            const UIClipVertex& b = points[(i + 1) % count];
+            const float da = keepGreater ? (a.Pos[axis] - bounds[edge]) : (bounds[edge] - a.Pos[axis]);
+            const float db = keepGreater ? (b.Pos[axis] - bounds[edge]) : (bounds[edge] - b.Pos[axis]);
+            if (da >= 0.0f) {
+                out[outCount++] = a;
+            }
+            if ((da >= 0.0f) != (db >= 0.0f)) {
+                const float t = da / (da - db);
+                out[outCount++] = { a.Pos + (b.Pos - a.Pos) * t,
+                                    a.Color + (b.Color - a.Color) * t,
+                                    a.Uv + (b.Uv - a.Uv) * t };
+            }
+        }
+        points = out;
+        count = outCount;
+        if (count < 3) {
+            return 0;
+        }
+    }
+    return count;
+}
+}
+
 void UIDrawList::AddImageTriangle(const Vec2 InPoints[3], const Vec2 InUvs[3], const Vec4& InColor, Texture* InTexture, const Mat4& InTransform) {
-    // Coarse clip: drop only when the whole AABB misses the clip rect.
+    UIClipVertex triangle[3];
+    for (int i = 0; i < 3; i++) {
+        triangle[i] = { InPoints[i], InColor, InUvs[i] };
+    }
+    UIClipVertex clipped[7];
+    const UIClipVertex* points = triangle;
+    int32_t count = 3;
     if (!m_ClipStack.IsEmpty()) {
-        const UIRectF& clip = m_ClipStack.LastItem();
-        const float minX = std::min({ InPoints[0].x, InPoints[1].x, InPoints[2].x });
-        const float maxX = std::max({ InPoints[0].x, InPoints[1].x, InPoints[2].x });
-        const float minY = std::min({ InPoints[0].y, InPoints[1].y, InPoints[2].y });
-        const float maxY = std::max({ InPoints[0].y, InPoints[1].y, InPoints[2].y });
-        if (maxX <= clip.Min().x || minX >= clip.Max().x || maxY <= clip.Min().y || minY >= clip.Max().y) {
+        count = ClipTriangleToRect(triangle, m_ClipStack.LastItem(), clipped);
+        if (count < 3) {
             return;
         }
+        points = clipped;
     }
 
     const uint32_t base = (uint32_t)m_Vertices.Size();
-    for (int i = 0; i < 3; i++) {
-        m_Vertices.Add(MakeVertex(InPoints[i], InUvs[i], InColor, InTransform));
+    for (int32_t i = 0; i < count; i++) {
+        m_Vertices.Add(MakeVertex(points[i].Pos, points[i].Uv, points[i].Color, InTransform));
     }
     const uint32_t firstIndex = (uint32_t)m_Indices.Size();
-    m_Indices.Add(base + 0); m_Indices.Add(base + 1); m_Indices.Add(base + 2);
+    for (int32_t i = 1; i < count - 1; i++) {
+        m_Indices.Add(base); m_Indices.Add(base + i); m_Indices.Add(base + i + 1);
+    }
 
-    ExtendBatch(InTexture ? BatchKind::Image : BatchKind::Solid, InTexture, firstIndex, 3);
+    ExtendBatch(InTexture ? BatchKind::Image : BatchKind::Solid, InTexture, firstIndex, (uint32_t)(count - 2) * 3);
 }
 
 void UIDrawList::AddTriangles(const Vec2* InPositions, const Vec4* InColors, int32_t InVertexCount,
@@ -118,6 +169,37 @@ void UIDrawList::AddTriangles(const Vec2* InPositions, const Vec4* InColors, int
         }
         const UIRectF& clip = m_ClipStack.LastItem();
         if (mx.x <= clip.Min().x || mn.x >= clip.Max().x || mx.y <= clip.Min().y || mn.y >= clip.Max().y) {
+            return;
+        }
+        const bool fullyInside = mn.x >= clip.Min().x && mx.x <= clip.Max().x
+                              && mn.y >= clip.Min().y && mx.y <= clip.Max().y;
+        if (!fullyInside) {
+            // The mesh straddles the clip rect: clip each triangle exactly. Shared vertices are
+            // duplicated per triangle here, which only happens for the partially visible case.
+            const uint32_t firstIndex = (uint32_t)m_Indices.Size();
+            for (int32_t i = 0; i + 2 < InIndexCount; i += 3) {
+                UIClipVertex triangle[3];
+                for (int32_t k = 0; k < 3; k++) {
+                    const uint32_t index = InIndices[i + k];
+                    triangle[k] = { InTopLeftPx + InPositions[index] * InScale, InColors[index] * InTint, Vec2(0.0f) };
+                }
+                UIClipVertex clipped[7];
+                const int32_t count = ClipTriangleToRect(triangle, clip, clipped);
+                if (count < 3) {
+                    continue;
+                }
+                const uint32_t base = (uint32_t)m_Vertices.Size();
+                for (int32_t v = 0; v < count; v++) {
+                    m_Vertices.Add(MakeVertex(clipped[v].Pos, Vec2(0.0f), clipped[v].Color, InTransform));
+                }
+                for (int32_t v = 1; v < count - 1; v++) {
+                    m_Indices.Add(base); m_Indices.Add(base + v); m_Indices.Add(base + v + 1);
+                }
+            }
+            const uint32_t indexCount = (uint32_t)m_Indices.Size() - firstIndex;
+            if (indexCount > 0) {
+                ExtendBatch(BatchKind::Solid, nullptr, firstIndex, indexCount);
+            }
             return;
         }
     }
