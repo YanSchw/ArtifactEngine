@@ -1,7 +1,6 @@
 #pragma once
 #include "MinorTab.h"
 #include "Object/Pointer.h"
-#include "GameFramework/World.h"
 #include "Common/Array.h"
 #include "OutlinerTab.gen.h"
 
@@ -64,7 +63,6 @@ public:
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
 
 private:
-    void PopulateExampleWorld();
     void RebuildVisible();
     void AppendSubtree(Node* InNode, int InDepth);
     bool MatchesFilter(Node* InNode) const;
@@ -72,7 +70,6 @@ private:
     void AppendFilteredSubtree(Node* InNode, int InDepth);
     void RefreshFooter();
 
-    SharedObjectPtr<World> m_World;
     UINode* m_List = nullptr;
     UITextArea* m_SearchField = nullptr;
     UILabel* m_FooterLabel = nullptr;

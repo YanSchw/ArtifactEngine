@@ -3,6 +3,29 @@
 #include "MinorTabStandaloneWindow.h"
 #include "UI/UIDockArea.h"
 
+static void AssignWorldToTabs(UIDockNode* InNode, World* InWorld) {
+    if (!InNode) {
+        return;
+    }
+    for (MinorTab* tab : InNode->GetTabs()) {
+        tab->SetEditedWorld(InWorld);
+    }
+    AssignWorldToTabs(InNode->GetChildA(), InWorld);
+    AssignWorldToTabs(InNode->GetChildB(), InWorld);
+}
+
+void MajorTab::SetEditedWorld(World* InWorld) {
+    m_World = InWorld;
+    AssignWorldToTabs(m_DockArea->GetRoot(), InWorld);
+    for (WeakObjectPtr<MinorTabStandaloneWindow>& weak : m_FloatingWindows) {
+        if (MinorTabStandaloneWindow* window = weak.Get()) {
+            if (MinorTab* tab = window->GetTab()) {
+                tab->SetEditedWorld(InWorld);
+            }
+        }
+    }
+}
+
 MajorTab::MajorTab() {
     Fill();
     m_DockArea = Add<UIDockArea>();

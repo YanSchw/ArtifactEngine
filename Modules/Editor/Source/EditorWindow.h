@@ -4,8 +4,6 @@
 
 class UIStack;
 class MajorTab;
-class Pipeline;
-class VertexBuffer;
 
 /** The editor's main window. */
 class EditorWindow : public ThemedWindow {
@@ -35,10 +33,6 @@ public:
 
     static void MoveTab(MajorTab* InTab, EditorWindow* InFrom, EditorWindow* InTo);
 
-protected:
-    virtual void PreUIRender(double InDeltaTime) override;
-    virtual void ReleaseResources() override;
-
 private:
     void BuildEditorChrome();
     void RegisterTab(MajorTab* InTab);
@@ -55,7 +49,4 @@ private:
 
     bool m_DraggingTabHandle = false;
     Vec2 m_TabHandleDragCursor = Vec2(0.0f);
-
-    SharedObjectPtr<Pipeline> m_ScenePipeline;
-    SharedObjectPtr<VertexBuffer> m_SceneQuad;
 };

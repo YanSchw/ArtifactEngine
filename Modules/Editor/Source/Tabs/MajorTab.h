@@ -1,5 +1,6 @@
 #pragma once
 #include "GameFramework/UINode.h"
+#include "GameFramework/World.h"
 #include "Object/Pointer.h"
 #include "MajorTab.gen.h"
 
@@ -21,6 +22,8 @@ public:
     virtual String GetTabTitle() const { return "Tab"; }
     virtual void BuildToolBar(UINode& InToolBar) { (void)InToolBar; }
 
+    World* GetEditedWorld() const { return m_World.Get(); }
+
     UIDockArea* GetDockArea() const { return m_DockArea; }
 
     void SetOwnerWindow(EditorWindow* InWindow) { m_OwnerWindow = InWindow; }
@@ -30,8 +33,12 @@ public:
     void ReDockFloatingTab(MinorTabStandaloneWindow* InWindow);
     void SetFloatingWindowsVisible(bool InVisible);
 
+protected:
+    void SetEditedWorld(World* InWorld);
+
 private:
     UIDockArea* m_DockArea = nullptr;
     EditorWindow* m_OwnerWindow = nullptr;
     Array<WeakObjectPtr<MinorTabStandaloneWindow>> m_FloatingWindows;
+    SharedObjectPtr<World> m_World;
 };

@@ -12,6 +12,9 @@ UIDockArea::UIDockArea() {
 }
 
 UIDockNode* UIDockArea::Dock(MinorTab* InTab, UIDockSlot InSlot, UIDockNode* InTarget, float InShare) {
+    if (MajorTab* owner = GetParent() ? GetParent()->As<MajorTab>() : nullptr) {
+        InTab->SetEditedWorld(owner->GetEditedWorld());
+    }
     UIDockNode* target = InTarget ? InTarget : m_Root;
     if (InSlot == UIDockSlot::Center) {
         target = target->FindFirstLeaf();

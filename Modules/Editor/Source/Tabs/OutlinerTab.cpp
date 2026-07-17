@@ -7,9 +7,6 @@
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UITextArea.h"
 #include "GameFramework/UICanvas.h"
-#include "GameFramework/Node3D.h"
-#include "GameFramework/CameraNode.h"
-#include "GameFramework/StaticMeshNode.h"
 #include "Assets/AssetManager.h"
 #include "Assets/VectorImage.h"
 #include "Common/UUID.h"
@@ -24,9 +21,6 @@ OutlinerTab::OutlinerTab() {
     m_ArrowCollapsed = assets.GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0003-4a00-9000-000000000003"));
     m_EyeIcon = assets.GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0004-4a00-9000-000000000004"));
     m_EyeClosedIcon = assets.GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0005-4a00-9000-000000000005"));
-
-    m_World = new World();
-    PopulateExampleWorld();
 
     UIVStack* layout = Add<UIVStack>();
     layout->Fill();
@@ -92,7 +86,8 @@ OutlinerTab::OutlinerTab() {
 }
 
 void OutlinerTab::RefreshFooter() {
-    const int total = m_World->GetAllNodes().Size();
+    World* world = GetEditedWorld();
+    const int total = world ? world->GetAllNodes().Size() : 0;
     String text = HasFilter()
         ? std::to_string(m_MatchCount) + " of " + std::to_string(total) + " nodes"
         : std::to_string(total) + " nodes";
@@ -100,33 +95,6 @@ void OutlinerTab::RefreshFooter() {
         text += " (1 selected)";
     }
     m_FooterLabel->Text = text;
-}
-
-void OutlinerTab::PopulateExampleWorld() {
-    // A single scene root keeps every node parented, so top-level nodes reorder by sibling index
-    // just like nested ones (Unity's "SampleScene" root).
-    Node* scene = m_World->Spawn(Node3D::StaticClass());
-    scene->SetName("Scene");
-
-    scene->CreateChild(Node3D::StaticClass())->SetName("Directional Light");
-    Node* camera = scene->CreateChild(CameraNode::StaticClass());
-    camera->SetName("Main Camera");
-
-    Node* environment = scene->CreateChild(Node3D::StaticClass());
-    environment->SetName("Environment");
-    environment->CreateChild(StaticMeshNode::StaticClass())->SetName("Floor");
-    Node* props = environment->CreateChild(Node3D::StaticClass());
-    props->SetName("Props");
-    props->CreateChild(StaticMeshNode::StaticClass())->SetName("Crate");
-    props->CreateChild(StaticMeshNode::StaticClass())->SetName("Barrel");
-
-    Node* rig = scene->CreateChild(Node3D::StaticClass());
-    rig->SetName("Character");
-    Node* pelvis = rig->CreateChild(Node3D::StaticClass());
-    pelvis->SetName("Pelvis");
-    pelvis->CreateChild(Node3D::StaticClass())->SetName("Spine");
-
-    m_Selected = camera;
 }
 
 const OutlinerTab::VisibleRow* OutlinerTab::GetVisibleRow(int InIndex) const {
@@ -152,7 +120,11 @@ void OutlinerTab::RebuildVisible() {
     m_Filter = ToLower(m_SearchField->Text);
     m_MatchCount = 0;
 
-    for (Node* node : m_World->GetAllNodes()) {
+    World* world = GetEditedWorld();
+    if (!world) {
+        return;
+    }
+    for (Node* node : world->GetAllNodes()) {
         if (node->GetParent()) {
             continue;
         }

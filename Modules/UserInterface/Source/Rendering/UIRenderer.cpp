@@ -128,8 +128,15 @@ Pipeline* UIRenderer::GetImagePipeline(Texture* InTexture) {
     if (!InTexture || !m_CachedTarget) {
         return nullptr;
     }
+    SharedObjectPtr<ImageView> view = InTexture->GetDefaultView();
+    if (!view.Get()) {
+        return nullptr;
+    }
     if (m_ImagePipelines.ContainsKey(InTexture)) {
-        return m_ImagePipelines[InTexture].Get();
+        Pipeline* cached = m_ImagePipelines[InTexture].Get();
+        if (std::get<1>(cached->GetDesc().ImageBindings[0]).Get() == view.Get()) {
+            return cached;
+        }
     }
     PipelineDesc imageDesc;
     imageDesc.Target = (Object*)m_CachedTarget;
@@ -138,7 +145,7 @@ Pipeline* UIRenderer::GetImagePipeline(Texture* InTexture) {
     imageDesc.EnableBlending = true;
     imageDesc.EnableDepthTest = false;
     imageDesc.Buffers.Add(m_ProjectionBuffer);
-    imageDesc.ImageBindings.Add({ 16, InTexture->GetDefaultView(), m_Sampler });
+    imageDesc.ImageBindings.Add({ 16, view, m_Sampler });
     SharedObjectPtr<Pipeline> pipeline = Pipeline::Create(imageDesc);
     m_ImagePipelines[InTexture] = pipeline;
     return pipeline.Get();

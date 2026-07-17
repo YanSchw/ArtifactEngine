@@ -21,44 +21,32 @@
 #include "GameFramework/StaticMeshNode.h"
 
 static SharedObjectPtr<Shader> s_Shader;
-static SharedObjectPtr<UniformBuffer> s_UniformBuffer;
-static SharedObjectPtr<Pipeline> s_Pipeline;
-static SharedObjectPtr<FrameBuffer> s_FrameBuffer;
 
-static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
-static SharedObjectPtr<VertexBuffer> s_FullScreenQuadVertexBuffer;
-
-static uint32_t s_Width  = 0;
-static uint32_t s_Height = 0;
-
-static struct {
+struct SceneUniformData {
     glm::mat4 viewProjectionMatrix;
-} uniformBufferData;
+};
 
-static void UpdateUniformData(const RenderParams& InParams) {
-    if (InParams.m_World && InParams.m_World->GetMainCamera()) {
-        InParams.m_World->GetMainCamera()->SetAspectRatio(InParams.Width / (float) InParams.Height);
-        uniformBufferData.viewProjectionMatrix = InParams.m_World->GetMainCamera()->GetViewProjectionMatrix();
+void ArtifactRenderPipeline::UpdateUniformData(const RenderParams& InParams) {
+    CameraNode* camera = InParams.CameraOverride;
+    if (!camera && InParams.m_World) {
+        camera = InParams.m_World->GetMainCamera();
     }
 
-    // Upload
-    void* data = s_UniformBuffer->MapData(sizeof(uniformBufferData), 0);
-    memcpy(data, &uniformBufferData, sizeof(uniformBufferData));
-    s_UniformBuffer->UnmapData();
+    SceneUniformData data;
+    data.viewProjectionMatrix = glm::mat4(1.0f);
+    if (camera) {
+        camera->SetAspectRatio(InParams.Width / (float) InParams.Height);
+        data.viewProjectionMatrix = camera->GetViewProjectionMatrix();
+    }
+
+    void* mapped = m_UniformBuffer->MapData(sizeof(data), 0);
+    memcpy(mapped, &data, sizeof(data));
+    m_UniformBuffer->UnmapData();
 }
 
 void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
-    s_Width = InWidth;
-    s_Height = InHeight;
-
-    Array<Vertex> fullScreenQuadVertices = {
-        { { -1.0f, -1.0f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
-        { { -1.0f,  1.0f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
-        { {  1.0f,  1.0f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
-        { {  1.0f, -1.0f,  0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }
-    };
-    s_FullScreenQuadVertexBuffer = VertexBuffer::Create(fullScreenQuadVertices, { 0, 1, 2, 0, 2, 3 });
-
+    m_Width = InWidth;
+    m_Height = InHeight;
 
     ImageDesc imageDesc;
     imageDesc.Width = InWidth;
@@ -89,28 +77,30 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     frameBufferDesc.ColorAttachments.Add(imageView);
     frameBufferDesc.DepthAttachment = depthImageView;
     frameBufferDesc.ClearColor = Vec4(0.08f, 0.09f, 0.11f, 1.0f);
-    s_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
+    m_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
 
     SamplerDesc samplerDesc;
     samplerDesc.MagFilter = FilterMode::Nearest;
     samplerDesc.MinFilter = FilterMode::Nearest;
     auto sampler = Sampler::Create(samplerDesc);
-    s_UniformBuffer = UniformBuffer::Create(0, sizeof(uniformBufferData));
+    if (!m_UniformBuffer.Get()) {
+        m_UniformBuffer = UniformBuffer::Create(0, sizeof(SceneUniformData));
+    }
     PipelineDesc pipelineDesc;
-    pipelineDesc.Target = s_FrameBuffer;
+    pipelineDesc.Target = m_FrameBuffer;
     pipelineDesc.Shader = s_Shader;
-    pipelineDesc.Buffers.Add(s_UniformBuffer);
+    pipelineDesc.Buffers.Add(m_UniformBuffer);
     pipelineDesc.ImageBindings.Add({ 16, AssetManager::Get().GetAsset<Texture2D>(UUID::FromString("8c2146d1-c4d7-41b4-b456-9fd071812573"))->GetTexture()->GetDefaultView(), sampler });
-    s_Pipeline = Pipeline::Create(pipelineDesc);
+    m_Pipeline = Pipeline::Create(pipelineDesc);
 }
 
 void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InParams) {
-    if (s_Width != InParams.Width || s_Height != InParams.Height) {
+    if (m_Width != InParams.Width || m_Height != InParams.Height) {
         Invalidate(InParams.Width, InParams.Height);
     }
 
     UpdateUniformData(InParams);
-    s_Pipeline->Bind();
+    m_Pipeline->Bind();
     if (InParams.m_World == nullptr) {
         return;
     }
@@ -120,7 +110,7 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
             RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData, CmdSetShaderData{ staticMesh->GetPerMeshShaderData() });
 
             Mesh* mesh = staticMesh->GetMesh();
-            if (mesh) {
+            if (staticMesh->IsEnabled() && mesh) {
                 VertexBuffer* vertexBuffer = mesh->GetVertexBuffer();
                 AE_ASSERT(vertexBuffer);
                 vertexBuffer->Draw();
@@ -130,14 +120,16 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
 }
 
 SharedObjectPtr<class ImageView> ArtifactRenderPipeline::GetFinalImageView() const {
-    if (!s_FrameBuffer) {
+    if (!m_FrameBuffer.Get()) {
         return nullptr;
     }
-    return s_FrameBuffer->GetDesc().ColorAttachments[0];
+    return m_FrameBuffer->GetDesc().ColorAttachments[0];
 }
 
 ArtifactRenderPipeline::ArtifactRenderPipeline() {
-    s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Shader.glsl"));
+    if (!s_Shader.Get()) {
+        s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Shader.glsl"));
+    }
     Invalidate(100, 100);
 }
 

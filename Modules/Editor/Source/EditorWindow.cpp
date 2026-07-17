@@ -6,15 +6,6 @@
 #include "GameFramework/UICanvas.h"
 #include "GameFramework/UIQuad.h"
 #include "Assets/Font.h"
-#include "Core/Engine.h"
-#include "Core/EngineConfig.h"
-#include "Platform/FileIO.h"
-#include "Rendering/RenderPipeline.h"
-#include "Rendering/Pipeline.h"
-#include "Rendering/Shader.h"
-#include "Rendering/Sampler.h"
-#include "Rendering/VertexBuffer.h"
-#include "Rendering/Image.h"
 #include <cmath>
 #include <string>
 
@@ -196,46 +187,3 @@ void EditorWindow::MoveTab(MajorTab* InTab, EditorWindow* InFrom, EditorWindow* 
     }
 }
 
-void EditorWindow::ReleaseResources() {
-    m_ScenePipeline = nullptr;
-    m_SceneQuad = nullptr;
-    ThemedWindow::ReleaseResources();
-}
-
-void EditorWindow::PreUIRender(double InDeltaTime) {
-    (void)InDeltaTime;
-    RenderPipeline* scenePipeline = Engine::Get().GetRenderPipeline();
-    if (!scenePipeline) {
-        return;
-    }
-    SharedObjectPtr<ImageView> finalView = scenePipeline->GetFinalImageView();
-    if (!finalView) {
-        return;
-    }
-
-    if (!m_SceneQuad) {
-        Array<Vertex> vertices = {
-            { { -1.0f, -1.0f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
-            { { -1.0f,  1.0f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
-            { {  1.0f,  1.0f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
-            { {  1.0f, -1.0f,  0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }
-        };
-        m_SceneQuad = VertexBuffer::Create(vertices, { 0, 1, 2, 0, 2, 3 });
-    }
-
-    bool rebuild = !m_ScenePipeline;
-    if (m_ScenePipeline) {
-        auto[binding, imageView, sampler] = m_ScenePipeline->GetDesc().ImageBindings[0];
-        rebuild = (imageView.Get() != finalView.Get());
-    }
-    if (rebuild) {
-        PipelineDesc desc;
-        desc.Target = this;
-        desc.Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Passthrough.glsl"));
-        desc.ImageBindings.Add({ 16, finalView, Sampler::Create({ FilterMode::Nearest, FilterMode::Nearest, AddressMode::Repeat, AddressMode::Repeat, AddressMode::Repeat }) });
-        m_ScenePipeline = Pipeline::Create(desc);
-    }
-
-    m_ScenePipeline->Bind();
-    m_SceneQuad->Draw();
-}

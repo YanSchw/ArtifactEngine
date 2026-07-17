@@ -6,6 +6,7 @@ struct RenderParams {
     uint32_t Width;
     uint32_t Height;
     class World* m_World = nullptr;
+    class CameraNode* CameraOverride = nullptr;
 };
 
 class RenderPipeline : public Object {
