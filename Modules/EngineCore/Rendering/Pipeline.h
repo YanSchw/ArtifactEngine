@@ -1,9 +1,9 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Vertex.h"
-#include "Pipeline.gen.h"
 
 #include <variant>
+#include "Pipeline.gen.h"
 
 struct PipelineDesc {
     SharedObjectPtr<class Shader> Shader;

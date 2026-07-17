@@ -1,12 +1,12 @@
 #pragma once
 #include "Common/String.h"
 #include "Object/Struct.h"
-#include "UUID.gen.h"
 
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include "UUID.gen.h"
 
 struct UUID {
     ARTIFACT_STRUCT();

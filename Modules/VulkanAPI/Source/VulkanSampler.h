@@ -1,9 +1,9 @@
 #pragma once
 #include "Rendering/Sampler.h"
-#include "VulkanSampler.gen.h"
 #include "VulkanAPI.h"
 
 #include <vulkan/vulkan.h>
+#include "VulkanSampler.gen.h"
 
 class VulkanSampler : public Sampler {
 public:

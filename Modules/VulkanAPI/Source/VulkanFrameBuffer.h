@@ -1,10 +1,10 @@
 #pragma once
 #include "Rendering/FrameBuffer.h"
-#include "VulkanFrameBuffer.gen.h"
 #include "VulkanAPI.h"
 
 #include <vulkan/vulkan.h>
 #include <vector>
+#include "VulkanFrameBuffer.gen.h"
 
 class VulkanFrameBuffer : public FrameBuffer {
 public:

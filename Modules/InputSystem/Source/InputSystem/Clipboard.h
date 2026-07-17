@@ -2,7 +2,7 @@
 #include "Common/String.h"
 #include <functional>
 
-/** Process-wide text clipboard, bridged to the OS by the active surface backend. 
+/** Process-wide text clipboard, bridged to the OS by the active surface backend.
  *  Reads return empty and writes are dropped until then. */
 class Clipboard {
 public:

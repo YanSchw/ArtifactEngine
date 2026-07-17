@@ -130,6 +130,7 @@ class Enum:
         escaped_enum_code = enum_code.replace("\n", "\\\n")
 
         gen_file.write(
+            f"#undef _GENERATED_BODY_{self.Line}\n"
             f"#define _GENERATED_BODY_{self.Line} \\\n"
             f"{escaped_enum_code}\n\n"
         )

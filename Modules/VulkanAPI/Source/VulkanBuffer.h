@@ -1,10 +1,10 @@
 #pragma once
 #include "Rendering/Buffer.h"
 #include "Rendering/RenderingAPI.h"
-#include "VulkanBuffer.gen.h"
 #include "VulkanAPI.h"
 
 #include <vulkan/vulkan.h>
+#include "VulkanBuffer.gen.h"
 
 class VulkanUniformBuffer : public UniformBuffer {
 public:

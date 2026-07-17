@@ -58,6 +58,7 @@ class Class:
         escaped_class_code = class_code.replace('\n', '\\\n')
 
         gen_file.write(
+            f"#undef _GENERATED_BODY_{self.Line}\n"
             f"#define _GENERATED_BODY_{self.Line} \\\n"
             f"{escaped_class_code}\n\n"
         )

@@ -1,9 +1,9 @@
 #pragma once
 #include "Object/Object.h"
 #include "Object/Pointer.h"
-#include "Engine.gen.h"
 
 #include <chrono>
+#include "Engine.gen.h"
 
 class GameInstance;
 

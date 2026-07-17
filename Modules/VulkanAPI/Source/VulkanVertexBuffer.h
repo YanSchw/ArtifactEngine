@@ -1,10 +1,10 @@
 #pragma once
 #include "Rendering/VertexBuffer.h"
 #include "Rendering/RenderingAPI.h"
-#include "VulkanVertexBuffer.gen.h"
 #include "VulkanAPI.h"
 
 #include <vulkan/vulkan.h>
+#include "VulkanVertexBuffer.gen.h"
 
 class VulkanVertexBuffer : public VertexBuffer {
 public:

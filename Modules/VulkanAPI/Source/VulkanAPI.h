@@ -1,8 +1,8 @@
 #pragma once
 #include "Rendering/RenderingAPI.h"
-#include "VulkanAPI.gen.h"
 
 #include <vulkan/vulkan.h>
+#include "VulkanAPI.gen.h"
 
 class VulkanAPI : public RenderingAPI {
 public:

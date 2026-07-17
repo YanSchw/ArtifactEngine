@@ -1,9 +1,9 @@
 #pragma once
 #include "Rendering/Texture.h"
-#include "VulkanTexture.gen.h"
 #include "VulkanAPI.h"
 
 #include <vulkan/vulkan.h>
+#include "VulkanTexture.gen.h"
 
 class VulkanTexture : public Texture {
 public:

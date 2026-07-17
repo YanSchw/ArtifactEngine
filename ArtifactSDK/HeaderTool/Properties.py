@@ -122,7 +122,6 @@ def generate_properties_registration_code(typename: str, body: str) -> str:
 
     return f"""struct InternalRegisterProperties {{
         InternalRegisterProperties() {{
-            {typename}* _NullInstance = nullptr;
 {indented_properties}
             Property::RegisterTypeProperties("{typename}", {{
                 {properties_list}

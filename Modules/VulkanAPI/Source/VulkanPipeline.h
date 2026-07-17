@@ -1,10 +1,10 @@
 #pragma once
 #include "Rendering/Pipeline.h"
 #include "Rendering/RenderingAPI.h"
-#include "VulkanPipeline.gen.h"
 #include "VulkanAPI.h"
 
 #include <vulkan/vulkan.h>
+#include "VulkanPipeline.gen.h"
 
 class VulkanPipeline : public Pipeline {
 public:

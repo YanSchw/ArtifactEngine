@@ -1,9 +1,9 @@
 #pragma once
 #include "Rendering/Image.h"
-#include "VulkanImage.gen.h"
 #include "VulkanAPI.h"
 
 #include <vulkan/vulkan.h>
+#include "VulkanImage.gen.h"
 
 class VulkanImage : public Image {
 public:

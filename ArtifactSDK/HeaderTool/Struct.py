@@ -34,6 +34,7 @@ class Struct:
         escaped_struct_code = struct_code.replace('\n', '\\\n')
 
         gen_file.write(
+            f"#undef _GENERATED_BODY_{self.Line}\n"
             f"#define _GENERATED_BODY_{self.Line} \\\n"
             f"{escaped_struct_code}\n\n"
         )
