@@ -33,14 +33,18 @@ void EditorEngine::Initialize() {
     window->OpenTab<SceneEditorTab>();
     window->OpenTab<SceneEditorTab>();
     window->OpenTab<SceneEditorTab>();
+
+    // Keep rendering while a modal resize/move blocks the main loop's event pump.
+    Window::SetRefreshCallback([this]() { RenderFrame(m_DeltaTime); });
 }
 
 void EditorEngine::TickInput(double InDeltaTime) {
+    Window::PollEvents();
     // Refresh devices + evaluate action maps before gameplay reads them.
     InputSystem::Get().Tick((float)InDeltaTime);
 }
 
-bool EditorEngine::MainTick(double InDeltaTime) {
+void EditorEngine::RenderFrame(double InDeltaTime) {
     Window* sceneWindow = nullptr;
     for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
         if (window->IsA<EditorWindow>()) {
@@ -49,7 +53,7 @@ bool EditorEngine::MainTick(double InDeltaTime) {
         }
     }
     if (!sceneWindow) {
-        return false;
+        return;
     }
 
     m_RenderPipeline->Render(InDeltaTime, RenderParams{ sceneWindow->GetWidth(), sceneWindow->GetHeight() });
@@ -59,8 +63,10 @@ bool EditorEngine::MainTick(double InDeltaTime) {
     }
 
     RenderingAPI::GetInstance()->Draw();
+}
 
-    sceneWindow->PollEvents();
+bool EditorEngine::MainTick(double InDeltaTime) {
+    RenderFrame(InDeltaTime);
 
     // Destroying a window can cascade, so restart the sweep whenever one goes away.
     bool sweptWindow = true;

@@ -33,7 +33,7 @@ protected:
 
 protected:
     std::chrono::steady_clock::time_point m_PreviousTime;
-    double m_DeltaTime;
+    double m_DeltaTime = 0.0;
     SharedObjectPtr<class RenderPipeline> m_RenderPipeline;
     SharedObjectPtr<class GameInstance> m_GameInstance;
 

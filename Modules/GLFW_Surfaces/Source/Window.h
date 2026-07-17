@@ -4,6 +4,7 @@
 #include "Common/Array.h"
 #include "Common/String.h"
 #include "InputSystem/CursorIcon.h"
+#include <functional>
 #include "Window.gen.h"
 
 struct WindowParams {
@@ -32,7 +33,9 @@ public:
     bool WasWindowResized() const;
 
     bool ShouldClose() const;
-    void PollEvents();
+    static void PollEvents();
+    
+    static void SetRefreshCallback(const std::function<void()>& InCallback);
 
     void Minimize();
     void ToggleMaximize();

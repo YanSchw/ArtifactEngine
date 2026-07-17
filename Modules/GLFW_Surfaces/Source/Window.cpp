@@ -1,6 +1,9 @@
 #include "Window.h"
 #include "Core/Log.h"
+#include "Core/EngineConfig.h"
+#include "Platform/Platform.h"
 #include "Rendering/RenderingAPI.h"
+#include "Serialization/ThirdParty/stb_image/stb_image.h"
 
 #include "GLFWKeyboardDevice.h"
 #include "GLFWMouseDevice.h"
@@ -14,6 +17,7 @@
 static Window* s_Instance = nullptr;
 static Array<Window*> s_AllWindows;
 static Vec2 s_GlobalScrollAccum = Vec2(0.0f);
+static std::function<void()> s_RefreshCallback;
 
 static void OnWindowResized(GLFWwindow* InWindow, int InWidth, int InHeight) {
     if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
@@ -23,6 +27,32 @@ static void OnWindowResized(GLFWwindow* InWindow, int InWidth, int InHeight) {
 
 static void OnWindowScroll(GLFWwindow* InWindow, double InOffsetX, double InOffsetY);
 static void OnWindowChar(GLFWwindow* InWindow, unsigned int InCodepoint);
+
+static void ApplyIcon(GLFWwindow* InWindow) {
+    const String iconPath = EngineConfig::ResolveContentPath("/Icons/Icon.png");
+
+    static bool s_ApplicationIconSet = false;
+    if (!s_ApplicationIconSet) {
+        s_ApplicationIconSet = true;
+        Platform::SetApplicationIcon(iconPath);
+    }
+
+#if defined(AE_PLATFORM_MACOS)
+    // GLFW windows have no icon of their own on macOS; the application icon covers the Dock.
+    (void)InWindow;
+#else
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    if (stbi_uc* pixels = stbi_load(iconPath.c_str(), &width, &height, &channels, STBI_rgb_alpha)) {
+        GLFWimage icon{ width, height, pixels };
+        glfwSetWindowIcon(InWindow, 1, &icon);
+        stbi_image_free(pixels);
+    } else {
+        AE_WARN("Failed to load window icon '{0}'", iconPath);
+    }
+#endif
+}
 
 Window::Window(const WindowParams& InParams) {
     if (!s_Instance) {
@@ -50,9 +80,15 @@ Window::Window(const WindowParams& InParams) {
         return;
     }
     glfwSetWindowUserPointer(m_Window, this);
+    ApplyIcon(m_Window);
     glfwSetWindowSizeCallback(m_Window, OnWindowResized);
     glfwSetScrollCallback(m_Window, OnWindowScroll);
     glfwSetCharCallback(m_Window, OnWindowChar);
+    glfwSetWindowRefreshCallback(m_Window, [](GLFWwindow*) {
+        if (s_RefreshCallback) {
+            s_RefreshCallback();
+        }
+    });
 
     if (m_Params.EditorStyle) {
         glfwSetTitlebarHitTestCallback(m_Window, [](GLFWwindow* InWindow, int InX, int InY, int* OutHit) {
@@ -149,6 +185,10 @@ bool Window::ShouldClose() const {
 
 void Window::PollEvents() {
     glfwPollEvents();
+}
+
+void Window::SetRefreshCallback(const std::function<void()>& InCallback) {
+    s_RefreshCallback = InCallback;
 }
 
 void Window::Minimize() {

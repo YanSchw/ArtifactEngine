@@ -11,4 +11,7 @@ protected:
     virtual bool MainTick(double InDeltaTime) override;
     virtual void TickInput(double InDeltaTime) override;
     virtual void Shutdown() override;
+
+private:
+    void RenderFrame(double InDeltaTime);
 };

@@ -62,16 +62,17 @@ void GameEngine::Initialize() {
     world->Spawn<CameraController>();
     world->Spawn<StaticMeshNode>()->SetPosition(Vec3(-2, 0, 0));
     world->Spawn<StaticMeshNode>()->SetPosition(Vec3(+2, 0, 0));
+
+    Window::SetRefreshCallback([this]() { RenderFrame(m_DeltaTime); });
 }
 
 void GameEngine::TickInput(double InDeltaTime) {
+    Window::PollEvents();
     // Refresh devices + evaluate action maps before gameplay reads them.
     InputSystem::Get().Tick((float)InDeltaTime);
 }
 
-bool GameEngine::MainTick(double InDeltaTime) {
-    GetGameInstance()->Update(InDeltaTime);
-
+void GameEngine::RenderFrame(double InDeltaTime) {
     m_RenderPipeline->Render(InDeltaTime, RenderParams {
         s_Window->GetWidth(),
         s_Window->GetHeight(),
@@ -89,8 +90,11 @@ bool GameEngine::MainTick(double InDeltaTime) {
     s_FullScreenQuadVertexBuffer->Draw();
 
     RenderingAPI::GetInstance()->Draw();
+}
 
-    s_Window->PollEvents();
+bool GameEngine::MainTick(double InDeltaTime) {
+    GetGameInstance()->Update(InDeltaTime);
+    RenderFrame(InDeltaTime);
     return !s_Window->ShouldClose();
 }
 
