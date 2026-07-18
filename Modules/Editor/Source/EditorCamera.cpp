@@ -10,6 +10,7 @@ static constexpr float s_MaxFlySpeed = 100.0f;
 static constexpr float s_SpeedStepFactor = 1.25f;
 static constexpr float s_DollyStepFactor = 0.25f;
 static constexpr float s_PanUnitsPerPixel = 0.002f;
+static constexpr float s_MaxLookPixelsPerFrame = 60.0f;
 
 EditorCamera::EditorCamera() {
     SetName("EditorCamera");
@@ -41,8 +42,14 @@ void EditorCamera::UpdateNavigation(float InDeltaTime, Window& InWindow, bool In
     }
 
     const Vec2 cursor = InWindow.GetCursorPosition();
-    const Vec2 cursorDelta = cursor - m_LastCursor;
+    Vec2 cursorDelta = cursor - m_LastCursor;
     m_LastCursor = cursor;
+
+    // Reject implausibly large single-frame cursor jumps.
+    if (std::abs(cursorDelta.x) > s_MaxLookPixelsPerFrame ||
+        std::abs(cursorDelta.y) > s_MaxLookPixelsPerFrame) {
+        cursorDelta = Vec2(0.0f);
+    }
 
     if (m_Mode == NavMode::Fly) {
         UpdateFly(InDeltaTime, cursorDelta);
@@ -54,8 +61,8 @@ void EditorCamera::UpdateNavigation(float InDeltaTime, Window& InWindow, bool In
 void EditorCamera::BeginNavigation(NavMode InMode, Window& InWindow) {
     m_Mode = InMode;
     m_NavWindow = &InWindow;
-    m_LastCursor = InWindow.GetCursorPosition();
     InWindow.SetCursorLocked(true);
+    m_LastCursor = InWindow.GetCursorPosition();
 }
 
 void EditorCamera::CancelNavigation() {

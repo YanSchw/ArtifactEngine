@@ -33,6 +33,7 @@ ViewportTab::ViewportTab() {
     m_ViewportArea->Size = { 1.0_rel, 1.0_rel };  // whatever the toolbar leaves over
     m_ViewportArea->Image = m_SceneTexture;
     m_ViewportArea->Interactable = true;
+    m_ViewportArea->Cursor = CursorIcon::Crosshair;
 }
 
 void ViewportTab::BuildToolBar(UINode& InToolBar) {
