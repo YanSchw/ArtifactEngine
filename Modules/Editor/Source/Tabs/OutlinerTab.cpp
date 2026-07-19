@@ -1,5 +1,6 @@
 #include "OutlinerTab.h"
 #include "OutlinerRow.h"
+#include "MajorTab.h"
 #include "UI/EditorStyle.h"
 #include "GameFramework/UIScrollArea.h"
 #include "GameFramework/UIVStack.h"
@@ -91,10 +92,52 @@ void OutlinerTab::RefreshFooter() {
     String text = HasFilter()
         ? std::to_string(m_MatchCount) + " of " + std::to_string(total) + " nodes"
         : std::to_string(total) + " nodes";
-    if (m_Selected.Get()) {
-        text += " (1 selected)";
+    const int32_t selected = GetMajorTab() ? GetMajorTab()->GetSelectionCount() : 0;
+    if (selected > 0) {
+        text += " (" + std::to_string(selected) + " selected)";
     }
     m_FooterLabel->Text = text;
+}
+
+bool OutlinerTab::IsSelected(Node* InNode) const {
+    return GetMajorTab() && GetMajorTab()->IsSelected(InNode);
+}
+
+bool OutlinerTab::IsSoleSelected(Node* InNode) const {
+    return GetMajorTab() && GetMajorTab()->GetSoleSelection() == InNode;
+}
+
+void OutlinerTab::HandleRowClick(Node* InNode, bool InToggle, bool InRange) {
+    MajorTab* major = GetMajorTab();
+    if (!major || !InNode) {
+        return;
+    }
+    if (InRange) {
+        int anchorIndex = -1;
+        int nodeIndex = -1;
+        for (int i = 0; i < m_Visible.Size(); i++) {
+            if (m_Visible[i].NodePtr == m_SelectAnchor.Get()) {
+                anchorIndex = i;
+            }
+            if (m_Visible[i].NodePtr == InNode) {
+                nodeIndex = i;
+            }
+        }
+        if (anchorIndex >= 0 && nodeIndex >= 0) {
+            Array<Object*> range;
+            for (int i = std::min(anchorIndex, nodeIndex); i <= std::max(anchorIndex, nodeIndex); i++) {
+                range.Add(m_Visible[i].NodePtr);
+            }
+            major->SetSelection(range);
+            return;
+        }
+    }
+    if (InToggle) {
+        major->ToggleSelection(InNode);
+    } else {
+        major->SetSelection(InNode);
+    }
+    m_SelectAnchor = InNode;
 }
 
 const OutlinerTab::VisibleRow* OutlinerTab::GetVisibleRow(int InIndex) const {
@@ -204,10 +247,9 @@ void OutlinerTab::OnUIUpdate(const UIFrameContext& InContext) {
     if (focused && focused->As<UITextArea>()) {
         return;
     }
-    if (Node* selected = m_Selected.Get()) {
-        if (m_Renaming.Get() != selected) {
-            BeginRename(selected);
-        }
+    Node* selected = GetMajorTab() ? Cast<Node>(GetMajorTab()->GetSoleSelection()) : nullptr;
+    if (selected && m_Renaming.Get() != selected) {
+        BeginRename(selected);
     }
 }
 

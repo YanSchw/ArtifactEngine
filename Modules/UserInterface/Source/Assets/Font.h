@@ -47,6 +47,7 @@ protected:
 
 public:
     virtual bool IsLoaded() const override;
+    virtual String GetDisplayName() const override { return DisplayNameFromPath(m_FontPath); }
 
 private:
     /** Rasterizes the SDF atlas into OutAtlasPixels and fills the glyph table and font metrics. */

@@ -3,6 +3,7 @@
 #include "Core/EngineConfig.h"
 #include "Serialization/ChunkedBinary.h"
 #include "Serialization/Binary.h"
+#include <filesystem>
 
 // AssetStreamHandle
 
@@ -91,4 +92,12 @@ bool Asset::IsMissing() const {
 
 AssetStreamHandle Asset::GetStreamHandle() const {
     return AssetStreamHandle(const_cast<Asset*>(this));
+}
+
+String Asset::GetDisplayName() const {
+    return m_Id.ToString();
+}
+
+String Asset::DisplayNameFromPath(const String& InPath) {
+    return std::filesystem::path(InPath).stem().string();
 }

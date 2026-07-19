@@ -200,3 +200,13 @@ Array<Asset*> AssetManager::GetAllAssets() const {
     }
     return assets;
 }
+
+Array<Asset*> AssetManager::GetAssetsOfClass(const Class& InClass) const {
+    Array<Asset*> assets;
+    for (const auto& [id, asset] : m_Assets) {
+        if (asset.Get() && asset.Get()->IsA(InClass)) {
+            assets.Add(asset.Get());
+        }
+    }
+    return assets;
+}

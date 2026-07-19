@@ -22,6 +22,7 @@ public:
     void LoadAsset(Asset* InAsset);
     void UnloadAsset(Asset* InAsset);
     Asset* GetAsset(const UUID& InId);
+    Array<Asset*> GetAssetsOfClass(const Class& InClass) const;
 
     template<typename T>
     T* GetAsset(const UUID& InId) {

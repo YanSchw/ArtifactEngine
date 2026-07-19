@@ -35,8 +35,9 @@ public:
     const VisibleRow* GetVisibleRow(int InIndex) const;
     int GetVisibleCount() const { return m_Visible.Size(); }
 
-    bool IsSelected(Node* InNode) const { return m_Selected.Get() == InNode; }
-    void SelectNode(Node* InNode) { m_Selected = InNode; }
+    bool IsSelected(Node* InNode) const;
+    bool IsSoleSelected(Node* InNode) const;
+    void HandleRowClick(Node* InNode, bool InToggle, bool InRange);
 
     bool IsExpanded(Node* InNode) const { return !m_Collapsed.Contains(InNode); }
     void ToggleExpanded(Node* InNode);
@@ -79,7 +80,7 @@ private:
     String m_Filter;  // lowercased search text, rebuilt each frame
     int m_MatchCount = 0;
 
-    WeakObjectPtr<Node> m_Selected;
+    WeakObjectPtr<Node> m_SelectAnchor;
     WeakObjectPtr<Node> m_Renaming;
     WeakObjectPtr<Node> m_DragSource;
     WeakObjectPtr<Node> m_DropRef;

@@ -15,7 +15,7 @@ static constexpr float s_MaxLookPixelsPerFrame = 60.0f;
 EditorCamera::EditorCamera() {
     SetName("EditorCamera");
     SetPosition(Vec3(0.0f, 2.0f, -6.0f));
-    m_Pitch = -15.0f;
+    m_Pitch = 15.0f;
     ApplyYawPitch();
 }
 
@@ -75,7 +75,7 @@ void EditorCamera::CancelNavigation() {
 
 void EditorCamera::UpdateFly(float InDeltaTime, const Vec2& InCursorDelta) {
     m_Yaw += InCursorDelta.x * m_LookSensitivity;
-    m_Pitch -= InCursorDelta.y * m_LookSensitivity;
+    m_Pitch += InCursorDelta.y * m_LookSensitivity;
     m_Pitch = glm::clamp(m_Pitch, -89.0f, 89.0f);
     ApplyYawPitch();
 
@@ -95,7 +95,7 @@ void EditorCamera::UpdateFly(float InDeltaTime, const Vec2& InCursorDelta) {
     };
     Vec3 velocity = GetForwardVector() * axis(KeyCode::W, KeyCode::S)
                   + GetRightVector() * axis(KeyCode::D, KeyCode::A)
-                  + VecUtils::Up * axis(KeyCode::Q, KeyCode::E);
+                  + VecUtils::Up * axis(KeyCode::E, KeyCode::Q);
     if (glm::length(velocity) > 1.0f) {
         velocity = glm::normalize(velocity);
     }
@@ -104,7 +104,7 @@ void EditorCamera::UpdateFly(float InDeltaTime, const Vec2& InCursorDelta) {
 
 void EditorCamera::UpdatePan(const Vec2& InCursorDelta) {
     const float unitsPerPixel = m_FlySpeed * s_PanUnitsPerPixel;
-    AddWorldOffset((GetRightVector() * InCursorDelta.x + GetUpVector() * InCursorDelta.y) * unitsPerPixel);
+    AddWorldOffset((GetRightVector() * InCursorDelta.x - GetUpVector() * InCursorDelta.y) * unitsPerPixel);
 }
 
 void EditorCamera::Dolly(float InSteps) {

@@ -24,6 +24,18 @@ public:
 
     World* GetEditedWorld() const { return m_World.Get(); }
 
+    /** The document-wide selection shared by every MinorTab; any Object can be selected. */
+    Array<Object*> GetSelection() const;
+    int32_t GetSelectionCount() const;
+    Object* GetSoleSelection() const;
+    bool IsSelected(Object* InObject) const;
+    void SetSelection(Object* InObject);
+    void SetSelection(const Array<Object*>& InObjects);
+    void AddToSelection(Object* InObject);
+    void RemoveFromSelection(Object* InObject);
+    void ToggleSelection(Object* InObject);
+    void ClearSelection();
+
     UIDockArea* GetDockArea() const { return m_DockArea; }
 
     void SetOwnerWindow(EditorWindow* InWindow) { m_OwnerWindow = InWindow; }
@@ -41,4 +53,5 @@ private:
     EditorWindow* m_OwnerWindow = nullptr;
     Array<WeakObjectPtr<MinorTabStandaloneWindow>> m_FloatingWindows;
     SharedObjectPtr<World> m_World;
+    Array<WeakObjectPtr<Object>> m_Selection;
 };

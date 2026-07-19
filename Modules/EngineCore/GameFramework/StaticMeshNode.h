@@ -20,5 +20,9 @@ public:
 private:
     SharedObjectPtr<ShaderData> m_PerMeshShaderData;
 
+    PROPERTY()
     WeakObjectPtr<Mesh> m_Mesh;
+
+    PROPERTY()
+    bool m_CastShadow = true;
 };

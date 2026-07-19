@@ -89,6 +89,7 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     PipelineDesc pipelineDesc;
     pipelineDesc.Target = m_FrameBuffer;
     pipelineDesc.Shader = s_Shader;
+    pipelineDesc.ClockwiseFrontFace = true;
     pipelineDesc.Buffers.Add(m_UniformBuffer);
     pipelineDesc.ImageBindings.Add({ 16, AssetManager::Get().GetAsset<Texture2D>(UUID::FromString("8c2146d1-c4d7-41b4-b456-9fd071812573"))->GetTexture()->GetDefaultView(), sampler });
     m_Pipeline = Pipeline::Create(pipelineDesc);

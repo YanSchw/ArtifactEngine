@@ -26,6 +26,7 @@ protected:
 
 public:
     virtual bool IsLoaded() const override;
+    virtual String GetDisplayName() const override { return DisplayNameFromPath(m_ImagePath); }
 
 private:
     SvgDocument m_Document;

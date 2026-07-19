@@ -18,6 +18,7 @@ protected:
 
 public:
     virtual bool IsLoaded() const override;
+    virtual String GetDisplayName() const override { return DisplayNameFromPath(m_TexturePath); }
     Texture* GetTexture() const;
 
 private:

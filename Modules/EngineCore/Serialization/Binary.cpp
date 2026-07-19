@@ -1,6 +1,8 @@
 #include "Binary.h"
 #include "ChunkedBinary.h"
 
+#include "Assets/AssetManager.h"
+#include "Assets/Asset.h"
 #include "Core/Assert.h"
 #include "Object/Enum.h"
 
@@ -97,6 +99,10 @@ void BinarySerializer::SerializeProperty(ChunkWriter& writer, Property* property
             writer << (uint64_t)serialized->GetSizeInBytes();
             writer.WriteBytes(serialized->GetData(), serialized->GetSizeInBytes());
         }
+    } else if (auto p = Cast<WeakObjectPtrProperty>(property)) {
+        // Weak references don't own their target; only asset targets round-trip, by id.
+        Asset* asset = Cast<Asset>((*(WeakObjectPtr<Object>*)valuePtr).Get());
+        writer << (asset ? asset->GetId().ToString() : String(""));
     } else if (auto p = Cast<ArrayProperty>(property)) {
         size_t count = p->GetSize(valuePtr);
         writer << (uint64_t)count;
@@ -173,6 +179,12 @@ void BinarySerializer::DeserializeProperty(ChunkReader& reader, Property* proper
             DeserializeObject(obj, data);
             *(SharedObjectPtr<Object>*)valuePtr = SharedObjectPtr<Object>(obj);
         }
+    } else if (auto p = Cast<WeakObjectPtrProperty>(property)) {
+        String id;
+        reader >> id;
+        *(WeakObjectPtr<Object>*)valuePtr = id.empty()
+            ? nullptr
+            : (Object*)AssetManager::Get().GetAsset(UUID::FromString(id));
     } else if (auto p = Cast<ArrayProperty>(property)) {
         uint64_t count;
         reader >> count;

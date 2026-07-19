@@ -58,11 +58,13 @@ protected:
     virtual void Cook(class ChunkedBinary& OutChunkedBinary);
 
     SharedObjectPtr<class ChunkedBinary> GetChunkedBinary() const;
+    static String DisplayNameFromPath(const String& InPath);
 public:
     virtual bool IsLoaded() const;
     bool IsMissing() const;
     AssetStreamHandle GetStreamHandle() const;
     UUID GetId() const { return m_Id; }
+    virtual String GetDisplayName() const;
 
 protected:
     PROPERTY()

@@ -5,6 +5,7 @@
 #include "MinorTab.gen.h"
 
 class UIDockNode;
+class MajorTab;
 
 /** Base class for dockable editor panels (Outliner, Details, Viewport, ...). A MinorTab lives
  *  in a UIDockNode leaf inside a MajorTab's dock area; subclasses build their content as
@@ -23,8 +24,12 @@ public:
     World* GetEditedWorld() const { return m_EditedWorld.Get(); }
     void SetEditedWorld(World* InWorld) { m_EditedWorld = InWorld; }
 
+    MajorTab* GetMajorTab() const { return m_MajorTab.Get(); }
+    void SetMajorTab(MajorTab* InMajorTab) { m_MajorTab = InMajorTab; }
+
     UIDockNode* GetDockNode() const;
 
 private:
     WeakObjectPtr<World> m_EditedWorld;
+    WeakObjectPtr<MajorTab> m_MajorTab;
 };

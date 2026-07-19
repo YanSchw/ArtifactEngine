@@ -25,12 +25,17 @@ void UIStack::LayoutChildren(const UIRectF& InContent) {
 
     float cursor = horizontal ? InContent.Position.x : InContent.Position.y;
     for (UINode* child : children) {
-        const UIValue& main = horizontal ? child->Size.X : child->Size.Y;
+        UIValue& main = horizontal ? child->Size.X : child->Size.Y;
         const float extent = std::max(0.0f, main.Pixels) + std::max(0.0f, main.Fraction) / weightNorm * leftover;
         const UIRectF slot = horizontal
             ? UIRectF(Vec2(cursor, InContent.Position.y), Vec2(extent, InContent.Size.y))
             : UIRectF(Vec2(InContent.Position.x, cursor), Vec2(InContent.Size.x, extent));
+
+        const UIValue share = main;
+        main = UIValue::Px(extent);
         LayoutChild(*child, slot, m_WorldMatrix);
+        main = share;
+
         cursor += extent + gap;
     }
 }

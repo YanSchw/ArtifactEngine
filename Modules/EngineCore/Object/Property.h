@@ -71,6 +71,15 @@ struct SharedObjectPtrProperty : public Property {
         : Property(name, offset), InnerClass(innerClass) {}
 };
 
+struct WeakObjectPtrProperty : public Property {
+    ARTIFACT_CLASS();
+
+    Class InnerClass;
+
+    WeakObjectPtrProperty(const std::string& name, uint64_t offset, const Class& innerClass)
+        : Property(name, offset), InnerClass(innerClass) {}
+};
+
 struct StructProperty : public Property {
     ARTIFACT_CLASS();
 

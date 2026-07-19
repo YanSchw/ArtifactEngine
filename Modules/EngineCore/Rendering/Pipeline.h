@@ -18,6 +18,8 @@ struct PipelineDesc {
     bool EnableBlending = false;
     /* Enable depth testing / writing. */
     bool EnableDepthTest = true;
+    /* Passes whose projection flips Y for Vulkan mirror their on-screen winding. */
+    bool ClockwiseFrontFace = false;
 
     bool IsFrameBufferTarget() const;
     bool IsSurfaceTarget() const;

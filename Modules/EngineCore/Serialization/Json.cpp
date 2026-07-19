@@ -1,6 +1,8 @@
 #include "Json.h"
 #include "ThirdParty/nlohmann/json.hpp"
 
+#include "Assets/AssetManager.h"
+#include "Assets/Asset.h"
 #include "Core/Assert.h"
 #include "Object/Enum.h"
 
@@ -111,6 +113,13 @@ json JsonSerializer::SerializeProperty(Property* property, void* valuePtr) {
         }
 
         return json::parse(SerializeObject(ptr.Get()));
+    } else if (auto p = Cast<WeakObjectPtrProperty>(property)) {
+        // Weak references don't own their target; only asset targets round-trip, by id.
+        Asset* asset = Cast<Asset>((*(WeakObjectPtr<Object>*)valuePtr).Get());
+        if (!asset) {
+            return nullptr;
+        }
+        return asset->GetId().ToString();
     } else if (auto p = Cast<ArrayProperty>(property)) {
         json arr = json::array();
 
@@ -177,6 +186,11 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
         DeserializeObject(obj, j.dump());
         *(SharedObjectPtr<Object>*)valuePtr = SharedObjectPtr<Object>(obj);
 
+        return;
+    } else if (auto p = Cast<WeakObjectPtrProperty>(property)) {
+        *(WeakObjectPtr<Object>*)valuePtr = j.is_null()
+            ? nullptr
+            : (Object*)AssetManager::Get().GetAsset(UUID::FromString(j.get<String>()));
         return;
     } else if (auto p = Cast<ArrayProperty>(property)) {
         for (auto& elemJson : j) {

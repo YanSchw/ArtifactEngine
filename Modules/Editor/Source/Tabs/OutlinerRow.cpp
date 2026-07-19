@@ -5,6 +5,7 @@
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UITextArea.h"
 #include "GameFramework/Node.h"
+#include "InputSystem/KeyboardDevice.h"
 #include "Rendering/UIDrawList.h"
 
 static const Vec4 s_SelectedColor = HexColor(0x0F5A9E);
@@ -204,9 +205,14 @@ void OutlinerRow::OnPressed(const Vec2& InCursorPos) {
         return;
     }
 
-    const bool wasSelected = Owner->IsSelected(node);
-    Owner->SelectNode(node);
-    if (wasSelected && m_DoubleClickTimer > 0.0f && Owner->GetRenamingNode() != node) {
+    KeyboardDevice* keyboard = KeyboardDevice::Instance();
+    const bool toggle = keyboard && (keyboard->IsPressed(KeyCode::LeftControl) || keyboard->IsPressed(KeyCode::RightControl)
+                                  || keyboard->IsPressed(KeyCode::LeftSuper) || keyboard->IsPressed(KeyCode::RightSuper));
+    const bool range = keyboard && (keyboard->IsPressed(KeyCode::LeftShift) || keyboard->IsPressed(KeyCode::RightShift));
+
+    const bool wasSoleSelected = Owner->IsSoleSelected(node);
+    Owner->HandleRowClick(node, toggle, range);
+    if (!toggle && !range && wasSoleSelected && m_DoubleClickTimer > 0.0f && Owner->GetRenamingNode() != node) {
         Owner->BeginRename(node);
     }
     m_DoubleClickTimer = 0.35f;

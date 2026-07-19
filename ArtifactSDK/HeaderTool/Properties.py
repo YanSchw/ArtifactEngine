@@ -75,6 +75,10 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
         inner_type = full_typename[len("SharedObjectPtr<"):-1].strip()
         return SIMPLE_PROPERTY.format(PROPERTY_TYPE="SharedObjectPtrProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', Class("{inner_type}")')
 
+    if full_typename.startswith("WeakObjectPtr<") and full_typename.endswith(">"):
+        inner_type = full_typename[len("WeakObjectPtr<"):-1].strip()
+        return SIMPLE_PROPERTY.format(PROPERTY_TYPE="WeakObjectPtrProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', Class("{inner_type}")')
+
     if full_typename.startswith("Array<") and full_typename.endswith(">"):
         inner_type = full_typename[len("Array<"):-1].strip()
         inner_type_str = generate_property_type(inner_type, prop_name + "_InnerArrayProperty", class_or_struct_typename, use_offset=False)
