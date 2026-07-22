@@ -116,6 +116,10 @@ Array<String> EngineConfig::GetContentMountDirs() {
     return dirs;
 }
 
+Array<String> EngineConfig::GetContentMountKeys() {
+    return s_ContentMountKeys;
+}
+
 String EngineConfig::ResolveContentPath(const String& InRelativePath) {
     Array<String> dirs = GetContentMountDirs();
     for (const String& dir : dirs) {

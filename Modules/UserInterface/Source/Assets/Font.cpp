@@ -179,6 +179,18 @@ Vec2 Font::MeasureText(const String& InText, float InPixelHeight) {
     return Vec2(width, GetLineHeightBasePx() * scale);
 }
 
+float Font::GetTextWidth(const String& InText, float InPixelHeight) {
+    const float scale = GetScaleForPixelHeight(InPixelHeight);
+    float width = 0.0f;
+    for (char c : InText) {
+        GlyphInfo glyph;
+        if (GetGlyph((uint32_t)(unsigned char)c, glyph)) {
+            width += glyph.AdvancePx * scale;
+        }
+    }
+    return width;
+}
+
 void Font::Unload() {
     m_AtlasTexture = nullptr;
     m_Glyphs.Clear();

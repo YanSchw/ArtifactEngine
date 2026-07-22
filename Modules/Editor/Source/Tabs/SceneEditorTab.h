@@ -10,5 +10,6 @@ public:
     SceneEditorTab();
 
     virtual String GetTabTitle() const override { return "MyLevel"; }
+    virtual VectorImage* GetTabIcon() const override;
     virtual void BuildToolBar(UINode& InToolBar) override;
 };

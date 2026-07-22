@@ -5,23 +5,12 @@
 #include "VulkanSampler.h"
 #include "VulkanImage.h"
 #include "VulkanFrameBuffer.h"
+#include "Helpers.h"
 
 static Array<VulkanPipeline*> s_Pipelines;
 
 extern VkExtent2D swapChainExtent;
 extern VkFormat swapChainFormat;
-
-static VkFormat ImageFormatToVkFormat(ImageFormat format) {
-    switch (format) {
-    case ImageFormat::RGBA8: return VK_FORMAT_R8G8B8A8_UNORM;
-    case ImageFormat::BGRA8: return VK_FORMAT_B8G8R8A8_UNORM;
-    case ImageFormat::RGBA16F: return VK_FORMAT_R16G16B16A16_SFLOAT;
-    case ImageFormat::RGBA32F: return VK_FORMAT_R32G32B32A32_SFLOAT;
-    case ImageFormat::Depth24Stencil8: return VK_FORMAT_D24_UNORM_S8_UINT;
-    case ImageFormat::Depth32F: return VK_FORMAT_D32_SFLOAT;
-    default: return VK_FORMAT_UNDEFINED;
-    }
-}
 
 static VkExtent2D GetPipelineTargetExtent(const PipelineDesc& InDesc) {
     if (InDesc.IsFrameBufferTarget()) {
@@ -41,7 +30,7 @@ static std::vector<VkFormat> GetPipelineTargetColorFormats(const PipelineDesc& I
         AE_ASSERT(!attachments.IsEmpty(), "Framebuffer target must include at least one color attachment");
         std::vector<VkFormat> formats;
         for (const auto& attachment : attachments) {
-            formats.push_back(ImageFormatToVkFormat(attachment->GetDesc().Format));
+            formats.push_back(VulkanHelpers::ImageFormatToVkFormat(attachment->GetDesc().Format));
         }
         return formats;
     }
@@ -50,7 +39,7 @@ static std::vector<VkFormat> GetPipelineTargetColorFormats(const PipelineDesc& I
 
 static VkFormat GetPipelineTargetDepthFormat(const PipelineDesc& InDesc) {
     if (InDesc.IsFrameBufferTarget() && InDesc.Target->As<FrameBuffer>()->GetDesc().DepthAttachment) {
-        return ImageFormatToVkFormat(InDesc.Target->As<FrameBuffer>()->GetDesc().DepthAttachment->GetDesc().Format);
+        return VulkanHelpers::ImageFormatToVkFormat(InDesc.Target->As<FrameBuffer>()->GetDesc().DepthAttachment->GetDesc().Format);
     }
     return VK_FORMAT_UNDEFINED;
 }

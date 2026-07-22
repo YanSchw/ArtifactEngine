@@ -37,6 +37,9 @@ void GizmoRenderer::EnsurePipeline(FrameBuffer* InTarget) {
     if (m_Pipeline.Get() && m_PipelineTarget.Get() == InTarget) {
         return;
     }
+    if (m_Pipeline.Get()) {
+        RenderingAPI::GetInstance()->WaitIdle();
+    }
     PipelineDesc desc;
     desc.Target = InTarget;
     desc.Shader = s_GizmoShader;

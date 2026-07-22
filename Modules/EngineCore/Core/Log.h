@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <format>
+#include <vector>
 
 enum class LogLevel : uint32_t {
     TRACE = 0,
@@ -14,9 +15,22 @@ enum class LogLevel : uint32_t {
     OFF = 6
 };
 
+struct LogEntry {
+    LogLevel Level = LogLevel::INFO;
+    std::string Category;
+    std::string Message;
+};
+
 class Logging {
 public:
     static void Log(LogLevel level, const std::string& file, const std::string& message);
+
+    /** A snapshot of the recent-entry ring buffer (thread-safe). */
+    static std::vector<LogEntry> GetRecentEntries();
+    static uint64_t GetLogVersion();
+    static int GetWarningCount();
+    static int GetErrorCount();
+    static void Clear();
 };
 
 // Main Logging Macro

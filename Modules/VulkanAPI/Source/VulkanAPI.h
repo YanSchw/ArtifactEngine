@@ -29,6 +29,7 @@ public:
     virtual void DestroySurfaceResources(class Surface* InSurface) override;
 
     virtual void Draw() override;
+    virtual void WaitIdle() override;
 
     VkDevice GetDevice() const;
     VkPhysicalDevice GetPhysicalDevice() const;

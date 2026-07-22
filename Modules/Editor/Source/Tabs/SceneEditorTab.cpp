@@ -5,6 +5,7 @@
 #include "GraphEditorTab.h"
 #include "UI/UIDockArea.h"
 #include "UI/EditorStyle.h"
+#include "UI/EditorIcons.h"
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/Node3D.h"
 #include "GameFramework/CameraNode.h"
@@ -49,6 +50,10 @@ SceneEditorTab::SceneEditorTab() {
     OutlinerTab* outliner = area->DockNew<OutlinerTab>(UIDockSlot::Left, nullptr, 0.24f);
     area->DockNew<DetailsTab>(UIDockSlot::Bottom, outliner->GetDockNode(), 0.45f);
     area->DockNew<GraphEditorTab>(UIDockSlot::Bottom, nullptr, 0.42f);
+}
+
+VectorImage* SceneEditorTab::GetTabIcon() const {
+    return EditorIcons::Level();
 }
 
 void SceneEditorTab::BuildToolBar(UINode& InToolBar) {

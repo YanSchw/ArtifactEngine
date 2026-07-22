@@ -17,6 +17,10 @@ public:
     virtual void Draw() = 0;
     virtual void CleanUp(bool InShouldDestroy) = 0;
 
+    /** Blocks until the GPU has finished every submitted frame. Callers must do this before
+     *  releasing a resource an in-flight frame still references. */
+    virtual void WaitIdle() = 0;
+
     /** Releases everything the backend holds for the given presentation surface (its swapchain
      *  etc.). A Surface calls this before it is destroyed; unknown surfaces are a no-op. */
     virtual void DestroySurfaceResources(class Surface* InSurface) { (void)InSurface; }

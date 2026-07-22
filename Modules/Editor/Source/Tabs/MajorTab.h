@@ -8,6 +8,7 @@ class UIDockArea;
 class MinorTab;
 class MinorTabStandaloneWindow;
 class EditorWindow;
+class VectorImage;
 
 /** A top-level editor document — the heart of the editor. A MajorTab edits one thing (a scene,
  *  a mesh, a texture, ...), hosts a dock area of MinorTabs as its workspace, fills the editor
@@ -20,6 +21,7 @@ public:
     virtual ~MajorTab();
 
     virtual String GetTabTitle() const { return "Tab"; }
+    virtual VectorImage* GetTabIcon() const;
     virtual void BuildToolBar(UINode& InToolBar) { (void)InToolBar; }
 
     World* GetEditedWorld() const { return m_World.Get(); }

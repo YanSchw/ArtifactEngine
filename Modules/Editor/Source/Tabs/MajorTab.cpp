@@ -2,6 +2,7 @@
 #include "MinorTab.h"
 #include "MinorTabStandaloneWindow.h"
 #include "UI/UIDockArea.h"
+#include "UI/EditorIcons.h"
 
 static void AssignWorldToTabs(UIDockNode* InNode, World* InWorld) {
     if (!InNode) {
@@ -29,6 +30,10 @@ void MajorTab::SetEditedWorld(World* InWorld) {
 MajorTab::MajorTab() {
     Fill();
     m_DockArea = Add<UIDockArea>();
+}
+
+VectorImage* MajorTab::GetTabIcon() const {
+    return EditorIcons::Document();
 }
 
 Array<Object*> MajorTab::GetSelection() const {

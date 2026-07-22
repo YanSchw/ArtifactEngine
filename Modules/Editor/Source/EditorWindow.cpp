@@ -1,10 +1,18 @@
 #include "EditorWindow.h"
 #include "Tabs/MajorTab.h"
 #include "UI/EditorStyle.h"
+#include "UI/EditorIcons.h"
 #include "UI/UIMajorTabHandle.h"
+#include "HeroTools/HeroTool.h"
+#include "HeroTools/ContentDrawer.h"
+#include "HeroTools/ConsoleTool.h"
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/UICanvas.h"
 #include "GameFramework/UIQuad.h"
+#include "GameFramework/UISvg.h"
+#include "GameFramework/UILabel.h"
+#include "InputSystem/KeyboardDevice.h"
+#include "InputSystem/KeyCodes.h"
 #include "Assets/Font.h"
 #include <cmath>
 #include <string>
@@ -17,6 +25,7 @@ static void ClearChildren(UINode* InNode) {
 
 EditorWindow::EditorWindow(const WindowParams& InParams)
     : ThemedWindow(InParams) {
+    RegisterHeroTools();
     BuildEditorChrome();
 }
 
@@ -30,16 +39,36 @@ SharedObjectPtr<EditorWindow> EditorWindow::Create(WindowParams InParams) {
     return window;
 }
 
+void EditorWindow::RegisterHeroTools() {
+    SharedObjectPtr<ContentDrawer> contentDrawer = Object::Create<ContentDrawer>();
+    contentDrawer->SetOwnerWindow(this);
+    m_ContentDrawerTool = contentDrawer.Get();
+    m_HeroTools.Add(contentDrawer);
+
+    SharedObjectPtr<ConsoleTool> console = Object::Create<ConsoleTool>();
+    console->SetOwnerWindow(this);
+    m_ConsoleTool = console.Get();
+    m_HeroTools.Add(console);
+}
+
 void EditorWindow::BuildEditorChrome() {
     UIVStack* column = GetContentRoot()->Add<UIVStack>();
     column->Fill();
     // Chrome rebuilds happen in the bind pass, before layout, so tab switches and moves
     // never delete nodes that are still routing this frame's input.
     column->Bind = [this] {
+        HandleShortcuts();
         if (m_ChromeDirty) {
             m_ChromeDirty = false;
             RebuildToolBar();
-            RebuildTabBar();
+            RebuildBottomBar();
+        }
+        if (m_DrawerDirty) {
+            m_DrawerDirty = false;
+            RebuildDrawerBody();
+        }
+        if (m_ActiveHeroTool) {
+            m_ActiveHeroTool->Tick((float)m_FrameSeconds);
         }
     };
 
@@ -58,30 +87,36 @@ void EditorWindow::BuildEditorChrome() {
     bottomBar->Size = { 1.0_rel, UIValue(EditorStyle::BottomBarHeight) };
     bottomBar->Color = EditorStyle::BottomBar;
 
-    m_TabBar = bottomBar->Add<UIHStack>();
-    m_TabBar->Anchor = Vec2(0.0f);
-    m_TabBar->Pivot = Vec2(0.0f);
-    m_TabBar->Position = Vec2(0.0f);
-    m_TabBar->Size = { 1.0_rel - 220.0_px, 1.0_rel };
-    m_TabBar->Padding = UIPadding(4.0f, 3.0f);
-    m_TabBar->Gap = 2.0f;
+    m_BottomRow = bottomBar->Add<UIHStack>();
+    m_BottomRow->Fill();
+    m_BottomRow->Padding = UIPadding(4.0f, 3.0f);
+    m_BottomRow->Gap = 4.0f;
 
-    UILabel* stats = bottomBar->Add<UILabel>();
-    stats->FontSize = EditorStyle::FontSize;
-    stats->Color = EditorStyle::TextDim;
-    stats->HAlign = UIHAlign::Right;
-    stats->VAlign = UIVAlign::Middle;
-    stats->Anchor = Vec2(1.0f, 0.0f);
-    stats->Pivot = Vec2(1.0f, 0.0f);
-    stats->Position = Vec2(-8.0f, 0.0f);
-    stats->Size = { 200.0_px, 1.0_rel };
-    stats->Bind = [this, stats] {
-        const double ms = m_FrameSeconds * 1000.0;
-        String text = "FPS: " + std::to_string(m_FrameSeconds > 0.0 ? (int)std::lround(1.0 / m_FrameSeconds) : 0);
-        String msText = std::to_string(ms);
-        text += "   " + msText.substr(0, msText.find('.') + 3) + "ms";
-        stats->Text = text;
-    };
+    // The drawer overlay sits above the bottom bar and covers the workspace; it lives in the window
+    // chrome rather than in a MajorTab, so it stays available while switching tabs.
+    m_DrawerHost = GetContentRoot()->Add<UINode>();
+    m_DrawerHost->Anchor = m_DrawerHost->Pivot = Vec2(0.0f, 1.0f);
+    m_DrawerHost->Position = Vec2(0.0f, -EditorStyle::BottomBarHeight);
+    m_DrawerHost->Size = { 1.0_rel, 0.42_rel };
+    m_DrawerHost->ClipChildren = true;
+    m_DrawerHost->SetEnabled(false);
+
+    UIQuad* drawerBg = m_DrawerHost->Add<UIQuad>();
+    drawerBg->Fill();
+    drawerBg->Color = EditorStyle::PanelDark;
+
+    UIQuad* drawerTopLine = m_DrawerHost->Add<UIQuad>();
+    drawerTopLine->Anchor = drawerTopLine->Pivot = Vec2(0.0f, 0.0f);
+    drawerTopLine->Position = Vec2(0.0f, 0.0f);
+    drawerTopLine->Size = { 1.0_rel, UIValue(1.0f) };
+    drawerTopLine->Color = EditorStyle::Accent;
+
+    m_DrawerBody = m_DrawerHost->Add<UINode>();
+    m_DrawerBody->Anchor = m_DrawerBody->Pivot = Vec2(0.0f, 0.0f);
+    m_DrawerBody->Position = Vec2(0.0f, 1.0f);
+    m_DrawerBody->Size = { 1.0_rel, 1.0_rel - 1.0_px };
+
+    m_ChromeDirty = true;
 }
 
 void EditorWindow::RegisterTab(MajorTab* InTab) {
@@ -110,25 +145,136 @@ void EditorWindow::RebuildToolBar() {
     }
 }
 
+void EditorWindow::RebuildBottomBar() {
+    ClearChildren(m_BottomRow);
+
+    for (const SharedObjectPtr<HeroTool>& tool : m_HeroTools) {
+        if (!tool->IsRightAligned()) {
+            AddHeroToolButton(*m_BottomRow, tool.Get());
+        }
+    }
+
+    m_TabBar = m_BottomRow->Add<UIHStack>();
+    m_TabBar->Size = { 1.0_rel, 1.0_rel };
+    m_TabBar->Gap = 2.0f;
+
+    for (const SharedObjectPtr<HeroTool>& tool : m_HeroTools) {
+        if (tool->IsRightAligned()) {
+            AddHeroToolButton(*m_BottomRow, tool.Get());
+        }
+    }
+
+    UILabel* stats = m_BottomRow->Add<UILabel>();
+    stats->Size = { 200.0_px, 1.0_rel };
+    stats->FontSize = EditorStyle::FontSize;
+    stats->Color = EditorStyle::TextDim;
+    stats->HAlign = UIHAlign::Right;
+    stats->VAlign = UIVAlign::Middle;
+    stats->Padding = UIPadding(0.0f, 0.0f, 8.0f, 0.0f);
+    stats->Bind = [this, stats] {
+        const double ms = m_FrameSeconds * 1000.0;
+        String text = "FPS: " + std::to_string(m_FrameSeconds > 0.0 ? (int)std::lround(1.0 / m_FrameSeconds) : 0);
+        String msText = std::to_string(ms);
+        text += "   " + msText.substr(0, msText.find('.') + 3) + "ms";
+        stats->Text = text;
+    };
+
+    RebuildTabBar();
+}
+
 void EditorWindow::RebuildTabBar() {
     ClearChildren(m_TabBar);
-    Font* font = UINode::GetDefaultFont();
     for (MajorTab* tab : m_OpenTabs) {
         const bool active = (tab == m_ActiveTab);
         UIMajorTabHandle* handle = m_TabBar->Add<UIMajorTabHandle>();
         handle->Tab = tab;
         handle->OwnerWindow = this;
-        handle->SetCaption(tab->GetTabTitle());
+        handle->SetContent(tab->GetTabTitle(), tab->GetTabIcon());
+        handle->SetActive(active);
         handle->Clicked = [this, tab] { ActivateTab(tab); };
-        const float width = font ? font->MeasureText(tab->GetTabTitle(), EditorStyle::FontSize).x + 28.0f : 96.0f;
-        handle->Size = { UIValue(width), 1.0_rel };
-        EditorStyle::ApplyButtonStyle(*handle);
-        handle->NormalColor = active ? EditorStyle::TabActive : EditorStyle::BottomBar;
-        handle->HoverColor = active ? EditorStyle::TabActive : EditorStyle::TabHover;
-        handle->PressedColor = EditorStyle::ButtonPressed;
-        if (Node* child = handle->GetChildByClass(UILabel::StaticClass())) {
-            child->As<UILabel>()->Color = active ? EditorStyle::TextBright : EditorStyle::TextDim;
-        }
+    }
+}
+
+void EditorWindow::AddHeroToolButton(UINode& InRow, HeroTool* InTool) {
+    UIButton* button = InRow.Add<UIButton>();
+    button->Size = { UIValue(InTool->GetStatusButtonWidth()), 1.0_rel };
+    button->NormalColor = EditorStyle::BottomBar;
+    button->HoverColor = EditorStyle::TabHover;
+    button->PressedColor = EditorStyle::ButtonPressed;
+
+    HeroTool* toolPtr = InTool;
+    button->Clicked = [this, toolPtr] { ToggleHeroTool(toolPtr); };
+    button->Bind = [this, button, toolPtr] {
+        button->NormalColor = IsHeroToolOpen(toolPtr) ? EditorStyle::Panel : EditorStyle::BottomBar;
+    };
+
+    if (InTool->BuildStatusWidget(*button)) {
+        return;
+    }
+
+    UILabel* label = button->Add<UILabel>();
+    label->Anchor = label->Pivot = Vec2(0.0f, 0.5f);
+    label->Position = Vec2(32.0f, 0.0f);
+    label->Size = { 1.0_rel - 44.0_px, 1.0_rel };
+    label->FontSize = EditorStyle::FontSize;
+    label->Color = EditorStyle::Text;
+    label->VAlign = UIVAlign::Middle;
+    label->Text = InTool->GetTitle();
+
+    UISvg* chevron = button->Add<UISvg>();
+    chevron->Anchor = chevron->Pivot = Vec2(1.0f, 0.5f);
+    chevron->Position = Vec2(-8.0f, 0.0f);
+    chevron->Size = Vec2(11.0f, 11.0f);
+    chevron->Tint = EditorStyle::TextDim;
+    chevron->Image = EditorIcons::ArrowDown();
+    chevron->Bind = [this, chevron, toolPtr] {
+        chevron->Image = IsHeroToolOpen(toolPtr) ? EditorIcons::ArrowDown() : EditorIcons::ArrowUp();
+    };
+}
+
+void EditorWindow::RebuildDrawerBody() {
+    ClearChildren(m_DrawerBody);
+    if (m_ActiveHeroTool) {
+        m_ActiveHeroTool->BuildDrawer(*m_DrawerBody);
+    }
+}
+
+void EditorWindow::ToggleHeroTool(HeroTool* InTool) {
+    if (m_ActiveHeroTool == InTool) {
+        CloseHeroTool();
+    } else {
+        OpenHeroTool(InTool);
+    }
+}
+
+void EditorWindow::OpenHeroTool(HeroTool* InTool) {
+    m_ActiveHeroTool = InTool;
+    m_DrawerHost->SetEnabled(InTool != nullptr);
+    m_DrawerDirty = true;
+}
+
+void EditorWindow::CloseHeroTool() {
+    m_ActiveHeroTool = nullptr;
+    m_DrawerHost->SetEnabled(false);
+    ClearChildren(m_DrawerBody);
+}
+
+void EditorWindow::HandleShortcuts() {
+    if (!IsFocused()) {
+        return;
+    }
+    KeyboardDevice* keyboard = KeyboardDevice::Instance();
+    if (!keyboard) {
+        return;
+    }
+    const bool ctrl = keyboard->IsPressed(KeyCode::LeftControl) || keyboard->IsPressed(KeyCode::RightControl)
+                   || keyboard->IsPressed(KeyCode::LeftSuper) || keyboard->IsPressed(KeyCode::RightSuper);
+    if (ctrl && keyboard->IsDown(KeyCode::Space)) {
+        ToggleHeroTool(m_ContentDrawerTool);
+    } else if (ctrl && keyboard->IsDown(KeyCode::Period)) {
+        ToggleHeroTool(m_ConsoleTool);
+    } else if (keyboard->IsDown(KeyCode::Escape) && m_ActiveHeroTool) {
+        CloseHeroTool();
     }
 }
 
@@ -186,4 +332,3 @@ void EditorWindow::MoveTab(MajorTab* InTab, EditorWindow* InFrom, EditorWindow* 
         InFrom->Close();
     }
 }
-

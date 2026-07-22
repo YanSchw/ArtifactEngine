@@ -650,10 +650,10 @@ void VulkanAPI::CreateLogicalDevice() {
     queueCreateInfo[0].queueCount = 1;
     queueCreateInfo[0].pQueuePriorities = &queuePriority;
 
-    queueCreateInfo[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo[0].queueFamilyIndex = presentQueueFamily;
-    queueCreateInfo[0].queueCount = 1;
-    queueCreateInfo[0].pQueuePriorities = &queuePriority;
+    queueCreateInfo[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo[1].queueFamilyIndex = presentQueueFamily;
+    queueCreateInfo[1].queueCount = 1;
+    queueCreateInfo[1].pQueuePriorities = &queuePriority;
 
     // Create logical device from physical device
     // Note: there are separate instance and device extensions!
@@ -674,11 +674,15 @@ void VulkanAPI::CreateLogicalDevice() {
     enabledFeatures.shaderClipDistance = VK_TRUE;
     enabledFeatures.shaderCullDistance = VK_TRUE;
 #endif
+    VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures = {};
+    dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
 
     const char* deviceExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME };
     deviceCreateInfo.enabledExtensionCount = 2;
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
     deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
+    deviceCreateInfo.pNext = &dynamicRenderingFeatures;
 
     if (ENABLE_DEBUGGING) {
         deviceCreateInfo.enabledLayerCount = 1;
@@ -727,6 +731,7 @@ void VulkanAPI::CreateCommandPool() {
     // Create graphics command pool
     VkCommandPoolCreateInfo poolCreateInfo = {};
     poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolCreateInfo.queueFamilyIndex = graphicsQueueFamily;
 
     if (vkCreateCommandPool(device, &poolCreateInfo, nullptr, &commandPool) != VK_SUCCESS) {
@@ -740,14 +745,18 @@ void VulkanAPI::CreateCommandPool() {
 
 void VulkanAPI::CreateDescriptorPool() {
     // This describes how many descriptor sets we'll create from this pool for each type
-    VkDescriptorPoolSize typeCount;
-    typeCount.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    typeCount.descriptorCount = 100; // total UBO bindings across all sets
+    VkDescriptorPoolSize typeCounts[2] = {};
+    typeCounts[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    typeCounts[0].descriptorCount = 100; // total UBO bindings across all sets
+    typeCounts[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    typeCounts[1].descriptorCount = 100; // total sampler bindings across all sets
 
     VkDescriptorPoolCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    createInfo.poolSizeCount = 1;
-    createInfo.pPoolSizes = &typeCount;
+    // Pipelines are rebuilt on resize, which returns their set to the pool.
+    createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    createInfo.poolSizeCount = 2;
+    createInfo.pPoolSizes = typeCounts;
     createInfo.maxSets = 100; // number of descriptor sets
 
     if (vkCreateDescriptorPool(device, &createInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
@@ -825,6 +834,10 @@ void VulkanAPI::Draw() {
         return;
     }
 
+    // Acquiring re-signals ImageAvailable, so the previous frame must have consumed it first.
+    // The fence is only reset once past the point where this frame can still bail out.
+    vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
+
     for (VulkanSwapchainData* swapchain : targets) {
         swapchain->Acquired = false;
         VkResult res = vkAcquireNextImageKHR(device, swapchain->SwapChain, UINT64_MAX, swapchain->ImageAvailable, VK_NULL_HANDLE, &swapchain->ImageIndex);
@@ -844,7 +857,6 @@ void VulkanAPI::Draw() {
         swapchain->Acquired = true;
     }
 
-    vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
     vkResetFences(device, 1, &frameFence);
 
     vkResetCommandBuffer(graphicsCommandBuffer, 0);
@@ -1087,6 +1099,10 @@ VkDevice VulkanAPI::GetDevice() const {
 
 VkPhysicalDevice VulkanAPI::GetPhysicalDevice() const {
     return physicalDevice;
+}
+
+void VulkanAPI::WaitIdle() {
+    vkDeviceWaitIdle(device);
 }
 
 VkCommandPool VulkanAPI::GetCommandPool() const {

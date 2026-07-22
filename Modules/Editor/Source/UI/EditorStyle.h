@@ -24,6 +24,7 @@ public:
     // Panels
     inline static const Vec4 Panel = HexColor(0x242424);
     inline static const Vec4 PanelDark = HexColor(0x161616);
+    inline static const Vec4 Folder = HexColor(0xD1A24C);
     inline static const Vec4 TabBar = HexColor(0x181818);
     inline static const Vec4 TabActive = HexColor(0x242424);
     inline static const Vec4 TabHover = HexColor(0x2D2D2D);
@@ -47,7 +48,7 @@ public:
     // Metrics
     inline static constexpr float TitleBarHeight = 36.0f;
     inline static constexpr float ToolBarHeight = 40.0f;
-    inline static constexpr float BottomBarHeight = 26.0f;
+    inline static constexpr float BottomBarHeight = 34.0f;
     inline static constexpr float TabHeaderHeight = 26.0f;
     inline static constexpr float CaptionButtonWidth = 46.0f;
     inline static constexpr float SplitterThickness = 4.0f;

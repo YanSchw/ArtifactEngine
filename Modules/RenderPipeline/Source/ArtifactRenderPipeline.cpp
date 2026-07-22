@@ -46,6 +46,10 @@ void ArtifactRenderPipeline::UpdateUniformData(const RenderParams& InParams) {
 }
 
 void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
+    if (m_FrameBuffer.Get()) {
+        RenderingAPI::GetInstance()->WaitIdle();
+    }
+
     m_Width = InWidth;
     m_Height = InHeight;
 
@@ -70,6 +74,7 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     ImageViewDesc depthImageViewDesc;
     depthImageViewDesc.ImagePtr = depthImage;
     depthImageViewDesc.Format = ImageFormat::Depth32F;
+    depthImageViewDesc.Aspect = ImageAspect::Depth;
     auto depthImageView = ImageView::Create(depthImageViewDesc);
 
     ImageDesc idImageDesc;

@@ -40,6 +40,8 @@ public:
     /** Measure a run of text at the given pixel height: x = total advance, y = line height. */
     Vec2 MeasureText(const String& InText, float InPixelHeight);
 
+    float GetTextWidth(const String& InText, float InPixelHeight);
+
 protected:
     virtual void Load() override;
     virtual void Unload() override;

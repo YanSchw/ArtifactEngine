@@ -26,6 +26,7 @@ public:
     static String GetContentDir(const String& InKey);
     static String ResolveContentPath(const String& InRelativePath);
     static Array<String> GetContentMountDirs();
+    static Array<String> GetContentMountKeys();
 
 private:
     static void Initialize(const Array<String>& InArgs);
