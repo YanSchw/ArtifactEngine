@@ -6,7 +6,9 @@
 class EditorCamera;
 class RenderPipeline;
 class RenderTargetTexture;
-class UIImage;
+class UIViewportSurface;
+class GizmoLayer;
+class GizmoRenderer;
 
 class ViewportTab : public MinorTab {
 public:
@@ -23,10 +25,13 @@ public:
 
 private:
     void BuildToolBar(UINode& InToolBar);
+    void PickAt(const Vec2& InRenderPixel);
 
     SharedObjectPtr<EditorCamera> m_Camera;
     SharedObjectPtr<RenderPipeline> m_Pipeline;
     SharedObjectPtr<RenderTargetTexture> m_SceneTexture;
-    UIImage* m_ViewportArea = nullptr;
+    SharedObjectPtr<GizmoLayer> m_GizmoLayer;
+    SharedObjectPtr<GizmoRenderer> m_GizmoRenderer;
+    UIViewportSurface* m_ViewportArea = nullptr;
     int m_ActiveTool = 0;
 };

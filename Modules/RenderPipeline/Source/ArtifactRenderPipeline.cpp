@@ -16,6 +16,7 @@
 #include "Rendering/Pipeline.h"
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
+#include "Rendering/ShaderData.h"
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
 #include "GameFramework/StaticMeshNode.h"
@@ -71,12 +72,28 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     depthImageViewDesc.Format = ImageFormat::Depth32F;
     auto depthImageView = ImageView::Create(depthImageViewDesc);
 
+    ImageDesc idImageDesc;
+    idImageDesc.Width = InWidth;
+    idImageDesc.Height = InHeight;
+    // The id is packed into RGBA8
+    idImageDesc.Format = ImageFormat::RGBA8;
+    idImageDesc.Usage = ImageUsage::ColorAttachment | ImageUsage::TransferSrc | ImageUsage::Sampled;
+    auto idImage = Image::Create(idImageDesc);
+
+    ImageViewDesc idImageViewDesc;
+    idImageViewDesc.ImagePtr = idImage;
+    idImageViewDesc.Format = ImageFormat::RGBA8;
+    auto idImageView = ImageView::Create(idImageViewDesc);
+
     FrameBufferDesc frameBufferDesc;
     frameBufferDesc.Width = InWidth;
     frameBufferDesc.Height = InHeight;
     frameBufferDesc.ColorAttachments.Add(imageView);
+    frameBufferDesc.ColorAttachments.Add(idImageView);
     frameBufferDesc.DepthAttachment = depthImageView;
     frameBufferDesc.ClearColor = Vec4(0.08f, 0.09f, 0.11f, 1.0f);
+    frameBufferDesc.ClearColors.Add(Vec4(0.08f, 0.09f, 0.11f, 1.0f));
+    frameBufferDesc.ClearColors.Add(Vec4(0.0f));
     m_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
 
     SamplerDesc samplerDesc;
@@ -118,6 +135,11 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
             }
         }
     }
+
+}
+
+uint32_t ArtifactRenderPipeline::PickNodeId(uint32_t InX, uint32_t InY) const {
+    return m_FrameBuffer.Get() ? m_FrameBuffer->ReadPixelUint(NodeIdAttachment, InX, InY) : 0;
 }
 
 SharedObjectPtr<class ImageView> ArtifactRenderPipeline::GetFinalImageView() const {

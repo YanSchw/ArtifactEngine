@@ -1,6 +1,13 @@
 #include "ViewportTab.h"
 #include "EditorCamera.h"
+#include "MajorTab.h"
 #include "UI/EditorStyle.h"
+#include "UI/UIViewportSurface.h"
+#include "Gizmos/GizmoLayer.h"
+#include "Gizmos/GizmoRenderer.h"
+#include "Rendering/FrameBuffer.h"
+#include "GameFramework/Node.h"
+#include "InputSystem/KeyboardDevice.h"
 #include "ThemedWindow.h"
 #include "Window.h"
 #include "Core/EngineConfig.h"
@@ -20,6 +27,8 @@ ViewportTab::ViewportTab() {
     m_Pipeline = Object::Create(EngineConfig::RenderPipelineClass())->As<RenderPipeline>();
     AE_ASSERT(m_Pipeline, "Failed to create RenderPipeline instance!");
     m_SceneTexture = Object::Create<RenderTargetTexture>();
+    m_GizmoLayer = Object::Create<GizmoLayer>();
+    m_GizmoRenderer = Object::Create<GizmoRenderer>();
 
     UIVStack* layout = Add<UIVStack>();
     layout->Fill();
@@ -29,11 +38,11 @@ ViewportTab::ViewportTab() {
     toolBar->Color = EditorStyle::ToolBar;
     BuildToolBar(*toolBar);
 
-    m_ViewportArea = layout->Add<UIImage>();
+    m_ViewportArea = layout->Add<UIViewportSurface>();
     m_ViewportArea->Size = { 1.0_rel, 1.0_rel };  // whatever the toolbar leaves over
     m_ViewportArea->Image = m_SceneTexture;
-    m_ViewportArea->Interactable = true;
     m_ViewportArea->Cursor = CursorIcon::Crosshair;
+    m_ViewportArea->Pressed = [this](const Vec2& InRenderPixel) { PickAt(InRenderPixel); };
 }
 
 void ViewportTab::BuildToolBar(UINode& InToolBar) {
@@ -90,7 +99,37 @@ void ViewportTab::OnUIUpdate(const UIFrameContext& InContext) {
     params.m_World = GetEditedWorld();
     params.CameraOverride = m_Camera.Get();
     m_Pipeline->Render(InContext.DeltaTime, params);
+
+    Array<GizmoDraw> gizmos;
+    m_GizmoLayer->Collect(GetEditedWorld(), m_Camera.Get(), GetMajorTab(), gizmos);
+    m_GizmoRenderer->Render(m_Pipeline->GetFrameBuffer().Get(), m_Camera.Get(), gizmos);
+
     m_SceneTexture->SetView(m_Pipeline->GetFinalImageView());
+}
+
+void ViewportTab::PickAt(const Vec2& InRenderPixel) {
+    MajorTab* major = GetMajorTab();
+    if (!major || !m_Pipeline.Get() || InRenderPixel.x < 0.0f || InRenderPixel.y < 0.0f) {
+        return;
+    }
+
+    Node* picked = Node::FindById(m_Pipeline->PickNodeId((uint32_t)InRenderPixel.x, (uint32_t)InRenderPixel.y));
+
+    KeyboardDevice* keyboard = KeyboardDevice::Instance();
+    const bool toggle = keyboard && (keyboard->IsPressed(KeyCode::LeftControl) || keyboard->IsPressed(KeyCode::RightControl)
+                                  || keyboard->IsPressed(KeyCode::LeftSuper) || keyboard->IsPressed(KeyCode::RightSuper));
+
+    if (!picked) {
+        if (!toggle) {
+            major->ClearSelection();
+        }
+        return;
+    }
+    if (toggle) {
+        major->ToggleSelection(picked);
+    } else {
+        major->SetSelection(picked);
+    }
 }
 
 bool ViewportTab::OnScroll(const Vec2& InDelta) {

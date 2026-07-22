@@ -4,8 +4,22 @@
 #include "World.h"
 #include "Core/Log.h"
 
+static Map<uint32_t, Node*>& GetNodeRegistry() {
+    static Map<uint32_t, Node*> registry;
+    return registry;
+}
+
 Node::Node() {
+    static uint32_t s_NextNodeId = 1;
+    m_NodeId = s_NextNodeId++;
+    GetNodeRegistry()[m_NodeId] = this;
+
     SetName(GetClass().Name);
+}
+
+Node* Node::FindById(uint32_t InNodeId) {
+    Map<uint32_t, Node*>& registry = GetNodeRegistry();
+    return registry.ContainsKey(InNodeId) ? registry.At(InNodeId) : nullptr;
 }
 
 Node::~Node() {
@@ -29,6 +43,8 @@ Node::~Node() {
     if (GetWorld()) {
         GetWorld()->UnregisterNode(this);
     }
+
+    GetNodeRegistry().Remove(m_NodeId);
 }
 
 String Node::GetName() const {

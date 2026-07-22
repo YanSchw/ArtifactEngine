@@ -17,5 +17,8 @@ public:
 
     virtual void Render(double InDeltaTime, const RenderParams& InParams) = 0;
     virtual SharedObjectPtr<class ImageView> GetFinalImageView() const = 0;
+    virtual SharedObjectPtr<class FrameBuffer> GetFrameBuffer() const { return nullptr; }
+
+    virtual uint32_t PickNodeId(uint32_t InX, uint32_t InY) const { (void)InX; (void)InY; return 0; }
 
 };

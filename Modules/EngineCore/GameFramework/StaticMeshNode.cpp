@@ -15,8 +15,10 @@ StaticMeshNode::~StaticMeshNode() {
 }
 
 ShaderData* StaticMeshNode::GetPerMeshShaderData() {
-    Mat4 transformMatrix = GetTransformMatrix();
-    m_PerMeshShaderData->Set(transformMatrix);
+    MeshShaderData data;
+    data.WorldTransform = GetTransformMatrix();
+    data.NodeId = GetNodeId();
+    m_PerMeshShaderData->Set(data);
     return m_PerMeshShaderData;
 }
 

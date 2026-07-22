@@ -35,13 +35,17 @@ static VkExtent2D GetPipelineTargetExtent(const PipelineDesc& InDesc) {
     }
 }
 
-static VkFormat GetPipelineTargetColorFormat(const PipelineDesc& InDesc) {
+static std::vector<VkFormat> GetPipelineTargetColorFormats(const PipelineDesc& InDesc) {
     if (InDesc.IsFrameBufferTarget()) {
         const auto& attachments = InDesc.Target->As<FrameBuffer>()->GetDesc().ColorAttachments;
         AE_ASSERT(!attachments.IsEmpty(), "Framebuffer target must include at least one color attachment");
-        return ImageFormatToVkFormat(attachments[0]->GetDesc().Format);
+        std::vector<VkFormat> formats;
+        for (const auto& attachment : attachments) {
+            formats.push_back(ImageFormatToVkFormat(attachment->GetDesc().Format));
+        }
+        return formats;
     }
-    return swapChainFormat;
+    return { swapChainFormat };
 }
 
 static VkFormat GetPipelineTargetDepthFormat(const PipelineDesc& InDesc) {
@@ -165,12 +169,16 @@ void VulkanPipeline::Invalidate() {
     colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
     // Note: all attachments must have the same values unless a device feature is enabled
+    const std::vector<VkFormat> targetColorFormats = GetPipelineTargetColorFormats(m_Desc);
+    const std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachmentStates(
+        targetColorFormats.size(), colorBlendAttachmentState);
+
     VkPipelineColorBlendStateCreateInfo colorBlendCreateInfo = {};
     colorBlendCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlendCreateInfo.logicOpEnable = VK_FALSE;
     colorBlendCreateInfo.logicOp = VK_LOGIC_OP_COPY;
-    colorBlendCreateInfo.attachmentCount = 1;
-    colorBlendCreateInfo.pAttachments = &colorBlendAttachmentState;
+    colorBlendCreateInfo.attachmentCount = (uint32_t)colorBlendAttachmentStates.size();
+    colorBlendCreateInfo.pAttachments = colorBlendAttachmentStates.data();
     colorBlendCreateInfo.blendConstants[0] = 0.0f;
     colorBlendCreateInfo.blendConstants[1] = 0.0f;
     colorBlendCreateInfo.blendConstants[2] = 0.0f;
@@ -212,14 +220,10 @@ void VulkanPipeline::Invalidate() {
         AE_INFO("created pipeline layout");
     }
 
-    // Create the graphics pipeline with dynamic rendering
-    std::vector<VkFormat> colorAttachmentFormats;
-    colorAttachmentFormats.push_back(GetPipelineTargetColorFormat(m_Desc));
-
     VkPipelineRenderingCreateInfo renderingCreateInfo = {};
     renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    renderingCreateInfo.colorAttachmentCount = (uint32_t)colorAttachmentFormats.size();
-    renderingCreateInfo.pColorAttachmentFormats = colorAttachmentFormats.data();
+    renderingCreateInfo.colorAttachmentCount = (uint32_t)targetColorFormats.size();
+    renderingCreateInfo.pColorAttachmentFormats = targetColorFormats.data();
     renderingCreateInfo.depthAttachmentFormat = GetPipelineTargetDepthFormat(m_Desc);
 
     VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};

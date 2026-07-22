@@ -33,6 +33,9 @@ public:
     String GetName() const;
     void SetName(const String& InName);
 
+    uint32_t GetNodeId() const { return m_NodeId; }
+    static Node* FindById(uint32_t InNodeId);
+
     /** Gameplay Events */
 
     /** Called the very first frame the Node is active in the world
@@ -96,6 +99,7 @@ private:
     bool ShouldUpdateInCurrentContext() const;
 
 private:
+    uint32_t m_NodeId = 0;
     String m_Name = "";
     Node* m_Parent = nullptr;
     Array<Node*> m_Children;

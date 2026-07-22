@@ -20,6 +20,8 @@ public:
 
     std::vector<VkRenderingAttachmentInfo> GetColorAttachmentInfo() const;
     VkRenderingAttachmentInfo GetDepthAttachmentInfo() const;
+
+    virtual uint32_t ReadPixelUint(int32_t InAttachment, uint32_t InX, uint32_t InY) const override;
 private:
     VulkanAPI* m_VulkanAPI = nullptr;
     std::vector<VkImageView> m_ColorAttachmentViews;

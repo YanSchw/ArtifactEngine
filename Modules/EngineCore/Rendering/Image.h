@@ -11,6 +11,7 @@ enum class ImageFormat {
     BGRA8,
     RGBA16F,
     RGBA32F,
+    R32UI,
 
     Depth24Stencil8,
     Depth32F
