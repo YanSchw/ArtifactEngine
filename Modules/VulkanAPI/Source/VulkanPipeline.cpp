@@ -11,6 +11,7 @@ static Array<VulkanPipeline*> s_Pipelines;
 
 extern VkExtent2D swapChainExtent;
 extern VkFormat swapChainFormat;
+extern VkSampleCountFlagBits swapChainSampleCount;
 
 static VkExtent2D GetPipelineTargetExtent(const PipelineDesc& InDesc) {
     if (InDesc.IsFrameBufferTarget()) {
@@ -135,11 +136,11 @@ void VulkanPipeline::Invalidate() {
     rasterizationCreateInfo.depthBiasSlopeFactor = 0.0f;
     rasterizationCreateInfo.lineWidth = 1.0f;
 
-    // Describe multisampling
-    // Note: using multisampling also requires turning on device features
+    // Describe multisampling. Surface targets render into the multisampled swapchain target, so
+    // their pipelines must rasterize at the same sample count; framebuffer targets stay single-sample.
     VkPipelineMultisampleStateCreateInfo multisampleCreateInfo = {};
     multisampleCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampleCreateInfo.rasterizationSamples = m_Desc.IsSurfaceTarget() ? swapChainSampleCount : VK_SAMPLE_COUNT_1_BIT;
     multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
     multisampleCreateInfo.minSampleShading = 1.0f;
     multisampleCreateInfo.alphaToCoverageEnable = VK_FALSE;

@@ -13,5 +13,11 @@
     "ExportIncludePaths": [
         "Source"
     ],
+    "AddAdditionalCMakeProjects": [
+        "ThirdParty/msdfgen-build"
+    ],
+    "LinkLibraries": [
+        "msdfgen-core"
+    ],
     "MountContentDir": "Content"
 }

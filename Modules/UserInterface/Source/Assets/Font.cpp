@@ -9,13 +9,21 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
-// SDF atlas parameters. The atlas stores white RGB with the signed distance in the alpha channel;
-// the text shader antialiases the 0.5 iso-line. onedge_value 128 => the edge sits at alpha ~0.5.
-static const uint32_t s_AtlasWidth = 512;
-static const uint32_t s_AtlasHeight = 512;
-static const int s_SdfPadding = 4;
-static const unsigned char s_SdfOnEdge = 128;
-static const float s_SdfPixelDistScale = 128.0f / (float)s_SdfPadding;
+#include "msdfgen/msdfgen.h"
+
+#include <cmath>
+
+// MTSDF atlas parameters. Each glyph is stored as a multi-channel + true signed distance field:
+// RGB holds the multi-channel distance (which preserves sharp corners) and A holds a plain SDF
+// (kept for outline/shadow effects). The text shader takes the median of RGB and antialiases the
+// 0.5 iso-line. s_MsdfPxRange is the distance range in atlas texels and MUST match the pxRange
+// constant in UIText.glsl. s_MsdfPadding must be at least half the range so the field is not
+// clipped at a glyph cell's border.
+static const uint32_t s_AtlasWidth = 1024;
+static const uint32_t s_AtlasHeight = 1024;
+static const int s_MsdfPadding = 4;
+static const double s_MsdfPxRange = 4.0;
+static const double s_MsdfAngleThreshold = 3.0;
 static const uint32_t s_FirstCodepoint = 32;
 static const uint32_t s_LastCodepoint = 126;
 
@@ -69,6 +77,60 @@ void Font::Load() {
 #endif
 }
 
+// Translates one glyph's stb_truetype outline (font units, Y-up) into an msdfgen::Shape.
+// stb emits each contour as a move followed by line/quadratic/cubic segments; contours are
+// closed with an explicit edge back to the start when the outline does not already return there.
+static void BuildGlyphShape(const stbtt_fontinfo& InFont, int InCodepoint, msdfgen::Shape& OutShape) {
+    stbtt_vertex* vertices = nullptr;
+    const int vertexCount = stbtt_GetCodepointShape(&InFont, InCodepoint, &vertices);
+    if (vertexCount <= 0 || !vertices) {
+        if (vertices) {
+            stbtt_FreeShape(&InFont, vertices);
+        }
+        return;
+    }
+
+    msdfgen::Contour* contour = nullptr;
+    msdfgen::Point2 contourStart(0.0, 0.0);
+    msdfgen::Point2 pen(0.0, 0.0);
+
+    for (int i = 0; i < vertexCount; i++) {
+        const stbtt_vertex& v = vertices[i];
+        const msdfgen::Point2 to((double)v.x, (double)v.y);
+        switch (v.type) {
+            case STBTT_vmove:
+                if (contour && pen != contourStart) {
+                    contour->addEdge(msdfgen::EdgeHolder(pen, contourStart));
+                }
+                contour = &OutShape.addContour();
+                contourStart = to;
+                break;
+            case STBTT_vline:
+                if (contour && to != pen) {
+                    contour->addEdge(msdfgen::EdgeHolder(pen, to));
+                }
+                break;
+            case STBTT_vcurve:
+                if (contour) {
+                    contour->addEdge(msdfgen::EdgeHolder(pen, msdfgen::Point2((double)v.cx, (double)v.cy), to));
+                }
+                break;
+            case STBTT_vcubic:
+                if (contour) {
+                    contour->addEdge(msdfgen::EdgeHolder(pen, msdfgen::Point2((double)v.cx, (double)v.cy), msdfgen::Point2((double)v.cx1, (double)v.cy1), to));
+                }
+                break;
+        }
+        pen = to;
+    }
+
+    if (contour && pen != contourStart) {
+        contour->addEdge(msdfgen::EdgeHolder(pen, contourStart));
+    }
+
+    stbtt_FreeShape(&InFont, vertices);
+}
+
 bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
     stbtt_fontinfo font;
     const int offset = stbtt_GetFontOffsetForIndex(InTtfData, 0);
@@ -85,7 +147,6 @@ bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
     m_DescentPx = (float)descent * scale; // negative
     m_LineGapPx = (float)lineGap * scale;
 
-    // Transparent RGBA atlas; glyphs write white RGB + SDF alpha.
     Array<byte>& atlas = OutAtlasPixels;
     atlas.Resize((size_t)s_AtlasWidth * s_AtlasHeight * 4);
     memset(atlas.Data(), 0, atlas.Size());
@@ -99,46 +160,74 @@ bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
         GlyphInfo glyph;
         glyph.AdvancePx = (float)advance * scale;
 
-        int w = 0, h = 0, xoff = 0, yoff = 0;
-        unsigned char* sdf = stbtt_GetCodepointSDF(&font, scale, (int)cp, s_SdfPadding, s_SdfOnEdge, s_SdfPixelDistScale, &w, &h, &xoff, &yoff);
+        msdfgen::Shape shape;
+        BuildGlyphShape(font, (int)cp, shape);
+        if (shape.contours.empty()) {
+            m_Glyphs[cp] = glyph; // whitespace and other outline-less glyphs
+            continue;
+        }
 
-        if (sdf && w > 0 && h > 0) {
-            // Advance to the next shelf row if the glyph doesn't fit on the current one.
-            if (penX + (uint32_t)w + 1 > s_AtlasWidth) {
-                penX = 0;
-                penY += rowHeight + 1;
-                rowHeight = 0;
-            }
+        shape.normalize();
+        shape.orientContours();
+        msdfgen::edgeColoringSimple(shape, s_MsdfAngleThreshold);
 
-            if (penY + (uint32_t)h <= s_AtlasHeight) {
-                for (int y = 0; y < h; y++) {
-                    for (int x = 0; x < w; x++) {
-                        const uint32_t ax = penX + (uint32_t)x;
-                        const uint32_t ay = penY + (uint32_t)y;
-                        const size_t dst = ((size_t)ay * s_AtlasWidth + ax) * 4;
-                        atlas[(int)(dst + 0)] = 255;
-                        atlas[(int)(dst + 1)] = 255;
-                        atlas[(int)(dst + 2)] = 255;
-                        atlas[(int)(dst + 3)] = sdf[y * w + x];
-                    }
-                }
+        const msdfgen::Shape::Bounds bounds = shape.getBounds();
+        const double glyphWidthPx = (bounds.r - bounds.l) * scale;
+        const double glyphHeightPx = (bounds.t - bounds.b) * scale;
+        if (glyphWidthPx <= 0.0 || glyphHeightPx <= 0.0) {
+            m_Glyphs[cp] = glyph;
+            continue;
+        }
 
-                glyph.UvMin = Vec2((float)penX / s_AtlasWidth, (float)penY / s_AtlasHeight);
-                glyph.UvMax = Vec2((float)(penX + w) / s_AtlasWidth, (float)(penY + h) / s_AtlasHeight);
-                glyph.SizePx = Vec2((float)w, (float)h);
-                glyph.OffsetPx = Vec2((float)xoff, (float)yoff);
+        const int w = (int)std::ceil(glyphWidthPx) + 2 * s_MsdfPadding;
+        const int h = (int)std::ceil(glyphHeightPx) + 2 * s_MsdfPadding;
 
-                penX += (uint32_t)w + 1;
-                rowHeight = std::max(rowHeight, (uint32_t)h);
-            } else {
-                AE_WARN("Font::BuildAtlasData ran out of atlas space at codepoint {0}", cp);
+        // Advance to the next shelf row if the glyph doesn't fit on the current one.
+        if (penX + (uint32_t)w + 1 > s_AtlasWidth) {
+            penX = 0;
+            penY += rowHeight + 1;
+            rowHeight = 0;
+        }
+        if (penY + (uint32_t)h > s_AtlasHeight) {
+            AE_WARN("Font::BuildAtlasData ran out of atlas space at codepoint {0}", cp);
+            m_Glyphs[cp] = glyph;
+            continue;
+        }
+
+        // Map shape coordinates (font units, Y-up) to the glyph cell so the shape's lower-left
+        // bound lands at (padding, padding); the range is expressed in shape units.
+        const msdfgen::Projection projection(
+            msdfgen::Vector2(scale, scale),
+            msdfgen::Vector2((double)s_MsdfPadding / scale - bounds.l, (double)s_MsdfPadding / scale - bounds.b));
+        const msdfgen::Range range = msdfgen::Range(s_MsdfPxRange) / (double)scale;
+
+        msdfgen::Bitmap<float, 4> bitmap(w, h);
+        msdfgen::generateMTSDF(bitmap, shape, projection, range, msdfgen::MSDFGeneratorConfig());
+
+        // msdfgen stores row 0 at the bottom (Y-up); the atlas is top-down, so rows are flipped.
+        const msdfgen::BitmapSection<float, 4> section = bitmap;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                const float* src = section(x, h - 1 - y);
+                const uint32_t ax = penX + (uint32_t)x;
+                const uint32_t ay = penY + (uint32_t)y;
+                const size_t dst = ((size_t)ay * s_AtlasWidth + ax) * 4;
+                atlas[(int)(dst + 0)] = msdfgen::pixelFloatToByte(src[0]);
+                atlas[(int)(dst + 1)] = msdfgen::pixelFloatToByte(src[1]);
+                atlas[(int)(dst + 2)] = msdfgen::pixelFloatToByte(src[2]);
+                atlas[(int)(dst + 3)] = msdfgen::pixelFloatToByte(src[3]);
             }
         }
 
-        if (sdf) {
-            stbtt_FreeSDF(sdf, nullptr);
-        }
+        glyph.UvMin = Vec2((float)penX / s_AtlasWidth, (float)penY / s_AtlasHeight);
+        glyph.UvMax = Vec2((float)(penX + w) / s_AtlasWidth, (float)(penY + h) / s_AtlasHeight);
+        glyph.SizePx = Vec2((float)w, (float)h);
+        glyph.OffsetPx = Vec2(
+            (float)(bounds.l * scale) - (float)s_MsdfPadding,
+            (float)s_MsdfPadding - (float)(bounds.b * scale) - (float)h);
 
+        penX += (uint32_t)w + 1;
+        rowHeight = std::max(rowHeight, (uint32_t)h);
         m_Glyphs[cp] = glyph;
     }
 

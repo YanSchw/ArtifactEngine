@@ -76,6 +76,11 @@ struct VulkanSwapchainData {
     VkSemaphore RenderingFinished = VK_NULL_HANDLE;
     uint32_t ImageIndex = 0;
     bool Acquired = false;
+    // Multisampled color target rendered into, then resolved to the swapchain image each frame.
+    // Null when MSAA is disabled (swapChainSampleCount == VK_SAMPLE_COUNT_1_BIT).
+    VkImage MsaaImage = VK_NULL_HANDLE;
+    VkDeviceMemory MsaaMemory = VK_NULL_HANDLE;
+    VkImageView MsaaView = VK_NULL_HANDLE;
 };
 static std::vector<VulkanSwapchainData*> swapchains;
 
@@ -83,6 +88,9 @@ static std::vector<VulkanSwapchainData*> swapchains;
 // scissor are dynamic state, so surface-targeting pipelines work for every window.
 VkExtent2D swapChainExtent = {1280, 720};
 VkFormat swapChainFormat = VK_FORMAT_UNDEFINED;
+// Multisample count for every surface (swapchain) render target and the pipelines that draw to a
+// surface; the result is resolved to the single-sample swapchain image. 1 disables MSAA entirely.
+VkSampleCountFlagBits swapChainSampleCount = VK_SAMPLE_COUNT_1_BIT;
 
 static VkCommandPool commandPool;
 static VkCommandBuffer graphicsCommandBuffer = VK_NULL_HANDLE;
@@ -158,6 +166,81 @@ static VulkanSwapchainData* FindSwapchainData(const Surface* InTarget) {
         }
     }
     return nullptr;
+}
+
+// (Re)creates the multisampled color target sized to the swapchain extent, releasing any previous
+// one first. A no-op that leaves the handles null when MSAA is disabled.
+static void CreateMsaaTarget(VulkanSwapchainData& data) {
+    if (data.MsaaView != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, data.MsaaView, nullptr);
+        data.MsaaView = VK_NULL_HANDLE;
+    }
+    if (data.MsaaImage != VK_NULL_HANDLE) {
+        vkDestroyImage(device, data.MsaaImage, nullptr);
+        data.MsaaImage = VK_NULL_HANDLE;
+    }
+    if (data.MsaaMemory != VK_NULL_HANDLE) {
+        vkFreeMemory(device, data.MsaaMemory, nullptr);
+        data.MsaaMemory = VK_NULL_HANDLE;
+    }
+
+    if (swapChainSampleCount == VK_SAMPLE_COUNT_1_BIT) {
+        return;
+    }
+
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent = { data.Extent.width, data.Extent.height, 1 };
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = swapChainFormat;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+    imageInfo.samples = swapChainSampleCount;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (vkCreateImage(device, &imageInfo, nullptr, &data.MsaaImage) != VK_SUCCESS) {
+        AE_ERROR("failed to create MSAA color target");
+        exit(1);
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(device, data.MsaaImage, &memRequirements);
+
+    // The multisampled target is never sampled or read back, so prefer memoryless storage when the
+    // driver offers it (free on tile-based GPUs such as Apple's), falling back to device-local.
+    uint32_t memoryTypeIndex = 0;
+    if (!GetMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &memoryTypeIndex) &&
+        !GetMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &memoryTypeIndex)) {
+        AE_ERROR("no suitable memory type for MSAA color target");
+        exit(1);
+    }
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &data.MsaaMemory) != VK_SUCCESS) {
+        AE_ERROR("failed to allocate MSAA color target memory");
+        exit(1);
+    }
+    vkBindImageMemory(device, data.MsaaImage, data.MsaaMemory, 0);
+
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = data.MsaaImage;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = swapChainFormat;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+    if (vkCreateImageView(device, &viewInfo, nullptr, &data.MsaaView) != VK_SUCCESS) {
+        AE_ERROR("failed to create MSAA color target view");
+        exit(1);
+    }
 }
 
 static void CreateSwapchainForData(VulkanSwapchainData& data) {
@@ -279,6 +362,8 @@ static void CreateSwapchainForData(VulkanSwapchainData& data) {
             exit(1);
         }
     }
+
+    CreateMsaaTarget(data);
 }
 
 static void CreateSwapchainResources(VulkanSwapchainData& data) {
@@ -312,6 +397,18 @@ static VulkanSwapchainData* GetOrCreateSwapchainData(Surface* InTarget) {
 }
 
 static void DestroySwapchainData(VulkanSwapchainData& data) {
+    if (data.MsaaView != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, data.MsaaView, nullptr);
+        data.MsaaView = VK_NULL_HANDLE;
+    }
+    if (data.MsaaImage != VK_NULL_HANDLE) {
+        vkDestroyImage(device, data.MsaaImage, nullptr);
+        data.MsaaImage = VK_NULL_HANDLE;
+    }
+    if (data.MsaaMemory != VK_NULL_HANDLE) {
+        vkFreeMemory(device, data.MsaaMemory, nullptr);
+        data.MsaaMemory = VK_NULL_HANDLE;
+    }
     for (VkImageView imageView : data.ImageViews) {
         vkDestroyImageView(device, imageView, nullptr);
     }
@@ -548,6 +645,16 @@ void VulkanAPI::FindPhysicalDevice() {
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
     vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
+
+    const VkSampleCountFlags colorSampleCounts = deviceProperties.limits.framebufferColorSampleCounts;
+    if (colorSampleCounts & VK_SAMPLE_COUNT_4_BIT) {
+        swapChainSampleCount = VK_SAMPLE_COUNT_4_BIT;
+    } else if (colorSampleCounts & VK_SAMPLE_COUNT_2_BIT) {
+        swapChainSampleCount = VK_SAMPLE_COUNT_2_BIT;
+    } else {
+        swapChainSampleCount = VK_SAMPLE_COUNT_1_BIT;
+    }
+    AE_INFO("surface MSAA sample count: {0}", (int)swapChainSampleCount);
 
     uint32_t supportedVersion[] = {
         VK_VERSION_MAJOR(deviceProperties.apiVersion),
@@ -884,6 +991,21 @@ void VulkanAPI::Draw() {
         presentToDrawBarrier.subresourceRange = subResourceRange;
 
         vkCmdPipelineBarrier(graphicsCommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
+
+        if (swapchain->MsaaImage != VK_NULL_HANDLE) {
+            VkImageMemoryBarrier msaaBarrier = {};
+            msaaBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            msaaBarrier.srcAccessMask = 0;
+            msaaBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            msaaBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            msaaBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            msaaBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            msaaBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            msaaBarrier.image = swapchain->MsaaImage;
+            msaaBarrier.subresourceRange = subResourceRange;
+
+            vkCmdPipelineBarrier(graphicsCommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &msaaBarrier);
+        }
     }
 
     RecordCommandBuffer(m_RenderQueue, graphicsCommandBuffer);
@@ -1001,11 +1123,22 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
 
                     VkRenderingAttachmentInfo swapchainColorAttachment{};
                     swapchainColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-                    swapchainColorAttachment.imageView = swapchain->ImageViews[swapchain->ImageIndex];
                     swapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     swapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
                     swapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
                     swapchainColorAttachment.clearValue = { 0.1f, 0.1f, 0.1f, 1.0f };
+                    if (swapchain->MsaaView != VK_NULL_HANDLE) {
+                        // Draw into the multisampled target and resolve it down to the swapchain
+                        // image; the resolve covers the whole area, so the swapchain image needs
+                        // no clear and the multisampled contents need not be stored.
+                        swapchainColorAttachment.imageView = swapchain->MsaaView;
+                        swapchainColorAttachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+                        swapchainColorAttachment.resolveImageView = swapchain->ImageViews[swapchain->ImageIndex];
+                        swapchainColorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                        swapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+                    } else {
+                        swapchainColorAttachment.imageView = swapchain->ImageViews[swapchain->ImageIndex];
+                    }
 
                     VkRenderingInfo renderingInfo{};
                     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;

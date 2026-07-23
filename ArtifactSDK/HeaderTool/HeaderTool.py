@@ -53,7 +53,7 @@ class HeaderTool:
 
     @staticmethod
     def collect_classes_from_header(h_file_path: str) -> list[Enum | Struct | Class]:
-        with open(h_file_path, 'r', encoding='utf-8') as h_file:
+        with open(h_file_path, 'r', encoding='utf-8', errors='ignore') as h_file:
             code = h_file.read()
             code_lines = code.splitlines()
             results = []
