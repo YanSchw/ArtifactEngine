@@ -854,17 +854,18 @@ void VulkanAPI::CreateDescriptorPool() {
     // This describes how many descriptor sets we'll create from this pool for each type
     VkDescriptorPoolSize typeCounts[2] = {};
     typeCounts[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    typeCounts[0].descriptorCount = 100; // total UBO bindings across all sets
+    typeCounts[0].descriptorCount = 1000; // total UBO bindings across all sets
     typeCounts[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    typeCounts[1].descriptorCount = 100; // total sampler bindings across all sets
+    typeCounts[1].descriptorCount = 1000; // total sampler bindings across all sets
 
     VkDescriptorPoolCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    // Pipelines are rebuilt on resize, which returns their set to the pool.
+    // A rebuilt pipeline's old set is retired (freed a frame later, see VulkanPipeline::Destroy),
+    // so it coexists with the replacement set
     createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     createInfo.poolSizeCount = 2;
     createInfo.pPoolSizes = typeCounts;
-    createInfo.maxSets = 100; // number of descriptor sets
+    createInfo.maxSets = 1000; // number of descriptor sets
 
     if (vkCreateDescriptorPool(device, &createInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         AE_ERROR("failed to create descriptor pool");
@@ -944,6 +945,8 @@ void VulkanAPI::Draw() {
     // Acquiring re-signals ImageAvailable, so the previous frame must have consumed it first.
     // The fence is only reset once past the point where this frame can still bail out.
     vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
+
+    VulkanPipeline::FlushRetired();
 
     for (VulkanSwapchainData* swapchain : targets) {
         swapchain->Acquired = false;

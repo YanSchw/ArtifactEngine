@@ -9,6 +9,19 @@
 
 static Array<VulkanPipeline*> s_Pipelines;
 
+// GPU handles whose owning pipeline has been destroyed or invalidated, but which the frame
+// still in flight may be reading from. Only one frame is buffered and its fence is waited at
+// the top of the next Draw, so these are safe to destroy the moment that fence is crossed.
+struct RetiredPipeline {
+    VkDevice Device;
+    VkDescriptorPool DescriptorPool;
+    VkPipeline Pipeline;
+    VkPipelineLayout PipelineLayout;
+    VkDescriptorSet DescriptorSet;
+    VkDescriptorSetLayout DescriptorSetLayout;
+};
+static Array<RetiredPipeline> s_RetiredPipelines;
+
 extern VkExtent2D swapChainExtent;
 extern VkFormat swapChainFormat;
 extern VkSampleCountFlagBits swapChainSampleCount;
@@ -408,22 +421,45 @@ PipelineDesc VulkanPipeline::GetDesc() const {
 }
 
 void VulkanPipeline::Destroy() {
-    if (m_Pipeline) {
-        vkDestroyPipeline(m_VulkanAPI->GetDevice(), m_Pipeline, nullptr);
-        m_Pipeline = VK_NULL_HANDLE;
+    if (!m_Pipeline && !m_PipelineLayout && !m_DescriptorSet && !m_DescriptorSetLayout) {
+        return;
     }
-    if (m_PipelineLayout) {
-        vkDestroyPipelineLayout(m_VulkanAPI->GetDevice(), m_PipelineLayout, nullptr);
-        m_PipelineLayout = VK_NULL_HANDLE;
+
+    // Don't free the GPU handles here: the previous frame's command buffer may still be reading
+    // them (its fence is only waited at the top of the next Draw). Retire them for FlushRetired
+    // to destroy once that fence has been crossed.
+    s_RetiredPipelines.Add({
+        m_VulkanAPI->GetDevice(),
+        m_VulkanAPI->GetDescriptorPool(),
+        m_Pipeline,
+        m_PipelineLayout,
+        m_DescriptorSet,
+        m_DescriptorSetLayout,
+    });
+
+    m_Pipeline = VK_NULL_HANDLE;
+    m_PipelineLayout = VK_NULL_HANDLE;
+    m_DescriptorSet = VK_NULL_HANDLE;
+    m_DescriptorSetLayout = VK_NULL_HANDLE;
+}
+
+void VulkanPipeline::FlushRetired() {
+    for (const RetiredPipeline& retired : s_RetiredPipelines) {
+        if (retired.Pipeline) {
+            vkDestroyPipeline(retired.Device, retired.Pipeline, nullptr);
+        }
+        if (retired.PipelineLayout) {
+            vkDestroyPipelineLayout(retired.Device, retired.PipelineLayout, nullptr);
+        }
+        if (retired.DescriptorSet) {
+            VkDescriptorSet set = retired.DescriptorSet;
+            vkFreeDescriptorSets(retired.Device, retired.DescriptorPool, 1, &set);
+        }
+        if (retired.DescriptorSetLayout) {
+            vkDestroyDescriptorSetLayout(retired.Device, retired.DescriptorSetLayout, nullptr);
+        }
     }
-    if (m_DescriptorSet) {
-        vkFreeDescriptorSets(m_VulkanAPI->GetDevice(), m_VulkanAPI->GetDescriptorPool(), 1, &m_DescriptorSet);
-        m_DescriptorSet = VK_NULL_HANDLE;
-    }
-    if (m_DescriptorSetLayout) {
-        vkDestroyDescriptorSetLayout(m_VulkanAPI->GetDevice(), m_DescriptorSetLayout, nullptr);
-        m_DescriptorSetLayout = VK_NULL_HANDLE;
-    }
+    s_RetiredPipelines.Clear();
 }
 
 void VulkanPipeline::InvalidateAll() {
@@ -439,4 +475,6 @@ void VulkanPipeline::DestroyAll() {
         delete pipeline;
     }
     s_Pipelines.Clear();
+
+    FlushRetired();
 }

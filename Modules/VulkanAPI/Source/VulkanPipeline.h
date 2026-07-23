@@ -22,6 +22,7 @@ public:
 
     static void InvalidateAll();
     static void DestroyAll();
+    static void FlushRetired();
 
 public:
     static const constexpr uint32_t MAX_SHADER_DATA_SIZE = 128;
