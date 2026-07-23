@@ -142,7 +142,9 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
 
     if (m_Mount.empty()) {
         Array<String> keys = EngineConfig::GetContentMountKeys();
-        if (!keys.IsEmpty()) {
+        if (keys.Contains("ProjectContent")) {
+            NavigateTo("ProjectContent", "");
+        } else if (!keys.IsEmpty()) {
             NavigateTo(keys[0], "");
         }
     }
