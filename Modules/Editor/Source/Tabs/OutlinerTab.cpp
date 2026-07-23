@@ -17,7 +17,6 @@
 
 OutlinerTab::OutlinerTab() {
     AssetManager& assets = AssetManager::Get();
-    m_NodeIcon = assets.GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0001-4a00-9000-000000000001"));
     m_ArrowExpanded = assets.GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0002-4a00-9000-000000000002"));
     m_ArrowCollapsed = assets.GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0003-4a00-9000-000000000003"));
     m_EyeIcon = assets.GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0004-4a00-9000-000000000004"));

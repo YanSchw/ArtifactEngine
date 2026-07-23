@@ -2,6 +2,7 @@
 #include "DetailsCategory.h"
 #include "DetailsRow.h"
 #include "Tabs/DetailsTab.h"
+#include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
 #include "UI/UIDragNumber.h"
 #include "UI/UICheckbox.h"
@@ -30,7 +31,7 @@ float NodeDetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, 
     icon->Position = Vec2(10.0f, 0.0f);
     icon->Size = Vec2(22.0f, 22.0f);
     icon->Tint = EditorStyle::Text;
-    icon->Image = AssetManager::Get().GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0001-4a00-9000-000000000001"));
+    icon->Image = EditorIcons::GetNodeIcon(node->GetClass());
 
     UICheckbox* enabled = background->Add<UICheckbox>();
     enabled->Anchor = enabled->Pivot = Vec2(1.0f, 0.5f);
@@ -100,9 +101,9 @@ static void AddVectorRow(UINode& InBody, DetailsTab& InTab, const String& InLabe
         Vec4 Color;
     };
     static const Axis s_Axes[3] = {
-        { "X", HexColor(0xD84A4A) },
-        { "Y", HexColor(0x71B33C) },
-        { "Z", HexColor(0x3D7BD8) },
+        { "X", EditorStyle::TransformX },
+        { "Y", EditorStyle::TransformY },
+        { "Z", EditorStyle::TransformZ },
     };
 
     DetailsRow* row = InBody.Add<DetailsRow>();

@@ -25,4 +25,6 @@ public:
     static VectorImage* Texture()       { return Get("b1c2d3e4-0010-4a00-9000-000000000010"); }
     static VectorImage* Font()          { return Get("b1c2d3e4-0011-4a00-9000-000000000011"); }
     static VectorImage* Asset()         { return Get("b1c2d3e4-0012-4a00-9000-000000000012"); }
+
+    static VectorImage* GetNodeIcon(const Class& InClass);
 };

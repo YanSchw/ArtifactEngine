@@ -45,6 +45,10 @@ public:
     inline static const Vec4 CaptionCloseHover = HexColor(0xC42B1C);
     inline static const Vec4 DropPreview = HexColor(0x26BBFF, 0.28f);
 
+    inline static const Vec4 TransformX = HexColor(0xD84A4A);
+    inline static const Vec4 TransformY = HexColor(0x71B33C);
+    inline static const Vec4 TransformZ = HexColor(0x3D7BD8);
+
     // Metrics
     inline static constexpr float TitleBarHeight = 36.0f;
     inline static constexpr float ToolBarHeight = 40.0f;

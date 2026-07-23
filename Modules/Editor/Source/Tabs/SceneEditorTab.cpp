@@ -8,6 +8,7 @@
 #include "UI/EditorIcons.h"
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/Node3D.h"
+#include "GameFramework/Component.h"
 #include "GameFramework/CameraNode.h"
 #include "GameFramework/StaticMeshNode.h"
 #include "Core/Log.h"
@@ -19,7 +20,9 @@ static void PopulateExampleWorld(World& InWorld) {
     scene->SetName("Scene");
 
     scene->CreateChild(Node3D::StaticClass())->SetName("Directional Light");
-    scene->CreateChild(CameraNode::StaticClass())->SetName("Main Camera");
+    Node* camera = scene->CreateChild(CameraNode::StaticClass());
+    camera->SetName("Main Camera");
+    camera->CreateChild(Component::StaticClass());
 
     Node* environment = scene->CreateChild(Node3D::StaticClass());
     environment->SetName("Environment");

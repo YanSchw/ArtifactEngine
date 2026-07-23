@@ -57,7 +57,6 @@ public:
     Node* GetDropRef() const { return m_DropRef.Get(); }
     DropMode GetDropMode() const { return m_DropMode; }
 
-    VectorImage* GetNodeIcon() const { return m_NodeIcon; }
     VectorImage* GetArrowIcon(bool InExpanded) const { return InExpanded ? m_ArrowExpanded : m_ArrowCollapsed; }
     VectorImage* GetEyeIcon(bool InOpen) const { return InOpen ? m_EyeIcon : m_EyeClosedIcon; }
 
@@ -86,7 +85,6 @@ private:
     WeakObjectPtr<Node> m_DropRef;
     DropMode m_DropMode = DropMode::None;
 
-    VectorImage* m_NodeIcon = nullptr;
     VectorImage* m_ArrowExpanded = nullptr;
     VectorImage* m_ArrowCollapsed = nullptr;
     VectorImage* m_EyeIcon = nullptr;

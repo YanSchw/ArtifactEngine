@@ -1,5 +1,6 @@
 #include "OutlinerRow.h"
 #include "OutlinerTab.h"
+#include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
 #include "GameFramework/UISvg.h"
 #include "GameFramework/UILabel.h"
@@ -102,7 +103,7 @@ void OutlinerRow::Refresh() {
     m_Arrow->Image = Owner->GetArrowIcon(Owner->HasFilter() || Owner->IsExpanded(node));
 
     m_Icon->Position = Vec2(indent + 16.0f, 0.0f);
-    m_Icon->Image = Owner->GetNodeIcon();
+    m_Icon->Image = EditorIcons::GetNodeIcon(node->GetClass());
     m_Icon->Tint = nodeEnabled ? EditorStyle::Text : s_DisabledText;
 
     const float textLeft = indent + 36.0f;
