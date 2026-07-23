@@ -13,17 +13,22 @@
 
 #include <cmath>
 
-// MTSDF atlas parameters. Each glyph is stored as a multi-channel + true signed distance field:
-// RGB holds the multi-channel distance (which preserves sharp corners) and A holds a plain SDF
-// (kept for outline/shadow effects). The text shader takes the median of RGB and antialiases the
-// 0.5 iso-line. s_MsdfPxRange is the distance range in atlas texels and MUST match the pxRange
-// constant in UIText.glsl. s_MsdfPadding must be at least half the range so the field is not
-// clipped at a glyph cell's border.
+// SDF atlas parameters. Each glyph is stored as a single-channel signed distance field replicated
+// across RGBA; the text shader takes median(RGB) (which equals the value when the channels match)
+// and antialiases the 0.5 iso-line. The field is built from a *filled* nonzero-winding
+// rasterization rather than the glyph outline, so fonts whose glyphs are drawn with overlapping or
+// self-intersecting contours (e.g. Inter, whose 'e' is one self-overlapping contour) don't get the
+// seam/gash artifacts that edge-based MSDF/SDF generation produces on them — edges internal to the
+// overlap simply don't exist in the fill. s_SdfPxRange is the distance range in atlas texels and
+// MUST match the pxRange constant in UIText.glsl. s_SdfPadding must be at least half the range so
+// the field is not clipped at a glyph cell's border. s_SdfSupersample is the fill-resolution
+// multiple used before the distance transform (higher = finer sub-texel edges).
 static const uint32_t s_AtlasWidth = 1024;
 static const uint32_t s_AtlasHeight = 1024;
-static const int s_MsdfPadding = 4;
-static const double s_MsdfPxRange = 4.0;
-static const double s_MsdfAngleThreshold = 3.0;
+static const int s_SdfPadding = 4;
+static const double s_SdfPxRange = 4.0;
+static const int s_SdfSupersample = 6;
+static const float s_EdtInf = 1e20f;
 static const uint32_t s_FirstCodepoint = 32;
 static const uint32_t s_LastCodepoint = 126;
 
@@ -131,6 +136,66 @@ static void BuildGlyphShape(const stbtt_fontinfo& InFont, int InCodepoint, msdfg
     stbtt_FreeShape(&InFont, vertices);
 }
 
+// Felzenszwalb & Huttenlocher exact Euclidean distance transform (returns squared distance to the
+// nearest seed, where seeds are the entries with value 0 and everything else starts at s_EdtInf).
+// InV/InZ are caller-provided scratch of length InN and InN+1 respectively.
+static void SdfEdt1D(const float* InF, float* OutD, int* InV, float* InZ, int InN) {
+    int k = 0;
+    InV[0] = 0;
+    InZ[0] = -s_EdtInf;
+    InZ[1] = s_EdtInf;
+    for (int q = 1; q < InN; q++) {
+        float s = ((InF[q] + (float)q * q) - (InF[InV[k]] + (float)InV[k] * InV[k])) / (float)(2 * q - 2 * InV[k]);
+        while (s <= InZ[k]) {
+            k--;
+            s = ((InF[q] + (float)q * q) - (InF[InV[k]] + (float)InV[k] * InV[k])) / (float)(2 * q - 2 * InV[k]);
+        }
+        k++;
+        InV[k] = q;
+        InZ[k] = s;
+        InZ[k + 1] = s_EdtInf;
+    }
+    k = 0;
+    for (int q = 0; q < InN; q++) {
+        while (InZ[k + 1] < (float)q) {
+            k++;
+        }
+        const float d = (float)(q - InV[k]);
+        OutD[q] = d * d + InF[InV[k]];
+    }
+}
+
+// In-place squared Euclidean distance transform of a 2D grid: transform every column, then every row.
+static void SdfEdt2D(float* InoutGrid, int InW, int InH) {
+    const int maxDim = InW > InH ? InW : InH;
+    Array<float> f;
+    Array<float> d;
+    Array<float> z;
+    Array<int> v;
+    f.Resize((size_t)maxDim);
+    d.Resize((size_t)maxDim);
+    z.Resize((size_t)maxDim + 1);
+    v.Resize((size_t)maxDim);
+    for (int x = 0; x < InW; x++) {
+        for (int y = 0; y < InH; y++) {
+            f[y] = InoutGrid[y * InW + x];
+        }
+        SdfEdt1D(f.Data(), d.Data(), v.Data(), z.Data(), InH);
+        for (int y = 0; y < InH; y++) {
+            InoutGrid[y * InW + x] = d[y];
+        }
+    }
+    for (int y = 0; y < InH; y++) {
+        for (int x = 0; x < InW; x++) {
+            f[x] = InoutGrid[y * InW + x];
+        }
+        SdfEdt1D(f.Data(), d.Data(), v.Data(), z.Data(), InW);
+        for (int x = 0; x < InW; x++) {
+            InoutGrid[y * InW + x] = d[x];
+        }
+    }
+}
+
 bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
     stbtt_fontinfo font;
     const int offset = stbtt_GetFontOffsetForIndex(InTtfData, 0);
@@ -168,8 +233,6 @@ bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
         }
 
         shape.normalize();
-        shape.orientContours();
-        msdfgen::edgeColoringSimple(shape, s_MsdfAngleThreshold);
 
         const msdfgen::Shape::Bounds bounds = shape.getBounds();
         const double glyphWidthPx = (bounds.r - bounds.l) * scale;
@@ -179,8 +242,8 @@ bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
             continue;
         }
 
-        const int w = (int)std::ceil(glyphWidthPx) + 2 * s_MsdfPadding;
-        const int h = (int)std::ceil(glyphHeightPx) + 2 * s_MsdfPadding;
+        const int w = (int)std::ceil(glyphWidthPx) + 2 * s_SdfPadding;
+        const int h = (int)std::ceil(glyphHeightPx) + 2 * s_SdfPadding;
 
         // Advance to the next shelf row if the glyph doesn't fit on the current one.
         if (penX + (uint32_t)w + 1 > s_AtlasWidth) {
@@ -194,28 +257,58 @@ bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
             continue;
         }
 
-        // Map shape coordinates (font units, Y-up) to the glyph cell so the shape's lower-left
-        // bound lands at (padding, padding); the range is expressed in shape units.
+        // Rasterize the glyph as a filled nonzero-winding mask at s_SdfSupersample x the cell
+        // resolution, mapping the shape's lower-left bound to the cell's (padding, padding). Because
+        // this is a fill, overlapping/self-intersecting contours collapse into one solid region with
+        // no internal edges, which is what keeps the resulting field free of overlap seams.
+        const int ss = s_SdfSupersample;
         const msdfgen::Projection projection(
-            msdfgen::Vector2(scale, scale),
-            msdfgen::Vector2((double)s_MsdfPadding / scale - bounds.l, (double)s_MsdfPadding / scale - bounds.b));
-        const msdfgen::Range range = msdfgen::Range(s_MsdfPxRange) / (double)scale;
+            msdfgen::Vector2(scale * ss, scale * ss),
+            msdfgen::Vector2((double)s_SdfPadding / scale - bounds.l, (double)s_SdfPadding / scale - bounds.b));
+        const int fillW = w * ss;
+        const int fillH = h * ss;
+        msdfgen::Bitmap<float, 1> coverage(fillW, fillH);
+        msdfgen::rasterize(coverage, shape, projection, msdfgen::FILL_NONZERO);
 
-        msdfgen::Bitmap<float, 4> bitmap(w, h);
-        msdfgen::generateMTSDF(bitmap, shape, projection, range, msdfgen::MSDFGeneratorConfig());
+        // Signed Euclidean distance transform: distIn = squared distance from inside texels to the
+        // nearest outside texel, distOut the reverse; combined they give a smooth signed distance.
+        const msdfgen::BitmapConstRef<float, 1> fill = coverage;
+        Array<float> distIn;
+        Array<float> distOut;
+        distIn.Resize((size_t)fillW * fillH);
+        distOut.Resize((size_t)fillW * fillH);
+        for (int y = 0; y < fillH; y++) {
+            for (int x = 0; x < fillW; x++) {
+                const int i = y * fillW + x;
+                const bool inside = *fill(x, y) >= 0.5f;
+                distIn[i] = inside ? s_EdtInf : 0.0f;
+                distOut[i] = inside ? 0.0f : s_EdtInf;
+            }
+        }
+        SdfEdt2D(distIn.Data(), fillW, fillH);
+        SdfEdt2D(distOut.Data(), fillW, fillH);
 
-        // msdfgen stores row 0 at the bottom (Y-up); the atlas is top-down, so rows are flipped.
-        const msdfgen::BitmapSection<float, 4> section = bitmap;
+        // One supersampled texel per atlas texel, flipping rows (the fill is Y-up, the atlas is
+        // top-down). Encode so 0.5 is the edge and s_SdfPxRange texels span the transition band,
+        // matching UIText.glsl; the same value goes to every channel so median(RGB) recovers it.
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
-                const float* src = section(x, h - 1 - y);
+                const int fx = x * ss + ss / 2;
+                const int fy = (h - 1 - y) * ss + ss / 2;
+                const int i = fy * fillW + fx;
+                const bool inside = *fill(fx, fy) >= 0.5f;
+                const float distField = inside ? (std::sqrt(distIn[i]) - 0.5f) : -(std::sqrt(distOut[i]) - 0.5f);
+                const float distTexels = distField / (float)ss;
+                float stored = (float)(distTexels / s_SdfPxRange) + 0.5f;
+                stored = std::max(0.0f, std::min(1.0f, stored));
+                const byte value = msdfgen::pixelFloatToByte(stored);
                 const uint32_t ax = penX + (uint32_t)x;
                 const uint32_t ay = penY + (uint32_t)y;
                 const size_t dst = ((size_t)ay * s_AtlasWidth + ax) * 4;
-                atlas[(int)(dst + 0)] = msdfgen::pixelFloatToByte(src[0]);
-                atlas[(int)(dst + 1)] = msdfgen::pixelFloatToByte(src[1]);
-                atlas[(int)(dst + 2)] = msdfgen::pixelFloatToByte(src[2]);
-                atlas[(int)(dst + 3)] = msdfgen::pixelFloatToByte(src[3]);
+                atlas[(int)(dst + 0)] = value;
+                atlas[(int)(dst + 1)] = value;
+                atlas[(int)(dst + 2)] = value;
+                atlas[(int)(dst + 3)] = value;
             }
         }
 
@@ -223,8 +316,8 @@ bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
         glyph.UvMax = Vec2((float)(penX + w) / s_AtlasWidth, (float)(penY + h) / s_AtlasHeight);
         glyph.SizePx = Vec2((float)w, (float)h);
         glyph.OffsetPx = Vec2(
-            (float)(bounds.l * scale) - (float)s_MsdfPadding,
-            (float)s_MsdfPadding - (float)(bounds.b * scale) - (float)h);
+            (float)(bounds.l * scale) - (float)s_SdfPadding,
+            (float)s_SdfPadding - (float)(bounds.b * scale) - (float)h);
 
         penX += (uint32_t)w + 1;
         rowHeight = std::max(rowHeight, (uint32_t)h);

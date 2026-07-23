@@ -8,7 +8,7 @@
 
 class Texture;
 
-/** Metrics for a single glyph in the MTSDF atlas, expressed in the atlas's base pixel size.
+/** Metrics for a single glyph in the SDF atlas, expressed in the atlas's base pixel size.
  *  Scale by GetScaleForPixelHeight(targetPx) to draw at another size. */
 struct GlyphInfo {
     Vec2 UvMin = Vec2(0.0f);   // atlas UV (0..1) of the glyph quad's top-left
@@ -18,9 +18,10 @@ struct GlyphInfo {
     float AdvancePx = 0.0f;    // horizontal advance in base pixels
 };
 
-/** A font asset. On load it rasterizes an MTSDF atlas for the printable ASCII range (glyph
- *  outlines from stb_truetype, distance field from msdfgen) and uploads it as a single RGBA8
- *  Texture (RGB = multi-channel distance, A = true SDF). */
+/** A font asset. On load it rasterizes a signed-distance-field atlas for the printable ASCII range
+ *  (glyph outlines from stb_truetype, filled with msdfgen's scanline rasterizer, then converted to
+ *  a distance field via a Euclidean distance transform) and uploads it as a single RGBA8 Texture
+ *  with the same SDF value in every channel. */
 class Font : public Asset {
 public:
     ARTIFACT_CLASS();
