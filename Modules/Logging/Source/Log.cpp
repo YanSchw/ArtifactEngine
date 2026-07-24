@@ -13,6 +13,8 @@
 #include <unordered_map>
 #include <mutex>
 
+#undef ERROR // windows.h/wingdi.h defines ERROR as 0, which clashes with LogLevel::ERROR
+
 static std::unordered_map<std::string, std::shared_ptr<spdlog::logger>> s_Loggers;
 
 static std::mutex s_CaptureMutex;
