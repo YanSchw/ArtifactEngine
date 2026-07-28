@@ -47,7 +47,7 @@ void CameraController::WorldUpdate(float InDeltatime) {
     Vec2 look = m_LookAction->ReadVec2() * LOOK_SENSITIVITY;
     bool gamepad = InputSystem::Get().GetLastActiveDevice()->As<GamepadDevice>() != nullptr;
     m_Yaw += look.x * m_LookSensitivity;
-    m_Pitch -= look.y * m_LookSensitivity * (gamepad ? -1 : 1);  // screen-y grows downward; invert for natural look
+    m_Pitch += look.y * m_LookSensitivity * (gamepad ? -1 : 1);
     m_Pitch = glm::clamp(m_Pitch, -89.0f, 89.0f);
 
     // Build the orientation roll-free: yaw about world up, then pitch about the

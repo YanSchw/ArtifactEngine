@@ -46,8 +46,8 @@
             "Bindings": [
                 {
                     "$type": "Axis1DComposite",
-                    "Positive": "Keyboard/Q",
-                    "Negative": "Keyboard/E"
+                    "Positive": "Keyboard/E",
+                    "Negative": "Keyboard/Q"
                 }
             ]
         }
