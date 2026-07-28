@@ -30,7 +30,7 @@ public:
     void SetOrthographicFarClip(float farClip) { m_OrthographicFar = farClip; RecalculateProjection(); }
     ProjectionType GetProjectionType() const { return m_ProjectionType; }
     void SetProjectionType(ProjectionType type) { m_ProjectionType = type; RecalculateProjection(); }
-    Vec3 ScreenPosToWorldDirection(const Vec2& pos, float windowWidth, float windowHeight) const;
+    Vec3 ScreenPosToWorldDirection(const Vec2& InScreenPos, float InWindowWidth, float InWindowHeight) const;
 
     public:
     void RecalculateProjection();

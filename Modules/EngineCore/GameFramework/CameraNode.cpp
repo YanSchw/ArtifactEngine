@@ -41,19 +41,12 @@ void CameraNode::SetViewportSize(uint32_t width, uint32_t height) {
     RecalculateProjection();
 }
 
-// https://stackoverflow.com/questions/29997209/opengl-c-mouse-ray-picking-glmunproject
-Vec3 CameraNode::ScreenPosToWorldDirection(const Vec2& pos, float windowWidth, float windowHeight) const {
-    // these positions must be in range [-1, 1] (!!!), not [0, width] and [0, height]
-    const float mouseX = pos.x / (windowWidth * 0.5f) - 1.0f;
-    const float mouseY = pos.y / (windowHeight * 0.5f) - 1.0f;
-    Mat4 proj = glm::perspectiveLH(glm::radians(m_PerspectiveFOV), m_AspectRatio, m_PerspectiveNear, m_PerspectiveFar);
-    proj[1][1] *= -1.0f;
-    Mat4 view = glm::lookAt(Vec3(0.0f), GetForwardVector(), GetUpVector());
-    Mat4 invVP = glm::inverse(proj * view);
-    Vec4 screenPos = Vec4(mouseX, mouseY, 1.0f, 1.0f);
-    Vec4 worldPos = invVP * screenPos;
-    Vec3 dir = glm::normalize(Vec3(worldPos));
-    return dir * -1.0f;
+Vec3 CameraNode::ScreenPosToWorldDirection(const Vec2& InScreenPos, float InWindowWidth, float InWindowHeight) const {
+    const Vec2 ndc = Vec2(InScreenPos.x / InWindowWidth, InScreenPos.y / InWindowHeight) * 2.0f - 1.0f;
+    const Mat4 inverseViewProjection = glm::inverse(GetViewProjectionMatrix());
+    const Vec4 nearPoint = inverseViewProjection * Vec4(ndc.x, ndc.y, 0.0f, 1.0f);
+    const Vec4 farPoint = inverseViewProjection * Vec4(ndc.x, ndc.y, 1.0f, 1.0f);
+    return glm::normalize(Vec3(farPoint) / farPoint.w - Vec3(nearPoint) / nearPoint.w);
 }
 
 void CameraNode::RecalculateProjection() {

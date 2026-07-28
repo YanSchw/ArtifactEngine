@@ -30,6 +30,6 @@ namespace VecUtils {
     inline const Vec3 Down = Vec3(0.0f, -1.0f, 0.0f);
     inline const Vec3 Right = Vec3(1.0f, 0.0f, 0.0f);
     inline const Vec3 Left = Vec3(-1.0f, 0.0f, 0.0f);
-    inline const Vec3 Forward = Vec3(0.0f, 0.0f, -1.0f);
-    inline const Vec3 Backward = Vec3(0.0f, 0.0f, 1.0f);
+    inline const Vec3 Forward = Vec3(0.0f, 0.0f, 1.0f);
+    inline const Vec3 Backward = Vec3(0.0f, 0.0f, -1.0f);
 }
