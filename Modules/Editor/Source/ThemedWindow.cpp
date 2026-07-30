@@ -4,6 +4,7 @@
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/UICanvas.h"
 #include "GameFramework/UIQuad.h"
+#include "Rendering/RenderingAPI.h"
 #include "Rendering/UIRenderer.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/KeyCodes.h"
@@ -21,6 +22,14 @@ ThemedWindow::~ThemedWindow() {
 }
 
 void ThemedWindow::ReleaseResources() {
+    if (!m_UIRenderer && !m_Canvas) {
+        return;
+    }
+
+    if (RenderingAPI::GetInstance()) {
+        RenderingAPI::GetInstance()->WaitIdle();
+    }
+
     delete m_UIRenderer;
     m_UIRenderer = nullptr;
     delete m_Canvas;
