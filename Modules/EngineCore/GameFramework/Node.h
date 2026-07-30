@@ -11,7 +11,8 @@ ARTIFACT_ENUM();
 enum class UpdateFlag : uint8_t {
     NeverUpdate = 0,
     WorldUpdate = 1,
-    LocalUpdate = 2
+    LocalUpdate = 2,
+    HalfWorldUpdate = 4
 };
 
 /** Node is the fundamental building block of the scene: every entity that lives
@@ -30,7 +31,7 @@ public:
     Node();
     virtual ~Node();
 
-    String GetName() const;
+    const String& GetName() const;
     void SetName(const String& InName);
 
     uint32_t GetNodeId() const { return m_NodeId; }
@@ -48,7 +49,16 @@ public:
 
     /** WorldUpdate is called every frame on the main thread
      *  UpdateFlag::WorldUpdate needs to be set first */
-    virtual void WorldUpdate(float InDeltatime);
+    virtual void WorldUpdate(float InDeltatime) { (void)InDeltatime; }
+
+    /** Called every second frame with the time elapsed since this Node's own last call
+     *  UpdateFlag::HalfWorldUpdate needs to be set first */
+    virtual void HalfWorldUpdate(float InDeltatime) { (void)InDeltatime; }
+
+    /** Called every frame on a worker thread. One scene tree runs sequentially while separate
+     *  trees run in parallel, so nothing outside your own tree may be touched here
+     *  UpdateFlag::LocalUpdate needs to be set first */
+    virtual void LocalUpdate(float InDeltatime) { (void)InDeltatime; }
 
     void SetUpdateFlag(UpdateFlag InFlag);
     bool IsUpdateFlagSet(UpdateFlag InFlag) const;

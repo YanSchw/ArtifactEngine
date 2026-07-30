@@ -11,11 +11,14 @@ class World final : public Object {
 public:
     ARTIFACT_CLASS();
 
+    virtual ~World();
+
     void Update(double InDeltatime);
 
     void ResolvePendingKills();
 
-    Array<Node*> GetAllNodes() const;
+    /** Every Node registered in this World */
+    const Array<Node*>& GetAllNodes() const;
 
     CameraNode* GetMainCamera() const;
     void SetMainCamera(CameraNode* InCamera);
@@ -27,18 +30,31 @@ public:
     }
 
 private:
+    struct LocalUpdateChunk {
+        Node* Root = nullptr;
+        Array<Node*> Nodes;
+    };
+
     void UnregisterNode(Node* node);
     void ReregisterNode(Node* node);
 
     void ResolveAllBeginPlayIssues();
 
     void WorldUpdate(float deltaTime);
+    void HalfWorldUpdate(float InDeltaTime);
     void PrepareLocalUpdate();
+    void LocalUpdate(float InDeltaTime);
 
 private:
     Array<Node*> m_WorldNodes;
     Array<Node*> m_WorldUpdateNodes;
+
+    Array<Node*> m_HalfWorldUpdateNodes[2];
+    float m_HalfWorldElapsed[2] = { 0.0f, 0.0f };
+    int32_t m_HalfWorldSide = 0;
+
     Array<Node*> m_LocalUpdateNodes;
+    Array<LocalUpdateChunk> m_LocalUpdateChunks;
 
     /** Array of all nodes, that need to have BeginPlay() called. */
     Array<WeakObjectPtr<Node>> m_BeginPlayIssues;

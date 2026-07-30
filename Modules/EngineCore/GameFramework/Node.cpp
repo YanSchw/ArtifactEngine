@@ -3,6 +3,7 @@
 #include "Node3D.h"
 #include "World.h"
 #include "Core/Log.h"
+#include "Core/MainThread.h"
 
 static Map<uint32_t, Node*>& GetNodeRegistry() {
     static Map<uint32_t, Node*> registry;
@@ -23,31 +24,27 @@ Node* Node::FindById(uint32_t InNodeId) {
 }
 
 Node::~Node() {
-    // Unparent Children - Before actually destroying the Parent --- if the World exits
     if (GetWorld()) {
-        while (HasChildren()) {
-            GetChild(0)->ForceSetParent(GetParent(), true, false);
-        }
-    } else {
-        // There is no World, the Node exits by itself and there is no gameplay context.
-        // Manually delete this Nodes children...
-        while (HasChildren()) {
-            Node* child = GetChild(0);
-            child->ForceSetParent(GetParent(), true, false);
-            delete child;
-        }
+        AE_ASSERT_MAIN_THREAD("Deleting a Node that belongs to a World");
+    }
+
+    // Each child unparents itself from us as it dies, which is what advances this loop.
+    while (HasChildren()) {
+        delete GetChild(0);
     }
 
     ForceSetParent(nullptr, true, false);
 
-    if (GetWorld()) {
-        GetWorld()->UnregisterNode(this);
+    if (World* world = GetWorld()) {
+        world->UnregisterNode(this);
+        // A child deleted with its parent never reaches ResolvePendingKills.
+        world->m_PendingKills.Remove(this);
     }
 
     GetNodeRegistry().Remove(m_NodeId);
 }
 
-String Node::GetName() const {
+const String& Node::GetName() const {
     return m_Name;
 }
 
@@ -86,10 +83,6 @@ void Node::SetName(const String& InName) {
     }
 }
 
-void Node::WorldUpdate(float InDeltatime) {
-    AE_INFO("Node::WorldUpdate(float InDeltatime)[{0}]: {1}", GetName(), InDeltatime);
-}
-
 void Node::SetUpdateFlag(UpdateFlag InFlag) {
     m_UpdateFlags |= InFlag;
 
@@ -97,6 +90,7 @@ void Node::SetUpdateFlag(UpdateFlag InFlag) {
         return;
     }
 
+    AE_ASSERT_MAIN_THREAD("Node::SetUpdateFlag on a Node in a World");
     GetWorld()->ReregisterNode(this);
 }
 
@@ -136,6 +130,8 @@ World* Node::GetWorld() const {
 }
 
 void Node::Destroy() {
+    AE_ASSERT_MAIN_THREAD("Node::Destroy");
+
     if (IsPendingKill()) {
         // The Node will already die at the end of the frame!
         return;
@@ -152,12 +148,20 @@ void Node::Destroy() {
         child->Destroy();
     }
 
-    AE_ASSERT(GetWorld());
-    AE_ASSERT(GetWorld()->m_PendingKills.Contains(this) == false);
-    GetWorld()->m_PendingKills.Add(this);
+    World* world = GetWorld();
+    AE_ASSERT(world, "Destroy() needs a World; delete a detached Node instead.");
+    if (!world) {
+        return;
+    }
+    AE_ASSERT(world->m_PendingKills.Contains(this) == false);
+    world->m_PendingKills.Add(this);
 }
 
 Node* Node::CreateChild(const Class& InChildClass) {
+    if (GetWorld()) {
+        AE_ASSERT_MAIN_THREAD("Node::CreateChild on a Node in a World");
+    }
+
     Node* node = Object::Create(InChildClass)->As<Node>();
     AE_ASSERT(node);
     AE_ASSERT(node->IsA<Node>(), "You can only add Nodes as Children.");
@@ -171,10 +175,6 @@ Node* Node::CreateChild(const Class& InChildClass) {
     }
 
     node->SetParent(this, false);
-
-    if (IsInitialized()) {
-        node->InitializeNode(*GetWorld());
-    }
 
     return node;
 }
@@ -301,6 +301,15 @@ void Node::InitializeNode(World& OutWorld) {
 
 void Node::UnInitializeNode(World& OutWorld) {
     AE_ASSERT(GetWorld() == &OutWorld);
+
+    for (int32_t i = 0; i < (int32_t)GetChildCount(); i++) {
+        GetChild(i)->UnInitializeNode(OutWorld);
+    }
+
+    OutWorld.UnregisterNode(this);
+    OutWorld.m_PendingKills.Remove(this);
+    m_World = nullptr;
+    m_Initialized = false;
 }
 
 void Node::TickTransform(bool InInWorldSpace) {
@@ -318,6 +327,9 @@ void Node::OnParentChange(Node* InPrev, Node* InNext) { }
 void Node::ForceSetParent(Node* InParent, bool InKeepWorldTransform, bool InInGameplayContext) {
     if (InParent && InParent->IsChildOf(this)) {
         return;
+    }
+    if (GetWorld() || (InParent && InParent->GetWorld())) {
+        AE_ASSERT_MAIN_THREAD("Reparenting a Node into or out of a World");
     }
     if (InInGameplayContext) {
         OnParentChange(GetParent(), InParent);
@@ -356,6 +368,15 @@ void Node::ForceSetParent(Node* InParent, bool InKeepWorldTransform, bool InInGa
     // Keep-local: nothing to do — local SRT is unchanged and world re-derives.
     if (transform && InKeepWorldTransform) {
         transform->SetTransformMatrix(worldBefore);
+    }
+
+    // A detached subtree parented under a live Node joins that World; CreateChild relies on it.
+    if (Node* parent = GetParent()) {
+        if (parent->IsInitialized() && !IsInitialized()) {
+            InitializeNode(*parent->GetWorld());
+        } else if (parent->IsInitialized() && GetWorld() != parent->GetWorld()) {
+            AE_ERROR("Node '{0}' was parented into another World; moving between Worlds is not supported.", GetName());
+        }
     }
 }
 

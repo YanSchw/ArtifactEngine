@@ -20,6 +20,7 @@ static std::unordered_map<std::string, std::shared_ptr<spdlog::logger>> s_Logger
 static std::mutex s_CaptureMutex;
 static std::vector<LogEntry> s_RecentEntries;
 static uint64_t s_LogVersion = 0;
+static int s_MessageCount = 0;
 static int s_WarningCount = 0;
 static int s_ErrorCount = 0;
 static constexpr size_t s_MaxRecentEntries = 4000;
@@ -121,6 +122,8 @@ void Logging::Log(LogLevel level, const std::string& file, const std::string& me
         s_WarningCount++;
     } else if (level == LogLevel::ERROR || level == LogLevel::CRITICAL) {
         s_ErrorCount++;
+    } else {
+        s_MessageCount++;
     }
     s_LogVersion++;
 }
@@ -133,6 +136,11 @@ std::vector<LogEntry> Logging::GetRecentEntries() {
 uint64_t Logging::GetLogVersion() {
     std::lock_guard<std::mutex> lock(s_CaptureMutex);
     return s_LogVersion;
+}
+
+int Logging::GetMessageCount() {
+    std::lock_guard<std::mutex> lock(s_CaptureMutex);
+    return s_MessageCount;
 }
 
 int Logging::GetWarningCount() {
@@ -148,6 +156,7 @@ int Logging::GetErrorCount() {
 void Logging::Clear() {
     std::lock_guard<std::mutex> lock(s_CaptureMutex);
     s_RecentEntries.clear();
+    s_MessageCount = 0;
     s_WarningCount = 0;
     s_ErrorCount = 0;
     s_LogVersion++;

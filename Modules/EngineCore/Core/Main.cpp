@@ -2,6 +2,7 @@
 
 #include "Log.h"
 #include "Assert.h"
+#include "MainThread.h"
 #include "Engine.h"
 #include "Platform/Platform.h"
 #include "Common/Types.h"
@@ -26,6 +27,7 @@ static void EnforceLinkingStaticLibraries() {
 }
 
 int ArtifactMain(const Array<String>& InArgs) {
+    MainThread::Register();
     EnforceLinkingStaticLibraries();
     AE_INFO("Artifact Engine Version {0}", Version::GetVersionString());
 

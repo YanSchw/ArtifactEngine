@@ -28,6 +28,7 @@ public:
     /** A snapshot of the recent-entry ring buffer (thread-safe). */
     static std::vector<LogEntry> GetRecentEntries();
     static uint64_t GetLogVersion();
+    static int GetMessageCount();
     static int GetWarningCount();
     static int GetErrorCount();
     static void Clear();
