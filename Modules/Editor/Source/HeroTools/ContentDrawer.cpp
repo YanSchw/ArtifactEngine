@@ -1,8 +1,10 @@
 #include "ContentDrawer.h"
+#include "ContentTile.h"
 #include "ThumbnailRenderer.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIGrid.h"
+#include "UI/UIRoundedQuad.h"
 #include "Assets/Font.h"
 #include "GameFramework/UINode.h"
 #include "GameFramework/UIVStack.h"
@@ -18,6 +20,7 @@
 #include "Assets/VectorImage.h"
 #include "Rendering/Texture.h"
 #include "Core/EngineConfig.h"
+#include "Core/Log.h"
 #include "Platform/FileIO.h"
 #include "Serialization/ThirdParty/nlohmann/json.hpp"
 #include <filesystem>
@@ -404,15 +407,23 @@ void ContentDrawer::BuildGrid() {
     });
 
     for (const GridEntry& entry : entries) {
-        UIButton* card = m_Grid->Add<UIButton>();
+        ContentTile* card = m_Grid->Add<ContentTile>();
+        card->CornerRadius = 6.0f;
         card->NormalColor = Vec4(0.0f);
         card->PressedColor = Vec4(0.0f);
 
         if (entry.IsFolder) {
             const String rel = entry.Rel;
             const String mount = m_Mount;
+            const String selectKey = DirFor(mount, rel);
             card->HoverColor = Vec4(1.0f, 1.0f, 1.0f, 0.05f);
-            card->Clicked = [this, mount, rel] { NavigateTo(mount, rel); };
+            card->Bind = [this, card, selectKey] {
+                const bool selected = (m_SelectedPath == selectKey);
+                card->NormalColor = selected ? s_SelectedColor : Vec4(0.0f);
+                card->HoverColor = selected ? s_SelectedColor : Vec4(1.0f, 1.0f, 1.0f, 0.05f);
+            };
+            card->Clicked = [this, selectKey] { m_SelectedPath = selectKey; };
+            card->DoubleClicked = [this, mount, rel] { NavigateTo(mount, rel); };
 
             UISvg* folderIcon = card->Add<UISvg>();
             folderIcon->Anchor = folderIcon->Pivot = Vec2(0.5f, 0.0f);
@@ -435,11 +446,14 @@ void ContentDrawer::BuildGrid() {
 
         // Asset card: a framed thumbnail with a name band + type strip, like Unreal's content browser.
         const String filePath = entry.FilePath;
+        const String assetName = entry.Name;
         card->HoverColor = Vec4(0.0f);
         card->Clicked = [this, filePath] { m_SelectedPath = filePath; };
+        card->DoubleClicked = [filePath, assetName] { AE_INFO("Open asset {0} ({1})", assetName, filePath); };
 
-        UIQuad* frame = card->Add<UIQuad>();
+        UIRoundedQuad* frame = card->Add<UIRoundedQuad>();
         frame->Fill();
+        frame->CornerRadius = Vec4(6.0f);
         frame->Bind = [this, card, frame, filePath] {
             const bool selected = (m_SelectedPath == filePath);
             frame->Color = selected ? s_SelectedColor
@@ -450,9 +464,10 @@ void ContentDrawer::BuildGrid() {
         column->Fill();
         column->Padding = UIPadding(1.0f, 1.0f);
 
-        UIQuad* thumbBg = column->Add<UIQuad>();
+        UIRoundedQuad* thumbBg = column->Add<UIRoundedQuad>();
         thumbBg->Size = { 1.0_rel, 1.0_rel };
         thumbBg->Color = EditorStyle::PanelDark;
+        thumbBg->CornerRadius = Vec4(5.0f, 5.0f, 0.0f, 0.0f);
 
         UISvg* icon = thumbBg->Add<UISvg>();
         icon->Center(Vec2(40.0f, 40.0f));
@@ -488,9 +503,10 @@ void ContentDrawer::BuildGrid() {
         name->Color = EditorStyle::TextBright;
         name->Text = entry.Name;
 
-        UIQuad* typeStrip = column->Add<UIQuad>();
+        UIRoundedQuad* typeStrip = column->Add<UIRoundedQuad>();
         typeStrip->Size = { 1.0_rel, 15.0_px };
         typeStrip->Color = EditorStyle::PanelDark;
+        typeStrip->CornerRadius = Vec4(0.0f, 0.0f, 5.0f, 5.0f);
         UILabel* type = typeStrip->Add<UILabel>();
         type->Fill();
         type->Padding = UIPadding(6.0f, 0.0f);
