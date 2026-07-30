@@ -275,6 +275,14 @@ Node3D* Node::GetParentTransform() {
     return GetParent() ? GetParent()->GetTransform() : nullptr;
 }
 
+void Node::SetMarkedAsInherited(bool InIsInherited) {
+    m_WasInherited = InIsInherited;
+}
+
+bool Node::IsInherited() const {
+    return m_WasInherited;
+}
+
 void Node::InitializeNode(World& OutWorld) {
     AE_ASSERT(GetWorld() == nullptr);
     /*if (GetName() == "New Node")

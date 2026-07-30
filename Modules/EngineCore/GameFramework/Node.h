@@ -82,6 +82,9 @@ public:
     virtual Node3D* GetTransform();
     virtual Node3D* GetParentTransform();
 
+    void SetMarkedAsInherited(bool InIsInherited);
+    bool IsInherited() const;
+
 protected:
     virtual void InitializeNode(World& OutWorld);
     virtual void UnInitializeNode(World& OutWorld);
@@ -110,6 +113,7 @@ private:
     bool m_Enabled = true, m_EnabledInHierarchy = true;
     bool m_WasBeginPlayCalled = false;
     bool m_IsPendingKill = false;
+    bool m_WasInherited = true; // Editor-only: true if this node was inherited from a parent, false if it was added to the scene directly
 
     friend class World;
 };
