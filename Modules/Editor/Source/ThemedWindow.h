@@ -56,4 +56,5 @@ private:
 
     UILabel* m_TitleLabel = nullptr;
     bool m_WasCursorDown = false;
+    bool m_WasSecondaryDown = false;
 };

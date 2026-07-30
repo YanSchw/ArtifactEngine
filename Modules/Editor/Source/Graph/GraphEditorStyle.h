@@ -28,11 +28,6 @@ public:
     inline static const Vec4 WireUnderlay = HexColor(0x000000, 0.32f);
     inline static const Vec4 InvalidTargetWire = HexColor(0xE0483C);
 
-    // Context menu
-    inline static const Vec4 MenuBackground = HexColor(0x1D1D1D);
-    inline static const Vec4 MenuBorder = HexColor(0x0C0C0C);
-    inline static const Vec4 MenuHover = HexColor(0x0070E0, 0.55f);
-
     // Metrics (graph units)
     inline static constexpr float NodeCornerRadius = 7.0f;
     inline static constexpr float HeaderHeight = 26.0f;
@@ -56,11 +51,8 @@ public:
     /** Zoom below which node text is dropped as unreadable. */
     inline static constexpr float TextCullZoom = 0.35f;
 
-    // Context menu metrics (screen pixels; the menu does not zoom)
+    /** Width the node-creation menu opens at (screen pixels; the menu does not zoom). */
     inline static constexpr float MenuWidth = 220.0f;
-    inline static constexpr float MenuRowHeight = 24.0f;
-    inline static constexpr float MenuHeaderHeight = 20.0f;
-    inline static constexpr float MenuPadding = 4.0f;
 
     static Vec4 PinColor(const String& InTypeName) {
         static Map<String, Vec4> s_Colors = BuildPinColors();

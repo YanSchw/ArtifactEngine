@@ -14,6 +14,9 @@ struct UIFrameContext {
     bool CursorDown = false;
     bool CursorPressedThisFrame = false;
     bool CursorReleasedThisFrame = false;
+    bool SecondaryDown = false;
+    bool SecondaryPressedThisFrame = false;
+    bool SecondaryReleasedThisFrame = false;
     Vec2 ScrollDelta = Vec2(0.0f);
 
     bool NavUp = false;

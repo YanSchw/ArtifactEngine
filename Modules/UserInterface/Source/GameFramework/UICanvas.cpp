@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 
+static constexpr float s_SecondaryClickSlop = 4.0f;
+
 UICanvas::UICanvas() {
     Fill();
 }
@@ -64,7 +66,20 @@ Mat4 UICanvas::BuildProjection(const Vec2& InViewportSize) const {
     return BuildOverlayProjection(rect.Size.x, rect.Size.y, Perspective);
 }
 
+void UICanvas::DestroyDeferred(UINode* InNode) {
+    if (!InNode || InNode == this) {
+        return;
+    }
+    InNode->SetEnabled(false);
+    m_PendingDestroy.Add(InNode);
+}
+
 Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList) {
+    for (const WeakObjectPtr<UINode>& node : m_PendingDestroy) {
+        delete node.Get();
+    }
+    m_PendingDestroy.Clear();
+
     const Mat4 projection = BuildProjection(InViewportSize);
     SetViewProjection(projection, InViewportSize.x, InViewportSize.y);
 
@@ -183,6 +198,25 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
             UINode* uiNode = node->As<UINode>();
             if (uiNode && uiNode->OnScroll(InContext.ScrollDelta)) {
                 break;
+            }
+        }
+    }
+
+    if (InContext.SecondaryPressedThisFrame) {
+        m_SecondaryPress = cursor;
+        m_SecondaryNode = HitTestTopmost(this, cursor, false);
+    }
+    if (InContext.SecondaryReleasedThisFrame) {
+        UINode* pressed = m_SecondaryNode.Get();
+        m_SecondaryNode = nullptr;
+        // Right-drags belong to whoever polls the button, so only a
+        // click that stayed in place is delivered.
+        if (pressed && glm::length(cursor - m_SecondaryPress) <= s_SecondaryClickSlop) {
+            for (Node* node = pressed; node; node = node->GetParent()) {
+                UINode* uiNode = node->As<UINode>();
+                if (uiNode && uiNode->OnSecondaryClick(cursor)) {
+                    break;
+                }
             }
         }
     }

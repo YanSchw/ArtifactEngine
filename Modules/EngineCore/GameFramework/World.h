@@ -13,6 +13,8 @@ public:
 
     void Update(double InDeltatime);
 
+    void ResolvePendingKills();
+
     Array<Node*> GetAllNodes() const;
 
     CameraNode* GetMainCamera() const;
@@ -29,7 +31,6 @@ private:
     void ReregisterNode(Node* node);
 
     void ResolveAllBeginPlayIssues();
-    void ResolvePendingKills();
 
     void WorldUpdate(float deltaTime);
     void PrepareLocalUpdate();

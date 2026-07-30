@@ -39,7 +39,7 @@ public:
     bool IsSoleSelected(Node* InNode) const;
     void HandleRowClick(Node* InNode, bool InToggle, bool InRange);
 
-    bool IsExpanded(Node* InNode) const { return !m_Collapsed.Contains(InNode); }
+    bool IsExpanded(Node* InNode) const;
     void ToggleExpanded(Node* InNode);
 
     /** A search filter is active; the tree shows matches (and their ancestors) fully expanded. */
@@ -75,7 +75,7 @@ private:
     UILabel* m_FooterLabel = nullptr;
 
     Array<VisibleRow> m_Visible;
-    Array<Node*> m_Collapsed;
+    Array<WeakObjectPtr<Node>> m_Collapsed;
     String m_Filter;  // lowercased search text, rebuilt each frame
     int m_MatchCount = 0;
 

@@ -101,6 +101,7 @@ public:
     virtual void OnClick() { }
     virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) { (void)InCursorPos; (void)InDelta; }
     virtual bool OnScroll(const Vec2& InDelta) { (void)InDelta; return false; }
+    virtual bool OnSecondaryClick(const Vec2& InCursorPos) { (void)InCursorPos; return false; }
     virtual void OnFocusChanged(bool InFocused) { (void)InFocused; }
     virtual bool OnNavBack() { return false; }
 

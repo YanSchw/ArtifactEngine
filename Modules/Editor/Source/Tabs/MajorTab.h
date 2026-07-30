@@ -24,6 +24,8 @@ public:
     virtual VectorImage* GetTabIcon() const;
     virtual void BuildToolBar(UINode& InToolBar) { (void)InToolBar; }
 
+    virtual void OnBind() override;
+
     World* GetEditedWorld() const { return m_World.Get(); }
 
     /** The document-wide selection shared by every MinorTab; any Object can be selected. */

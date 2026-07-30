@@ -53,6 +53,9 @@ public:
     /** Pointer shape requested by the topmost hit (or captured) node this frame. */
     CursorIcon GetDesiredCursor() const { return m_DesiredCursor; }
 
+    /** Disables InNode now and deletes it at the start of the next frame. */
+    void DestroyDeferred(UINode* InNode);
+
     /** Runs one UI frame — bind, layout, input, paint — filling OutDrawList and returning the
      *  canvas->clip projection it must be rendered with. Called by UIRenderer. */
     Mat4 RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList);
@@ -74,6 +77,9 @@ private:
     WeakObjectPtr<UINode> m_HoveredNode;
     WeakObjectPtr<UINode> m_CapturedNode;
     WeakObjectPtr<UINode> m_FocusedNode;
+    WeakObjectPtr<UINode> m_SecondaryNode;
+    Array<WeakObjectPtr<UINode>> m_PendingDestroy;
     Vec2 m_LastCursor = Vec2(0.0f);
+    Vec2 m_SecondaryPress = Vec2(0.0f);
     CursorIcon m_DesiredCursor = CursorIcon::Arrow;
 };

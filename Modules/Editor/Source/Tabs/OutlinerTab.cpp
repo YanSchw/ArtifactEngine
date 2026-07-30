@@ -166,6 +166,7 @@ void OutlinerTab::RebuildVisible() {
     if (!world) {
         return;
     }
+
     for (Node* node : world->GetAllNodes()) {
         if (node->GetParent()) {
             continue;
@@ -252,10 +253,25 @@ void OutlinerTab::OnUIUpdate(const UIFrameContext& InContext) {
     }
 }
 
+bool OutlinerTab::IsExpanded(Node* InNode) const {
+    for (const WeakObjectPtr<Node>& collapsed : m_Collapsed) {
+        if (collapsed.Get() == InNode) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void OutlinerTab::ToggleExpanded(Node* InNode) {
-    if (m_Collapsed.Contains(InNode)) {
-        m_Collapsed.Remove(InNode);
-    } else {
+    const bool collapse = IsExpanded(InNode);
+    // Entries whose node died drop out on the way past.
+    for (int32_t i = m_Collapsed.Size() - 1; i >= 0; i--) {
+        Node* collapsed = m_Collapsed[i].Get();
+        if (!collapsed || collapsed == InNode) {
+            m_Collapsed.RemoveAt(i);
+        }
+    }
+    if (collapse) {
         m_Collapsed.Add(InNode);
     }
 }
@@ -307,7 +323,9 @@ void OutlinerTab::EndDrag() {
         // ForceSetParent already rejects reparenting under a descendant.
         if (!ref->IsChildOf(source)) {
             source->SetParent(ref, false);
-            m_Collapsed.Remove(ref);
+            if (!IsExpanded(ref)) {
+                ToggleExpanded(ref);
+            }
         }
         return;
     }

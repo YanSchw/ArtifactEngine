@@ -21,6 +21,7 @@ public:
 
     virtual void Paint(UIDrawList& OutDrawList) override;
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
+    virtual bool OnSecondaryClick(const Vec2& InCursorPos) override;
     virtual void OnPressed(const Vec2& InCursorPos) override;
     virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
     virtual void OnReleased(bool InInside) override;
@@ -53,12 +54,6 @@ private:
         Array<PinSlot> Slots;
     };
 
-    struct MenuEntry {
-        Class NodeClass;
-        String Label;
-        bool IsHeader = false;
-    };
-
     Vec2 GraphToScreen(const Vec2& InGraphPos) const;
     Vec2 ScreenToGraph(const Vec2& InScreenPos) const;
     static Vec2 SnapToGrid(const Vec2& InGraphPos);
@@ -81,19 +76,11 @@ private:
     void UpdatePanning();
     void UpdateShortcuts();
 
-    void OpenContextMenu(const Vec2& InScreenPos);
-    void CloseContextMenu();
-    void BuildMenuEntries();
-    UIRectF GetMenuRect() const;
-    int32_t MenuRowAt(const Vec2& InScreenPos) const;
-    void ActivateMenuRow(int32_t InRow);
-
     void PaintGrid(UIDrawList& OutDrawList) const;
     void PaintConnections(UIDrawList& OutDrawList) const;
     void PaintNode(UIDrawList& OutDrawList, GraphNode& InNode) const;
     void PaintPendingWire(UIDrawList& OutDrawList) const;
     void PaintMarquee(UIDrawList& OutDrawList) const;
-    void PaintContextMenu(UIDrawList& OutDrawList) const;
     void PaintWire(UIDrawList& OutDrawList, const Vec2& InFromScreen, const Vec2& InToScreen, Vec4 InColorA, Vec4 InColorB) const;
 
     SharedObjectPtr<NodeGraph> m_Graph;
@@ -113,20 +100,13 @@ private:
     PinRef m_HoverPin;
     bool m_HoverPinCompatible = true;
 
-    // Right/middle mouse is not routed through UICanvas, so pan/context-menu state is tracked
-    // here from polled buttons.
+    // Right/middle mouse dragging is not routed through UICanvas, so panning is tracked here from
+    // polled buttons.
     bool m_WasPanButtonDown = false;
     bool m_PanCandidate = false;
-    bool m_PanIsRightButton = false;
     bool m_Panning = false;
     Vec2 m_PanPressScreen = Vec2(0.0f);
     Vec2 m_LastPanCursor = Vec2(0.0f);
-
-    bool m_MenuOpen = false;
-    Vec2 m_MenuScreen = Vec2(0.0f);
-    Vec2 m_MenuGraphPos = Vec2(0.0f);
-    int32_t m_MenuHoverRow = -1;
-    Array<MenuEntry> m_MenuEntries;
 
     bool m_PendingFrameContent = true;
 };

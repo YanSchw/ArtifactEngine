@@ -31,6 +31,7 @@ public:
     OutlinerTab::DropMode HitZone(const Vec2& InScreenCursor) const;
 
     virtual void Paint(UIDrawList& OutDrawList) override;
+    virtual bool OnSecondaryClick(const Vec2& InCursorPos) override;
     virtual void OnPressed(const Vec2& InCursorPos) override;
     virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
     virtual void OnReleased(bool InInside) override;

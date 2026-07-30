@@ -1,7 +1,9 @@
 #include "EditorWindow.h"
 #include "Tabs/MajorTab.h"
+#include "Tabs/SceneEditorTab.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
+#include "UI/UIContextMenu.h"
 #include "UI/UIMajorTabHandle.h"
 #include "HeroTools/HeroTool.h"
 #include "HeroTools/ContentDrawer.h"
@@ -22,6 +24,12 @@ static void ClearChildren(UINode* InNode) {
         delete InNode->GetChild(0);
     }
 }
+
+#if defined(AE_PLATFORM_MACOS)
+static const String s_CommandKey = "Cmd";
+#else
+static const String s_CommandKey = "Ctrl";
+#endif
 
 EditorWindow::EditorWindow(const WindowParams& InParams)
     : ThemedWindow(InParams) {
@@ -51,7 +59,90 @@ void EditorWindow::RegisterHeroTools() {
     m_HeroTools.Add(console);
 }
 
+void EditorWindow::BuildTitleBarMenus() {
+    UIHStack* row = m_TitleBar->Add<UIHStack>();
+    row->Anchor = row->Pivot = Vec2(0.0f, 0.0f);
+#if defined(AE_PLATFORM_MACOS)
+    row->Position = Vec2(EditorStyle::MacTrafficLightInset, 0.0f);
+#else
+    row->Position = Vec2(6.0f, 0.0f);
+#endif
+    row->Size = { 400.0_px, 1.0_rel };
+
+    AddTitleBarMenu(*row, "File", [this](UIMenuModel& OutMenu) { BuildFileMenu(OutMenu); });
+    AddTitleBarMenu(*row, "Window", [this](UIMenuModel& OutMenu) { BuildWindowMenu(OutMenu); });
+}
+
+void EditorWindow::AddTitleBarMenu(UINode& InRow, const String& InTitle, std::function<void(UIMenuModel&)> InBuild) {
+    UIButton* button = InRow.Add<UIButton>();
+    button->SetCaption(InTitle);
+    button->Size = { 60.0_px, 1.0_rel };
+    button->NormalColor = Vec4(0.0f);
+    button->HoverColor = EditorStyle::CaptionHover;
+    button->PressedColor = EditorStyle::CaptionHover;
+    button->Cursor = CursorIcon::Arrow;
+    if (Node* child = button->GetChildByClass(UILabel::StaticClass())) {
+        UILabel* label = child->As<UILabel>();
+        label->FontSize = EditorStyle::FontSize;
+        label->Color = EditorStyle::Text;
+    }
+    // The chrome is built before the default font exists, so the width follows the caption.
+    button->Bind = [button, InTitle] {
+        if (Font* font = UINode::GetDefaultFont()) {
+            button->Size = { UIValue(font->GetTextWidth(InTitle, EditorStyle::FontSize) + 22.0f), 1.0_rel };
+        }
+    };
+    button->Clicked = [button, build = std::move(InBuild)] {
+        UIMenuModel menu;
+        build(menu);
+        UIContextMenu::OpenUnder(*button, menu);
+    };
+
+    // Title-bar hit-testing hands everything it does not know about to the OS as a drag region.
+    m_TitleBarButtons.Add(button);
+}
+
+void EditorWindow::BuildFileMenu(UIMenuModel& OutMenu) {
+    OutMenu.Section("Editor");
+    OutMenu.Item("New Scene Tab", [this] { OpenTab<SceneEditorTab>(); }).Icon(EditorIcons::Level());
+    OutMenu.Item("New Window", [this] {
+        WindowParams params;
+        params.Title = "Artifact Editor";
+        params.Width = 1100;
+        params.Height = 650;
+        SharedObjectPtr<EditorWindow> spawned = EditorWindow::Create(params);
+        spawned->SetPosition(GetPosition() + Vec2(40.0f, 40.0f));
+        spawned->OpenTab<SceneEditorTab>();
+    }).Icon(EditorIcons::Document());
+    OutMenu.Separator();
+    OutMenu.Item("Close Window", [this] { Close(); });
+}
+
+void EditorWindow::BuildWindowMenu(UIMenuModel& OutMenu) {
+    OutMenu.Section("Hero Tools");
+    for (const SharedObjectPtr<HeroTool>& tool : m_HeroTools) {
+        HeroTool* toolPtr = tool.Get();
+        String shortcut;
+        if (toolPtr == m_ContentDrawerTool) {
+            shortcut = s_CommandKey + "+Space";
+        } else if (toolPtr == m_ConsoleTool) {
+            shortcut = s_CommandKey + "+.";
+        }
+        OutMenu.Item(toolPtr->GetTitle(), [this, toolPtr] { ToggleHeroTool(toolPtr); })
+               .Shortcut(shortcut)
+               .Checked(IsHeroToolOpen(toolPtr));
+    }
+
+    OutMenu.Section("Tabs");
+    for (MajorTab* tab : m_OpenTabs) {
+        OutMenu.Item(tab->GetTabTitle(), [this, tab] { ActivateTab(tab); })
+               .Checked(tab == m_ActiveTab);
+    }
+}
+
 void EditorWindow::BuildEditorChrome() {
+    BuildTitleBarMenus();
+
     UIVStack* column = GetContentRoot()->Add<UIVStack>();
     column->Fill();
     // Chrome rebuilds happen in the bind pass, before layout, so tab switches and moves

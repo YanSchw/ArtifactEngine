@@ -36,6 +36,14 @@ VectorImage* MajorTab::GetTabIcon() const {
     return EditorIcons::Document();
 }
 
+void MajorTab::OnBind() {
+    Super::OnBind();
+
+    if (World* world = GetEditedWorld()) {
+        world->ResolvePendingKills();
+    }
+}
+
 Array<Object*> MajorTab::GetSelection() const {
     Array<Object*> alive;
     for (const WeakObjectPtr<Object>& weak : m_Selection) {

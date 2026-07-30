@@ -7,6 +7,7 @@
 #include "Rendering/UIRenderer.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/KeyCodes.h"
+#include "InputSystem/MouseCodes.h"
 
 static Array<SharedObjectPtr<ThemedWindow>> s_WindowRegistry;
 
@@ -87,12 +88,16 @@ void ThemedWindow::SetTitleText(const String& InText) {
 void ThemedWindow::BuildFrameContext(UIFrameContext& OutContext, double InDeltaTime) {
     OutContext.DeltaTime = (float)InDeltaTime;
     OutContext.CursorPosition = GetCursorPosition();
-    OutContext.CursorDown = IsMouseButtonDown(0);
+    OutContext.CursorDown = IsMouseButtonDown((int32_t)MouseCode::Left);
     OutContext.CursorPressedThisFrame = OutContext.CursorDown && !m_WasCursorDown;
     OutContext.CursorReleasedThisFrame = !OutContext.CursorDown && m_WasCursorDown;
+    OutContext.SecondaryDown = IsMouseButtonDown((int32_t)MouseCode::Right);
+    OutContext.SecondaryPressedThisFrame = OutContext.SecondaryDown && !m_WasSecondaryDown;
+    OutContext.SecondaryReleasedThisFrame = !OutContext.SecondaryDown && m_WasSecondaryDown;
     OutContext.ScrollDelta = ConsumeScrollDelta();
     OutContext.TextInput = ConsumeTextInput();
     m_WasCursorDown = OutContext.CursorDown;
+    m_WasSecondaryDown = OutContext.SecondaryDown;
 
     if (IsFocused()) {
         if (KeyboardDevice* keyboard = KeyboardDevice::Instance()) {

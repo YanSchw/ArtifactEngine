@@ -2,12 +2,14 @@
 #include "ThemedWindow.h"
 #include "Object/Pointer.h"
 #include "Common/Array.h"
+#include <functional>
 #include "EditorWindow.gen.h"
 
 class UIStack;
 class UINode;
 class MajorTab;
 class HeroTool;
+class UIMenuModel;
 
 /** The editor's main window. */
 class EditorWindow : public ThemedWindow {
@@ -44,6 +46,10 @@ public:
 
 private:
     void BuildEditorChrome();
+    void BuildTitleBarMenus();
+    void AddTitleBarMenu(UINode& InRow, const String& InTitle, std::function<void(UIMenuModel&)> InBuild);
+    void BuildFileMenu(UIMenuModel& OutMenu);
+    void BuildWindowMenu(UIMenuModel& OutMenu);
     void RegisterHeroTools();
     void RegisterTab(MajorTab* InTab);
     void RebuildToolBar();

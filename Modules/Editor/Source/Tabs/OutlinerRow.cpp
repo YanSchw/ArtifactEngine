@@ -2,10 +2,12 @@
 #include "OutlinerTab.h"
 #include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
+#include "UI/UIContextMenu.h"
 #include "GameFramework/UISvg.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UITextArea.h"
 #include "GameFramework/Node.h"
+#include "GameFramework/Node3D.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "Rendering/UIDrawList.h"
 
@@ -184,6 +186,86 @@ void OutlinerRow::Paint(UIDrawList& OutDrawList) {
                            Vec2(m_Geometry.Size.x - indent - 4.0f, 2.0f));
         OutDrawList.AddRect(line, EditorStyle::AccentBright, m_WorldMatrix);
     }
+}
+
+static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent) {
+    OutMenu.Searchable("Search classes");
+
+    Array<Class> classes = Class::GetSubclassesOf(Node::StaticClass());
+    classes.Sort([](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
+
+    for (const Class& nodeClass : classes) {
+        // Reflected classes without a default constructor cannot be spawned; probing is the only
+        // way to tell, and CreateChild would assert on them.
+        Object* probe = Object::Create(nodeClass);
+        if (!probe) {
+            continue;
+        }
+        delete probe;
+
+        OutMenu.Item(nodeClass.Name, [InOwner, InParent, nodeClass] {
+            OutlinerTab* owner = InOwner.Get();
+            Node* parent = InParent.Get();
+            if (!owner || !parent) {
+                return;
+            }
+            Node* child = parent->CreateChild(nodeClass);
+            if (!child) {
+                return;
+            }
+            child->SetName(nodeClass.Name);
+            if (!owner->IsExpanded(parent)) {
+                owner->ToggleExpanded(parent);
+            }
+            owner->HandleRowClick(child, false, false);
+        }).Icon(EditorIcons::GetNodeIcon(nodeClass));
+    }
+}
+
+bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
+    Node* node = m_Node.Get();
+    if (!node || !Owner) {
+        return false;
+    }
+    if (!Owner->IsSelected(node)) {
+        Owner->HandleRowClick(node, false, false);
+    }
+
+    const WeakObjectPtr<OutlinerTab> owner = Owner;
+    const WeakObjectPtr<Node> target = node;
+
+    UIMenuModel menu;
+    menu.Section(node->GetName());
+    menu.Item("Rename", [owner, target] {
+        if (owner.Get() && target.Get()) {
+            owner.Get()->BeginRename(target.Get());
+        }
+    }).Shortcut("F2").Icon(EditorIcons::GetNodeIcon(node->GetClass()));
+    menu.Item("Enabled", [target] {
+        if (Node* bound = target.Get()) {
+            bound->SetEnabled(!bound->IsSelfEnabled());
+        }
+    }).Checked(node->IsSelfEnabled()).Tooltip("Disabled nodes and their children stop updating and rendering");
+    if (node->HasChildren()) {
+        const bool expanded = Owner->IsExpanded(node);
+        menu.Item(expanded ? "Collapse" : "Expand", [owner, target] {
+            if (owner.Get() && target.Get()) {
+                owner.Get()->ToggleExpanded(target.Get());
+            }
+        }).Icon(Owner->GetArrowIcon(expanded));
+    }
+    menu.Separator();
+    menu.Submenu("Add Child", [owner, target](UIMenuModel& OutSub) { BuildAddChildMenu(OutSub, owner, target); })
+        .Tooltip("Spawn a new node under " + node->GetName());
+    menu.Separator();
+    menu.Item("Delete", [target] {
+        if (Node* bound = target.Get()) {
+            bound->Destroy();
+        }
+    }).Tooltip("Destroys the node and everything under it");
+
+    UIContextMenu::OpenAt(*this, InCursorPos, menu);
+    return true;
 }
 
 void OutlinerRow::OnPressed(const Vec2& InCursorPos) {
