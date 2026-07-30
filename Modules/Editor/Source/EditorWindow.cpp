@@ -240,17 +240,19 @@ void EditorWindow::RebuildBottomBar() {
     ClearChildren(m_BottomRow);
 
     for (const SharedObjectPtr<HeroTool>& tool : m_HeroTools) {
-        if (!tool->IsRightAligned()) {
+        if (tool->HasStatusButton() && !tool->IsRightAligned()) {
             AddHeroToolButton(*m_BottomRow, tool.Get());
         }
     }
+
+    AddLogStatusButton(*m_BottomRow);
 
     m_TabBar = m_BottomRow->Add<UIHStack>();
     m_TabBar->Size = { 1.0_rel, 1.0_rel };
     m_TabBar->Gap = 2.0f;
 
     for (const SharedObjectPtr<HeroTool>& tool : m_HeroTools) {
-        if (tool->IsRightAligned()) {
+        if (tool->HasStatusButton() && tool->IsRightAligned()) {
             AddHeroToolButton(*m_BottomRow, tool.Get());
         }
     }
@@ -303,24 +305,43 @@ void EditorWindow::AddHeroToolButton(UINode& InRow, HeroTool* InTool) {
         return;
     }
 
+    UISvg* chevron = button->Add<UISvg>();
+    chevron->Anchor = chevron->Pivot = Vec2(0.0f, 0.5f);
+    chevron->Position = Vec2(10.0f, 0.0f);
+    chevron->Size = Vec2(11.0f, 11.0f);
+    chevron->Tint = EditorStyle::TextDim;
+    chevron->Image = EditorIcons::ArrowUp();
+    chevron->Bind = [this, chevron, toolPtr] {
+        chevron->Image = IsHeroToolOpen(toolPtr) ? EditorIcons::ArrowDown() : EditorIcons::ArrowUp();
+    };
+
     UILabel* label = button->Add<UILabel>();
     label->Anchor = label->Pivot = Vec2(0.0f, 0.5f);
-    label->Position = Vec2(32.0f, 0.0f);
-    label->Size = { 1.0_rel - 44.0_px, 1.0_rel };
+    label->Position = Vec2(28.0f, 0.0f);
+    label->Size = { 1.0_rel - 36.0_px, 1.0_rel };
     label->FontSize = EditorStyle::FontSize;
     label->Color = EditorStyle::Text;
     label->VAlign = UIVAlign::Middle;
     label->Text = InTool->GetTitle();
+}
 
-    UISvg* chevron = button->Add<UISvg>();
-    chevron->Anchor = chevron->Pivot = Vec2(1.0f, 0.5f);
-    chevron->Position = Vec2(-8.0f, 0.0f);
-    chevron->Size = Vec2(11.0f, 11.0f);
-    chevron->Tint = EditorStyle::TextDim;
-    chevron->Image = EditorIcons::ArrowDown();
-    chevron->Bind = [this, chevron, toolPtr] {
-        chevron->Image = IsHeroToolOpen(toolPtr) ? EditorIcons::ArrowDown() : EditorIcons::ArrowUp();
+void EditorWindow::AddLogStatusButton(UINode& InRow) {
+    ConsoleTool* console = m_ConsoleTool ? m_ConsoleTool->As<ConsoleTool>() : nullptr;
+    if (!console) {
+        return;
+    }
+
+    UIButton* button = InRow.Add<UIButton>();
+    button->Size = { UIValue(ConsoleTool::GetLogStatusWidth()), 1.0_rel };
+    button->NormalColor = EditorStyle::BottomBar;
+    button->HoverColor = EditorStyle::TabHover;
+    button->PressedColor = EditorStyle::ButtonPressed;
+    button->Clicked = [this, console] { ToggleHeroTool(console); };
+    button->Bind = [this, button, console] {
+        button->NormalColor = IsHeroToolOpen(console) ? EditorStyle::Panel : EditorStyle::BottomBar;
     };
+
+    console->BuildLogStatus(*button);
 }
 
 void EditorWindow::RebuildDrawerBody() {

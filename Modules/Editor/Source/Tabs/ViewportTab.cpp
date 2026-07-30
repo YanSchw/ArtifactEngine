@@ -2,6 +2,7 @@
 #include "EditorCamera.h"
 #include "MajorTab.h"
 #include "UI/EditorStyle.h"
+#include "UI/EditorIcons.h"
 #include "UI/UIViewportSurface.h"
 #include "Gizmos/GizmoLayer.h"
 #include "Gizmos/GizmoRenderer.h"
@@ -21,6 +22,10 @@
 #include "Core/Log.h"
 
 static constexpr float s_ToolBarHeight = 30.0f;
+
+VectorImage* ViewportTab::GetTabIcon() const {
+    return EditorIcons::Viewport();
+}
 
 ViewportTab::ViewportTab() {
     m_Camera = Object::Create<EditorCamera>();

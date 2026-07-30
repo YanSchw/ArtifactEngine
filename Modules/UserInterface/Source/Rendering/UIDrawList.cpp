@@ -309,14 +309,14 @@ void UIDrawList::AddRoundedRectEx(const UIRectF& InRectPx, const Vec4& InColorTo
     };
     const float startAngles[4] = { -halfPi, std::numbers::pi_v<float>, halfPi, 0.0f };
 
-    Vec2 points[40];
+    Vec2 points[4 * (12 + 1)];
     int32_t count = 0;
     for (int32_t corner = 0; corner < 4; corner++) {
         if (radii[corner] <= 0.5f) {
             points[count++] = sharpCorners[corner];
             continue;
         }
-        const int32_t segments = std::clamp((int32_t)(radii[corner] * 0.5f), 2, 8);
+        const int32_t segments = std::clamp((int32_t)radii[corner], 3, 12);
         for (int32_t i = 0; i <= segments; i++) {
             const float angle = startAngles[corner] - halfPi * (float)i / (float)segments;
             points[count++] = arcCenters[corner] + Vec2(std::cos(angle), std::sin(angle)) * radii[corner];

@@ -9,6 +9,7 @@ class RenderTargetTexture;
 class UIViewportSurface;
 class GizmoLayer;
 class GizmoRenderer;
+class VectorImage;
 
 class ViewportTab : public MinorTab {
 public:
@@ -17,6 +18,7 @@ public:
     ViewportTab();
 
     virtual String GetTabTitle() const override { return "Viewport"; }
+    virtual VectorImage* GetTabIcon() const override;
 
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
     virtual bool OnScroll(const Vec2& InDelta) override;

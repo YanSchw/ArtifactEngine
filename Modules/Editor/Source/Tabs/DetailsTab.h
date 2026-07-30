@@ -9,6 +9,7 @@ class UILabel;
 class UIScrollArea;
 class UIVStack;
 class DetailsCustomization;
+class VectorImage;
 
 /** Edits the selected object of the MajorTab through its DetailsCustomization. */
 class DetailsTab : public MinorTab {
@@ -18,6 +19,7 @@ public:
     DetailsTab();
 
     virtual String GetTabTitle() const override { return "Details"; }
+    virtual VectorImage* GetTabIcon() const override;
 
     float GetLabelSplit() const { return m_LabelSplit; }
     void SetLabelSplit(float InSplit);

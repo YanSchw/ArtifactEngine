@@ -26,6 +26,8 @@ public:
         return tab;
     }
 
+    void CloseTab(MinorTab* InTab, UIDockNode* InSource);
+
     bool IsDraggingTab() const { return m_DraggedTab != nullptr; }
     void BeginTabDrag(MinorTab* InTab, UIDockNode* InSource, const Vec2& InCursorPos);
     void UpdateTabDrag(const Vec2& InCursorPos);

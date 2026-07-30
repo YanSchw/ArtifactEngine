@@ -11,11 +11,11 @@ public:
     ARTIFACT_CLASS();
 
     virtual String GetTitle() const override { return "Console"; }
-    virtual bool IsRightAligned() const override { return true; }
-    virtual float GetStatusButtonWidth() const override { return 118.0f; }
+    virtual bool HasStatusButton() const override { return false; }
     virtual void BuildDrawer(UINode& InBody) override;
     virtual void Tick(float InDeltaTime) override;
-    virtual bool BuildStatusWidget(UINode& InButton) override;
+    void BuildLogStatus(UINode& InHost);
+    static float GetLogStatusWidth();
 
 private:
     void RebuildLog();

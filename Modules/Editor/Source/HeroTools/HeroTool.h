@@ -12,6 +12,7 @@ public:
     ARTIFACT_CLASS();
 
     virtual String GetTitle() const { return "Tool"; }
+    virtual bool HasStatusButton() const { return true; }
     /** Status-bar button side: false docks it on the left (before the tabs), true on the right. */
     virtual bool IsRightAligned() const { return false; }
     virtual float GetStatusButtonWidth() const { return 156.0f; }

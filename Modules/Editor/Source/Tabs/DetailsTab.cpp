@@ -3,6 +3,7 @@
 #include "Details/DetailsCustomization.h"
 #include "Details/DetailsItem.h"
 #include "UI/EditorStyle.h"
+#include "UI/EditorIcons.h"
 #include "GameFramework/UIVStack.h"
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UILabel.h"
@@ -16,6 +17,10 @@ static String ToLower(const String& InText) {
     std::transform(lower.begin(), lower.end(), lower.begin(),
                    [](unsigned char c) { return (char)std::tolower(c); });
     return lower;
+}
+
+VectorImage* DetailsTab::GetTabIcon() const {
+    return EditorIcons::Details();
 }
 
 DetailsTab::DetailsTab() {

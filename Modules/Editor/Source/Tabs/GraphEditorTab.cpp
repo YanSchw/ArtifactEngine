@@ -1,8 +1,13 @@
 #include "GraphEditorTab.h"
 #include "Graph/GraphEditorView.h"
+#include "UI/EditorIcons.h"
 #include "Graph/GraphExampleNodes.h"
 
 static const String s_DemoGraphFile = "NodeGraphExample.json";
+
+VectorImage* GraphEditorTab::GetTabIcon() const {
+    return EditorIcons::GraphEditor();
+}
 
 GraphEditorTab::GraphEditorTab() {
     m_Graph = NodeGraph::LoadFromFile(s_DemoGraphFile);

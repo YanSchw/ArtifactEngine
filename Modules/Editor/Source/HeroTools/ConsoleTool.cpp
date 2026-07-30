@@ -104,29 +104,56 @@ void ConsoleTool::RebuildLog() {
     }
 }
 
-bool ConsoleTool::BuildStatusWidget(UINode& InButton) {
-    const auto placeIcon = [&InButton](float InX, float InSize, VectorImage* InImage, const Vec4& InTint) {
-        UISvg* svg = InButton.Add<UISvg>();
-        svg->Anchor = svg->Pivot = Vec2(0.0f, 0.5f);
-        svg->Position = Vec2(InX, 0.0f);
-        svg->Size = Vec2(InSize, InSize);
-        svg->Image = InImage;
-        svg->Tint = InTint;
+static constexpr float s_TallyInset = 8.0f;
+static constexpr float s_TallyColumnWidth = 36.0f;
+static constexpr float s_TallyIconSize = 13.0f;
+static constexpr float s_TallyIconTop = 2.0f;
+static constexpr float s_TallyCountTop = s_TallyIconTop + s_TallyIconSize + 1.0f;
+static constexpr float s_TallyCountHeight = 11.0f;
+
+float ConsoleTool::GetLogStatusWidth() {
+    return s_TallyInset * 2.0f + s_TallyColumnWidth * 3.0f;
+}
+
+void ConsoleTool::BuildLogStatus(UINode& InHost) {
+    struct Tally {
+        VectorImage* Icon;
+        Vec4 Color;
+        int (*Count)();
     };
-    const auto placeCount = [&InButton](float InX, const Vec4& InColor, std::function<int()> InCount) {
-        UILabel* label = InButton.Add<UILabel>();
-        label->Anchor = label->Pivot = Vec2(0.0f, 0.5f);
-        label->Position = Vec2(InX, 0.0f);
-        label->Size = { 22.0_px, 1.0_rel };
-        label->FontSize = EditorStyle::FontSize - 1.0f;
-        label->VAlign = UIVAlign::Middle;
-        label->Color = InColor;
-        label->Bind = [label, count = std::move(InCount)] { label->Text = std::to_string(count()); };
+    const Tally tallies[] = {
+        { EditorIcons::Message(), EditorStyle::Text, &Logging::GetMessageCount },
+        { EditorIcons::Warning(), s_WarnColor,       &Logging::GetWarningCount },
+        { EditorIcons::Error(),   s_ErrorColor,      &Logging::GetErrorCount },
     };
 
-    placeIcon(31.0f, 13.0f, EditorIcons::Warning(), s_WarnColor);
-    placeCount(46.0f, s_WarnColor, [] { return Logging::GetWarningCount(); });
-    placeIcon(70.0f, 13.0f, EditorIcons::Error(), s_ErrorColor);
-    placeCount(85.0f, s_ErrorColor, [] { return Logging::GetErrorCount(); });
-    return true;
+    float x = s_TallyInset;
+    for (const Tally& tally : tallies) {
+        UISvg* icon = InHost.Add<UISvg>();
+        icon->Anchor = icon->Pivot = Vec2(0.0f, 0.0f);
+        icon->Position = Vec2(x + (s_TallyColumnWidth - s_TallyIconSize) * 0.5f, s_TallyIconTop);
+        icon->Size = Vec2(s_TallyIconSize, s_TallyIconSize);
+        icon->Image = tally.Icon;
+        icon->Tint = tally.Color;
+
+        UILabel* label = InHost.Add<UILabel>();
+        label->Anchor = label->Pivot = Vec2(0.0f, 0.0f);
+        label->Position = Vec2(x, s_TallyCountTop);
+        label->Size = { UIValue(s_TallyColumnWidth), UIValue(s_TallyCountHeight) };
+        label->FontSize = EditorStyle::FontSize - 3.0f;
+        label->HAlign = UIHAlign::Center;
+        label->VAlign = UIVAlign::Middle;
+        label->Color = tally.Color;
+
+        label->Bind = [label, icon, color = tally.Color, count = tally.Count] {
+            const int value = count();
+            label->Text = std::to_string(value);
+            const Vec4 tint(color.r, color.g, color.b, value > 0 ? color.a : color.a * 0.4f);
+            label->Color = tint;
+            icon->Tint = tint;
+        };
+
+        x += s_TallyColumnWidth;
+    }
 }
+

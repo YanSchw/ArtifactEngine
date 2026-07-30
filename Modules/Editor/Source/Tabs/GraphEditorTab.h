@@ -4,6 +4,7 @@
 #include "GraphEditorTab.gen.h"
 
 class GraphEditorView;
+class VectorImage;
 
 /** Dockable panel wrapping a GraphEditorView. Until graphs are assets it edits a demo document:
  *  the example graph on first open, then whatever Ctrl/Cmd+S last wrote next to the binary. */
@@ -14,6 +15,7 @@ public:
     GraphEditorTab();
 
     virtual String GetTabTitle() const override;
+    virtual VectorImage* GetTabIcon() const override;
 
     NodeGraph* GetGraph() const { return m_Graph.Get(); }
     GraphEditorView* GetView() const { return m_View; }

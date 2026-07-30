@@ -6,6 +6,7 @@
 
 class UIDockNode;
 class MajorTab;
+class VectorImage;
 
 /** Base class for dockable editor panels (Outliner, Details, Viewport, ...). A MinorTab lives
  *  in a UIDockNode leaf inside a MajorTab's dock area; subclasses build their content as
@@ -17,6 +18,7 @@ public:
     MinorTab();
 
     virtual String GetTabTitle() const { return "Tab"; }
+    virtual VectorImage* GetTabIcon() const;
     /** Transparent panels paint no background, leaving a hole in the editor chrome through
      *  which the 3D scene rendered behind the UI shows. */
     virtual bool HasTransparentBackground() const { return false; }

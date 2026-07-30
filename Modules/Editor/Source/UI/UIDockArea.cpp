@@ -3,7 +3,7 @@
 #include "Tabs/MinorTab.h"
 #include "Tabs/MajorTab.h"
 #include "EditorWindow.h"
-#include "Assets/Font.h"
+#include "GameFramework/UICanvas.h"
 #include "Rendering/UIDrawList.h"
 
 UIDockArea::UIDockArea() {
@@ -66,6 +66,19 @@ void UIDockArea::EndTabDrag() {
 
     DetachTab(tab, source, target);
     Dock(tab, slot, target, 0.5f);
+}
+
+void UIDockArea::CloseTab(MinorTab* InTab, UIDockNode* InSource) {
+    if (!InTab || !InSource) {
+        return;
+    }
+    UIDockNode* unusedTarget = nullptr;
+    DetachTab(InTab, InSource, unusedTarget);
+    if (UICanvas* canvas = GetCanvas()) {
+        canvas->DestroyDeferred(InTab);
+    } else {
+        delete InTab;
+    }
 }
 
 void UIDockArea::DetachTab(MinorTab* InTab, UIDockNode* InSource, UIDockNode*& InOutTarget) {
@@ -149,11 +162,8 @@ void UIDockArea::PaintOverlay(UIDrawList& OutDrawList) {
     }
 
     // Ghost handle following the cursor.
-    if (Font* font = GetDefaultFont()) {
-        const String title = m_DraggedTab->GetTabTitle();
-        const Vec2 textSize = font->MeasureText(title, EditorStyle::FontSize);
-        const UIRectF ghost(m_DragCursor + Vec2(12.0f, 8.0f), Vec2(textSize.x + 24.0f, EditorStyle::TabHeaderHeight));
-        OutDrawList.AddRect(ghost, EditorStyle::TabHover, m_WorldMatrix);
-        OutDrawList.AddText(font, title, ghost.Center() - textSize * 0.5f, EditorStyle::FontSize, EditorStyle::TextBright, m_WorldMatrix);
-    }
+    const UIRectF ghost(m_DragCursor + Vec2(12.0f, 8.0f),
+                        Vec2(UIDockNode::TabHandleWidthFor(m_DraggedTab), EditorStyle::TabHeaderHeight));
+    OutDrawList.AddRoundedRect(ghost, EditorStyle::TabHover, 8.0f, m_WorldMatrix);
+    UIDockNode::PaintTabHandleContent(OutDrawList, m_DraggedTab, ghost, EditorStyle::TextBright, false, false, m_WorldMatrix);
 }

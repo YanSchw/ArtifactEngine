@@ -17,6 +17,7 @@ public:
     OutlinerTab();
 
     virtual String GetTabTitle() const override { return "Outliner"; }
+    virtual VectorImage* GetTabIcon() const override;
 
     /** Where a dragged row lands: onto a node (become its child) or between rows (become a sibling
      *  just above/below the reference node). */

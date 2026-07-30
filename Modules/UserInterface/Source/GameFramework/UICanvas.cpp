@@ -1,5 +1,6 @@
 #include "UICanvas.h"
 #include "Rendering/UIDrawList.h"
+#include "Rendering/RenderingAPI.h"
 #include "GameFramework/CameraNode.h"
 #include <algorithm>
 #include <cmath>
@@ -75,10 +76,15 @@ void UICanvas::DestroyDeferred(UINode* InNode) {
 }
 
 Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList) {
-    for (const WeakObjectPtr<UINode>& node : m_PendingDestroy) {
-        delete node.Get();
+    if (!m_PendingDestroy.IsEmpty()) {
+        if (RenderingAPI::GetInstance()) {
+            RenderingAPI::GetInstance()->WaitIdle();
+        }
+        for (const WeakObjectPtr<UINode>& node : m_PendingDestroy) {
+            delete node.Get();
+        }
+        m_PendingDestroy.Clear();
     }
-    m_PendingDestroy.Clear();
 
     const Mat4 projection = BuildProjection(InViewportSize);
     SetViewProjection(projection, InViewportSize.x, InViewportSize.y);
@@ -185,7 +191,7 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
             const bool inside = captured->HitTest(cursor);
             captured->m_Pressed = false;
             captured->OnReleased(inside);
-            if (inside) {
+            if (inside && m_CapturedNode.Get() == captured) {
                 captured->OnClick();
             }
             m_CapturedNode = nullptr;

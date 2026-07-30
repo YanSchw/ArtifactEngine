@@ -57,6 +57,7 @@ private:
     void RebuildTabBar();
     void RebuildDrawerBody();
     void AddHeroToolButton(UINode& InRow, HeroTool* InTool);
+    void AddLogStatusButton(UINode& InRow);
     void HandleShortcuts();
 
     UIStack* m_ToolBarContent = nullptr;

@@ -2,6 +2,7 @@
 #include "UIDockArea.h"
 #include "UIDockSplitter.h"
 #include "EditorStyle.h"
+#include "EditorIcons.h"
 #include "Tabs/MinorTab.h"
 #include "Assets/Font.h"
 #include "Rendering/UIDrawList.h"
@@ -133,19 +134,66 @@ UIRectF UIDockNode::GetHeaderRect() const {
     return UIRectF(m_Geometry.Position, Vec2(m_Geometry.Size.x, EditorStyle::TabHeaderHeight));
 }
 
-float UIDockNode::TabHandleWidth(int InTabIndex) const {
+static constexpr float s_IconInset = 8.0f;
+static constexpr float s_IconSize = 14.0f;
+static constexpr float s_IconTextGap = 6.0f;
+static constexpr float s_TextCloseGap = 8.0f;
+static constexpr float s_CloseSize = 14.0f;
+static constexpr float s_CloseRightPad = 7.0f;
+static constexpr float s_CornerRadius = 8.0f;
+static constexpr float s_ActiveBarHeight = 2.0f;
+
+float UIDockNode::TabHandleWidthFor(MinorTab* InTab) {
+    const float fixed = s_IconInset + s_IconSize + s_IconTextGap + s_TextCloseGap + s_CloseSize + s_CloseRightPad;
     if (Font* font = GetDefaultFont()) {
-        return font->MeasureText(m_Tabs[InTabIndex]->GetTabTitle(), EditorStyle::FontSize).x + 24.0f;
+        return font->MeasureText(InTab->GetTabTitle(), EditorStyle::FontSize).x + fixed;
     }
     return 90.0f;
+}
+
+UIRectF UIDockNode::TabCloseRect(const UIRectF& InHandle) {
+    return UIRectF(
+        Vec2(InHandle.Position.x + InHandle.Size.x - s_CloseRightPad - s_CloseSize,
+             InHandle.Position.y + (InHandle.Size.y - s_CloseSize) * 0.5f),
+        Vec2(s_CloseSize, s_CloseSize));
+}
+
+void UIDockNode::PaintTabHandleContent(UIDrawList& OutDrawList, MinorTab* InTab, const UIRectF& InHandle,
+                                       const Vec4& InTextColor, bool InShowClose, bool InCloseHovered,
+                                       const Mat4& InTransform) {
+    const UIRectF iconRect(
+        Vec2(InHandle.Position.x + s_IconInset, InHandle.Position.y + (InHandle.Size.y - s_IconSize) * 0.5f),
+        Vec2(s_IconSize, s_IconSize));
+    EditorIcons::Paint(OutDrawList, InTab->GetTabIcon(), iconRect, InTextColor, InTransform);
+
+    if (Font* font = GetDefaultFont()) {
+        const String title = InTab->GetTabTitle();
+        const Vec2 textSize = font->MeasureText(title, EditorStyle::FontSize);
+        const Vec2 textPos(iconRect.Position.x + s_IconSize + s_IconTextGap,
+                           InHandle.Position.y + (InHandle.Size.y - textSize.y) * 0.5f);
+        OutDrawList.AddText(font, title, textPos, EditorStyle::FontSize, InTextColor, InTransform);
+    }
+
+    if (!InShowClose) {
+        return;
+    }
+    const UIRectF close = TabCloseRect(InHandle);
+    if (InCloseHovered) {
+        OutDrawList.AddRoundedRect(close, EditorStyle::ButtonHover, 3.0f, InTransform);
+    }
+    const Vec2 glyphMin = close.Position + Vec2(4.0f);
+    const Vec2 glyphMax = close.Position + close.Size - Vec2(4.0f);
+    const Vec4 glyphColor = InCloseHovered ? EditorStyle::TextBright : InTextColor;
+    OutDrawList.AddLine(glyphMin, glyphMax, 1.3f, glyphColor, InTransform);
+    OutDrawList.AddLine(Vec2(glyphMax.x, glyphMin.y), Vec2(glyphMin.x, glyphMax.y), 1.3f, glyphColor, InTransform);
 }
 
 UIRectF UIDockNode::TabHandleRect(int InTabIndex) const {
     float x = m_Geometry.Position.x;
     for (int i = 0; i < InTabIndex; i++) {
-        x += TabHandleWidth(i) + 1.0f;
+        x += TabHandleWidthFor(m_Tabs[i]) + 1.0f;
     }
-    return UIRectF(Vec2(x, m_Geometry.Position.y), Vec2(TabHandleWidth(InTabIndex), EditorStyle::TabHeaderHeight));
+    return UIRectF(Vec2(x, m_Geometry.Position.y), Vec2(TabHandleWidthFor(m_Tabs[InTabIndex]), EditorStyle::TabHeaderHeight));
 }
 
 int UIDockNode::TabHandleIndexAt(const Vec2& InPoint) const {
@@ -207,20 +255,26 @@ void UIDockNode::Paint(UIDrawList& OutDrawList) {
     }
     OutDrawList.AddRect(GetHeaderRect(), EditorStyle::TabBar, m_WorldMatrix);
 
-    Font* font = GetDefaultFont();
     for (int i = 0; i < m_Tabs.Size(); i++) {
         MinorTab* tab = m_Tabs[i];
         const UIRectF handle = TabHandleRect(i);
         const bool active = (tab == m_ActiveTab);
         const bool hovered = IsHovered() && handle.Contains(m_LastCursor);
         const Vec4 background = active ? EditorStyle::TabActive : (hovered ? EditorStyle::TabHover : EditorStyle::TabBar);
-        OutDrawList.AddRect(handle, background, m_WorldMatrix);
-        if (font) {
-            const String title = tab->GetTabTitle();
-            const Vec2 textSize = font->MeasureText(title, EditorStyle::FontSize);
-            const Vec2 textPos = handle.Center() - textSize * 0.5f;
-            OutDrawList.AddText(font, title, textPos, EditorStyle::FontSize, active ? EditorStyle::Text : EditorStyle::TextDim, m_WorldMatrix);
+        OutDrawList.AddRoundedRectEx(handle, background, background, s_CornerRadius, s_CornerRadius, 0.0f, 0.0f, m_WorldMatrix);
+
+        if (active) {
+            UIRectF accentBar = handle;
+            accentBar.Position.x += s_CornerRadius;
+            accentBar.Size.x = std::max(0.0f, accentBar.Size.x - s_CornerRadius * 2.0f);
+            accentBar.Size.y = s_ActiveBarHeight;
+            OutDrawList.AddRoundedRect(accentBar, EditorStyle::Accent, s_ActiveBarHeight * 0.5f, m_WorldMatrix);
         }
+
+        const bool showClose = active || hovered;
+        const bool closeHovered = showClose && hovered && TabCloseRect(handle).Contains(m_LastCursor);
+        PaintTabHandleContent(OutDrawList, tab, handle, active ? EditorStyle::Text : EditorStyle::TextDim,
+                              showClose, closeHovered, m_WorldMatrix);
     }
 }
 
@@ -239,10 +293,17 @@ UIDockArea* UIDockNode::GetArea() const {
 
 void UIDockNode::OnPressed(const Vec2& InCursorPos) {
     m_PressedTabIndex = TabHandleIndexAt(InCursorPos);
+    m_PressedCloseIndex = -1;
     m_PressPosition = InCursorPos;
-    if (m_PressedTabIndex >= 0) {
-        SetActiveTab(m_Tabs[m_PressedTabIndex]);
+    if (m_PressedTabIndex < 0) {
+        return;
     }
+    if (TabCloseRect(TabHandleRect(m_PressedTabIndex)).Contains(InCursorPos)) {
+        m_PressedCloseIndex = m_PressedTabIndex;
+        m_PressedTabIndex = -1;
+        return;
+    }
+    SetActiveTab(m_Tabs[m_PressedTabIndex]);
 }
 
 void UIDockNode::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
@@ -263,10 +324,20 @@ void UIDockNode::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
 
 void UIDockNode::OnReleased(bool InInside) {
     (void)InInside;
-    if (UIDockArea* area = GetArea()) {
-        if (area->IsDraggingTab()) {
-            area->EndTabDrag();
-        }
-    }
+    const int closeIndex = m_PressedCloseIndex;
     m_PressedTabIndex = -1;
+    m_PressedCloseIndex = -1;
+
+    UIDockArea* area = GetArea();
+    if (!area) {
+        return;
+    }
+    if (area->IsDraggingTab()) {
+        area->EndTabDrag();
+        return;
+    }
+    if (closeIndex >= 0 && closeIndex < m_Tabs.Size()
+        && TabCloseRect(TabHandleRect(closeIndex)).Contains(m_LastCursor)) {
+        area->CloseTab(m_Tabs[closeIndex], this);
+    }
 }

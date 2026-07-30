@@ -38,6 +38,12 @@ public:
     UIDockNode* FindFirstLeaf() { return IsLeaf() ? this : m_ChildA->FindFirstLeaf(); }
     UIRectF GetHeaderRect() const;
 
+    static float TabHandleWidthFor(MinorTab* InTab);
+    static UIRectF TabCloseRect(const UIRectF& InHandle);
+    static void PaintTabHandleContent(UIDrawList& OutDrawList, MinorTab* InTab, const UIRectF& InHandle,
+                                      const Vec4& InTextColor, bool InShowClose, bool InCloseHovered,
+                                      const Mat4& InTransform);
+
     virtual void Paint(UIDrawList& OutDrawList) override;
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
     virtual void OnPressed(const Vec2& InCursorPos) override;
@@ -49,7 +55,6 @@ protected:
 
 private:
     UIDockArea* GetArea() const;
-    float TabHandleWidth(int InTabIndex) const;
     UIRectF TabHandleRect(int InTabIndex) const;
     int TabHandleIndexAt(const Vec2& InPoint) const;
 
@@ -63,6 +68,7 @@ private:
     float m_SplitRatio = 0.5f;
 
     int m_PressedTabIndex = -1;
+    int m_PressedCloseIndex = -1;
     Vec2 m_PressPosition = Vec2(0.0f);
     Vec2 m_LastCursor = Vec2(0.0f);
 };

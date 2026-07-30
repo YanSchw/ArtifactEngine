@@ -2,6 +2,7 @@
 #include "OutlinerRow.h"
 #include "MajorTab.h"
 #include "UI/EditorStyle.h"
+#include "UI/EditorIcons.h"
 #include "GameFramework/UIScrollArea.h"
 #include "GameFramework/UIVStack.h"
 #include "GameFramework/UIQuad.h"
@@ -14,6 +15,10 @@
 #include "InputSystem/KeyboardDevice.h"
 #include <algorithm>
 #include <cctype>
+
+VectorImage* OutlinerTab::GetTabIcon() const {
+    return EditorIcons::Outliner();
+}
 
 OutlinerTab::OutlinerTab() {
     AssetManager& assets = AssetManager::Get();

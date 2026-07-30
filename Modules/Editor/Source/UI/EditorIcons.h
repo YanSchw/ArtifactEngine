@@ -2,6 +2,9 @@
 #include "Assets/AssetManager.h"
 #include "Assets/VectorImage.h"
 #include "Common/UUID.h"
+#include "GameFramework/UILayout.h"
+
+class UIDrawList;
 
 /** The editor's built-in vector icons, resolved from the AssetManager by their fixed content UUIDs. */
 class EditorIcons {
@@ -25,6 +28,14 @@ public:
     static VectorImage* Texture()       { return Get("b1c2d3e4-0010-4a00-9000-000000000010"); }
     static VectorImage* Font()          { return Get("b1c2d3e4-0011-4a00-9000-000000000011"); }
     static VectorImage* Asset()         { return Get("b1c2d3e4-0012-4a00-9000-000000000012"); }
+    static VectorImage* Outliner()      { return Get("b1c2d3e4-0015-4a00-9000-000000000015"); }
+    static VectorImage* Details()       { return Get("b1c2d3e4-0016-4a00-9000-000000000016"); }
+    static VectorImage* Viewport()      { return Get("b1c2d3e4-0017-4a00-9000-000000000017"); }
+    static VectorImage* GraphEditor()   { return Get("b1c2d3e4-0018-4a00-9000-000000000018"); }
+    static VectorImage* Message()       { return Get("b1c2d3e4-0019-4a00-9000-000000000019"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
+
+    static void Paint(UIDrawList& OutDrawList, VectorImage* InIcon, const UIRectF& InRect,
+                      const Vec4& InTint, const Mat4& InTransform);
 };
