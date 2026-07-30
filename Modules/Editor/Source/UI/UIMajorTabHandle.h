@@ -28,9 +28,12 @@ public:
 
 private:
     float ExpandedWidth() const;
+    float CloseOffsetX() const;
 
     UISvg* m_Icon = nullptr;
     UILabel* m_Label = nullptr;
+    class UIButton* m_Close = nullptr;
+    UISvg* m_CloseIcon = nullptr;
     float m_TextWidth = 0.0f;
     float m_Expand = 0.0f;
     bool m_Active = false;

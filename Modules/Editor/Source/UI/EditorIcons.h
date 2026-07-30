@@ -33,6 +33,7 @@ public:
     static VectorImage* Viewport()      { return Get("b1c2d3e4-0017-4a00-9000-000000000017"); }
     static VectorImage* GraphEditor()   { return Get("b1c2d3e4-0018-4a00-9000-000000000018"); }
     static VectorImage* Message()       { return Get("b1c2d3e4-0019-4a00-9000-000000000019"); }
+    static VectorImage* Close()         { return Get("b1c2d3e4-001a-4a00-9000-00000000001a"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
 

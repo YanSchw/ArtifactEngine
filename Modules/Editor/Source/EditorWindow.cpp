@@ -16,6 +16,7 @@
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/KeyCodes.h"
 #include "Assets/Font.h"
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -227,6 +228,31 @@ void EditorWindow::ActivateTab(MajorTab* InTab) {
         tab->SetFloatingWindowsVisible(active);
     }
     m_ChromeDirty = true;
+}
+
+void EditorWindow::CloseTab(MajorTab* InTab) {
+    if (!InTab || !m_OpenTabs.Contains(InTab)) {
+        return;
+    }
+    const bool wasActive = (m_ActiveTab == InTab);
+    const int32_t index = m_OpenTabs.IndexOf(InTab);
+    m_OpenTabs.Remove(InTab);
+    if (UICanvas* canvas = InTab->GetCanvas()) {
+        canvas->DestroyDeferred(InTab);
+    } else {
+        delete InTab;
+    }
+
+    if (m_OpenTabs.IsEmpty()) {
+        ActivateTab(nullptr);
+        Close();
+        return;
+    }
+    if (wasActive) {
+        ActivateTab(m_OpenTabs[std::min(index, m_OpenTabs.Size() - 1)]);
+    } else {
+        m_ChromeDirty = true;
+    }
 }
 
 void EditorWindow::RebuildToolBar() {

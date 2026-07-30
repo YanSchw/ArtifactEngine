@@ -29,6 +29,7 @@ public:
         return tab;
     }
     void ActivateTab(MajorTab* InTab);
+    void CloseTab(MajorTab* InTab);
     MajorTab* GetActiveTab() const { return m_ActiveTab; }
     const Array<MajorTab*>& GetOpenTabs() const { return m_OpenTabs; }
 
