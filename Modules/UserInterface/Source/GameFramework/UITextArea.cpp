@@ -8,6 +8,7 @@
 static constexpr float s_RepeatDelay = 0.45f;    // seconds a key is held before it repeats
 static constexpr float s_RepeatInterval = 0.03f; // seconds between repeats once repeating
 static constexpr float s_BlinkPeriod = 1.0f;
+static constexpr float s_CaretMargin = 2.0f;     // pixels kept between the caret and the right edge
 
 UITextArea::UITextArea() {
     Interactable = true;
@@ -358,8 +359,8 @@ void UITextArea::ScrollCaretIntoView() {
         return;
     }
     const float caretX = CaretLocalPosition(font).x;
-    const float width = std::max(GetContentRect().Size.x, 1.0f);
-    m_ScrollX = std::clamp(m_ScrollX, caretX - width + 2.0f, caretX);
+    const float width = std::max(GetContentRect().Size.x, s_CaretMargin);
+    m_ScrollX = std::clamp(m_ScrollX, caretX - width + s_CaretMargin, caretX);
     m_ScrollX = std::max(0.0f, m_ScrollX);
 }
 
