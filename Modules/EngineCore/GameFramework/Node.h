@@ -1,11 +1,14 @@
 #pragma once
 #include "Object/Object.h"
 #include "Object/Enum.h"
+#include "Common/UUID.h"
 #include "Node.gen.h"
 
 class World;
 class Node3D;
 class Component;
+
+struct NodeSpecialProperties { NodeSpecialProperties(); };
 
 ARTIFACT_ENUM();
 enum class UpdateFlag : uint8_t {
@@ -75,8 +78,10 @@ public:
     void Destroy();
 
     Node* CreateChild(const Class& InChildClass);
+    Node* AttachChild(const Class& InChildClass);
 
     Node* GetChild(int InIndex) const;
+    Node* GetDirectChildByName(const String& InName) const;
     Node* GetChildByName(const String& InName, bool InIncludeSelf = false);
     Node* GetChildByClass(const Class& InClass, bool InIncludeSelf = false);
     int32_t GetSiblingIndex() const;
@@ -94,6 +99,16 @@ public:
 
     void SetMarkedAsInherited(bool InIsInherited);
     bool IsInherited() const;
+
+    void MarkPropertyOverridden(const String& InPropertyName);
+    void ClearPropertyOverride(const String& InPropertyName);
+    bool IsPropertyOverridden(const String& InPropertyName) const;
+    const Array<String>& GetOverriddenProperties() const { return m_OverriddenProperties; }
+    void ClearAllPropertyOverrides();
+    void ResetPropertyToDefault(const String& InPropertyName);
+
+    UUID GetBlueprintId() const { return m_BlueprintId; }
+    Class GetSerializedClass() const;
 
 protected:
     virtual void InitializeNode(World& OutWorld);
@@ -125,5 +140,12 @@ private:
     bool m_IsPendingKill = false;
     bool m_WasInherited = true; // Editor-only: true if this node was inherited from a parent, false if it was added to the scene directly
 
+    Array<String> m_OverriddenProperties;
+    UUID m_BlueprintId;
+
+    inline static NodeSpecialProperties s_SpecialProperties;
+
     friend class World;
+    friend class Blueprint;
+    friend struct NodeSpecialProperties;
 };

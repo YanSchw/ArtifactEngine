@@ -21,6 +21,7 @@ public:
     UINode* GetValueHost() const { return m_ValueHost; }
 
     std::function<void()> ResetAction;
+    std::function<bool()> IsOverridden;
 
     virtual float MeasureHeight(const String& InFilter) const override;
     virtual void OnBind() override;

@@ -1,6 +1,7 @@
 #include "MajorTab.h"
 #include "MinorTab.h"
 #include "MinorTabStandaloneWindow.h"
+#include "EditorWindow.h"
 #include "UI/UIDockArea.h"
 #include "UI/EditorIcons.h"
 
@@ -34,6 +35,29 @@ MajorTab::MajorTab() {
 
 VectorImage* MajorTab::GetTabIcon() const {
     return EditorIcons::Document();
+}
+
+void MajorTab::BroadcastAssetSaved(Asset* InAsset, MajorTab* InSource) {
+    if (!InAsset) {
+        return;
+    }
+
+    Array<MajorTab*> targets;
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        EditorWindow* editorWindow = window.Get() ? window->As<EditorWindow>() : nullptr;
+        if (!editorWindow) {
+            continue;
+        }
+        for (MajorTab* tab : editorWindow->GetOpenTabs()) {
+            if (tab && tab != InSource) {
+                targets.Add(tab);
+            }
+        }
+    }
+
+    for (MajorTab* tab : targets) {
+        tab->OnAssetSaved(InAsset);
+    }
 }
 
 void MajorTab::OnBind() {

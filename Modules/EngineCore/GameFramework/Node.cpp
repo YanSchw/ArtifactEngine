@@ -10,12 +10,17 @@ static Map<uint32_t, Node*>& GetNodeRegistry() {
     return registry;
 }
 
+NodeSpecialProperties::NodeSpecialProperties() {
+    Property::RegisterTypeProperties("Node", {
+        (new BoolProperty("m_Enabled", offsetof(Node, m_Enabled)))
+            ->Changed([](void* InNode) { ((Node*)InNode)->SetEnabled(((Node*)InNode)->m_Enabled); }),
+    });
+}
+
 Node::Node() {
     static uint32_t s_NextNodeId = 1;
     m_NodeId = s_NextNodeId++;
     GetNodeRegistry()[m_NodeId] = this;
-
-    SetName(GetClass().Name);
 }
 
 Node* Node::FindById(uint32_t InNodeId) {
@@ -162,9 +167,18 @@ Node* Node::CreateChild(const Class& InChildClass) {
         AE_ASSERT_MAIN_THREAD("Node::CreateChild on a Node in a World");
     }
 
-    Node* node = Object::Create(InChildClass)->As<Node>();
-    AE_ASSERT(node);
-    AE_ASSERT(node->IsA<Node>(), "You can only add Nodes as Children.");
+    Object* created = Object::Create(InChildClass);
+    if (!created) {
+        AE_ERROR("Cannot create a child of class '{0}'", InChildClass.Name);
+        return nullptr;
+    }
+
+    Node* node = created->As<Node>();
+    if (!node) {
+        AE_ERROR("Class '{0}' is not a Node and cannot be added as a child", InChildClass.Name);
+        delete created;
+        return nullptr;
+    }
 
     if (Component* component = node->As<Component>()) {
         if (!GetClass().IsSubclassOf(component->GetRequiredParentClass())) {
@@ -175,7 +189,16 @@ Node* Node::CreateChild(const Class& InChildClass) {
     }
 
     node->SetParent(this, false);
+    node->SetName(node->GetName());
 
+    return node;
+}
+
+Node* Node::AttachChild(const Class& InChildClass) {
+    Node* node = CreateChild(InChildClass);
+    if (node) {
+        node->SetMarkedAsInherited(false);
+    }
     return node;
 }
 
@@ -183,6 +206,15 @@ Node* Node::GetChild(int InIndex) const {
     if (InIndex < 0 || InIndex >= m_Children.Size())
         return nullptr;
     return m_Children[InIndex];
+}
+
+Node* Node::GetDirectChildByName(const String& InName) const {
+    for (Node* child : m_Children) {
+        if (child->GetName() == InName) {
+            return child;
+        }
+    }
+    return nullptr;
 }
 
 Node* Node::GetChildByName(const String& InName, bool InIncludeSelf) {
@@ -281,6 +313,45 @@ void Node::SetMarkedAsInherited(bool InIsInherited) {
 
 bool Node::IsInherited() const {
     return m_WasInherited;
+}
+
+void Node::MarkPropertyOverridden(const String& InPropertyName) {
+    if (!m_OverriddenProperties.Contains(InPropertyName)) {
+        m_OverriddenProperties.Add(InPropertyName);
+    }
+}
+
+void Node::ClearPropertyOverride(const String& InPropertyName) {
+    m_OverriddenProperties.Remove(InPropertyName);
+}
+
+bool Node::IsPropertyOverridden(const String& InPropertyName) const {
+    return m_OverriddenProperties.Contains(InPropertyName);
+}
+
+void Node::ClearAllPropertyOverrides() {
+    m_OverriddenProperties.Clear();
+}
+
+void Node::ResetPropertyToDefault(const String& InPropertyName) {
+    ClearPropertyOverride(InPropertyName);
+
+    Property* property = Property::FindTypeProperty(GetSerializedClass(), InPropertyName);
+    if (!property) {
+        return;
+    }
+
+    Node* defaults = Cast<Node>(Object::Create(GetSerializedClass()));
+    if (!defaults) {
+        return;
+    }
+    property->CopyValue(this, defaults);
+    property->NotifyChanged(this);
+    delete defaults;
+}
+
+Class Node::GetSerializedClass() const {
+    return m_BlueprintId.IsValid() ? Class::FromBlueprint(m_BlueprintId) : GetClass();
 }
 
 void Node::InitializeNode(World& OutWorld) {

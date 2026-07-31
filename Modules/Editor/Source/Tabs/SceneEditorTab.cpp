@@ -8,51 +8,119 @@
 #include "UI/EditorIcons.h"
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/Node3D.h"
-#include "GameFramework/Component.h"
-#include "GameFramework/CameraNode.h"
-#include "GameFramework/StaticMeshNode.h"
+#include "GameFramework/SceneRootNode.h"
+#include "Assets/AssetManager.h"
+#include "Assets/Scene.h"
+#include "Assets/Blueprint.h"
+#include "Assets/NodeRecord.h"
+#include "Core/EngineConfig.h"
 #include "Core/Log.h"
 
-static void PopulateExampleWorld(World& InWorld) {
-    // A single scene root keeps every node parented, so top-level nodes reorder by sibling index
-    // just like nested ones (Unity's "SampleScene" root).
-    Node* scene = InWorld.Spawn(Node3D::StaticClass());
-    scene->SetName("Scene");
-
-    scene->CreateChild(Node3D::StaticClass())->SetName("Directional Light");
-    Node* camera = scene->CreateChild(CameraNode::StaticClass());
-    camera->SetName("Main Camera");
-    camera->CreateChild(Component::StaticClass());
-
-    Node* environment = scene->CreateChild(Node3D::StaticClass());
-    environment->SetName("Environment");
-    environment->CreateChild(StaticMeshNode::StaticClass())->SetName("Floor");
-    Node* props = environment->CreateChild(Node3D::StaticClass());
-    props->SetName("Props");
-    Node* crate = props->CreateChild(StaticMeshNode::StaticClass());
-    crate->SetName("Crate");
-    crate->GetTransform()->SetPosition(Vec3(-2.0f, 0.0f, 0.0f));
-    Node* barrel = props->CreateChild(StaticMeshNode::StaticClass());
-    barrel->SetName("Barrel");
-    barrel->GetTransform()->SetPosition(Vec3(2.0f, 0.0f, 0.0f));
-
-    Node* rig = scene->CreateChild(Node3D::StaticClass());
-    rig->SetName("Character");
-    Node* pelvis = rig->CreateChild(Node3D::StaticClass());
-    pelvis->SetName("Pelvis");
-    pelvis->CreateChild(Node3D::StaticClass())->SetName("Spine");
+SceneEditorTab::SceneEditorTab() {
+    SetEditedWorld(new World());
+    BuildLayout();
 }
 
-SceneEditorTab::SceneEditorTab() {
-    World* world = new World();
-    PopulateExampleWorld(*world);
-    SetEditedWorld(world);
-
+void SceneEditorTab::BuildLayout() {
     UIDockArea* area = GetDockArea();
     area->DockNew<ViewportTab>(UIDockSlot::Center);
     OutlinerTab* outliner = area->DockNew<OutlinerTab>(UIDockSlot::Left, nullptr, 0.24f);
     area->DockNew<DetailsTab>(UIDockSlot::Bottom, outliner->GetDockNode(), 0.45f);
     area->DockNew<GraphEditorTab>(UIDockSlot::Bottom, nullptr, 0.42f);
+}
+
+bool SceneEditorTab::UsesBlueprint(Node& InNode, const UUID& InBlueprintId) {
+    const UUID nodeBlueprint = InNode.GetBlueprintId();
+    if (nodeBlueprint.IsValid()) {
+        if (nodeBlueprint == InBlueprintId) {
+            return true;
+        }
+        Blueprint* used = AssetManager::Get().GetAsset<Blueprint>(nodeBlueprint);
+        if (used && used->DependsOn(InBlueprintId)) {
+            return true;
+        }
+    }
+
+    for (uint32_t i = 0; i < InNode.GetChildCount(); i++) {
+        if (UsesBlueprint(*InNode.GetChild((int)i), InBlueprintId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void SceneEditorTab::DestroyRoot() {
+    ClearSelection();
+    if (SceneRootNode* previous = m_Root.Get()) {
+        previous->Destroy();
+        GetEditedWorld()->ResolvePendingKills();
+    }
+    m_Root = nullptr;
+}
+
+void SceneEditorTab::OpenScene(Scene* InScene) {
+    DestroyRoot();
+    m_Scene = InScene;
+    m_Root = InScene ? GetEditedWorld()->Populate(InScene) : nullptr;
+}
+
+void SceneEditorTab::RebuildFromCurrentState() {
+    Scene* scene = m_Scene.Get();
+    SceneRootNode* root = m_Root.Get();
+    if (!scene || !root) {
+        return;
+    }
+
+    SharedObjectPtr<NodeRecord> state = NodeRecord::Capture(*root);
+    DestroyRoot();
+
+    SceneRootNode* rebuilt = GetEditedWorld()->Spawn<SceneRootNode>();
+    rebuilt->SetName(state->Name);
+    state->Apply(*rebuilt);
+    rebuilt->BindScene(scene);
+    m_Root = rebuilt;
+}
+
+void SceneEditorTab::Save() {
+    Scene* scene = m_Scene.Get();
+    SceneRootNode* root = m_Root.Get();
+    if (!scene || !root) {
+        AE_WARN("There is no scene open to save");
+        return;
+    }
+
+    scene->CaptureFrom(*root);
+    if (AssetManager::Get().SaveAsset(scene)) {
+        BroadcastAssetSaved(scene, this);
+    }
+}
+
+Asset* SceneEditorTab::GetEditedAsset() const {
+    return m_Scene.Get();
+}
+
+void SceneEditorTab::OnAssetSaved(Asset* InAsset) {
+    Scene* scene = m_Scene.Get();
+    SceneRootNode* root = m_Root.Get();
+    if (!scene || !root) {
+        return;
+    }
+
+    if (InAsset == scene) {
+        OpenScene(scene);
+        return;
+    }
+
+    if (Blueprint* blueprint = Cast<Blueprint>(InAsset)) {
+        if (UsesBlueprint(*root, blueprint->GetId())) {
+            RebuildFromCurrentState();
+        }
+    }
+}
+
+String SceneEditorTab::GetTabTitle() const {
+    Scene* scene = m_Scene.Get();
+    return scene ? scene->GetDisplayName() : String("Untitled Scene");
 }
 
 VectorImage* SceneEditorTab::GetTabIcon() const {
@@ -65,7 +133,7 @@ void SceneEditorTab::BuildToolBar(UINode& InToolBar) {
         button.Size = { 70.0_px, 1.0_rel };
         EditorStyle::ApplyButtonStyle(button);
     };
-    addButton("Save", [] { AE_INFO("SceneEditorTab: Save"); });
+    addButton("Save", [this] { Save(); });
     addButton("Settings", [] { AE_INFO("SceneEditorTab: Settings"); });
     addButton("Play", [] { AE_INFO("SceneEditorTab: Play"); });
 }

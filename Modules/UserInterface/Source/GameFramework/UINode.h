@@ -8,6 +8,8 @@
 class UIDrawList;
 class Font;
 
+struct UINodeSpecialProperties { UINodeSpecialProperties(); };
+
 /** Base class for all UI. A UINode is a Node with a rect transform (Anchor/Pivot/Position/Size)
  *  plus CSS-style margin/padding and optional Split (row/column) child layout. The tree is
  *  re-laid-out and re-painted every frame, so you configure a node by setting its public fields
@@ -152,6 +154,7 @@ protected:
     inline static Mat4 s_ViewProjection = Mat4(1.0f);
     inline static float s_ViewportW = 1.0f;
     inline static float s_ViewportH = 1.0f;
+    inline static UINodeSpecialProperties s_SpecialProperties;
 
     friend class UICanvas;
 };

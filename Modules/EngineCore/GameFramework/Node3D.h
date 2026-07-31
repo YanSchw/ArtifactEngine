@@ -7,6 +7,8 @@ class World;
 class Node3D;
 class Component;
 
+struct Node3DSpecialProperties { Node3DSpecialProperties(); };
+
 /** Node3D is a Node with a 3D Transform.
  *  The transform is stored as local position / rotation / scale
  *  World-space values are *derived* from the parent chain on demand. */
@@ -62,4 +64,8 @@ private:
     Vec3 m_LocalPosition = Vec3(0.0f);
     Quat m_LocalRotation = Quat(1.0f, 0.0f, 0.0f, 0.0f);
     Vec3 m_LocalScale    = Vec3(1.0f);
+
+    inline static Node3DSpecialProperties s_SpecialProperties;
+
+    friend struct Node3DSpecialProperties;
 };

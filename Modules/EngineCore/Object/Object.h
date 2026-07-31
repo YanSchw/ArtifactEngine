@@ -5,8 +5,11 @@
 #include <unordered_map>
 
 template<typename T> struct Array;
+struct UUID;
 
 struct Class {
+    static constexpr char BlueprintPrefix = '@';
+
     std::string Name;
 
     Class() : Name("") {};
@@ -18,6 +21,11 @@ struct Class {
     static Array<Class> GetSubclassesOf(const Class& InBaseClass);
 
     static Array<Class> GetAllClasses();
+
+    bool IsBlueprint() const { return !Name.empty() && Name[0] == BlueprintPrefix; }
+    UUID GetBlueprintId() const;
+    static Class FromBlueprint(const UUID& InBlueprintId);
+    String GetDisplayName() const;
 
     inline bool operator==(const Class& InOther) const { return Name == InOther.Name; }
     inline bool operator!=(const Class& InOther) const { return !operator==(InOther); }

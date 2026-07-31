@@ -56,6 +56,10 @@ void DetailsRow::OnBind() {
     const float split = OwnerTab ? OwnerTab->GetLabelSplit() : 0.32f;
     const float indent = 8.0f + (float)Depth * 12.0f;
 
+    const bool overridden = IsOverridden && IsOverridden();
+    m_NameLabel->Color = overridden ? EditorStyle::AccentBright : EditorStyle::Text;
+    m_ResetButton->SetEnabled(ResetAction != nullptr && overridden);
+
     m_NameLabel->Position = Vec2(indent, 0.0f);
     m_NameLabel->Size = { UIValue(split, -(indent + 8.0f)), RowHeight };
 

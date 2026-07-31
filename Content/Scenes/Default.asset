@@ -1,0 +1,81 @@
+{
+    "$type": "Scene",
+    "AssetClass": "Scene",
+    "m_Id": "a1b2c3d4-0001-4a00-9000-000000000001",
+    "Root": {
+        "Name": "Scene",
+        "Class": "SceneRootNode",
+        "Children": [
+            {
+                "Class": "CameraController",
+                "Name": "Main Camera",
+                "Overrides": {
+                    "m_LocalPosition": {
+                        "X": 0.0,
+                        "Y": 1.5,
+                        "Z": -6.0
+                    }
+                }
+            },
+            {
+                "Class": "Node3D",
+                "Name": "Directional Light",
+                "Overrides": {
+                    "m_LocalRotation": {
+                        "W": 0.9238795042037964,
+                        "X": 0.3826833963394165,
+                        "Y": 0.0,
+                        "Z": 0.0
+                    }
+                }
+            },
+            {
+                "Class": "Node3D",
+                "Name": "Environment",
+                "Children": [
+                    {
+                        "Class": "StaticMeshNode",
+                        "Name": "Floor",
+                        "Overrides": {
+                            "m_LocalPosition": {
+                                "X": 0.0,
+                                "Y": -1.5,
+                                "Z": 0.0
+                            },
+                            "m_LocalScale": {
+                                "X": 8.0,
+                                "Y": 0.25,
+                                "Z": 8.0
+                            },
+                            "m_Mesh": "c6308770-3a5b-4b2b-9cec-14ba803ff817"
+                        }
+                    },
+                    {
+                        "Class": "StaticMeshNode",
+                        "Name": "Crate",
+                        "Overrides": {
+                            "m_LocalPosition": {
+                                "X": -2.0,
+                                "Y": 0.0,
+                                "Z": 0.0
+                            },
+                            "m_Mesh": "c6308770-3a5b-4b2b-9cec-14ba803ff817"
+                        }
+                    },
+                    {
+                        "Class": "StaticMeshNode",
+                        "Name": "Barrel",
+                        "Overrides": {
+                            "m_LocalPosition": {
+                                "X": 2.0,
+                                "Y": 0.0,
+                                "Z": 0.0
+                            },
+                            "m_Mesh": "c6308770-3a5b-4b2b-9cec-14ba803ff817"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

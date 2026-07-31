@@ -32,6 +32,10 @@ private:
     void BuildTree();
     void BuildTreeNode(const String& InMount, const String& InRel, const String& InName, int32_t InDepth);
     void BuildGrid();
+    void BuildAddMenu(class UIMenuModel& OutMenu, UINode& InAnchor);
+
+    String MakeUniqueAssetName(const String& InBaseName) const;
+    void OpenAsset(class Asset* InAsset);
 
     bool IsExpanded(const String& InKey) const;
     void SetExpanded(const String& InKey, bool InExpanded);

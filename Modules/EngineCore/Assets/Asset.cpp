@@ -3,6 +3,8 @@
 #include "Core/EngineConfig.h"
 #include "Serialization/ChunkedBinary.h"
 #include "Serialization/Binary.h"
+#include "Serialization/Json.h"
+#include "Serialization/ThirdParty/nlohmann/json.hpp"
 #include <filesystem>
 
 // AssetStreamHandle
@@ -48,8 +50,8 @@ AssetStreamHandle::~AssetStreamHandle() {
 void AssetStreamHandle::Acquire(Asset* AssetPtr) {
     m_Asset = AssetPtr;
 
-    if (m_Asset) {
-        ++m_Asset->m_ActiveStreamHandleCount;
+    if (m_Asset && ++m_Asset->m_ActiveStreamHandleCount == 1) {
+        AssetManager::Get().LoadAsset(m_Asset);
     }
 }
 
@@ -96,6 +98,16 @@ AssetStreamHandle Asset::GetStreamHandle() const {
 
 String Asset::GetDisplayName() const {
     return m_Id.ToString();
+}
+
+String Asset::SerializeToJson() const {
+    nlohmann::json json = nlohmann::json::parse(JsonSerializer::SerializeObject(this));
+    json["AssetClass"] = GetClass().Name;
+    return json.dump(4);
+}
+
+void Asset::DeserializeFromJson(const String& InJson) {
+    JsonSerializer::DeserializeObject(this, InJson);
 }
 
 String Asset::DisplayNameFromPath(const String& InPath) {

@@ -41,20 +41,19 @@ void BinarySerializer::DeserializeStruct(void* OutStruct, const Struct& InStruct
 }
 
 void BinarySerializer::SerializeType(ChunkWriter& writer, void* instance, const String& typeName) {
-    auto props = Property::GetTypeProperties(typeName);
+    auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        void* valuePtr = (char*)instance + prop->Offset;
-        SerializeProperty(writer, prop, valuePtr);
+        SerializeProperty(writer, prop, prop->GetValuePtr(instance));
     }
 }
 
 void BinarySerializer::DeserializeType(ChunkReader& reader, void* instance, const String& typeName) {
-    auto props = Property::GetTypeProperties(typeName);
+    auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        void* valuePtr = (char*)instance + prop->Offset;
-        DeserializeProperty(reader, prop, valuePtr);
+        DeserializeProperty(reader, prop, prop->GetValuePtr(instance));
+        prop->NotifyChanged(instance);
     }
 }
 
@@ -115,6 +114,10 @@ void BinarySerializer::SerializeProperty(ChunkWriter& writer, Property* property
         int64_t value = 0;
         std::memcpy(&value, valuePtr, p->ByteSize);
         writer << Enum(p->InnerEnumTypename).ConvertValueToString(value);
+    } else if (auto p = Cast<UUIDProperty>(property)) {
+        writer << ((UUID*)valuePtr)->ToString();
+    } else if (auto p = Cast<StructProperty>(property)) {
+        SerializeType(writer, valuePtr, p->InnerStructTypename);
     } else {
         AE_ASSERT(false, "Unsupported property type for serialization: " + property->Name);
     }
@@ -189,6 +192,7 @@ void BinarySerializer::DeserializeProperty(ChunkReader& reader, Property* proper
         uint64_t count;
         reader >> count;
 
+        p->Clear(valuePtr);
         for (uint64_t i = 0; i < count; ++i) {
             p->AddDefault(valuePtr);
 
@@ -202,6 +206,12 @@ void BinarySerializer::DeserializeProperty(ChunkReader& reader, Property* proper
         reader >> name;
         int64_t value = Enum(p->InnerEnumTypename).ConvertStringToValue(name);
         std::memcpy(valuePtr, &value, p->ByteSize);
+    } else if (auto p = Cast<UUIDProperty>(property)) {
+        String id;
+        reader >> id;
+        *(UUID*)valuePtr = UUID::FromString(id);
+    } else if (auto p = Cast<StructProperty>(property)) {
+        DeserializeType(reader, valuePtr, p->InnerStructTypename);
     } else {
         AE_ASSERT(false, "Unsupported property type for deserialization: " + property->Name);
     }

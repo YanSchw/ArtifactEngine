@@ -17,6 +17,8 @@
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
 #include "Assets/AssetManager.h"
+#include "Assets/Scene.h"
+#include "Common/UUID.h"
 #include "GameFramework/GameInstance.h"
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
@@ -59,9 +61,17 @@ void GameEngine::Initialize() {
     // create GameInstance and World
     m_GameInstance = new GameInstance();
     World* world = m_GameInstance->CreateNewWorld(true);
-    world->Spawn<CameraController>();
-    world->Spawn<StaticMeshNode>()->SetPosition(Vec3(-2, 0, 0));
-    world->Spawn<StaticMeshNode>()->SetPosition(Vec3(+2, 0, 0));
+
+    const UUID defaultSceneId = EngineConfig::GetConfigVar<UUID>("DefaultScene");
+    if (Scene* defaultScene = AssetManager::Get().GetAsset<Scene>(defaultSceneId)) {
+        world->Populate(defaultScene);
+    } else if (defaultSceneId.IsValid()) {
+        AE_ERROR("DefaultScene {0} could not be found", defaultSceneId.ToString());
+    }
+
+    if (!world->GetMainCamera()) {
+        world->Spawn<CameraController>();
+    }
 
     Window::SetRefreshCallback([this]() { RenderFrame(m_DeltaTime); });
 }

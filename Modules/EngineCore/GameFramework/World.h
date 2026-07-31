@@ -5,6 +5,8 @@
 
 class Node;
 class CameraNode;
+class Scene;
+class SceneRootNode;
 
 /** Container for all Nodes during Gameplay */
 class World final : public Object {
@@ -28,6 +30,8 @@ public:
     T* Spawn() {
         return Spawn(T::StaticClass())->template As<T>();
     }
+
+    SceneRootNode* Populate(Scene* InScene);
 
 private:
     struct LocalUpdateChunk {

@@ -24,8 +24,14 @@ ARRAY_LAMBDAS = """
 /* AddDefault */
 [](void* ptr) {{
     reinterpret_cast<Array<{PROPERTY_TYPE}>*>(ptr)->Emplace();
+}},
+/* Clear */
+[](void* ptr) {{
+    reinterpret_cast<Array<{PROPERTY_TYPE}>*>(ptr)->Clear();
 }}
 """
+
+BUILTIN_STRUCTS = ["Vec2", "Vec3", "Vec4", "Quat", "UIValue", "UIVec2", "UIPadding"]
 
 def _enum_underlying_byte_size(underlying: str) -> int:
     sizes = {
@@ -83,6 +89,12 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
         inner_type = full_typename[len("Array<"):-1].strip()
         inner_type_str = generate_property_type(inner_type, prop_name + "_InnerArrayProperty", class_or_struct_typename, use_offset=False)
         return inner_type_str + "\n" + SIMPLE_PROPERTY.format(PROPERTY_TYPE="ArrayProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', &_Property_{prop_name}_InnerArrayProperty,{ARRAY_LAMBDAS.format(PROPERTY_TYPE=inner_type)}')
+
+    if full_typename == "UUID":
+        return SIMPLE_PROPERTY.format(PROPERTY_TYPE="UUIDProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER="")
+
+    if full_typename in BUILTIN_STRUCTS:
+        return SIMPLE_PROPERTY.format(PROPERTY_TYPE="StructProperty", PROPERTY_NAME=prop_name, OFFSET=offset, INITIALIZER=f', "{full_typename}"')
 
     from HeaderTool.HeaderTool import Class, Struct, Enum
     for struct in Struct.ALL_STRUCTS:

@@ -18,6 +18,15 @@
 #include "Assets/AssetManager.h"
 #include "Assets/Asset.h"
 #include "Assets/VectorImage.h"
+#include "Assets/Scene.h"
+#include "Assets/Blueprint.h"
+#include "Assets/NodeRecord.h"
+#include "GameFramework/Node3D.h"
+#include "EditorWindow.h"
+#include "Tabs/SceneEditorTab.h"
+#include "Tabs/BlueprintEditorTab.h"
+#include "UI/UIContextMenu.h"
+#include "UI/UIMenuModel.h"
 #include "Rendering/Texture.h"
 #include "Core/EngineConfig.h"
 #include "Core/Log.h"
@@ -72,6 +81,8 @@ static VectorImage* IconForClass(const String& InClass) {
     if (InClass == "Texture2D") return EditorIcons::Texture();
     if (InClass == "Font") return EditorIcons::Font();
     if (InClass == "VectorImage") return EditorIcons::Node();
+    if (InClass == "Scene") return EditorIcons::Level();
+    if (InClass == "Blueprint") return EditorIcons::Node();
     return EditorIcons::Asset();
 }
 
@@ -189,9 +200,23 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
         icon->Rotation = Vec3(0.0f, 0.0f, InRotation);
     };
 
-    labelButton(*toolbarRow, "+ Add", 62.0f, s_AddGreen, [] {});
+    UIButton* addButton = labelButton(*toolbarRow, "+ Add", 62.0f, s_AddGreen, [] {});
+    addButton->Clicked = [this, addButton] {
+        UIMenuModel menu;
+        BuildAddMenu(menu, *addButton);
+        UIContextMenu::OpenUnder(*addButton, menu);
+    };
     labelButton(*toolbarRow, "Import", 62.0f, EditorStyle::Button, [] {});
-    labelButton(*toolbarRow, "Save All", 74.0f, EditorStyle::Button, [] {});
+    labelButton(*toolbarRow, "Save All", 74.0f, EditorStyle::Button, [this] {
+        EditorWindow* window = GetOwnerWindow();
+        for (MajorTab* tab : window ? window->GetOpenTabs() : Array<MajorTab*>()) {
+            if (SceneEditorTab* sceneTab = tab->As<SceneEditorTab>()) {
+                sceneTab->Save();
+            } else if (BlueprintEditorTab* blueprintTab = tab->As<BlueprintEditorTab>()) {
+                blueprintTab->Save();
+            }
+        }
+    });
 
     arrowButton(*toolbarRow, EditorIcons::ArrowRight(), 180.0f, [this] { GoBack(); });
     arrowButton(*toolbarRow, EditorIcons::ArrowRight(), 0.0f, [this] { GoForward(); });
@@ -289,6 +314,75 @@ void ContentDrawer::BuildBreadcrumb() {
         label->Color = (i == segments.Size() - 1) ? EditorStyle::TextBright : EditorStyle::TextDim;
         label->Text = segments[i];
     }
+}
+
+String ContentDrawer::MakeUniqueAssetName(const String& InBaseName) const {
+    const String dir = DirFor(m_Mount, m_RelPath);
+    String name = InBaseName;
+    int32_t suffix = 1;
+    while (FileIO::FileExists(dir + "/" + name + ".asset")) {
+        name = InBaseName + std::to_string(++suffix);
+    }
+    return name;
+}
+
+void ContentDrawer::OpenAsset(Asset* InAsset) {
+    EditorWindow* window = GetOwnerWindow();
+    if (!window || !InAsset) {
+        return;
+    }
+
+    for (MajorTab* tab : window->GetOpenTabs()) {
+        SceneEditorTab* sceneTab = tab->As<SceneEditorTab>();
+        BlueprintEditorTab* blueprintTab = tab->As<BlueprintEditorTab>();
+        const bool alreadyOpen = (sceneTab && sceneTab->GetScene() == InAsset)
+                              || (blueprintTab && blueprintTab->GetBlueprint() == InAsset);
+        if (alreadyOpen) {
+            window->ActivateTab(tab);
+            window->CloseHeroTool();
+            return;
+        }
+    }
+
+    if (Scene* scene = Cast<Scene>(InAsset)) {
+        window->OpenTab<SceneEditorTab>()->OpenScene(scene);
+        window->CloseHeroTool();
+        return;
+    }
+    if (Blueprint* blueprint = Cast<Blueprint>(InAsset)) {
+        window->OpenTab<BlueprintEditorTab>()->OpenBlueprint(blueprint);
+        window->CloseHeroTool();
+        return;
+    }
+
+    AE_INFO("No editor for asset '{0}' ({1})", InAsset->GetDisplayName(), InAsset->GetClass().Name);
+}
+
+void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu, UINode& InAnchor) {
+    (void)InAnchor;
+    const String dir = DirFor(m_Mount, m_RelPath);
+
+    OutMenu.Section("Create Asset");
+    OutMenu.Item("Scene", [this, dir] {
+        if (Scene* scene = Scene::CreateEmpty(dir, MakeUniqueAssetName("NewScene"))) {
+            m_NavDirty = true;
+            OpenAsset(scene);
+        }
+    }).Icon(EditorIcons::Level());
+    OutMenu.Item("Blueprint", [this, dir] {
+        Blueprint* blueprint = Cast<Blueprint>(AssetManager::Get().CreateAsset(Blueprint::StaticClass(), dir,
+                                                                              MakeUniqueAssetName("NewBlueprint")));
+        if (!blueprint) {
+            return;
+        }
+        NodeRecord* record = new NodeRecord();
+        record->Name = blueprint->GetDisplayName();
+        record->ClassName = Node3D::StaticClass().Name;
+        blueprint->SetRoot(SharedObjectPtr<NodeRecord>(record));
+        AssetManager::Get().SaveAsset(blueprint);
+        m_NavDirty = true;
+        OpenAsset(blueprint);
+    }).Icon(EditorIcons::Asset());
 }
 
 void ContentDrawer::BuildTree() {
@@ -449,7 +543,14 @@ void ContentDrawer::BuildGrid() {
         const String assetName = entry.Name;
         card->HoverColor = Vec4(0.0f);
         card->Clicked = [this, filePath] { m_SelectedPath = filePath; };
-        card->DoubleClicked = [filePath, assetName] { AE_INFO("Open asset {0} ({1})", assetName, filePath); };
+        Asset* assetPtr = entry.AssetPtr;
+        card->DoubleClicked = [this, assetPtr, filePath, assetName] {
+            if (assetPtr) {
+                OpenAsset(assetPtr);
+            } else {
+                AE_WARN("Asset {0} ({1}) is not registered", assetName, filePath);
+            }
+        };
 
         UIRoundedQuad* frame = card->Add<UIRoundedQuad>();
         frame->Fill();

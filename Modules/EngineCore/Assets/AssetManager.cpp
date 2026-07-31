@@ -125,33 +125,79 @@ void AssetManager::HotLoadAssets() {
             AE_ASSERT(j.contains("m_Id"), "JSON does not contain asset ID");
             UUID assetId = UUID::FromString(j["m_Id"].get<String>());
 
+            if (m_Assets.ContainsKey(assetId)) {
+                m_AssetPaths[assetId] = filePath;
+                continue;
+            }
+
             Asset* asset = Object::Create(Class(assetClassName))->As<Asset>();
             AE_ASSERT(asset, "Failed to create asset instance");
             asset->m_Id = assetId;
             jsonStrings[asset] = jsonString;
             m_Assets[asset->GetId()] = asset;
+            m_AssetPaths[asset->GetId()] = filePath;
         }
     }
 
     for (auto& [asset, jsonString] : jsonStrings) {
-        JsonSerializer::DeserializeObject(asset, jsonString);
+        asset->DeserializeFromJson(jsonString);
     }
 }
 
 void AssetManager::LoadAsset(Asset* InAsset) {
-    if (!InAsset)
+    if (!InAsset || InAsset->IsLoaded())
         return;
 
-    std::lock_guard<std::mutex> lock(s_AssetLoadingMutex);
-    AE_ASSERT(false, "Not implemented yet");
+    InAsset->Load();
 }
 
 void AssetManager::UnloadAsset(Asset* InAsset) {
-    if (!InAsset)
+    if (!InAsset || !InAsset->IsLoaded())
+        return;
+    if (InAsset->m_StreamType == AssetStreamType::AlwaysLoaded)
         return;
 
-    std::lock_guard<std::mutex> lock(s_AssetLoadingMutex);
-    AE_ASSERT(false, "Not implemented yet");
+    InAsset->Unload();
+}
+
+String AssetManager::GetAssetPath(const UUID& InId) {
+    return m_AssetPaths.ContainsKey(InId) ? m_AssetPaths.At(InId) : String();
+}
+
+Asset* AssetManager::CreateAsset(const Class& InClass, const String& InDirectory, const String& InName) {
+    Asset* asset = Cast<Asset>(Object::Create(InClass));
+    if (!asset) {
+        AE_ERROR("Cannot create an asset of class '{0}'", InClass.Name);
+        return nullptr;
+    }
+
+    asset->m_Id = UUID::Generate();
+    m_Assets[asset->GetId()] = asset;
+    m_AssetPaths[asset->GetId()] = InDirectory + "/" + InName + ".asset";
+    return asset;
+}
+
+bool AssetManager::SaveAsset(Asset* InAsset) {
+    if (!InAsset) {
+        return false;
+    }
+
+    const String path = GetAssetPath(InAsset->GetId());
+    if (path.empty()) {
+        AE_ERROR("Asset {0} has no file to save to", InAsset->GetId().ToString());
+        return false;
+    }
+
+    std::error_code error;
+    std::filesystem::create_directories(std::filesystem::path(path).parent_path(), error);
+
+    if (!FileIO::WriteStringToFile(path, InAsset->SerializeToJson())) {
+        AE_ERROR("Failed to write asset to {0}", path);
+        return false;
+    }
+
+    AE_INFO("Saved asset {0}", path);
+    return true;
 }
 
 Asset* AssetManager::GetAsset(const UUID& InId) {

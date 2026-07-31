@@ -6,6 +6,8 @@
 #include "Tabs/SceneEditorTab.h"
 #include "Rendering/RenderingAPI.h"
 #include "Assets/AssetManager.h"
+#include "Assets/Scene.h"
+#include "Core/EngineConfig.h"
 #include "InputSystem/InputSystem.h"
 #include "Common/UUID.h"
 
@@ -25,9 +27,12 @@ void EditorEngine::Initialize() {
     // Set the default UI font once (see Content/Fonts/Default.asset)
     UINode::SetDefaultFont(AssetManager::Get().GetAsset<Font>(UUID::FromString("f0e1d2c3-b4a5-4967-8899-aabbccddeeff")));
 
-    window->OpenTab<SceneEditorTab>();
-    window->OpenTab<SceneEditorTab>();
-    window->OpenTab<SceneEditorTab>();
+    Scene* scene = AssetManager::Get().GetAsset<Scene>(EngineConfig::GetConfigVar<UUID>("DefaultScene"));
+    if (!scene) {
+        Array<Asset*> scenes = AssetManager::Get().GetAssetsOfClass(Scene::StaticClass());
+        scene = scenes.IsEmpty() ? nullptr : Cast<Scene>(scenes[0]);
+    }
+    window->OpenTab<SceneEditorTab>()->OpenScene(scene);
 
     // Keep rendering while a modal resize/move blocks the main loop's event pump.
     Window::SetRefreshCallback([this]() { RenderFrame(m_DeltaTime); });

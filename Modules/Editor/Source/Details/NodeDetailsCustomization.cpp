@@ -44,6 +44,7 @@ float NodeDetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, 
     enabled->Changed = [weak](bool InValue) {
         if (Node* bound = weak.Get()) {
             bound->SetEnabled(InValue);
+            bound->MarkPropertyOverridden("m_Enabled");
         }
     };
 
@@ -80,6 +81,9 @@ float NodeDetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, 
 }
 
 bool NodeDetailsCustomization::WantsClassCategory(const Class& InClass) const {
+    if (InClass == Node::StaticClass()) {
+        return false;
+    }
     return InClass == Node3D::StaticClass() || DetailsCustomization::WantsClassCategory(InClass);
 }
 
@@ -94,6 +98,7 @@ void NodeDetailsCustomization::BuildClassCategory(DetailsCategory& InCategory, c
 }
 
 static void AddVectorRow(UINode& InBody, DetailsTab& InTab, const String& InLabel,
+                         const WeakObjectPtr<Node>& InNode, const String& InPropertyName,
                          std::function<Vec3()> InGet, std::function<void(const Vec3&)> InSet,
                          double InSensitivity, float InAxisDefault) {
     struct Axis {
@@ -109,6 +114,14 @@ static void AddVectorRow(UINode& InBody, DetailsTab& InTab, const String& InLabe
     DetailsRow* row = InBody.Add<DetailsRow>();
     row->OwnerTab = &InTab;
     row->SetLabel(InLabel);
+    DetailsCustomization::BindOverride(*row, InNode, InPropertyName);
+
+    const auto apply = [InSet, InNode, InPropertyName](const Vec3& InValue) {
+        InSet(InValue);
+        if (Node* node = InNode.Get()) {
+            node->MarkPropertyOverridden(InPropertyName);
+        }
+    };
 
     UIHStack* stack = row->GetValueHost()->Add<UIHStack>();
     stack->Fill();
@@ -121,15 +134,15 @@ static void AddVectorRow(UINode& InBody, DetailsTab& InTab, const String& InLabe
         drag->PrefixColor = s_Axes[axis].Color;
         drag->Sensitivity = InSensitivity;
         drag->Get = [InGet, axis]() -> double { return (double)InGet()[axis]; };
-        drag->Set = [InGet, InSet, axis](double InValue) {
+        drag->Set = [InGet, apply, axis](double InValue) {
             Vec3 value = InGet();
             value[axis] = (float)InValue;
-            InSet(value);
+            apply(value);
         };
-        drag->PrefixClicked = [InGet, InSet, axis, InAxisDefault] {
+        drag->PrefixClicked = [InGet, apply, axis, InAxisDefault] {
             Vec3 value = InGet();
             value[axis] = InAxisDefault;
-            InSet(value);
+            apply(value);
         };
     }
 }
@@ -152,12 +165,12 @@ void NodeDetailsCustomization::BuildTransformCategory(DetailsCategory& InCategor
     WeakObjectPtr<Node3D> weak(InNode);
     UINode& body = *InCategory.GetBody();
 
-    AddVectorRow(body, InTab, "Position",
+    AddVectorRow(body, InTab, "Position", weak, "m_LocalPosition",
         [weak] { Node3D* node = weak.Get(); return node ? node->GetLocalPosition() : Vec3(0.0f); },
         [weak](const Vec3& InValue) { if (Node3D* node = weak.Get()) node->SetLocalPosition(InValue); },
         0.05, 0.0f);
     auto euler = std::make_shared<EulerEditState>();
-    AddVectorRow(body, InTab, "Rotation",
+    AddVectorRow(body, InTab, "Rotation", weak, "m_LocalRotation",
         [weak, euler] {
             Node3D* node = weak.Get();
             if (!node) {
@@ -182,7 +195,7 @@ void NodeDetailsCustomization::BuildTransformCategory(DetailsCategory& InCategor
             euler->Valid = true;
         },
         0.5, 0.0f);
-    AddVectorRow(body, InTab, "Scale",
+    AddVectorRow(body, InTab, "Scale", weak, "m_LocalScale",
         [weak] { Node3D* node = weak.Get(); return node ? node->GetLocalScale() : Vec3(1.0f); },
         [weak](const Vec3& InValue) { if (Node3D* node = weak.Get()) node->SetLocalScale(InValue); },
         0.05, 1.0f);

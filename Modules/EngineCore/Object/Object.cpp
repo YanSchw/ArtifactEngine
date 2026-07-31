@@ -2,6 +2,9 @@
 #include "Pointer.h"
 #include "Common/Map.h"
 #include "Common/Array.h"
+#include "Common/UUID.h"
+#include "Assets/AssetManager.h"
+#include "Assets/Blueprint.h"
 
 static Array<Class>* GetListOfAllClasses() {
     static Array<Class>* s_ListOfAllClasses = nullptr;
@@ -24,8 +27,37 @@ static Map<String, String>* GetChildToParentClassnames() {
 
 const Class Class::None = Class("");
 
+static Blueprint* FindBlueprint(const Class& InClass) {
+    if (!InClass.IsBlueprint()) {
+        return nullptr;
+    }
+    return AssetManager::Get().GetAsset<Blueprint>(InClass.GetBlueprintId());
+}
+
 Class Class::GetParentClass() const {
+    if (IsBlueprint()) {
+        Blueprint* blueprint = FindBlueprint(*this);
+        return blueprint ? blueprint->GetRootClass() : Class::None;
+    }
+    if (!GetChildToParentClassnames()->ContainsKey(Name)) {
+        return Class::None;
+    }
     return GetChildToParentClassnames()->At(Name);
+}
+
+UUID Class::GetBlueprintId() const {
+    return IsBlueprint() ? UUID::FromString(Name.substr(1)) : UUID::INVALID;
+}
+
+Class Class::FromBlueprint(const UUID& InBlueprintId) {
+    return Class(String(1, BlueprintPrefix) + InBlueprintId.ToString());
+}
+
+String Class::GetDisplayName() const {
+    if (Blueprint* blueprint = FindBlueprint(*this)) {
+        return blueprint->GetDisplayName();
+    }
+    return Name;
 }
 
 bool Class::IsSubclassOf(const Class& InBaseClass) const {
@@ -63,6 +95,10 @@ Class::RegisterParentChildClassRelationship::RegisterParentChildClassRelationshi
 }
 
 Object* Object::Create(const Class& type) {
+    if (type.IsBlueprint()) {
+        Blueprint* blueprint = FindBlueprint(type);
+        return blueprint ? (Object*)blueprint->CreateInstance() : nullptr;
+    }
     if (s_ObjectAllocators.find(type.Name) == s_ObjectAllocators.end()) {
         return nullptr;
     }

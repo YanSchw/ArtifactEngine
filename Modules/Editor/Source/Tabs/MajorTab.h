@@ -9,6 +9,7 @@ class MinorTab;
 class MinorTabStandaloneWindow;
 class EditorWindow;
 class VectorImage;
+class Asset;
 
 /** A top-level editor document — the heart of the editor. A MajorTab edits one thing (a scene,
  *  a mesh, a texture, ...), hosts a dock area of MinorTabs as its workspace, fills the editor
@@ -25,6 +26,10 @@ public:
     virtual void BuildToolBar(UINode& InToolBar) { (void)InToolBar; }
 
     virtual void OnBind() override;
+
+    virtual Asset* GetEditedAsset() const { return nullptr; }
+    virtual void OnAssetSaved(Asset* InAsset) { (void)InAsset; }
+    static void BroadcastAssetSaved(Asset* InAsset, MajorTab* InSource);
 
     World* GetEditedWorld() const { return m_World.Get(); }
 

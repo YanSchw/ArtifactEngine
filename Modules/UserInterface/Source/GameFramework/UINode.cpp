@@ -3,6 +3,34 @@
 #include "Rendering/UIDrawList.h"
 #include <cmath>
 
+UINodeSpecialProperties::UINodeSpecialProperties() {
+    Property::RegisterTypeProperties("UIValue", {
+        new FloatProperty("Fraction", offsetof(UIValue, Fraction), false),
+        new FloatProperty("Pixels", offsetof(UIValue, Pixels), false),
+    });
+    Property::RegisterTypeProperties("UIVec2", {
+        new StructProperty("X", offsetof(UIVec2, X), "UIValue"),
+        new StructProperty("Y", offsetof(UIVec2, Y), "UIValue"),
+    });
+    Property::RegisterTypeProperties("UIPadding", {
+        new StructProperty("Left", offsetof(UIPadding, Left), "UIValue"),
+        new StructProperty("Top", offsetof(UIPadding, Top), "UIValue"),
+        new StructProperty("Right", offsetof(UIPadding, Right), "UIValue"),
+        new StructProperty("Bottom", offsetof(UIPadding, Bottom), "UIValue"),
+    });
+
+    Property::RegisterTypeProperties("UINode", {
+        new StructProperty("Anchor", offsetof(UINode, Anchor), "Vec2"),
+        new StructProperty("Pivot", offsetof(UINode, Pivot), "Vec2"),
+        new StructProperty("Rotation", offsetof(UINode, Rotation), "Vec3"),
+        new StructProperty("Position", offsetof(UINode, Position), "UIVec2"),
+        new StructProperty("Size", offsetof(UINode, Size), "UIVec2"),
+        new StructProperty("Padding", offsetof(UINode, Padding), "UIPadding"),
+        new BoolProperty("Interactable", offsetof(UINode, Interactable)),
+        new BoolProperty("ClipChildren", offsetof(UINode, ClipChildren)),
+    });
+}
+
 UIRectF UINode::ComputeGeometry(const UIRectF& InParentContentRect) const {
     // Place the node so its Pivot lands on Anchor + Position within the parent's content rect.
     const Vec2 parentSize = InParentContentRect.Size;

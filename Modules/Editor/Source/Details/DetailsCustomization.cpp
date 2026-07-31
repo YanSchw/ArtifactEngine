@@ -11,6 +11,7 @@
 #include "Object/Enum.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Asset.h"
+#include "GameFramework/Node.h"
 #include "Common/Map.h"
 #include <cctype>
 #include <cstring>
@@ -83,7 +84,8 @@ static UILabel& AddValueLabel(UINode& InHost, const String& InText) {
     return *label;
 }
 
-static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, Property* InProperty) {
+static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, Property* InProperty,
+                           const std::function<void()>& InOnEdited) {
     UIDragNumber* drag = InRow.GetValueHost()->Add<UIDragNumber>();
     drag->Fill();
     if (IntProperty* intProperty = Cast<IntProperty>(InProperty)) {
@@ -96,9 +98,10 @@ static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
             char* base = ResolveBase(InObject, InOffset);
             return base ? ReadIntValue(*intProperty, base) : 0.0;
         };
-        drag->Set = [InObject, InOffset, intProperty](double InValue) {
+        drag->Set = [InObject, InOffset, intProperty, InOnEdited](double InValue) {
             if (char* base = ResolveBase(InObject, InOffset)) {
                 WriteIntValue(*intProperty, base, InValue);
+                InOnEdited();
             }
         };
     } else if (FloatProperty* floatProperty = Cast<FloatProperty>(InProperty)) {
@@ -109,19 +112,21 @@ static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
             }
             return floatProperty->IsDouble ? *(double*)base : (double)*(float*)base;
         };
-        drag->Set = [InObject, InOffset, floatProperty](double InValue) {
+        drag->Set = [InObject, InOffset, floatProperty, InOnEdited](double InValue) {
             if (char* base = ResolveBase(InObject, InOffset)) {
                 if (floatProperty->IsDouble) {
                     *(double*)base = InValue;
                 } else {
                     *(float*)base = (float)InValue;
                 }
+                InOnEdited();
             }
         };
     }
 }
 
-static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset) {
+static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                         const std::function<void()>& InOnEdited) {
     UICheckbox* checkbox = InRow.GetValueHost()->Add<UICheckbox>();
     checkbox->Anchor = checkbox->Pivot = Vec2(0.0f, 0.5f);
     checkbox->Position = Vec2(2.0f, 0.0f);
@@ -130,14 +135,16 @@ static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
             checkbox->IsOn = *(bool*)base;
         }
     };
-    checkbox->Changed = [InObject, InOffset](bool InValue) {
+    checkbox->Changed = [InObject, InOffset, InOnEdited](bool InValue) {
         if (char* base = ResolveBase(InObject, InOffset)) {
             *(bool*)base = InValue;
+            InOnEdited();
         }
     };
 }
 
-static void BuildStringRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset) {
+static void BuildStringRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                           const std::function<void()>& InOnEdited) {
     UITextArea* field = InRow.GetValueHost()->Add<UITextArea>();
     field->Fill();
     field->SingleLine = true;
@@ -155,16 +162,18 @@ static void BuildStringRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
             }
         }
     };
-    const auto commit = [InObject, InOffset](const String& InText) {
+    const auto commit = [InObject, InOffset, InOnEdited](const String& InText) {
         if (char* base = ResolveBase(InObject, InOffset)) {
             *(String*)base = InText;
+            InOnEdited();
         }
     };
     field->Submitted = commit;
     field->FocusLost = [field, commit] { commit(field->Text); };
 }
 
-static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, EnumProperty* InProperty) {
+static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, EnumProperty* InProperty,
+                         const std::function<void()>& InOnEdited) {
     const auto read = [InObject, InOffset, InProperty]() -> int64_t {
         int64_t value = 0;
         if (char* base = ResolveBase(InObject, InOffset)) {
@@ -194,19 +203,20 @@ static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
         }
         return -1;
     };
-    dropdown->SelectionChanged = [InObject, InOffset, InProperty](int32_t InIndex) {
+    dropdown->SelectionChanged = [InObject, InOffset, InProperty, InOnEdited](int32_t InIndex) {
         const Array<Enum::EnumValue>& values = Enum(InProperty->InnerEnumTypename).GetValues();
         if (InIndex < 0 || InIndex >= values.Size()) {
             return;
         }
         if (char* base = ResolveBase(InObject, InOffset)) {
             std::memcpy(base, &values[InIndex].Value, InProperty->ByteSize);
+            InOnEdited();
         }
     };
 }
 
 static void BuildAssetRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                          const Class& InAssetClass, bool InIsWeak) {
+                          const Class& InAssetClass, bool InIsWeak, const std::function<void()>& InOnEdited) {
     auto snapshot = std::make_shared<Array<WeakObjectPtr<Asset>>>();
 
     UIDropdown* dropdown = InRow.GetValueHost()->Add<UIDropdown>();
@@ -236,10 +246,11 @@ static void BuildAssetRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObje
         }
         return 0;
     };
-    dropdown->SelectionChanged = [snapshot, InObject, InOffset, InIsWeak](int32_t InIndex) {
+    dropdown->SelectionChanged = [snapshot, InObject, InOffset, InIsWeak, InOnEdited](int32_t InIndex) {
         Asset* asset = (InIndex > 0 && InIndex <= snapshot->Size()) ? (*snapshot)[InIndex - 1].Get() : nullptr;
         if (char* base = ResolveBase(InObject, InOffset)) {
             WriteObjectPtr(base, InIsWeak, asset);
+            InOnEdited();
         }
     };
 }
@@ -297,42 +308,75 @@ DetailsRow& DetailsCustomization::AddRow(UINode& InParent, DetailsTab& InTab, co
     return *row;
 }
 
+std::function<void()> DetailsCustomization::MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty) {
+    return [InObject, InRootProperty] {
+        Object* object = InObject.Get();
+        if (!object || !InRootProperty) {
+            return;
+        }
+        InRootProperty->NotifyChanged(object);
+        if (Node* node = Cast<Node>(object)) {
+            node->MarkPropertyOverridden(InRootProperty->Name);
+        }
+    };
+}
+
+void DetailsCustomization::BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName) {
+    if (!Cast<Node>(InObject.Get())) {
+        return;
+    }
+    InRow.IsOverridden = [InObject, InPropertyName] {
+        Node* node = Cast<Node>(InObject.Get());
+        return node && node->IsPropertyOverridden(InPropertyName);
+    };
+    InRow.ResetAction = [InObject, InPropertyName] {
+        if (Node* node = Cast<Node>(InObject.Get())) {
+            node->ResetPropertyToDefault(InPropertyName);
+        }
+    };
+}
+
 void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
-                                          uint64_t InBaseOffset, Property* InProperty, int32_t InDepth) {
+                                          uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
+                                          Property* InRootProperty) {
     const uint64_t offset = InBaseOffset + InProperty->Offset;
+    Property* root = InRootProperty ? InRootProperty : InProperty;
+    const String label = PrettyPropertyName(InProperty->Name);
 
     if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
         const Array<Property*> inner = Property::GetTypeProperties(structProperty->InnerStructTypename);
         if (!inner.IsEmpty()) {
-            DetailsCategory& category = AddCategory(InParent, InTab, InProperty->Name, InDepth + 1);
+            DetailsCategory& category = AddCategory(InParent, InTab, label, InDepth + 1);
             for (Property* property : inner) {
-                AddPropertyRow(*category.GetBody(), InTab, InObject, offset, property, InDepth + 1);
+                AddPropertyRow(*category.GetBody(), InTab, InObject, offset, property, InDepth + 1, root);
             }
             return;
         }
-        AddValueLabel(*AddRow(InParent, InTab, InProperty->Name, InDepth).GetValueHost(), structProperty->InnerStructTypename);
+        AddValueLabel(*AddRow(InParent, InTab, label, InDepth).GetValueHost(), structProperty->InnerStructTypename);
         return;
     }
 
-    DetailsRow& row = AddRow(InParent, InTab, InProperty->Name, InDepth);
+    DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
+    BindOverride(row, InObject, root->Name);
+    const std::function<void()> onEdited = MakeEditHandler(InObject, root);
 
     if (Cast<IntProperty>(InProperty) || Cast<FloatProperty>(InProperty)) {
-        BuildNumberRow(row, InObject, offset, InProperty);
+        BuildNumberRow(row, InObject, offset, InProperty, onEdited);
     } else if (Cast<BoolProperty>(InProperty)) {
-        BuildBoolRow(row, InObject, offset);
+        BuildBoolRow(row, InObject, offset, onEdited);
     } else if (Cast<StringProperty>(InProperty)) {
-        BuildStringRow(row, InObject, offset);
+        BuildStringRow(row, InObject, offset, onEdited);
     } else if (EnumProperty* enumProperty = Cast<EnumProperty>(InProperty)) {
-        BuildEnumRow(row, InObject, offset, enumProperty);
+        BuildEnumRow(row, InObject, offset, enumProperty, onEdited);
     } else if (SharedObjectPtrProperty* sharedProperty = Cast<SharedObjectPtrProperty>(InProperty)) {
         if (sharedProperty->InnerClass.IsSubclassOf(Asset::StaticClass())) {
-            BuildAssetRow(row, InObject, offset, sharedProperty->InnerClass, false);
+            BuildAssetRow(row, InObject, offset, sharedProperty->InnerClass, false, onEdited);
         } else {
             AddValueLabel(*row.GetValueHost(), sharedProperty->InnerClass.Name);
         }
     } else if (WeakObjectPtrProperty* weakProperty = Cast<WeakObjectPtrProperty>(InProperty)) {
         if (weakProperty->InnerClass.IsSubclassOf(Asset::StaticClass())) {
-            BuildAssetRow(row, InObject, offset, weakProperty->InnerClass, true);
+            BuildAssetRow(row, InObject, offset, weakProperty->InnerClass, true, onEdited);
         } else {
             AddValueLabel(*row.GetValueHost(), weakProperty->InnerClass.Name);
         }
@@ -347,16 +391,24 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
     }
 }
 
-String DetailsCustomization::PrettyClassName(const Class& InClass) {
+static String SplitCamelCase(const String& InName) {
     String pretty;
-    for (size_t i = 0; i < InClass.Name.size(); i++) {
-        const char current = InClass.Name[i];
-        if (i > 0 && std::isupper((unsigned char)current) && std::islower((unsigned char)InClass.Name[i - 1])) {
+    for (size_t i = 0; i < InName.size(); i++) {
+        const char current = InName[i];
+        if (i > 0 && std::isupper((unsigned char)current) && std::islower((unsigned char)InName[i - 1])) {
             pretty += ' ';
         }
         pretty += current;
     }
     return pretty;
+}
+
+String DetailsCustomization::PrettyClassName(const Class& InClass) {
+    return SplitCamelCase(InClass.GetDisplayName());
+}
+
+String DetailsCustomization::PrettyPropertyName(const String& InName) {
+    return SplitCamelCase(InName.starts_with("m_") ? InName.substr(2) : InName);
 }
 
 DetailsCustomization* DetailsCustomization::FindFor(const Class& InClass) {

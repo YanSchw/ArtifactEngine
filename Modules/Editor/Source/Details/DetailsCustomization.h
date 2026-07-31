@@ -3,6 +3,7 @@
 #include "Object/Property.h"
 #include "Object/Pointer.h"
 #include "Common/Array.h"
+#include <functional>
 #include "DetailsCustomization.gen.h"
 
 class DetailsTab;
@@ -23,6 +24,11 @@ public:
 
     static DetailsCustomization* FindFor(const Class& InClass);
 
+    static void BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName);
+    static std::function<void()> MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty);
+    static String PrettyClassName(const Class& InClass);
+    static String PrettyPropertyName(const String& InName);
+
 protected:
     virtual bool WantsClassCategory(const Class& InClass) const;
     virtual void BuildClassCategory(DetailsCategory& InCategory, const Class& InClass, Object* InObject, DetailsTab& InTab);
@@ -30,6 +36,6 @@ protected:
     static DetailsCategory& AddCategory(UINode& InParent, DetailsTab& InTab, const String& InTitle, int32_t InDepth);
     static DetailsRow& AddRow(UINode& InParent, DetailsTab& InTab, const String& InLabel, int32_t InDepth);
     static void AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
-                               uint64_t InBaseOffset, Property* InProperty, int32_t InDepth);
-    static String PrettyClassName(const Class& InClass);
+                               uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
+                               Property* InRootProperty = nullptr);
 };

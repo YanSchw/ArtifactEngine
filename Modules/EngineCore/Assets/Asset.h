@@ -66,6 +66,9 @@ public:
     UUID GetId() const { return m_Id; }
     virtual String GetDisplayName() const;
 
+    virtual String SerializeToJson() const;
+    virtual void DeserializeFromJson(const String& InJson);
+
 protected:
     PROPERTY()
     UUID m_Id;

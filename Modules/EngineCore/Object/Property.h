@@ -9,24 +9,27 @@
 
 struct Property : public Object {
     ARTIFACT_CLASS();
+
+    using ChangedFn = void(*)(void*);
+
     String Name;
     uint64_t Offset;
+    ChangedFn OnChanged = nullptr;
 
     Property(const std::string& name, uint64_t offset)
         : Name(name), Offset(offset) {}
 
-    static void RegisterTypeProperties(const String& InTypename, const Array<Property*>& InProperties) {
-        s_TypeProperties[InTypename] = InProperties;
-    }
-    static Array<Property*> GetTypeProperties(const String& InTypeName) {
-        if (!s_TypeProperties.ContainsKey(InTypeName))
-            return Array<Property*>();
+    void* GetValuePtr(void* InInstance) const { return (char*)InInstance + Offset; }
+    void NotifyChanged(void* InInstance) const { if (OnChanged) OnChanged(InInstance); }
 
-        return s_TypeProperties[InTypeName];
-    }
+    Property* Changed(ChangedFn InChanged) { OnChanged = InChanged; return this; }
 
-private:
-    inline static Map<String, Array<Property*>> s_TypeProperties;
+    void CopyValue(void* OutInstance, const void* InInstance) const;
+
+    static void RegisterTypeProperties(const String& InTypename, const Array<Property*>& InProperties);
+    static Array<Property*> GetTypeProperties(const String& InTypeName);
+    static Array<Property*> GetAllTypeProperties(const Class& InClass);
+    static Property* FindTypeProperty(const Class& InClass, const String& InName);
 };
 
 struct IntProperty : public Property {
@@ -80,6 +83,13 @@ struct WeakObjectPtrProperty : public Property {
         : Property(name, offset), InnerClass(innerClass) {}
 };
 
+struct UUIDProperty : public Property {
+    ARTIFACT_CLASS();
+
+    UUIDProperty(const std::string& name, uint64_t offset)
+        : Property(name, offset) {}
+};
+
 struct StructProperty : public Property {
     ARTIFACT_CLASS();
 
@@ -105,12 +115,14 @@ struct ArrayProperty : public Property {
     using GetSizeFn = size_t(*)(void*);
     using GetElementPtrFn = void*(*)(void*, size_t);
     using AddDefaultFn = void(*)(void*);
+    using ClearFn = void(*)(void*);
 
     Property* InnerProperty;
     GetSizeFn GetSize;
     GetElementPtrFn GetElementPtr;
     AddDefaultFn AddDefault;
+    ClearFn Clear;
 
-    ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty, GetSizeFn getSize, GetElementPtrFn getElementPtr, AddDefaultFn addDefault)
-        : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize), GetElementPtr(getElementPtr), AddDefault(addDefault) {}
+    ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty, GetSizeFn getSize, GetElementPtrFn getElementPtr, AddDefaultFn addDefault, ClearFn clear)
+        : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize), GetElementPtr(getElementPtr), AddDefault(addDefault), Clear(clear) {}
 };

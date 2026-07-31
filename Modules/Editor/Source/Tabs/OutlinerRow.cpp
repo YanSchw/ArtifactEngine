@@ -1,5 +1,6 @@
 #include "OutlinerRow.h"
 #include "OutlinerTab.h"
+#include "MajorTab.h"
 #include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
 #include "UI/UIContextMenu.h"
@@ -8,6 +9,10 @@
 #include "GameFramework/UITextArea.h"
 #include "GameFramework/Node.h"
 #include "GameFramework/Node3D.h"
+#include "Assets/AssetManager.h"
+#include "Assets/Blueprint.h"
+#include "Core/EngineConfig.h"
+#include "Core/Log.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "Rendering/UIDrawList.h"
 
@@ -104,9 +109,11 @@ void OutlinerRow::Refresh() {
     m_Arrow->Position = Vec2(indent, 0.0f);
     m_Arrow->Image = Owner->GetArrowIcon(Owner->HasFilter() || Owner->IsExpanded(node));
 
+    const bool inherited = node->IsInherited();
     m_Icon->Position = Vec2(indent + 16.0f, 0.0f);
     m_Icon->Image = EditorIcons::GetNodeIcon(node->GetClass());
-    m_Icon->Tint = nodeEnabled ? EditorStyle::Text : s_DisabledText;
+    m_Icon->Tint = node->GetBlueprintId().IsValid() ? EditorStyle::AccentBright
+                                                    : (nodeEnabled ? EditorStyle::Text : s_DisabledText);
 
     const float textLeft = indent + 36.0f;
     m_Label->Position = Vec2(textLeft, 0.0f);
@@ -118,11 +125,13 @@ void OutlinerRow::Refresh() {
                                       : (nodeEnabled ? EditorStyle::TextDim : s_DisabledText);
     } else if (!nodeEnabled) {
         m_Label->Color = s_DisabledText;
+    } else if (inherited) {
+        m_Label->Color = Owner->IsSelected(node) ? EditorStyle::Text : EditorStyle::TextDim;
     } else {
         m_Label->Color = Owner->IsSelected(node) ? EditorStyle::TextBright : EditorStyle::Text;
     }
 
-    m_TypeLabel->Text = node->GetClass().Name;
+    m_TypeLabel->Text = node->GetSerializedClass().GetDisplayName();
     m_TypeLabel->Color = nodeEnabled ? EditorStyle::TextDim : s_DisabledText;
 
     const bool renaming = Owner->GetRenamingNode() == node;
@@ -188,12 +197,57 @@ void OutlinerRow::Paint(UIDrawList& OutDrawList) {
     }
 }
 
+static void AttachChildFromMenu(const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent,
+                                const Class& InClass, const String& InName) {
+    OutlinerTab* owner = InOwner.Get();
+    Node* parent = InParent.Get();
+    if (!owner || !parent) {
+        return;
+    }
+    Node* child = parent->AttachChild(InClass);
+    if (!child) {
+        return;
+    }
+    child->SetName(InName);
+    if (!owner->IsExpanded(parent)) {
+        owner->ToggleExpanded(parent);
+    }
+    owner->HandleRowClick(child, false, false);
+}
+
 static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent) {
     OutMenu.Searchable("Search classes");
+
+    MajorTab* document = InOwner.Get() ? InOwner.Get()->GetMajorTab() : nullptr;
+    Blueprint* edited = document ? Cast<Blueprint>(document->GetEditedAsset()) : nullptr;
+    const UUID editedId = edited ? edited->GetId() : UUID::INVALID;
+
+    Array<Asset*> blueprints = AssetManager::Get().GetAssetsOfClass(Blueprint::StaticClass());
+    blueprints.Sort([](Asset* const& InA, Asset* const& InB) { return InA->GetDisplayName() < InB->GetDisplayName(); });
+
+    if (!blueprints.IsEmpty()) {
+        OutMenu.Section("Blueprints");
+    }
+    for (Asset* asset : blueprints) {
+        Blueprint* blueprint = Cast<Blueprint>(asset);
+        if (!blueprint) {
+            continue;
+        }
+        const String name = blueprint->GetDisplayName();
+        const Class blueprintClass = Class::FromBlueprint(blueprint->GetId());
+        const bool recursive = Blueprint::WouldRecurse(editedId, blueprint->GetId());
+
+        OutMenu.Item(name, [InOwner, InParent, blueprintClass, name] {
+            AttachChildFromMenu(InOwner, InParent, blueprintClass, name);
+        }).Icon(EditorIcons::Node())
+          .Enabled(!recursive)
+          .Tooltip(recursive ? "'" + name + "' already contains this Blueprint" : "");
+    }
 
     Array<Class> classes = Class::GetSubclassesOf(Node::StaticClass());
     classes.Sort([](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
 
+    OutMenu.Section("Classes");
     for (const Class& nodeClass : classes) {
         // Reflected classes without a default constructor cannot be spawned; probing is the only
         // way to tell, and CreateChild would assert on them.
@@ -204,20 +258,7 @@ static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<Outliner
         delete probe;
 
         OutMenu.Item(nodeClass.Name, [InOwner, InParent, nodeClass] {
-            OutlinerTab* owner = InOwner.Get();
-            Node* parent = InParent.Get();
-            if (!owner || !parent) {
-                return;
-            }
-            Node* child = parent->CreateChild(nodeClass);
-            if (!child) {
-                return;
-            }
-            child->SetName(nodeClass.Name);
-            if (!owner->IsExpanded(parent)) {
-                owner->ToggleExpanded(parent);
-            }
-            owner->HandleRowClick(child, false, false);
+            AttachChildFromMenu(InOwner, InParent, nodeClass, nodeClass.Name);
         }).Icon(EditorIcons::GetNodeIcon(nodeClass));
     }
 }
@@ -256,13 +297,27 @@ bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
     }
     menu.Separator();
     menu.Submenu("Add Child", [owner, target](UIMenuModel& OutSub) { BuildAddChildMenu(OutSub, owner, target); })
-        .Tooltip("Spawn a new node under " + node->GetName());
+        .Tooltip("Attach a new node to " + node->GetName());
+    menu.Item("Create Blueprint...", [owner, target] {
+        Node* bound = target.Get();
+        if (!bound) {
+            return;
+        }
+        Blueprint* blueprint = Blueprint::CreateFromNode(*bound, EngineConfig::GetProjectContentDir() + "/Blueprints",
+                                                         bound->GetName());
+        if (blueprint) {
+            AE_INFO("Created blueprint '{0}'", blueprint->GetDisplayName());
+        }
+    }).Enabled(!node->IsInherited() && node->GetParent() != nullptr)
+      .Tooltip("Saves this node and its children as a reusable Blueprint asset");
     menu.Separator();
     menu.Item("Delete", [target] {
         if (Node* bound = target.Get()) {
             bound->Destroy();
         }
-    }).Tooltip("Destroys the node and everything under it");
+    }).Enabled(!node->IsInherited())
+      .Tooltip(node->IsInherited() ? "Inherited nodes are owned by the class or Blueprint that creates them"
+                                   : "Destroys the node and everything under it");
 
     UIContextMenu::OpenAt(*this, InCursorPos, menu);
     return true;

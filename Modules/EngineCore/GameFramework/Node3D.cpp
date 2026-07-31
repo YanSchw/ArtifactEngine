@@ -6,6 +6,15 @@
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+Node3DSpecialProperties::Node3DSpecialProperties() {
+    const auto tickTransform = [](void* InNode) { ((Node3D*)InNode)->TickTransform(); };
+    Property::RegisterTypeProperties("Node3D", {
+        (new StructProperty("m_LocalPosition", offsetof(Node3D, m_LocalPosition), "Vec3"))->Changed(tickTransform),
+        (new StructProperty("m_LocalRotation", offsetof(Node3D, m_LocalRotation), "Quat"))->Changed(tickTransform),
+        (new StructProperty("m_LocalScale", offsetof(Node3D, m_LocalScale), "Vec3"))->Changed(tickTransform),
+    });
+}
+
 Node3D* Node3D::GetTransform() {
     return this;
 }

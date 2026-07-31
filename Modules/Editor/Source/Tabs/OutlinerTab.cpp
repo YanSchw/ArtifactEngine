@@ -320,7 +320,7 @@ void OutlinerTab::EndDrag() {
     m_DropRef = nullptr;
     m_DropMode = DropMode::None;
 
-    if (!source || !ref || ref == source) {
+    if (!source || !ref || ref == source || source->IsInherited()) {
         return;
     }
 

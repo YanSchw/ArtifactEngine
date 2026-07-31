@@ -56,26 +56,23 @@ void JsonSerializer::DeserializeStruct(void* OutStruct, const Struct& InStructTy
 json JsonSerializer::SerializeType(void* instance, const String& typeName) {
     json j = json::object();
 
-    auto props = Property::GetTypeProperties(typeName);
+    auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        void* valuePtr = (char*)instance + prop->Offset;
-
-        j[prop->Name] = SerializeProperty(prop, valuePtr);
+        j[prop->Name] = SerializeProperty(prop, prop->GetValuePtr(instance));
     }
 
     return j;
 }
 void JsonSerializer::DeserializeType(void* instance, const String& typeName, const json& j) {
-    auto props = Property::GetTypeProperties(typeName);
+    auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
         if (!j.contains(prop->Name))
             continue;
 
-        void* valuePtr = (char*)instance + prop->Offset;
-
-        DeserializeProperty(prop, valuePtr, j[prop->Name]);
+        DeserializeProperty(prop, prop->GetValuePtr(instance), j[prop->Name]);
+        prop->NotifyChanged(instance);
     }
 }
 
@@ -135,6 +132,10 @@ json JsonSerializer::SerializeProperty(Property* property, void* valuePtr) {
         int64_t value = 0;
         std::memcpy(&value, valuePtr, p->ByteSize);
         return Enum(p->InnerEnumTypename).ConvertValueToString(value);
+    } else if (auto p = Cast<UUIDProperty>(property)) {
+        return ((UUID*)valuePtr)->ToString();
+    } else if (auto p = Cast<StructProperty>(property)) {
+        return SerializeType(valuePtr, p->InnerStructTypename);
     } else {
         AE_ASSERT(false, "Unsupported property type for serialization: " + property->Name);
     }
@@ -193,6 +194,7 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
             : (Object*)AssetManager::Get().GetAsset(UUID::FromString(j.get<String>()));
         return;
     } else if (auto p = Cast<ArrayProperty>(property)) {
+        p->Clear(valuePtr);
         for (auto& elemJson : j) {
             p->AddDefault(valuePtr);
 
@@ -204,6 +206,10 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
     } else if (auto p = Cast<EnumProperty>(property)) {
         int64_t value = Enum(p->InnerEnumTypename).ConvertStringToValue(j.get<String>());
         std::memcpy(valuePtr, &value, p->ByteSize);
+    } else if (auto p = Cast<UUIDProperty>(property)) {
+        *(UUID*)valuePtr = j.is_string() ? UUID::FromString(j.get<String>()) : UUID::INVALID;
+    } else if (auto p = Cast<StructProperty>(property)) {
+        DeserializeType(valuePtr, p->InnerStructTypename, j);
     } else {
         AE_ASSERT(false, "Unsupported property type for deserialization: " + property->Name);
     }

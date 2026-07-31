@@ -1,6 +1,7 @@
 #include "World.h"
 #include "Node.h"
 #include "Component.h"
+#include "Assets/Scene.h"
 #include "Common/Map.h"
 #include "Core/Assert.h"
 #include "Core/MainThread.h"
@@ -144,14 +145,34 @@ Node* World::Spawn(const Class& InClass) {
     AE_ASSERT_MAIN_THREAD("World::Spawn");
     AE_ASSERT(!InClass.IsSubclassOf(Component::StaticClass()), "A Component may never be spawned!");
 
-    Node* node = Object::Create(InClass)->As<Node>();
-    AE_ASSERT(node);
+    Object* created = Object::Create(InClass);
+    if (!created) {
+        AE_ERROR("Cannot spawn '{0}'", InClass.Name);
+        return nullptr;
+    }
+
+    Node* node = created->As<Node>();
+    if (!node) {
+        AE_ERROR("Class '{0}' is not a Node and cannot be spawned", InClass.Name);
+        delete created;
+        return nullptr;
+    }
 
     // node->m_IsActorLayer = true;
 
+    node->SetMarkedAsInherited(false);
+    node->SetName(node->GetName());
     node->InitializeNode(*this);
 
     return node;
+}
+
+SceneRootNode* World::Populate(Scene* InScene) {
+    AE_ASSERT_MAIN_THREAD("World::Populate");
+    if (!InScene) {
+        return nullptr;
+    }
+    return InScene->Populate(*this);
 }
 
 const Array<Node*>& World::GetAllNodes() const {

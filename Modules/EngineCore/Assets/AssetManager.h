@@ -30,12 +30,17 @@ public:
         return asset ? asset->As<T>() : nullptr;
     }
 
+    String GetAssetPath(const UUID& InId);
+    Asset* CreateAsset(const Class& InClass, const String& InDirectory, const String& InName);
+    bool SaveAsset(Asset* InAsset);
+
 private:
     static void AssetStreamingThreadFunc();
     Array<Asset*> GetAllAssets() const;
 
 private:
     Map<UUID, SharedObjectPtr<Asset>> m_Assets;
+    Map<UUID, String> m_AssetPaths;
 
     friend class AssetCookerEngine;
 };
