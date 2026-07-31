@@ -6,8 +6,10 @@ which is installed from the engine's `ArtifactSDK/` directory.
 ## Prerequisites
 
 - Python 3.10 or newer
-- A C++20 toolchain (Xcode on macOS, Visual Studio 2022 on Windows)
 - Git
+
+Everything else — the C++ toolchain, CMake, Ninja and the Vulkan SDK — is installed by
+`artifact setup` below.
 
 ## Install the SDK
 
@@ -23,6 +25,33 @@ pip install -e ./ArtifactSDK/.
 
 The build toolchain (`cmake`, `ninja`) is pulled in as pip dependencies, so nothing else
 needs to be installed system-wide.
+
+## Install the development dependencies
+
+```bash
+artifact setup
+```
+
+This checks what the machine needs to build the engine and reports it:
+
+```
+Development dependencies for MacOS
+
+✓ Xcode Command Line Tools  Apple clang version 17.0.0
+✓ CMake                     4.0.2
+✓ Ninja                     1.11.1
+✗ Vulkan SDK                no SDK in $VULKAN_SDK or ~/VulkanSDK
+
+Run `artifact setup vulkan` to install the missing dependencies.
+Or run `artifact setup all` to install all dependencies.
+```
+
+`artifact setup vulkan` installs a single dependency, `artifact setup all` everything that
+is missing. The dependencies differ per development platform — the C++ toolchain is
+AppleClang on macOS, the Visual Studio 2022 build tools on Windows and GCC on Linux, and
+Linux additionally needs the X11/Wayland development packages GLFW builds against. The
+Vulkan SDK is installed from the command line rather than through LunarG's GUI installer.
+Some installers need administrator rights and will ask for them.
 
 ## Create a project
 

@@ -68,25 +68,6 @@ class BuildError(JobError):
         super().__init__(f"Build failed with return code {returncode}", returncode)
 
 
-def _find_vcvarsall():
-    """Locate vcvarsall.bat for the latest Visual Studio with the VC toolset."""
-    program_files = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
-    vswhere = os.path.join(program_files, "Microsoft Visual Studio", "Installer", "vswhere.exe")
-    if not os.path.exists(vswhere):
-        return None
-    result = subprocess.run(
-        [vswhere, "-latest", "-products", "*",
-         "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
-         "-property", "installationPath"],
-        capture_output=True, text=True, errors="replace",
-    )
-    install_path = result.stdout.strip().splitlines()
-    if not install_path:
-        return None
-    vcvars = os.path.join(install_path[0], "VC", "Auxiliary", "Build", "vcvarsall.bat")
-    return vcvars if os.path.exists(vcvars) else None
-
-
 def build_environment():
     """Return the environment used for CMake/Ninja invocations.
 
@@ -100,7 +81,8 @@ def build_environment():
         return env
     if shutil.which("cl"):
         return env  # already inside a Developer Command Prompt
-    vcvars = _find_vcvarsall()
+    from SetupTool.Toolchain import find_vcvarsall
+    vcvars = find_vcvarsall()
     if not vcvars:
         return env  # fall back and let CMake try whatever compiler it finds
     result = subprocess.run(f'"{vcvars}" x64 && set', capture_output=True,

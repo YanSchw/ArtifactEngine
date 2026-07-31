@@ -7,6 +7,7 @@ so generated files are never edited by hand.
 ## Commands
 
 ```bash
+artifact setup          # check this machine's dev dependencies ('all' or a name installs them)
 artifact build [--target Win64|MacOS|Linux] [--configuration Debug|Dev|Dist] [--clean]
 artifact run            # builds (Dev) then launches Binaries/Artifact
 artifact cook           # cooks Content/ into Build/Intermediate/Cooked

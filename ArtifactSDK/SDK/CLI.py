@@ -182,6 +182,17 @@ def cmd_lint(args):
         print(f"{Fore.GREEN}No linting errors found.{Style.RESET_ALL}")
     sys.exit(lint_errors)
 
+def cmd_setup(args):
+    from SetupTool.Setup import run_setup
+    try:
+        run_setup(args.dependencies, force=args.force)
+    except KeyboardInterrupt:
+        print("Setup cancelled by user.")
+        sys.exit(1)
+    except JobError as e:
+        print(f"{Fore.RED}{e}{Style.RESET_ALL}")
+        sys.exit(e.returncode)
+
 def cmd_version(args):
     from SDK.Version import get_version_string
     print(f"Artifact SDK version {get_version_string()}")
@@ -236,6 +247,12 @@ def main():
     lint_parser = subparsers.add_parser("lint", help="Lint C++/Header files")
     lint_parser.add_argument("--fix", action="store_true", default=False, help="Automatically fix fixable lint errors in place")
     lint_parser.set_defaults(func=cmd_lint)
+
+    setup_parser = subparsers.add_parser("setup", help="Check (and install) the development dependencies of this machine")
+    setup_parser.add_argument("dependencies", nargs="*", metavar="dependency",
+                              help="Dependencies to install, or 'all' for every one. Without arguments the dependencies are only checked.")
+    setup_parser.add_argument("--force", action="store_true", default=False, help="Reinstall dependencies that are already present")
+    setup_parser.set_defaults(func=cmd_setup)
 
     version_parser = subparsers.add_parser("version", help="Show engine version")
     version_parser.set_defaults(func=cmd_version)
