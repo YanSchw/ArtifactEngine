@@ -70,6 +70,52 @@ static std::string ConvertSourceFilenameToLoggerLabel(std::string name) {
     return name;
 }
 
+static spdlog::sink_ptr TryCreateFileSink(const std::filesystem::path& InDirectory) {
+    try {
+        std::error_code directoryError;
+        std::filesystem::create_directories(InDirectory, directoryError);
+
+        auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((InDirectory / "Artifact.log").string(), true);
+        sink->set_pattern("[%T] [%l] %n: %v");
+        return sink;
+    } catch (const spdlog::spdlog_ex& error) {
+        std::cerr << "Could not open a log file in " << InDirectory.string() << ": " << error.what() << std::endl;
+        return nullptr;
+    }
+}
+
+static spdlog::sink_ptr GetFileSink() {
+    static const spdlog::sink_ptr sink = [] {
+        std::filesystem::path directory;
+        if (IsPackagedBuild()) {
+            directory = GetPackagedBuildLogFileDirectory();
+        } else {
+            std::error_code cwdError;
+            directory = std::filesystem::current_path(cwdError);
+            if (cwdError) {
+                directory = GetPackagedBuildLogFileDirectory();
+            }
+        }
+
+        if (spdlog::sink_ptr fileSink = TryCreateFileSink(directory)) {
+            return fileSink;
+        }
+
+        const std::filesystem::path fallback = GetPackagedBuildLogFileDirectory();
+        return fallback == directory ? spdlog::sink_ptr() : TryCreateFileSink(fallback);
+    }();
+    return sink;
+}
+
+static spdlog::sink_ptr GetConsoleSink() {
+    static const spdlog::sink_ptr sink = [] {
+        auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        consoleSink->set_pattern("%^[%T] %n: %v%$");
+        return consoleSink;
+    }();
+    return sink;
+}
+
 static void CreateLoggerIfNotExists(const std::string& name) {
     if (s_Loggers.find(name) != s_Loggers.end()) {
         return;
@@ -78,25 +124,11 @@ static void CreateLoggerIfNotExists(const std::string& name) {
     std::vector<spdlog::sink_ptr> logSinks;
 
     if (!IsPackagedBuild() /* || IsFlagSet("--LogToConsole") */) {
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        console_sink->set_pattern("%^[%T] %n: %v%$");
-        logSinks.emplace_back(console_sink);
+        logSinks.emplace_back(GetConsoleSink());
     }
-
-    std::filesystem::path loggingDirectory;
-    if (IsPackagedBuild()) {
-        loggingDirectory = GetPackagedBuildLogFileDirectory();
-        std::filesystem::create_directories(loggingDirectory);
-    } else {
-        std::error_code cwdError;
-        loggingDirectory = std::filesystem::current_path(cwdError);
-        if (cwdError) {
-            loggingDirectory = ".";
-        }
+    if (spdlog::sink_ptr fileSink = GetFileSink()) {
+        logSinks.emplace_back(fileSink);
     }
-    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((loggingDirectory / "Artifact.log").string(), false);
-    file_sink->set_pattern("[%T] [%l] %n: %v");
-    logSinks.emplace_back(file_sink);
 
     std::string logger_label = std::string("[") + ConvertSourceFilenameToLoggerLabel(name) + std::string("]");
     s_Loggers[name] = std::make_shared<spdlog::logger>(logger_label, begin(logSinks), end(logSinks));
