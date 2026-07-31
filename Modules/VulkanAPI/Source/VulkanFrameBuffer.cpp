@@ -2,6 +2,8 @@
 #include "VulkanImage.h"
 #include "Helpers.h"
 
+#include <cstring>
+
 VulkanFrameBuffer::VulkanFrameBuffer(const FrameBufferDesc& InFrameBufferDesc, VulkanAPI& InVulkanAPI) {
     m_Desc = InFrameBufferDesc;
     m_VulkanAPI = &InVulkanAPI;
