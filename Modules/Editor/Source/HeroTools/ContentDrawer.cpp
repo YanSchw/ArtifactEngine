@@ -328,34 +328,12 @@ String ContentDrawer::MakeUniqueAssetName(const String& InBaseName) const {
 
 void ContentDrawer::OpenAsset(Asset* InAsset) {
     EditorWindow* window = GetOwnerWindow();
-    if (!window || !InAsset) {
+    if (!window) {
         return;
     }
-
-    for (MajorTab* tab : window->GetOpenTabs()) {
-        SceneEditorTab* sceneTab = tab->As<SceneEditorTab>();
-        BlueprintEditorTab* blueprintTab = tab->As<BlueprintEditorTab>();
-        const bool alreadyOpen = (sceneTab && sceneTab->GetScene() == InAsset)
-                              || (blueprintTab && blueprintTab->GetBlueprint() == InAsset);
-        if (alreadyOpen) {
-            window->ActivateTab(tab);
-            window->CloseHeroTool();
-            return;
-        }
-    }
-
-    if (Scene* scene = Cast<Scene>(InAsset)) {
-        window->OpenTab<SceneEditorTab>()->OpenScene(scene);
+    if (window->OpenAssetEditor(InAsset)) {
         window->CloseHeroTool();
-        return;
     }
-    if (Blueprint* blueprint = Cast<Blueprint>(InAsset)) {
-        window->OpenTab<BlueprintEditorTab>()->OpenBlueprint(blueprint);
-        window->CloseHeroTool();
-        return;
-    }
-
-    AE_INFO("No editor for asset '{0}' ({1})", InAsset->GetDisplayName(), InAsset->GetClass().Name);
 }
 
 void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu, UINode& InAnchor) {

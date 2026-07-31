@@ -30,6 +30,7 @@ public:
     }
     void ActivateTab(MajorTab* InTab);
     void CloseTab(MajorTab* InTab);
+    MajorTab* OpenAssetEditor(class Asset* InAsset);
     MajorTab* GetActiveTab() const { return m_ActiveTab; }
     const Array<MajorTab*>& GetOpenTabs() const { return m_OpenTabs; }
 

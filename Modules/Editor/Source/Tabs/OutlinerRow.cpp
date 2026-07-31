@@ -1,6 +1,7 @@
 #include "OutlinerRow.h"
 #include "OutlinerTab.h"
 #include "MajorTab.h"
+#include "EditorWindow.h"
 #include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
 #include "UI/UIContextMenu.h"
@@ -15,6 +16,8 @@
 #include "Core/Log.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "Rendering/UIDrawList.h"
+#include "Assets/Font.h"
+#include <algorithm>
 
 static const Vec4 s_SelectedColor = HexColor(0x0F5A9E);
 static const Vec4 s_DropColor = HexColor(0x26BBFF, 0.35f);
@@ -112,8 +115,7 @@ void OutlinerRow::Refresh() {
     const bool inherited = node->IsInherited();
     m_Icon->Position = Vec2(indent + 16.0f, 0.0f);
     m_Icon->Image = EditorIcons::GetNodeIcon(node->GetClass());
-    m_Icon->Tint = node->GetBlueprintId().IsValid() ? EditorStyle::AccentBright
-                                                    : (nodeEnabled ? EditorStyle::Text : s_DisabledText);
+    m_Icon->Tint = nodeEnabled ? EditorStyle::Text : s_DisabledText;
 
     const float textLeft = indent + 36.0f;
     m_Label->Position = Vec2(textLeft, 0.0f);
@@ -132,7 +134,11 @@ void OutlinerRow::Refresh() {
     }
 
     m_TypeLabel->Text = node->GetSerializedClass().GetDisplayName();
-    m_TypeLabel->Color = nodeEnabled ? EditorStyle::TextDim : s_DisabledText;
+    if (node->GetBlueprintId().IsValid()) {
+        m_TypeLabel->Color = m_TypeHovered ? EditorStyle::TextBright : EditorStyle::AccentBright;
+    } else {
+        m_TypeLabel->Color = nodeEnabled ? EditorStyle::TextDim : s_DisabledText;
+    }
 
     const bool renaming = Owner->GetRenamingNode() == node;
     m_Label->SetEnabled(!renaming);
@@ -194,6 +200,12 @@ void OutlinerRow::Paint(UIDrawList& OutDrawList) {
         const UIRectF line(Vec2(m_Geometry.Min().x + indent, y - 1.0f),
                            Vec2(m_Geometry.Size.x - indent - 4.0f, 2.0f));
         OutDrawList.AddRect(line, EditorStyle::AccentBright, m_WorldMatrix);
+    }
+
+    if (m_TypeHovered) {
+        const UIRectF text = TypeTextRect();
+        const UIRectF underline(Vec2(text.Min().x, text.Max().y - 5.0f), Vec2(text.Size.x, 1.0f));
+        OutDrawList.AddRect(underline, EditorStyle::TextBright, m_WorldMatrix);
     }
 }
 
@@ -337,6 +349,11 @@ void OutlinerRow::OnPressed(const Vec2& InCursorPos) {
         return;
     }
 
+    if (IsBlueprintLink() && HitTestRect(TypeTextRect(), InCursorPos)) {
+        OpenBlueprint();
+        return;
+    }
+
     const OutlinerTab::VisibleRow* row = Owner->GetVisibleRow(RowIndex);
     if (!Owner->HasFilter() && row && row->HasChildren && m_Arrow->IsEnabled() && m_Arrow->HitTest(InCursorPos)) {
         Owner->ToggleExpanded(node);
@@ -385,4 +402,31 @@ void OutlinerRow::OnUIUpdate(const UIFrameContext& InContext) {
     if (m_DoubleClickTimer > 0.0f) {
         m_DoubleClickTimer -= InContext.DeltaTime;
     }
+
+    m_TypeHovered = IsBlueprintLink() && IsHovered() && HitTestRect(TypeTextRect(), InContext.CursorPosition);
+    Cursor = m_TypeHovered ? CursorIcon::Hand : CursorIcon::Arrow;
+}
+
+bool OutlinerRow::IsBlueprintLink() const {
+    Node* node = m_Node.Get();
+    return node && node->GetBlueprintId().IsValid();
+}
+
+// The type column is a fixed-width right-aligned slot; only the glyphs themselves are the link.
+UIRectF OutlinerRow::TypeTextRect() const {
+    const UIRectF& column = m_TypeLabel->GetGeometry();
+    Font* font = UINode::GetDefaultFont();
+    const float width = font ? std::min(column.Size.x, font->GetTextWidth(m_TypeLabel->Text, m_TypeLabel->FontSize))
+                             : column.Size.x;
+    return UIRectF(Vec2(column.Max().x - width, column.Min().y), Vec2(width, column.Size.y));
+}
+
+void OutlinerRow::OpenBlueprint() {
+    Node* node = m_Node.Get();
+    MajorTab* document = Owner ? Owner->GetMajorTab() : nullptr;
+    EditorWindow* window = document ? document->GetOwnerWindow() : nullptr;
+    if (!node || !window) {
+        return;
+    }
+    window->OpenAssetEditor(AssetManager::Get().GetAsset<Blueprint>(node->GetBlueprintId()));
 }

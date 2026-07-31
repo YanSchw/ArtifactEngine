@@ -1,6 +1,9 @@
 #include "EditorWindow.h"
 #include "Tabs/MajorTab.h"
 #include "Tabs/SceneEditorTab.h"
+#include "Tabs/BlueprintEditorTab.h"
+#include "Assets/Scene.h"
+#include "Assets/Blueprint.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIContextMenu.h"
@@ -228,6 +231,33 @@ void EditorWindow::ActivateTab(MajorTab* InTab) {
         tab->SetFloatingWindowsVisible(active);
     }
     m_ChromeDirty = true;
+}
+
+MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
+    if (!InAsset) {
+        return nullptr;
+    }
+
+    for (MajorTab* tab : m_OpenTabs) {
+        if (tab->GetEditedAsset() == InAsset) {
+            ActivateTab(tab);
+            return tab;
+        }
+    }
+
+    if (Scene* scene = Cast<Scene>(InAsset)) {
+        SceneEditorTab* tab = OpenTab<SceneEditorTab>();
+        tab->OpenScene(scene);
+        return tab;
+    }
+    if (Blueprint* blueprint = Cast<Blueprint>(InAsset)) {
+        BlueprintEditorTab* tab = OpenTab<BlueprintEditorTab>();
+        tab->OpenBlueprint(blueprint);
+        return tab;
+    }
+
+    AE_INFO("No editor for asset '{0}' ({1})", InAsset->GetDisplayName(), InAsset->GetClass().Name);
+    return nullptr;
 }
 
 void EditorWindow::CloseTab(MajorTab* InTab) {

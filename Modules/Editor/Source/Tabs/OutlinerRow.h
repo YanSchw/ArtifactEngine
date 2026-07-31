@@ -39,6 +39,9 @@ public:
 
 private:
     void Refresh();
+    bool IsBlueprintLink() const;
+    UIRectF TypeTextRect() const;
+    void OpenBlueprint();
 
     WeakObjectPtr<Node> m_Node;
     WeakObjectPtr<Node> m_RenameTarget;
@@ -51,5 +54,6 @@ private:
 
     Vec2 m_PressPos = Vec2(0.0f);
     bool m_Dragging = false;
+    bool m_TypeHovered = false;
     float m_DoubleClickTimer = 0.0f;
 };
