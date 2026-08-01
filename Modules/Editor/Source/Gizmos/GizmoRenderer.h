@@ -10,7 +10,9 @@ class Pipeline;
 class FrameBuffer;
 class UniformBuffer;
 class ShaderData;
+class VertexBuffer;
 class CameraNode;
+class GizmoGeometry;
 
 struct GizmoDraw {
     Mesh* MeshPtr = nullptr;
@@ -26,12 +28,19 @@ public:
     GizmoRenderer();
 
     void Render(FrameBuffer* InTarget, CameraNode* InViewCamera, const Array<GizmoDraw>& InDraws);
+    void RenderOverlay(FrameBuffer* InTarget, CameraNode* InViewCamera, const GizmoGeometry& InGeometry);
 
 private:
+    void UpdateViewProjection(CameraNode* InViewCamera);
     void EnsurePipeline(FrameBuffer* InTarget);
+    void EnsureOverlayPipeline(FrameBuffer* InTarget);
 
     SharedObjectPtr<Pipeline> m_Pipeline;
     SharedObjectPtr<UniformBuffer> m_UniformBuffer;
     Array<SharedObjectPtr<ShaderData>> m_ShaderData;
     WeakObjectPtr<FrameBuffer> m_PipelineTarget;
+
+    SharedObjectPtr<Pipeline> m_OverlayPipeline;
+    SharedObjectPtr<VertexBuffer> m_OverlayBuffer;
+    WeakObjectPtr<FrameBuffer> m_OverlayTarget;
 };

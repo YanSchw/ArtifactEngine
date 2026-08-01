@@ -1,4 +1,5 @@
 #include "GizmoRenderer.h"
+#include "GizmoGeometry.h"
 #include "Assets/Mesh.h"
 #include "Core/EngineConfig.h"
 #include "GameFramework/CameraNode.h"
@@ -12,6 +13,7 @@
 #include "Rendering/VertexBuffer.h"
 
 static SharedObjectPtr<Shader> s_GizmoShader;
+static SharedObjectPtr<Shader> s_OverlayShader;
 
 struct GizmoUniformData {
     Mat4 ViewProjection;
@@ -30,7 +32,19 @@ GizmoRenderer::GizmoRenderer() {
         s_GizmoShader = Shader::Create(FileIO::ReadFileToString(
             EngineConfig::GetContentDir("Editor") + "/Shaders/Gizmo.glsl"));
     }
+    if (!s_OverlayShader.Get()) {
+        s_OverlayShader = Shader::Create(FileIO::ReadFileToString(
+            EngineConfig::GetContentDir("Editor") + "/Shaders/GizmoOverlay.glsl"));
+    }
     m_UniformBuffer = UniformBuffer::Create(0, sizeof(GizmoUniformData));
+}
+
+void GizmoRenderer::UpdateViewProjection(CameraNode* InViewCamera) {
+    GizmoUniformData uniforms;
+    uniforms.ViewProjection = InViewCamera->GetViewProjectionMatrix();
+    void* mapped = m_UniformBuffer->MapData(sizeof(uniforms), 0);
+    memcpy(mapped, &uniforms, sizeof(uniforms));
+    m_UniformBuffer->UnmapData();
 }
 
 void GizmoRenderer::EnsurePipeline(FrameBuffer* InTarget) {
@@ -54,12 +68,7 @@ void GizmoRenderer::Render(FrameBuffer* InTarget, CameraNode* InViewCamera, cons
         return;
     }
     EnsurePipeline(InTarget);
-
-    GizmoUniformData uniforms;
-    uniforms.ViewProjection = InViewCamera->GetViewProjectionMatrix();
-    void* mapped = m_UniformBuffer->MapData(sizeof(uniforms), 0);
-    memcpy(mapped, &uniforms, sizeof(uniforms));
-    m_UniformBuffer->UnmapData();
+    UpdateViewProjection(InViewCamera);
 
     m_Pipeline->Bind();
 
@@ -84,4 +93,40 @@ void GizmoRenderer::Render(FrameBuffer* InTarget, CameraNode* InViewCamera, cons
             CmdSetShaderData{ m_ShaderData[i].Get() });
         draw.MeshPtr->GetVertexBuffer()->Draw();
     }
+}
+
+void GizmoRenderer::EnsureOverlayPipeline(FrameBuffer* InTarget) {
+    if (m_OverlayPipeline.Get() && m_OverlayTarget.Get() == InTarget) {
+        return;
+    }
+    if (m_OverlayPipeline.Get()) {
+        RenderingAPI::GetInstance()->WaitIdle();
+    }
+    PipelineDesc desc;
+    desc.Target = InTarget;
+    desc.Shader = s_OverlayShader;
+    desc.VertexLayout = GizmoVertex::GetLayout();
+    desc.EnableBlending = true;
+    desc.EnableDepthTest = false;
+    desc.DisableBackFaceCulling = true;
+    desc.Buffers.Add(m_UniformBuffer);
+    m_OverlayPipeline = Pipeline::Create(desc);
+    m_OverlayTarget = InTarget;
+}
+
+void GizmoRenderer::RenderOverlay(FrameBuffer* InTarget, CameraNode* InViewCamera, const GizmoGeometry& InGeometry) {
+    if (!InTarget || !InViewCamera || InGeometry.IsEmpty() || !s_OverlayShader.Get()) {
+        return;
+    }
+    EnsureOverlayPipeline(InTarget);
+    UpdateViewProjection(InViewCamera);
+
+    if (!m_OverlayBuffer.Get()) {
+        m_OverlayBuffer = VertexBuffer::CreateDynamic();
+    }
+    const Array<GizmoVertex>& vertices = InGeometry.GetVertices();
+    m_OverlayBuffer->Update(&vertices[0], (uint32_t)(vertices.Size() * sizeof(GizmoVertex)), InGeometry.GetIndices());
+
+    m_OverlayPipeline->Bind();
+    m_OverlayBuffer->Draw();
 }

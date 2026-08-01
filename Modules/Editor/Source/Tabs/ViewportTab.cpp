@@ -6,6 +6,7 @@
 #include "UI/UIViewportSurface.h"
 #include "Gizmos/GizmoLayer.h"
 #include "Gizmos/GizmoRenderer.h"
+#include "Gizmos/TransformGizmo.h"
 #include "Rendering/FrameBuffer.h"
 #include "GameFramework/Node.h"
 #include "InputSystem/KeyboardDevice.h"
@@ -34,6 +35,7 @@ ViewportTab::ViewportTab() {
     m_SceneTexture = Object::Create<RenderTargetTexture>();
     m_GizmoLayer = Object::Create<GizmoLayer>();
     m_GizmoRenderer = Object::Create<GizmoRenderer>();
+    m_TransformGizmo = Object::Create<TransformGizmo>();
 
     UIVStack* layout = Add<UIVStack>();
     layout->Fill();
@@ -47,7 +49,13 @@ ViewportTab::ViewportTab() {
     m_ViewportArea->Size = { 1.0_rel, 1.0_rel };  // whatever the toolbar leaves over
     m_ViewportArea->Image = m_SceneTexture;
     m_ViewportArea->Cursor = CursorIcon::Crosshair;
-    m_ViewportArea->Pressed = [this](const Vec2& InRenderPixel) { PickAt(InRenderPixel); };
+    m_ViewportArea->Pressed = [this](const Vec2& InRenderPixel) {
+        if (!m_TransformGizmo->BeginDrag(InRenderPixel)) {
+            PickAt(InRenderPixel);
+        }
+    };
+    m_ViewportArea->Dragged = [this](const Vec2& InRenderPixel, const Vec2&) { m_TransformGizmo->Drag(InRenderPixel); };
+    m_ViewportArea->Released = [this](bool) { m_TransformGizmo->EndDrag(); };
 }
 
 void ViewportTab::BuildToolBar(UINode& InToolBar) {
@@ -59,13 +67,29 @@ void ViewportTab::BuildToolBar(UINode& InToolBar) {
     tools->Gap = 2.0f;
 
     static const char* toolNames[] = { "Select", "Move", "Rotate", "Scale" };
+    static const GizmoMode toolModes[] = { GizmoMode::Select, GizmoMode::Translate, GizmoMode::Rotate, GizmoMode::Scale };
     for (int i = 0; i < 4; i++) {
-        UIButton& button = UI::Button(*tools, toolNames[i], [this, i] { m_ActiveTool = i; });
+        const GizmoMode mode = toolModes[i];
+        UIButton& button = UI::Button(*tools, toolNames[i], [this, mode] { m_TransformGizmo->Mode = mode; });
         button.Size = { 58.0_px, 1.0_rel };
         EditorStyle::ApplyButtonStyle(button);
         UIButton* buttonPtr = &button;
-        button.Bind = [this, buttonPtr, i] {
-            buttonPtr->NormalColor = (m_ActiveTool == i) ? EditorStyle::Accent : EditorStyle::Button;
+        button.Bind = [this, buttonPtr, mode] {
+            buttonPtr->NormalColor = (m_TransformGizmo->Mode == mode) ? EditorStyle::Accent : EditorStyle::Button;
+        };
+    }
+
+    UIButton& space = UI::Button(*tools, "World", [this] {
+        m_TransformGizmo->Space = m_TransformGizmo->Space == GizmoSpace::World ? GizmoSpace::Local : GizmoSpace::World;
+    });
+    space.Size = { 58.0_px, 1.0_rel };
+    EditorStyle::ApplyButtonStyle(space);
+    if (Node* caption = space.GetChildByClass(UILabel::StaticClass())) {
+        UILabel* spaceLabel = caption->As<UILabel>();
+        space.Bind = [this, spaceLabel] {
+            const bool local = m_TransformGizmo->Space == GizmoSpace::Local || m_TransformGizmo->Mode == GizmoMode::Scale;
+            spaceLabel->Text = local ? "Local" : "World";
+            spaceLabel->Color = m_TransformGizmo->Mode == GizmoMode::Scale ? EditorStyle::TextDim : EditorStyle::Text;
         };
     }
 
@@ -89,10 +113,14 @@ void ViewportTab::OnUIUpdate(const UIFrameContext& InContext) {
     // Keyboard and right/middle mouse are polled globally, so only the focused window's
     // viewport may drive the camera.
     ThemedWindow* focusedWindow = Cast<ThemedWindow>(Window::GetFocusedWindow());
-    if (focusedWindow && focusedWindow->GetCanvas() == GetCanvas()) {
+    const bool focused = focusedWindow && focusedWindow->GetCanvas() == GetCanvas();
+    if (focused) {
         m_Camera->UpdateNavigation(InContext.DeltaTime, *focusedWindow, m_ViewportArea->IsHovered());
     } else if (m_Camera->IsNavigating()) {
         m_Camera->CancelNavigation();
+    }
+    if (focused && m_ViewportArea->IsHovered() && !m_Camera->IsNavigating()) {
+        UpdateToolShortcuts();
     }
 
     // Render the scene at the viewport's size; the scene commands enter the queue here,
@@ -109,7 +137,34 @@ void ViewportTab::OnUIUpdate(const UIFrameContext& InContext) {
     m_GizmoLayer->Collect(GetEditedWorld(), m_Camera.Get(), GetMajorTab(), gizmos);
     m_GizmoRenderer->Render(m_Pipeline->GetFrameBuffer().Get(), m_Camera.Get(), gizmos);
 
+    m_TransformGizmo->Update(GetMajorTab(), m_Camera.Get(), rect.Size);
+    if (m_ViewportArea->IsHovered() && !m_Camera->IsNavigating()) {
+        m_TransformGizmo->SetHover(m_ViewportArea->ToRenderPixel(InContext.CursorPosition));
+    } else if (!m_TransformGizmo->IsDragging()) {
+        m_TransformGizmo->ClearHover();
+    }
+    m_ViewportArea->Cursor = m_TransformGizmo->IsEngaged() ? CursorIcon::Hand : CursorIcon::Crosshair;
+    m_GizmoRenderer->RenderOverlay(m_Pipeline->GetFrameBuffer().Get(), m_Camera.Get(), m_TransformGizmo->BuildGeometry());
+
     m_SceneTexture->SetView(m_Pipeline->GetFinalImageView());
+}
+
+void ViewportTab::UpdateToolShortcuts() {
+    KeyboardDevice* keyboard = KeyboardDevice::Instance();
+    if (!keyboard || m_TransformGizmo->IsDragging()) {
+        return;
+    }
+    if (keyboard->IsDown(KeyCode::Q)) {
+        m_TransformGizmo->Mode = GizmoMode::Select;
+    } else if (keyboard->IsDown(KeyCode::W)) {
+        m_TransformGizmo->Mode = GizmoMode::Translate;
+    } else if (keyboard->IsDown(KeyCode::E)) {
+        m_TransformGizmo->Mode = GizmoMode::Rotate;
+    } else if (keyboard->IsDown(KeyCode::R)) {
+        m_TransformGizmo->Mode = GizmoMode::Scale;
+    } else if (keyboard->IsDown(KeyCode::X)) {
+        m_TransformGizmo->Space = m_TransformGizmo->Space == GizmoSpace::World ? GizmoSpace::Local : GizmoSpace::World;
+    }
 }
 
 void ViewportTab::PickAt(const Vec2& InRenderPixel) {

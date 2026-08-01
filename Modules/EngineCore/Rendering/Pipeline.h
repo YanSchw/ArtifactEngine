@@ -20,6 +20,7 @@ struct PipelineDesc {
     bool EnableDepthTest = true;
     /* Passes whose projection flips Y for Vulkan mirror their on-screen winding. */
     bool ClockwiseFrontFace = false;
+    bool DisableBackFaceCulling = false;
 
     bool IsFrameBufferTarget() const;
     bool IsSurfaceTarget() const;
