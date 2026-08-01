@@ -75,7 +75,9 @@ Node* NodeRecord::Instantiate(Node* InParent) const {
         return nullptr;
     }
 
-    node->SetName(Name);
+    if (!Name.empty()) {
+        node->SetName(Name);
+    }
     Apply(*node);
     return node;
 }
@@ -136,7 +138,9 @@ void NodeRecord::CollectAssetReferences(Array<UUID>& OutIds) const {
 
 json NodeRecord::ToJson() const {
     json record = json::object();
-    record["Name"] = Name;
+    if (!Name.empty()) {
+        record["Name"] = Name;
+    }
     record["Class"] = ClassName;
     if (Inherited) {
         record["Inherited"] = true;

@@ -19,6 +19,9 @@ void NodeAsset::SetRoot(const SharedObjectPtr<NodeRecord>& InRoot) {
 
 void NodeAsset::CaptureFrom(Node& InNode) {
     m_Root = NodeRecord::Capture(InNode);
+    if (m_Root.Get()) {
+        m_Root->Name.clear();
+    }
 }
 
 Class NodeAsset::GetRootClass() const {
@@ -45,6 +48,9 @@ void NodeAsset::DeserializeFromJson(const String& InJson) {
         return;
     }
     m_Root = NodeRecord::FromJson(json["Root"]);
+    if (m_Root.Get()) {
+        m_Root->Name.clear();
+    }
 }
 
 bool NodeAsset::IsLoaded() const {

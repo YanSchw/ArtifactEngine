@@ -126,7 +126,13 @@ void AssetManager::HotLoadAssets() {
             UUID assetId = UUID::FromString(j["m_Id"].get<String>());
 
             if (m_Assets.ContainsKey(assetId)) {
-                m_AssetPaths[assetId] = filePath;
+                const String boundPath = GetAssetPath(assetId);
+                if (boundPath.empty() || boundPath == filePath || !FileIO::FileExists(boundPath)) {
+                    m_AssetPaths[assetId] = filePath;
+                } else {
+                    AE_ERROR("'{0}' carries the same asset id as '{1}' and is being ignored. Copying a .asset file copies its id; the copy needs a new one.",
+                             filePath, boundPath);
+                }
                 continue;
             }
 

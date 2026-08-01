@@ -90,6 +90,8 @@ public:
 
     /** The canvas this node is rooted in, or null while detached. */
     class UICanvas* GetCanvas() const;
+
+    void RunSubtreeFrame(const UIRectF& InRect, const UIFrameContext& InContext, UIDrawList& OutDrawList);
     /** Move the owning canvas's keyboard focus to this node. */
     void RequestFocus();
     /** Clear the owning canvas's focus if this node holds it. */

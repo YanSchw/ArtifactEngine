@@ -60,6 +60,9 @@ void SceneEditorTab::OpenScene(Scene* InScene) {
     DestroyRoot();
     m_Scene = InScene;
     m_Root = InScene ? GetEditedWorld()->Populate(InScene) : nullptr;
+    if (SceneRootNode* root = m_Root.Get()) {
+        root->SetName(InScene->GetDisplayName());
+    }
 }
 
 void SceneEditorTab::RebuildFromCurrentState() {
@@ -73,7 +76,7 @@ void SceneEditorTab::RebuildFromCurrentState() {
     DestroyRoot();
 
     SceneRootNode* rebuilt = GetEditedWorld()->Spawn<SceneRootNode>();
-    rebuilt->SetName(state->Name);
+    rebuilt->SetName(scene->GetDisplayName());
     state->Apply(*rebuilt);
     rebuilt->BindScene(scene);
     m_Root = rebuilt;
@@ -95,6 +98,10 @@ void SceneEditorTab::Save() {
 
 Asset* SceneEditorTab::GetEditedAsset() const {
     return m_Scene.Get();
+}
+
+Node* SceneEditorTab::GetAssetRootNode() const {
+    return m_Root.Get();
 }
 
 void SceneEditorTab::OnAssetSaved(Asset* InAsset) {

@@ -354,7 +354,6 @@ void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu, UINode& InAnchor) {
             return;
         }
         NodeRecord* record = new NodeRecord();
-        record->Name = blueprint->GetDisplayName();
         record->ClassName = Node3D::StaticClass().Name;
         blueprint->SetRoot(SharedObjectPtr<NodeRecord>(record));
         AssetManager::Get().SaveAsset(blueprint);

@@ -82,6 +82,7 @@ void DetailsCategory::OnBind() {
     const float indent = 4.0f + (float)Depth * 12.0f;
     m_Arrow->Position = Vec2(indent, (HeaderHeight - 12.0f) * 0.5f);
     m_TitleLabel->Position = Vec2(indent + 16.0f, 0.0f);
+    m_TitleLabel->Size = { 1.0_rel - UIValue::Px(indent + 20.0f), HeaderHeight };
     m_Arrow->Image = AssetManager::Get().GetAsset<VectorImage>(UUID::FromString(
         open ? "b1c2d3e4-0002-4a00-9000-000000000002" : "b1c2d3e4-0003-4a00-9000-000000000003"));
 }

@@ -282,6 +282,10 @@ void OutlinerTab::ToggleExpanded(Node* InNode) {
 }
 
 void OutlinerTab::BeginRename(Node* InNode) {
+    MajorTab* major = GetMajorTab();
+    if (major && major->IsAssetRootNode(InNode)) {
+        return;
+    }
     m_Renaming = InNode;
 }
 

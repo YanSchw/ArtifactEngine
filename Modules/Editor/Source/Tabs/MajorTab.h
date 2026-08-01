@@ -28,6 +28,8 @@ public:
     virtual void OnBind() override;
 
     virtual Asset* GetEditedAsset() const { return nullptr; }
+    virtual Node* GetAssetRootNode() const { return nullptr; }
+    bool IsAssetRootNode(Object* InObject) const { return InObject && InObject == (Object*)GetAssetRootNode(); }
     virtual void OnAssetSaved(Asset* InAsset) { (void)InAsset; }
     static void BroadcastAssetSaved(Asset* InAsset, MajorTab* InSource);
 

@@ -12,6 +12,7 @@ class Pipeline;
 class VertexBuffer;
 class UniformBuffer;
 class UICanvas;
+class UIDrawList;
 
 /** Draws a UI canvas each frame.
  *  The engine owns one instance and calls Render() after the scene blit, before
@@ -20,11 +21,12 @@ class UIRenderer {
 public:
     UIRenderer() = default;
 
-    void Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InViewportSize, const UIFrameContext& InContext);
+    void Render(Object* InTarget, UICanvas* InCanvas, const Vec2& InViewportSize, const UIFrameContext& InContext);
+    void Submit(Object* InTarget, const Vec2& InViewportSize, const UIDrawList& InDrawList, const Mat4& InProjection);
 
 private:
     void CreateSharedResources();
-    void CreatePipelines(Surface* InTarget);
+    void CreatePipelines(Object* InTarget);
     Pipeline* GetImagePipeline(Texture* InTexture);
 
     SharedObjectPtr<Shader> m_SolidShader;
@@ -39,7 +41,7 @@ private:
     SharedObjectPtr<VertexBuffer> m_DynamicVertexBuffer;
 
     bool m_ResourcesReady = false;
-    Surface* m_CachedTarget = nullptr;
+    Object* m_CachedTarget = nullptr;
     uint32_t m_CachedWidth = 0;
     uint32_t m_CachedHeight = 0;
     bool m_TextPipelineReady = false;

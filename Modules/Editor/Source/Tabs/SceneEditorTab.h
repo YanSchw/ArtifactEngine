@@ -23,6 +23,7 @@ public:
     virtual VectorImage* GetTabIcon() const override;
     virtual void BuildToolBar(UINode& InToolBar) override;
     virtual Asset* GetEditedAsset() const override;
+    virtual Node* GetAssetRootNode() const override;
     virtual void OnAssetSaved(Asset* InAsset) override;
 
 private:

@@ -20,7 +20,7 @@ BlueprintEditorTab::BlueprintEditorTab() {
     SetEditedWorld(new World());
 
     UIDockArea* area = GetDockArea();
-    area->DockNew<ViewportTab>(UIDockSlot::Center);
+    m_Viewport = area->DockNew<ViewportTab>(UIDockSlot::Center);
     OutlinerTab* outliner = area->DockNew<OutlinerTab>(UIDockSlot::Left, nullptr, 0.24f);
     area->DockNew<DetailsTab>(UIDockSlot::Bottom, outliner->GetDockNode(), 0.45f);
 }
@@ -43,11 +43,30 @@ void BlueprintEditorTab::BuildInstanceFrom(NodeRecord& InRecord) {
         return;
     }
 
-    instance->SetName(InRecord.Name);
+    if (!InRecord.Name.empty()) {
+        instance->SetName(InRecord.Name);
+    }
     InRecord.Apply(*instance);
     m_Instance = instance;
 
+    if (Blueprint* blueprint = m_Blueprint.Get()) {
+        instance->SetName(blueprint->GetDisplayName());
+    }
+    SyncViewportMode();
+
     SetSelection(instance);
+}
+
+void BlueprintEditorTab::SyncViewportMode() {
+    Node* instance = m_Instance.Get();
+    if (!m_Viewport || !instance) {
+        return;
+    }
+    const int8_t isUI = instance->IsA<UINode>() ? 1 : 0;
+    if (m_RootWasUI != isUI) {
+        m_RootWasUI = isUI;
+        m_Viewport->SetDesignMode(isUI != 0);
+    }
 }
 
 void BlueprintEditorTab::OpenBlueprint(Blueprint* InBlueprint) {
@@ -153,6 +172,10 @@ void BlueprintEditorTab::Save() {
 
 Asset* BlueprintEditorTab::GetEditedAsset() const {
     return m_Blueprint.Get();
+}
+
+Node* BlueprintEditorTab::GetAssetRootNode() const {
+    return m_Instance.Get();
 }
 
 void BlueprintEditorTab::OnAssetSaved(Asset* InAsset) {

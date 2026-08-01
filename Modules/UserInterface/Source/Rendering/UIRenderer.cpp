@@ -38,11 +38,11 @@ void UIRenderer::CreateSharedResources() {
     m_ResourcesReady = true;
 }
 
-void UIRenderer::CreatePipelines(Surface* InTarget) {
+void UIRenderer::CreatePipelines(Object* InTarget) {
     m_ImagePipelines = Map<Texture*, SharedObjectPtr<Pipeline>>();
 
     PipelineDesc solidDesc;
-    solidDesc.Target = (Object*)InTarget;
+    solidDesc.Target = InTarget;
     solidDesc.Shader = m_SolidShader;
     solidDesc.VertexLayout = UIVertex::GetLayout();
     solidDesc.EnableBlending = true;
@@ -55,7 +55,7 @@ void UIRenderer::CreatePipelines(Surface* InTarget) {
     Font* font = UINode::GetDefaultFont();
     if (font && font->GetAtlasTexture()) {
         PipelineDesc textDesc;
-        textDesc.Target = (Object*)InTarget;
+        textDesc.Target = InTarget;
         textDesc.Shader = m_TextShader;
         textDesc.VertexLayout = UIVertex::GetLayout();
         textDesc.EnableBlending = true;
@@ -67,8 +67,17 @@ void UIRenderer::CreatePipelines(Surface* InTarget) {
     }
 }
 
-void UIRenderer::Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InViewportSize, const UIFrameContext& InContext) {
+void UIRenderer::Render(Object* InTarget, UICanvas* InCanvas, const Vec2& InViewportSize, const UIFrameContext& InContext) {
     if (!InTarget || !InCanvas || InViewportSize.x <= 0.0f || InViewportSize.y <= 0.0f) {
+        return;
+    }
+    UIDrawList drawList;
+    const Mat4 projection = InCanvas->RunFrame(InViewportSize, InContext, drawList);
+    Submit(InTarget, InViewportSize, drawList, projection);
+}
+
+void UIRenderer::Submit(Object* InTarget, const Vec2& InViewportSize, const UIDrawList& InDrawList, const Mat4& InProjection) {
+    if (!InTarget || InViewportSize.x <= 0.0f || InViewportSize.y <= 0.0f) {
         return;
     }
     if (!m_ResourcesReady) {
@@ -88,24 +97,22 @@ void UIRenderer::Render(Surface* InTarget, UICanvas* InCanvas, const Vec2& InVie
         m_CachedHeight = height;
     }
 
-    // The canvas runs the frame (bind/layout/input/paint) and hands back the projection to draw with.
-    UIDrawList drawList;
-    const Mat4 projection = InCanvas->RunFrame(InViewportSize, InContext, drawList);
     void* mapped = m_ProjectionBuffer->MapData(sizeof(Mat4), 0);
-    memcpy(mapped, &projection, sizeof(Mat4));
+    memcpy(mapped, &InProjection, sizeof(Mat4));
     m_ProjectionBuffer->UnmapData();
 
-    if (drawList.IsEmpty()) {
+    m_SolidPipeline->Bind();
+    if (InDrawList.IsEmpty()) {
         return;
     }
 
     if (!m_DynamicVertexBuffer) {
         m_DynamicVertexBuffer = VertexBuffer::CreateDynamic();
     }
-    m_DynamicVertexBuffer->Update(&drawList.GetVertices()[0], (uint32_t)(drawList.GetVertices().Size() * sizeof(UIVertex)), drawList.GetIndices());
+    m_DynamicVertexBuffer->Update(&InDrawList.GetVertices()[0], (uint32_t)(InDrawList.GetVertices().Size() * sizeof(UIVertex)), InDrawList.GetIndices());
 
     // Draw each batch in paint (tree) order so later nodes layer in front.
-    for (const UIDrawList::Batch& batch : drawList.GetBatches()) {
+    for (const UIDrawList::Batch& batch : InDrawList.GetBatches()) {
         if (batch.Kind == UIDrawList::BatchKind::Text) {
             if (!m_TextPipelineReady) {
                 continue;

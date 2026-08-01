@@ -2,6 +2,7 @@
 #include "DetailsCategory.h"
 #include "DetailsRow.h"
 #include "Tabs/DetailsTab.h"
+#include "Tabs/MajorTab.h"
 #include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
 #include "UI/UIDragNumber.h"
@@ -18,9 +19,10 @@
 #include <memory>
 
 float NodeDetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, DetailsTab& InTab) {
-    (void)InTab;
     Node* node = Cast<Node>(InObject);
     WeakObjectPtr<Node> weak(node);
+    MajorTab* major = InTab.GetMajorTab();
+    const bool isAssetRoot = major && major->IsAssetRootNode(InObject);
 
     UIQuad* background = InHeader.Add<UIQuad>();
     background->Fill();
@@ -67,6 +69,14 @@ float NodeDetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, 
             }
         }
     };
+
+    if (isAssetRoot) {
+        name->Interactable = false;
+        name->TextColor = EditorStyle::TextDim;
+        name->BackgroundColor = EditorStyle::ToolBar;
+        return 44.0f;
+    }
+
     const auto commitName = [weak](const String& InName) {
         if (Node* bound = weak.Get()) {
             if (!InName.empty()) {

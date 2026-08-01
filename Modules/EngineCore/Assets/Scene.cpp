@@ -9,8 +9,8 @@ SceneRootNode* Scene::Populate(World& OutWorld) {
     AssetManager::Get().LoadAsset(this);
 
     SceneRootNode* root = OutWorld.Spawn<SceneRootNode>();
+    root->SetName(GetDisplayName());
     if (NodeRecord* record = GetRoot()) {
-        root->SetName(record->Name);
         record->Apply(*root);
     }
     root->BindScene(this);
@@ -24,7 +24,6 @@ Scene* Scene::CreateEmpty(const String& InDirectory, const String& InName) {
     }
 
     NodeRecord* record = new NodeRecord();
-    record->Name = InName;
     record->ClassName = SceneRootNode::StaticClass().Name;
     scene->SetRoot(SharedObjectPtr<NodeRecord>(record));
 

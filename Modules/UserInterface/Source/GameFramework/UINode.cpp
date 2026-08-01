@@ -124,6 +124,14 @@ void UINode::UpdateTree(const UIFrameContext& InContext) {
     }
 }
 
+void UINode::RunSubtreeFrame(const UIRectF& InRect, const UIFrameContext& InContext, UIDrawList& OutDrawList) {
+    BindTree();
+    Layout(InRect);
+    UpdateTree(InContext);
+    Layout(InRect);
+    PaintTree(OutDrawList);
+}
+
 UICanvas* UINode::GetCanvas() const {
     for (Node* node = const_cast<UINode*>(this); node; node = node->GetParent()) {
         if (UICanvas* canvas = node->As<UICanvas>()) {

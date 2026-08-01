@@ -40,6 +40,7 @@ Node* Blueprint::CreateInstance() const {
     }
 
     AdoptAsBlueprintContent(*node, true);
+    node->SetName(GetDisplayName());
     node->m_BlueprintId = GetId();
     return node;
 }
