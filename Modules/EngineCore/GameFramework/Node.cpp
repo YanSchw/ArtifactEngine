@@ -333,20 +333,41 @@ void Node::ClearAllPropertyOverrides() {
     m_OverriddenProperties.Clear();
 }
 
+static Node* FindDefaultsFor(Node& InNode, Node*& OutTemplate) {
+    Array<String> path;
+    Node* definer = &InNode;
+    while (definer->IsInherited() && definer->GetParent()) {
+        path.Add(definer->GetName());
+        definer = definer->GetParent();
+    }
+
+    OutTemplate = Cast<Node>(Object::Create(definer->GetSerializedClass()));
+
+    Node* source = OutTemplate;
+    for (int32_t i = path.Size() - 1; i >= 0 && source; i--) {
+        source = source->GetDirectChildByName(path[i]);
+    }
+    return source;
+}
+
 void Node::ResetPropertyToDefault(const String& InPropertyName) {
     ClearPropertyOverride(InPropertyName);
 
-    Property* property = Property::FindTypeProperty(GetSerializedClass(), InPropertyName);
+    Property* property = Property::FindTypeProperty(GetClass(), InPropertyName);
     if (!property) {
         return;
     }
 
-    Node* defaults = Cast<Node>(Object::Create(GetSerializedClass()));
-    if (!defaults) {
-        return;
+    Node* defaults = nullptr;
+    Node* source = FindDefaultsFor(*this, defaults);
+
+    if (source && source->IsA(GetClass())) {
+        property->CopyValue(this, source);
+        property->NotifyChanged(this);
+    } else {
+        AE_WARN("'{0}' no longer exists in what defines it, so '{1}' cannot be reset", GetName(), InPropertyName);
     }
-    property->CopyValue(this, defaults);
-    property->NotifyChanged(this);
+
     delete defaults;
 }
 
