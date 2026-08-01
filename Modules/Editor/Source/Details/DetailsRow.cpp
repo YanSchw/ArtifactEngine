@@ -48,7 +48,7 @@ void DetailsRow::SetLabel(const String& InLabel) {
 }
 
 float DetailsRow::MeasureHeight(const String& InFilter) const {
-    return DetailsTab::MatchesFilter(m_Label, InFilter) ? RowHeight : 0.0f;
+    return DetailsTab::MatchesFilter(m_Label, InFilter) ? Height : 0.0f;
 }
 
 void DetailsRow::OnBind() {
@@ -61,10 +61,10 @@ void DetailsRow::OnBind() {
     m_ResetButton->SetEnabled(ResetAction != nullptr && overridden);
 
     m_NameLabel->Position = Vec2(indent, 0.0f);
-    m_NameLabel->Size = { UIValue(split, -(indent + 8.0f)), RowHeight };
+    m_NameLabel->Size = { UIValue(split, -(indent + 8.0f)), Height };
 
     m_ValueHost->Position = { UIValue(split, 5.0f), 0.0f };
-    m_ValueHost->Size = { UIValue(1.0f - split, -(5.0f + 3.0f + ResetColumnWidth)), RowHeight - 4.0f };
+    m_ValueHost->Size = { UIValue(1.0f - split, -(5.0f + 3.0f + ResetColumnWidth)), Height - 4.0f };
 }
 
 void DetailsRow::Paint(UIDrawList& OutDrawList) {

@@ -27,6 +27,8 @@ public:
     const String& GetFilter() const { return m_Filter; }
     static bool MatchesFilter(const String& InText, const String& InLowerFilter);
 
+    class ThumbnailRenderer& GetThumbnails();
+
 private:
     void Refresh();
     void RebuildInspector(Object* InObject, DetailsCustomization* InCustomization);
@@ -39,6 +41,7 @@ private:
     UILabel* m_MessageLabel = nullptr;
 
     WeakObjectPtr<Object> m_Inspected;
+    SharedObjectPtr<class ThumbnailRenderer> m_Thumbnails;
     float m_HeaderHeight = 0.0f;
     float m_LabelSplit = 0.32f;
     String m_Filter;

@@ -1,10 +1,21 @@
 #include "EditorIcons.h"
+#include "EditorStyle.h"
 #include "Rendering/UIDrawList.h"
 #include <algorithm>
 
+template<typename T>
+static bool FindForClassChain(Map<String, T>& InTable, const Class& InClass, T& OutValue) {
+    for (Class current = InClass; current != Class::None; current = current.GetParentClass()) {
+        if (InTable.ContainsKey(current.Name)) {
+            OutValue = InTable[current.Name];
+            return true;
+        }
+    }
+    return false;
+}
+
 VectorImage* EditorIcons::GetNodeIcon(const Class& InClass) {
     static Map<String, VectorImage*> s_NodeIcons;
-    AssetManager& assets = AssetManager::Get();
     if (s_NodeIcons.Size() == 0) {
         s_NodeIcons["Node"] = Get("b1c2d3e4-0001-4a00-9000-000000000001");
         s_NodeIcons["Node3D"] = Get("b1c2d3e4-0009-4a00-9000-000000000014");
@@ -13,7 +24,40 @@ VectorImage* EditorIcons::GetNodeIcon(const Class& InClass) {
         s_NodeIcons["Component"] = Get("b1c2d3e4-0009-4a00-9000-000000000012");
     }
 
-    return s_NodeIcons.ContainsKey(InClass.Name) ? s_NodeIcons[InClass.Name] : GetNodeIcon(InClass.GetParentClass());
+    VectorImage* icon = nullptr;
+    return FindForClassChain(s_NodeIcons, InClass, icon) ? icon : Node();
+}
+
+VectorImage* EditorIcons::GetAssetIcon(const Class& InClass) {
+    static Map<String, VectorImage*> s_AssetIcons;
+    if (s_AssetIcons.Size() == 0) {
+        s_AssetIcons["Asset"] = Asset();
+        s_AssetIcons["Mesh"] = Mesh();
+        s_AssetIcons["Texture2D"] = Texture();
+        s_AssetIcons["Font"] = Font();
+        s_AssetIcons["VectorImage"] = Node();
+        s_AssetIcons["Scene"] = Level();
+        s_AssetIcons["Blueprint"] = Node();
+    }
+
+    VectorImage* icon = nullptr;
+    return FindForClassChain(s_AssetIcons, InClass, icon) ? icon : Asset();
+}
+
+Vec4 EditorIcons::GetAssetColor(const Class& InClass) {
+    static Map<String, Vec4> s_AssetColors;
+    if (s_AssetColors.Size() == 0) {
+        s_AssetColors["Asset"] = HexColor(0x9A9A9A);
+        s_AssetColors["Mesh"] = HexColor(0x1FB8C4);
+        s_AssetColors["Texture2D"] = HexColor(0xE0704A);
+        s_AssetColors["Font"] = HexColor(0xA96BD8);
+        s_AssetColors["VectorImage"] = HexColor(0x4ACF8B);
+        s_AssetColors["Scene"] = HexColor(0xE0A44A);
+        s_AssetColors["Blueprint"] = HexColor(0x3D8BE0);
+    }
+
+    Vec4 color(0.0f);
+    return FindForClassChain(s_AssetColors, InClass, color) ? color : HexColor(0x9A9A9A);
 }
 
 void EditorIcons::Paint(UIDrawList& OutDrawList, VectorImage* InIcon, const UIRectF& InRect,

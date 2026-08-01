@@ -2,6 +2,7 @@
 #include "Assets/AssetManager.h"
 #include "Assets/Asset.h"
 #include "Assets/Mesh.h"
+#include "Assets/Texture2D.h"
 #include "Core/EngineConfig.h"
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/RenderTargetTexture.h"
@@ -14,7 +15,15 @@ static constexpr int32_t s_MaxCache = 128;
 static constexpr int32_t s_PerFrameBudget = 2;
 
 Texture* ThumbnailRenderer::GetThumbnail(Asset* InAsset) {
-    Mesh* mesh = InAsset ? InAsset->As<Mesh>() : nullptr;
+    if (!InAsset) {
+        return nullptr;
+    }
+
+    if (Texture2D* texture = InAsset->As<Texture2D>()) {
+        return texture->IsLoaded() ? texture->GetTexture() : nullptr;
+    }
+
+    Mesh* mesh = InAsset->As<Mesh>();
     if (!mesh) {
         return nullptr;
     }

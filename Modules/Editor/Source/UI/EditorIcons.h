@@ -36,6 +36,8 @@ public:
     static VectorImage* Close()         { return Get("b1c2d3e4-001a-4a00-9000-00000000001a"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
+    static VectorImage* GetAssetIcon(const Class& InClass);
+    static Vec4 GetAssetColor(const Class& InClass);
 
     static void Paint(UIDrawList& OutDrawList, VectorImage* InIcon, const UIRectF& InRect,
                       const Vec4& InTint, const Mat4& InTransform);

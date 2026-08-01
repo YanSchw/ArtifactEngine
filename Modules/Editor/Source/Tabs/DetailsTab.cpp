@@ -4,6 +4,7 @@
 #include "Details/DetailsItem.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
+#include "HeroTools/ThumbnailRenderer.h"
 #include "GameFramework/UIVStack.h"
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UILabel.h"
@@ -63,6 +64,13 @@ DetailsTab::DetailsTab() {
     Bind = [this] { Refresh(); };
 }
 
+ThumbnailRenderer& DetailsTab::GetThumbnails() {
+    if (!m_Thumbnails.Get()) {
+        m_Thumbnails = Object::Create<ThumbnailRenderer>();
+    }
+    return *m_Thumbnails.Get();
+}
+
 void DetailsTab::SetLabelSplit(float InSplit) {
     m_LabelSplit = std::clamp(InSplit, 0.2f, 0.8f);
 }
@@ -73,6 +81,10 @@ bool DetailsTab::MatchesFilter(const String& InText, const String& InLowerFilter
 
 void DetailsTab::Refresh() {
     m_Filter = ToLower(m_SearchField->Text);
+
+    if (m_Thumbnails.Get()) {
+        m_Thumbnails->Tick();
+    }
 
     MajorTab* major = GetMajorTab();
     const Array<Object*> selection = major ? major->GetSelection() : Array<Object*>();

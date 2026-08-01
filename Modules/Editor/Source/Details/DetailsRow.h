@@ -16,6 +16,8 @@ public:
 
     DetailsRow();
 
+    float Height = RowHeight;
+
     void SetLabel(const String& InLabel);
     const String& GetLabel() const { return m_Label; }
     UINode* GetValueHost() const { return m_ValueHost; }

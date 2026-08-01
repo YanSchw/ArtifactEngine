@@ -3,11 +3,17 @@
 #include "DetailsRow.h"
 #include "Tabs/DetailsTab.h"
 #include "UI/EditorStyle.h"
+#include "UI/EditorIcons.h"
 #include "UI/UIDragNumber.h"
 #include "UI/UIDropdown.h"
 #include "UI/UICheckbox.h"
+#include "HeroTools/ThumbnailRenderer.h"
 #include "GameFramework/UILabel.h"
+#include "GameFramework/UIQuad.h"
+#include "GameFramework/UISvg.h"
+#include "GameFramework/UIImage.h"
 #include "GameFramework/UITextArea.h"
+#include "Rendering/Texture.h"
 #include "Object/Enum.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Asset.h"
@@ -16,6 +22,9 @@
 #include <cctype>
 #include <cstring>
 #include <memory>
+
+static constexpr float AssetThumbnailSize = 44.0f;
+static constexpr float AssetRowHeight = 52.0f;
 
 static char* ResolveBase(const WeakObjectPtr<Object>& InObject, uint64_t InOffset) {
     Object* object = InObject.Get();
@@ -215,15 +224,65 @@ static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
     };
 }
 
-static void BuildAssetRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+static void BuildAssetThumbnail(UINode& InHost, DetailsTab& InTab, const Class& InAssetClass,
+                                const std::function<Asset*()>& InGetAsset) {
+    UIQuad* frame = InHost.Add<UIQuad>();
+    frame->Anchor = frame->Pivot = Vec2(0.0f, 0.5f);
+    frame->Size = Vec2(AssetThumbnailSize, AssetThumbnailSize);
+    frame->Color = EditorStyle::FieldBorder;
+
+    UIQuad* background = frame->Add<UIQuad>();
+    background->Anchor = background->Pivot = Vec2(0.0f);
+    background->Position = Vec2(1.0f, 1.0f);
+    background->Size = Vec2(AssetThumbnailSize - 2.0f, AssetThumbnailSize - 2.0f);
+    background->Color = EditorStyle::PanelDark;
+
+    UISvg* icon = background->Add<UISvg>();
+    icon->Center(Vec2(22.0f, 22.0f));
+
+    UIImage* preview = background->Add<UIImage>();
+    preview->Center({ 1.0_rel - 4.0_px, 1.0_rel - 4.0_px });
+
+    UIQuad* typeBar = frame->Add<UIQuad>();
+    typeBar->Anchor = typeBar->Pivot = Vec2(0.0f, 1.0f);
+    typeBar->Size = { 1.0_rel, 3.0_px };
+
+    DetailsTab* tab = &InTab;
+    frame->Bind = [icon, preview, typeBar, tab, InAssetClass, InGetAsset] {
+        Asset* asset = InGetAsset();
+        const Class assetClass = asset ? asset->GetClass() : InAssetClass;
+        const Vec4 color = EditorIcons::GetAssetColor(assetClass);
+
+        typeBar->Color = asset ? color : Vec4(color.r, color.g, color.b, 0.35f);
+        icon->Image = EditorIcons::GetAssetIcon(assetClass);
+        icon->Tint = asset ? color : Vec4(color.r, color.g, color.b, 0.4f);
+
+        Texture* thumbnail = asset ? tab->GetThumbnails().GetThumbnail(asset) : nullptr;
+        const bool ready = thumbnail && thumbnail->GetDefaultView().Get();
+        preview->Image = ready ? thumbnail : nullptr;
+        preview->SetEnabled(ready);
+        icon->SetEnabled(!ready);
+    };
+}
+
+static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
                           const Class& InAssetClass, bool InIsWeak, const std::function<void()>& InOnEdited) {
     auto snapshot = std::make_shared<Array<WeakObjectPtr<Asset>>>();
 
-    UIDropdown* dropdown = InRow.GetValueHost()->Add<UIDropdown>();
-    dropdown->Fill();
-    dropdown->GetSelectedLabel = [InObject, InOffset, InIsWeak] {
+    const auto readAsset = [InObject, InOffset, InIsWeak]() -> Asset* {
         char* base = ResolveBase(InObject, InOffset);
-        Asset* asset = base ? Cast<Asset>(ReadObjectPtr(base, InIsWeak)) : nullptr;
+        return base ? Cast<Asset>(ReadObjectPtr(base, InIsWeak)) : nullptr;
+    };
+
+    InRow.Height = AssetRowHeight;
+    BuildAssetThumbnail(*InRow.GetValueHost(), InTab, InAssetClass, readAsset);
+
+    UIDropdown* dropdown = InRow.GetValueHost()->Add<UIDropdown>();
+    dropdown->Anchor = dropdown->Pivot = Vec2(0.0f, 0.5f);
+    dropdown->Position = Vec2(AssetThumbnailSize + 6.0f, 0.0f);
+    dropdown->Size = { 1.0_rel - UIValue::Px(AssetThumbnailSize + 6.0f), 22.0_px };
+    dropdown->GetSelectedLabel = [readAsset] {
+        Asset* asset = readAsset();
         return asset ? asset->GetDisplayName() : String("None");
     };
     dropdown->GetOptions = [snapshot, InAssetClass] {
@@ -236,9 +295,8 @@ static void BuildAssetRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObje
         }
         return options;
     };
-    dropdown->GetSelectedIndex = [snapshot, InObject, InOffset, InIsWeak]() -> int32_t {
-        char* base = ResolveBase(InObject, InOffset);
-        Object* current = base ? ReadObjectPtr(base, InIsWeak) : nullptr;
+    dropdown->GetSelectedIndex = [snapshot, readAsset]() -> int32_t {
+        Object* current = readAsset();
         for (int32_t i = 0; i < snapshot->Size(); i++) {
             if ((*snapshot)[i].Get() == current) {
                 return i + 1;
@@ -370,13 +428,13 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
         BuildEnumRow(row, InObject, offset, enumProperty, onEdited);
     } else if (SharedObjectPtrProperty* sharedProperty = Cast<SharedObjectPtrProperty>(InProperty)) {
         if (sharedProperty->InnerClass.IsSubclassOf(Asset::StaticClass())) {
-            BuildAssetRow(row, InObject, offset, sharedProperty->InnerClass, false, onEdited);
+            BuildAssetRow(row, InTab, InObject, offset, sharedProperty->InnerClass, false, onEdited);
         } else {
             AddValueLabel(*row.GetValueHost(), sharedProperty->InnerClass.Name);
         }
     } else if (WeakObjectPtrProperty* weakProperty = Cast<WeakObjectPtrProperty>(InProperty)) {
         if (weakProperty->InnerClass.IsSubclassOf(Asset::StaticClass())) {
-            BuildAssetRow(row, InObject, offset, weakProperty->InnerClass, true, onEdited);
+            BuildAssetRow(row, InTab, InObject, offset, weakProperty->InnerClass, true, onEdited);
         } else {
             AddValueLabel(*row.GetValueHost(), weakProperty->InnerClass.Name);
         }
