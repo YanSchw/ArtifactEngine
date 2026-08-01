@@ -81,6 +81,7 @@ void TransformGizmo::Update(MajorTab* InMajorTab, CameraNode* InViewCamera, cons
 
     if (IsDragging()) {
         m_ViewerFromPivot = DirectionToViewer(m_Pivot);
+        m_HandleScale = WorldPerPixel(m_Pivot);
         return;
     }
 
@@ -380,6 +381,7 @@ bool TransformGizmo::BeginDrag(const Vec2& InViewportPixel) {
     m_DragHandle = handle;
     m_Hover = handle;
     m_DragPivot = m_Pivot;
+    m_DragHandleScale = m_HandleScale;
 
     Vec3 rayOrigin, rayDirection;
     BuildRay(InViewportPixel, rayOrigin, rayDirection);
@@ -489,7 +491,7 @@ void TransformGizmo::Drag(const Vec2& InViewportPixel) {
         return;
     }
 
-    const float handleLength = glm::max(s_AxisLength * m_HandleScale, 1e-5f);
+    const float handleLength = glm::max(s_AxisLength * m_DragHandleScale, 1e-5f);
     Vec3 factor(1.0f);
     if (axisIndex >= 0) {
         float amount = 1.0f + (AxisParameter(rayOrigin, rayDirection, m_DragAxis) - m_DragStartParameter) / handleLength;

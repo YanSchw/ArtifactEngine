@@ -95,6 +95,7 @@ private:
     Handle m_DragHandle = Handle::None;
     Array<DragTarget> m_DragTargets;
     Vec3 m_DragPivot = Vec3(0.0f);
+    float m_DragHandleScale = 1.0f;
     Vec3 m_DragAxis = Vec3(1.0f, 0.0f, 0.0f);
     Vec3 m_DragPlaneNormal = Vec3(0.0f, 1.0f, 0.0f);
     Vec3 m_DragStartPoint = Vec3(0.0f);
