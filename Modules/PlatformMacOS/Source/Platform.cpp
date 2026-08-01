@@ -1,6 +1,8 @@
 #include "Platform/Platform.h"
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <dlfcn.h>
+#include <cstdlib>
 
 static std::filesystem::path GetMacOSResourcesPath() {
     CFBundleRef bundle = CFBundleGetMainBundle();
@@ -72,4 +74,31 @@ void Platform::SetApplicationIcon(const String& InImagePath) {
     void* app = SendMessage(objc_getClass("NSApplication"), "sharedApplication");
     SendMessage(app, "setApplicationIconImage:", image);
     SendMessage(image, "release");
+}
+
+static constexpr int32_t s_PreviousInputSourceHotKey = 60;
+static constexpr int32_t s_NextInputSourceHotKey = 61;
+
+void Platform::SetSystemShortcutsSuppressed(bool InSuppressed) {
+    // CGSSetSymbolicHotKeyEnabled is the only way to release a symbolic hotkey without the user
+    // turning it off in System Settings. It is private, so it is resolved at runtime and the
+    // suppression is simply skipped if a future release drops it.
+    using SetHotKeyEnabledFn = int32_t (*)(int32_t, bool);
+    static SetHotKeyEnabledFn setHotKeyEnabled = (SetHotKeyEnabledFn)dlsym(RTLD_DEFAULT, "CGSSetSymbolicHotKeyEnabled");
+    static bool suppressed = false;
+
+    if (!setHotKeyEnabled || suppressed == InSuppressed) {
+        return;
+    }
+    if (InSuppressed && !suppressed) {
+        // The suspension outlives the process, so make sure a normal exit always restores it.
+        static bool registered = false;
+        if (!registered) {
+            registered = true;
+            std::atexit([]() { Platform::SetSystemShortcutsSuppressed(false); });
+        }
+    }
+    suppressed = InSuppressed;
+    setHotKeyEnabled(s_PreviousInputSourceHotKey, !InSuppressed);
+    setHotKeyEnabled(s_NextInputSourceHotKey, !InSuppressed);
 }

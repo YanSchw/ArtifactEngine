@@ -40,6 +40,7 @@ void EditorEngine::Initialize() {
 
 void EditorEngine::TickInput(double InDeltaTime) {
     Window::PollEvents();
+    Platform::SetSystemShortcutsSuppressed(Window::GetFocusedWindow() != nullptr);
     // Refresh devices + evaluate action maps before gameplay reads them.
     InputSystem::Get().Tick((float)InDeltaTime);
 }
@@ -81,6 +82,7 @@ bool EditorEngine::MainTick(double InDeltaTime) {
 }
 
 void EditorEngine::Shutdown() {
+    Platform::SetSystemShortcutsSuppressed(false);
     // Tear the windows (and their UI renderers) down before the assets they sample and the RHI.
     ThemedWindow::DestroyAllWindows();
     AssetManager::Get().Shutdown();

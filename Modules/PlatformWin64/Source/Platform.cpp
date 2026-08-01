@@ -26,3 +26,6 @@ String Platform::GetContentDirectory() {
 
 void Platform::SetApplicationIcon(const String&) {
 }
+
+void Platform::SetSystemShortcutsSuppressed(bool) {
+}
