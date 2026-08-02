@@ -64,6 +64,7 @@ public:
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
 
 private:
+    void SpawnDroppedAsset(class Asset* InAsset, const Vec2& InCursorPos);
     void RebuildVisible();
     void AppendSubtree(Node* InNode, int InDepth);
     bool MatchesFilter(Node* InNode) const;

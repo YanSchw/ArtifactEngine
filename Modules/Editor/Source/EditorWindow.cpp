@@ -16,6 +16,7 @@
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UISvg.h"
 #include "GameFramework/UILabel.h"
+#include "GameFramework/UITextArea.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/KeyCodes.h"
 #include "Assets/Font.h"
@@ -433,6 +434,11 @@ void EditorWindow::HandleShortcuts() {
     }
     KeyboardDevice* keyboard = KeyboardDevice::Instance();
     if (!keyboard) {
+        return;
+    }
+    UICanvas* canvas = GetContentRoot() ? GetContentRoot()->GetCanvas() : nullptr;
+    UINode* focused = canvas ? canvas->GetFocusedNode() : nullptr;
+    if (focused && focused->As<UITextArea>()) {
         return;
     }
     const bool ctrl = keyboard->IsPressed(KeyCode::LeftControl) || keyboard->IsPressed(KeyCode::RightControl)

@@ -14,9 +14,35 @@ void ContentTile::Paint(UIDrawList& OutDrawList) {
 }
 
 void ContentTile::OnPressed(const Vec2& InCursorPos) {
-    (void)InCursorPos;
+    m_PressPos = InCursorPos;
+    m_Dragging = false;
     m_DoublePending = m_DoubleClickTimer > 0.0f;
     m_DoubleClickTimer = s_DoubleClickTime;
+}
+
+void ContentTile::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
+    (void)InDelta;
+    if (!m_Dragging) {
+        const Vec2 moved = InCursorPos - m_PressPos;
+        if (moved.x * moved.x + moved.y * moved.y < s_DragThresholdSq) {
+            return;
+        }
+        m_Dragging = true;
+        if (DragStarted) {
+            DragStarted();
+        }
+    }
+    if (DragMoved) {
+        DragMoved(InCursorPos);
+    }
+}
+
+void ContentTile::OnReleased(bool InInside) {
+    (void)InInside;
+    if (m_Dragging && DragEnded) {
+        DragEnded();
+    }
+    m_Dragging = false;
 }
 
 void ContentTile::OnClick() {

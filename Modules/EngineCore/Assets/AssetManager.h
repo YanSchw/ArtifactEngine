@@ -34,6 +34,11 @@ public:
     Asset* CreateAsset(const Class& InClass, const String& InDirectory, const String& InName);
     bool SaveAsset(Asset* InAsset);
 
+    bool MoveAsset(const UUID& InId, const String& InNewPath);
+    bool DeleteAsset(Asset* InAsset);
+    void RebindAssetPaths(const String& InOldDirectory, const String& InNewDirectory);
+    void UnregisterAssetsUnder(const String& InDirectory);
+
 private:
     static void AssetStreamingThreadFunc();
     Array<Asset*> GetAllAssets() const;

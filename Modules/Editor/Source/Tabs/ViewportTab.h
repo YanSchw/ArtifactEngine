@@ -54,6 +54,9 @@ private:
     void OnViewportReleased();
     void PickAt(const Vec2& InRenderPixel);
     void PickUIAt(const Vec2& InCanvasPoint);
+    Vec3 DropPointAt(const Vec2& InRenderPixel) const;
+    bool AcceptsDroppedAsset(class Asset* InAsset) const;
+    void SpawnDroppedAsset(class Asset* InAsset, const Vec2& InCursorPos);
 
     SharedObjectPtr<EditorCamera> m_Camera;
     SharedObjectPtr<RenderPipeline> m_Pipeline;

@@ -4,6 +4,7 @@
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIViewportSurface.h"
+#include "UI/EditorDragDrop.h"
 #include "Gizmos/GizmoLayer.h"
 #include "Gizmos/GizmoRenderer.h"
 #include "Gizmos/TransformGizmo.h"
@@ -14,7 +15,9 @@
 #include "Rendering/UIDrawList.h"
 #include "Rendering/UIRenderer.h"
 #include "GameFramework/Node.h"
+#include "GameFramework/Node3D.h"
 #include "GameFramework/World.h"
+#include "Assets/Asset.h"
 #include "GameFramework/UICanvas.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "ThemedWindow.h"
@@ -30,6 +33,8 @@
 #include "Core/Log.h"
 
 static constexpr float s_ToolBarHeight = 30.0f;
+static constexpr float s_DefaultDropDistance = 8.0f;
+static constexpr float s_MaxDropDistance = 200.0f;
 static const Vec4 s_DesignClearColor = HexColor(0x1B1B1E);
 
 VectorImage* ViewportTab::GetTabIcon() const {
@@ -62,6 +67,10 @@ ViewportTab::ViewportTab() {
     m_ViewportArea->Pressed = [this](const Vec2& InRenderPixel) { OnViewportPressed(InRenderPixel); };
     m_ViewportArea->Dragged = [this](const Vec2& InRenderPixel, const Vec2&) { OnViewportDragged(InRenderPixel); };
     m_ViewportArea->Released = [this](bool) { OnViewportReleased(); };
+
+    EditorDragDrop::AddDropZone(*m_ViewportArea,
+        [this](Asset* InAsset) { return AcceptsDroppedAsset(InAsset); },
+        [this](Asset* InAsset, const Vec2& InCursorPos) { SpawnDroppedAsset(InAsset, InCursorPos); });
 }
 
 ViewportTab::~ViewportTab() {
@@ -452,6 +461,46 @@ void ViewportTab::PickAt(const Vec2& InRenderPixel) {
     } else {
         major->SetSelection(picked);
     }
+}
+
+Vec3 ViewportTab::DropPointAt(const Vec2& InRenderPixel) const {
+    const Vec2 size = m_ViewportArea->GetGeometry().Size;
+    if (size.x <= 0.0f || size.y <= 0.0f) {
+        return Vec3(0.0f);
+    }
+
+    const Vec2 ndc = Vec2(InRenderPixel.x / size.x, InRenderPixel.y / size.y) * 2.0f - 1.0f;
+    const Mat4 inverseViewProjection = glm::inverse(m_Camera->GetViewProjectionMatrix());
+    const Vec4 nearPoint = inverseViewProjection * Vec4(ndc.x, ndc.y, 0.0f, 1.0f);
+    const Vec4 farPoint = inverseViewProjection * Vec4(ndc.x, ndc.y, 1.0f, 1.0f);
+    const Vec3 origin = Vec3(nearPoint) / nearPoint.w;
+    const Vec3 direction = glm::normalize(Vec3(farPoint) / farPoint.w - origin);
+
+    const float toGround = (std::abs(direction.y) > 1e-4f) ? (-origin.y / direction.y) : -1.0f;
+    const float distance = (toGround > 0.0f) ? std::min(toGround, s_MaxDropDistance) : s_DefaultDropDistance;
+    return origin + direction * distance;
+}
+
+bool ViewportTab::AcceptsDroppedAsset(Asset* InAsset) const {
+    MajorTab* major = GetMajorTab();
+    return !m_DesignMode && major && major->GetAssetRootNode() && MajorTab::IsSpawnableAsset(InAsset);
+}
+
+void ViewportTab::SpawnDroppedAsset(Asset* InAsset, const Vec2& InCursorPos) {
+    MajorTab* major = GetMajorTab();
+    Node* root = major ? major->GetAssetRootNode() : nullptr;
+    if (!root) {
+        return;
+    }
+
+    Node* spawned = MajorTab::SpawnFromAsset(InAsset, *root);
+    if (!spawned) {
+        return;
+    }
+    if (Node3D* placed = Cast<Node3D>(spawned)) {
+        placed->SetPosition(DropPointAt(m_ViewportArea->ToRenderPixel(InCursorPos)));
+    }
+    major->SetSelection(spawned);
 }
 
 bool ViewportTab::OnScroll(const Vec2& InDelta) {

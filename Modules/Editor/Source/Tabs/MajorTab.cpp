@@ -4,6 +4,9 @@
 #include "EditorWindow.h"
 #include "UI/UIDockArea.h"
 #include "UI/EditorIcons.h"
+#include "Assets/Mesh.h"
+#include "Assets/Blueprint.h"
+#include "GameFramework/StaticMeshNode.h"
 
 static void AssignWorldToTabs(UIDockNode* InNode, World* InWorld) {
     if (!InNode) {
@@ -58,6 +61,29 @@ void MajorTab::BroadcastAssetSaved(Asset* InAsset, MajorTab* InSource) {
     for (MajorTab* tab : targets) {
         tab->OnAssetSaved(InAsset);
     }
+}
+
+bool MajorTab::IsSpawnableAsset(Asset* InAsset) {
+    return InAsset && (InAsset->IsA(Mesh::StaticClass()) || InAsset->IsA(Blueprint::StaticClass()));
+}
+
+Node* MajorTab::SpawnFromAsset(Asset* InAsset, Node& InParent) {
+    if (Mesh* mesh = Cast<Mesh>(InAsset)) {
+        StaticMeshNode* node = Cast<StaticMeshNode>(InParent.AttachChild(StaticMeshNode::StaticClass()));
+        if (node) {
+            node->SetMesh(mesh);
+            node->SetName(mesh->GetDisplayName());
+        }
+        return node;
+    }
+    if (Blueprint* blueprint = Cast<Blueprint>(InAsset)) {
+        Node* node = InParent.AttachChild(Class::FromBlueprint(blueprint->GetId()));
+        if (node) {
+            node->SetName(blueprint->GetDisplayName());
+        }
+        return node;
+    }
+    return nullptr;
 }
 
 void MajorTab::OnBind() {

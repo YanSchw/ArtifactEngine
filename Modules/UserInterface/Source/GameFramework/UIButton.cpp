@@ -19,6 +19,14 @@ void UIButton::SetCaption(const String& InText) {
     m_Label->Text = InText;
 }
 
+bool UIButton::OnSecondaryClick(const Vec2& InCursorPos) {
+    if (!SecondaryClicked) {
+        return false;
+    }
+    SecondaryClicked(InCursorPos);
+    return true;
+}
+
 void UIButton::Paint(UIDrawList& OutDrawList) {
     const Vec4 color = (IsPressed() && IsHovered()) ? PressedColor : (IsHovered() ? HoverColor : NormalColor);
     OutDrawList.AddRect(m_Geometry, color, m_WorldMatrix);

@@ -33,6 +33,9 @@ public:
     virtual void OnAssetSaved(Asset* InAsset) { (void)InAsset; }
     static void BroadcastAssetSaved(Asset* InAsset, MajorTab* InSource);
 
+    static bool IsSpawnableAsset(Asset* InAsset);
+    static Node* SpawnFromAsset(Asset* InAsset, Node& InParent);
+
     World* GetEditedWorld() const { return m_World.Get(); }
 
     /** The document-wide selection shared by every MinorTab; any Object can be selected. */

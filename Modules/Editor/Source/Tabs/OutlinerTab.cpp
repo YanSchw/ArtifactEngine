@@ -3,6 +3,7 @@
 #include "MajorTab.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
+#include "UI/EditorDragDrop.h"
 #include "GameFramework/UIScrollArea.h"
 #include "GameFramework/UIVStack.h"
 #include "GameFramework/UIQuad.h"
@@ -88,6 +89,13 @@ OutlinerTab::OutlinerTab() {
     m_FooterLabel->FontSize = EditorStyle::FontSize - 1.0f;
     m_FooterLabel->Color = EditorStyle::TextDim;
     m_FooterLabel->VAlign = UIVAlign::Middle;
+
+    EditorDragDrop::AddDropZone(*this,
+        [this](Asset* InAsset) {
+            MajorTab* major = GetMajorTab();
+            return major && major->GetAssetRootNode() && MajorTab::IsSpawnableAsset(InAsset);
+        },
+        [this](Asset* InAsset, const Vec2& InCursorPos) { SpawnDroppedAsset(InAsset, InCursorPos); });
 }
 
 void OutlinerTab::RefreshFooter() {
@@ -238,6 +246,33 @@ void OutlinerTab::AppendFilteredSubtree(Node* InNode, int InDepth) {
     for (Node* child : visibleChildren) {
         AppendFilteredSubtree(child, InDepth + 1);
     }
+}
+
+void OutlinerTab::SpawnDroppedAsset(Asset* InAsset, const Vec2& InCursorPos) {
+    MajorTab* major = GetMajorTab();
+    Node* root = major ? major->GetAssetRootNode() : nullptr;
+    if (!root) {
+        return;
+    }
+
+    // Dropping onto a row parents the new node under it; anywhere else lands at the scene root.
+    Node* parent = root;
+    for (uint32_t i = 0; i < m_List->GetChildCount(); i++) {
+        OutlinerRow* row = m_List->GetChild((int)i)->As<OutlinerRow>();
+        if (row && row->IsEnabled() && row->HitTest(InCursorPos) && row->GetBoundNode()) {
+            parent = row->GetBoundNode();
+            break;
+        }
+    }
+
+    Node* spawned = MajorTab::SpawnFromAsset(InAsset, *parent);
+    if (!spawned) {
+        return;
+    }
+    if (parent != root && !IsExpanded(parent)) {
+        ToggleExpanded(parent);
+    }
+    major->SetSelection(spawned);
 }
 
 void OutlinerTab::OnUIUpdate(const UIFrameContext& InContext) {

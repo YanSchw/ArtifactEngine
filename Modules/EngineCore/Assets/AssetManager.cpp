@@ -206,6 +206,87 @@ bool AssetManager::SaveAsset(Asset* InAsset) {
     return true;
 }
 
+bool AssetManager::MoveAsset(const UUID& InId, const String& InNewPath) {
+    const String oldPath = GetAssetPath(InId);
+    if (oldPath.empty()) {
+        AE_ERROR("Asset {0} has no file to move", InId.ToString());
+        return false;
+    }
+    if (oldPath == InNewPath) {
+        return true;
+    }
+    if (FileIO::FileExists(InNewPath)) {
+        AE_ERROR("Cannot move '{0}' to '{1}': the target already exists", oldPath, InNewPath);
+        return false;
+    }
+
+    std::error_code error;
+    std::filesystem::create_directories(std::filesystem::path(InNewPath).parent_path(), error);
+    std::filesystem::rename(oldPath, InNewPath, error);
+    if (error) {
+        AE_ERROR("Failed to move '{0}' to '{1}': {2}", oldPath, InNewPath, error.message());
+        return false;
+    }
+
+    m_AssetPaths[InId] = InNewPath;
+    return true;
+}
+
+bool AssetManager::DeleteAsset(Asset* InAsset) {
+    if (!InAsset) {
+        return false;
+    }
+
+    const UUID id = InAsset->GetId();
+    const String path = GetAssetPath(id);
+    if (!path.empty()) {
+        std::error_code error;
+        std::filesystem::remove(path, error);
+        if (error) {
+            AE_ERROR("Failed to delete '{0}': {1}", path, error.message());
+            return false;
+        }
+    }
+
+    if (InAsset->IsLoaded()) {
+        InAsset->Unload();
+    }
+    m_AssetPaths.Remove(id);
+    m_Assets.Remove(id);
+    return true;
+}
+
+static bool IsUnderDirectory(const String& InPath, const String& InDirectory) {
+    const String prefix = InDirectory + "/";
+    return InPath.compare(0, prefix.size(), prefix) == 0;
+}
+
+void AssetManager::RebindAssetPaths(const String& InOldDirectory, const String& InNewDirectory) {
+    for (auto& [id, path] : m_AssetPaths) {
+        if (IsUnderDirectory(path, InOldDirectory)) {
+            path = InNewDirectory + path.substr(InOldDirectory.size());
+        }
+    }
+}
+
+void AssetManager::UnregisterAssetsUnder(const String& InDirectory) {
+    Array<UUID> removed;
+    for (const auto& [id, path] : m_AssetPaths) {
+        if (IsUnderDirectory(path, InDirectory)) {
+            removed.Add(id);
+        }
+    }
+    for (const UUID& id : removed) {
+        if (Asset* asset = GetAsset(id)) {
+            if (asset->IsLoaded()) {
+                asset->Unload();
+            }
+        }
+        m_AssetPaths.Remove(id);
+        m_Assets.Remove(id);
+    }
+}
+
 Asset* AssetManager::GetAsset(const UUID& InId) {
     if (!m_Assets.ContainsKey(InId))
         return nullptr;
