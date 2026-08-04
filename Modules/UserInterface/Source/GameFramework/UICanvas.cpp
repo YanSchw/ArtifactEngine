@@ -200,7 +200,7 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
 
     if (InContext.ScrollDelta != Vec2(0.0f)) {
         // Bubble up from the innermost node under the cursor until one consumes it.
-        for (Node* node = HitTestTopmost(this, cursor, false); node; node = node->GetParent()) {
+        for (Node* node = HitTestTopmost(this, cursor, true); node; node = node->GetParent()) {
             UINode* uiNode = node->As<UINode>();
             if (uiNode && uiNode->OnScroll(InContext.ScrollDelta)) {
                 break;
@@ -210,7 +210,7 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
 
     if (InContext.SecondaryPressedThisFrame) {
         m_SecondaryPress = cursor;
-        m_SecondaryNode = HitTestTopmost(this, cursor, false);
+        m_SecondaryNode = HitTestTopmost(this, cursor, true);
     }
     if (InContext.SecondaryReleasedThisFrame) {
         UINode* pressed = m_SecondaryNode.Get();

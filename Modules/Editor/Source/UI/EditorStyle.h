@@ -2,6 +2,7 @@
 #include "Common/Types.h"
 #include "GameFramework/UIButton.h"
 #include "GameFramework/UILabel.h"
+#include "GameFramework/UISvg.h"
 
 inline Vec4 HexColor(uint32_t InRGB, float InAlpha = 1.0f) {
     return Vec4(
@@ -69,5 +70,32 @@ public:
             label->FontSize = InFontSize;
             label->Color = Text;
         }
+    }
+
+    static UIButton& IconButton(UINode& InParent, VectorImage* InIcon, const Vec4& InIconTint,
+                                const String& InCaption, float InWidth, std::function<void()> InAction) {
+        UIButton* button = InParent.Add<UIButton>();
+        button->Clicked = std::move(InAction);
+        button->Size = { UIValue(InWidth), 1.0_rel };
+        button->NormalColor = Button;
+        button->HoverColor = ButtonHover;
+        button->PressedColor = ButtonPressed;
+
+        UISvg* icon = button->Add<UISvg>();
+        icon->Anchor = icon->Pivot = Vec2(0.0f, 0.5f);
+        icon->Position = Vec2(9.0f, 0.0f);
+        icon->Size = Vec2(12.0f, 12.0f);
+        icon->Tint = InIconTint;
+        icon->Image = InIcon;
+
+        UILabel* label = button->Add<UILabel>();
+        label->Anchor = label->Pivot = Vec2(0.0f, 0.5f);
+        label->Position = Vec2(26.0f, 0.0f);
+        label->Size = { 1.0_rel - 30.0_px, 1.0_rel };
+        label->FontSize = FontSize;
+        label->Color = Text;
+        label->VAlign = UIVAlign::Middle;
+        label->Text = InCaption;
+        return *button;
     }
 };

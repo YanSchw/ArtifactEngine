@@ -23,7 +23,7 @@ public:
      *  which the 3D scene rendered behind the UI shows. */
     virtual bool HasTransparentBackground() const { return false; }
 
-    World* GetEditedWorld() const { return m_EditedWorld.Get(); }
+    World* GetEditedWorld() const;
     void SetEditedWorld(World* InWorld) { m_EditedWorld = InWorld; }
 
     MajorTab* GetMajorTab() const { return m_MajorTab.Get(); }

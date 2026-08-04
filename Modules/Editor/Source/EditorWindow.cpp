@@ -215,6 +215,14 @@ void EditorWindow::BuildEditorChrome() {
     m_ChromeDirty = true;
 }
 
+void EditorWindow::MarkAllChromeDirty() {
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        if (EditorWindow* editorWindow = window.Get() ? window->As<EditorWindow>() : nullptr) {
+            editorWindow->MarkChromeDirty();
+        }
+    }
+}
+
 void EditorWindow::RegisterTab(MajorTab* InTab) {
     m_OpenTabs.Add(InTab);
     InTab->SetOwnerWindow(this);

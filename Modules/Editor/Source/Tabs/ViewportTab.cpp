@@ -17,6 +17,7 @@
 #include "GameFramework/Node.h"
 #include "GameFramework/Node3D.h"
 #include "GameFramework/World.h"
+#include "GameFramework/CameraNode.h"
 #include "Assets/Asset.h"
 #include "GameFramework/UICanvas.h"
 #include "InputSystem/KeyboardDevice.h"
@@ -39,6 +40,21 @@ static const Vec4 s_DesignClearColor = HexColor(0x1B1B1E);
 
 VectorImage* ViewportTab::GetTabIcon() const {
     return EditorIcons::Viewport();
+}
+
+bool ViewportTab::IsPossessedByPlay() const {
+    MajorTab* major = GetMajorTab();
+    return major && major->GetPlayState() == PlayState::Playing;
+}
+
+CameraNode* ViewportTab::GetViewCamera() const {
+    if (IsPossessedByPlay()) {
+        World* world = GetEditedWorld();
+        if (CameraNode* playCamera = world ? world->GetMainCamera() : nullptr) {
+            return playCamera;
+        }
+    }
+    return m_Camera.Get();
 }
 
 ViewportTab::ViewportTab() {
@@ -254,8 +270,16 @@ void ViewportTab::RenderScene(const UIFrameContext& InContext, const UIRectF& In
     params.Width = (uint32_t)glm::max(InRect.Size.x, 1.0f);
     params.Height = (uint32_t)glm::max(InRect.Size.y, 1.0f);
     params.m_World = GetEditedWorld();
-    params.CameraOverride = m_Camera.Get();
+    params.CameraOverride = GetViewCamera();
     m_Pipeline->Render(InContext.DeltaTime, params);
+
+    if (IsPossessedByPlay()) {
+        m_TransformGizmo->EndDrag();
+        m_TransformGizmo->ClearHover();
+        m_ViewportArea->Cursor = CursorIcon::Arrow;
+        m_SceneTexture->SetView(m_Pipeline->GetFinalImageView());
+        return;
+    }
 
     Array<GizmoDraw> gizmos;
     m_GizmoLayer->Collect(GetEditedWorld(), m_Camera.Get(), GetMajorTab(), gizmos);
@@ -333,7 +357,8 @@ void ViewportTab::OnUIUpdate(const UIFrameContext& InContext) {
     // Keyboard and right/middle mouse are polled globally, so only the focused window's
     // viewport may drive the camera.
     ThemedWindow* focusedWindow = Cast<ThemedWindow>(Window::GetFocusedWindow());
-    const bool focused = focusedWindow && focusedWindow->GetCanvas() == GetCanvas();
+    const bool possessed = IsPossessedByPlay();
+    const bool focused = focusedWindow && focusedWindow->GetCanvas() == GetCanvas() && !possessed;
     if (focused && !m_DesignMode) {
         m_Camera->UpdateNavigation(InContext.DeltaTime, *focusedWindow, m_ViewportArea->IsHovered());
     } else if (m_Camera->IsNavigating()) {
@@ -390,6 +415,9 @@ static bool IsToggleModifierHeld() {
 }
 
 void ViewportTab::OnViewportPressed(const Vec2& InRenderPixel) {
+    if (IsPossessedByPlay()) {
+        return;
+    }
     if (m_DesignMode) {
         if (m_PreviewInput) {
             return;
@@ -406,6 +434,9 @@ void ViewportTab::OnViewportPressed(const Vec2& InRenderPixel) {
 }
 
 void ViewportTab::OnViewportDragged(const Vec2& InRenderPixel) {
+    if (IsPossessedByPlay()) {
+        return;
+    }
     if (m_DesignMode) {
         if (!m_PreviewInput) {
             m_LayoutGizmo->Drag(CanvasFromViewport(InRenderPixel));
@@ -470,7 +501,7 @@ Vec3 ViewportTab::DropPointAt(const Vec2& InRenderPixel) const {
     }
 
     const Vec2 ndc = Vec2(InRenderPixel.x / size.x, InRenderPixel.y / size.y) * 2.0f - 1.0f;
-    const Mat4 inverseViewProjection = glm::inverse(m_Camera->GetViewProjectionMatrix());
+    const Mat4 inverseViewProjection = glm::inverse(GetViewCamera()->GetViewProjectionMatrix());
     const Vec4 nearPoint = inverseViewProjection * Vec4(ndc.x, ndc.y, 0.0f, 1.0f);
     const Vec4 farPoint = inverseViewProjection * Vec4(ndc.x, ndc.y, 1.0f, 1.0f);
     const Vec3 origin = Vec3(nearPoint) / nearPoint.w;
@@ -507,7 +538,7 @@ bool ViewportTab::OnScroll(const Vec2& InDelta) {
     if (!m_ViewportArea->IsHovered()) {
         return false;
     }
-    if (m_DesignMode) {
+    if (m_DesignMode || IsPossessedByPlay()) {
         return true;
     }
     if (!m_Camera->IsNavigating()) {

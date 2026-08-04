@@ -41,6 +41,9 @@ public:
 
     static void MoveTab(MajorTab* InTab, EditorWindow* InFrom, EditorWindow* InTo);
 
+    void MarkChromeDirty() { m_ChromeDirty = true; }
+    static void MarkAllChromeDirty();
+
     void ToggleHeroTool(HeroTool* InTool);
     void OpenHeroTool(HeroTool* InTool);
     void CloseHeroTool();

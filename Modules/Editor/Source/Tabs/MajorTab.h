@@ -11,6 +11,8 @@ class EditorWindow;
 class VectorImage;
 class Asset;
 
+enum class PlayState : uint8_t { Editor = 0, Playing, Simulating };
+
 /** A top-level editor document — the heart of the editor. A MajorTab edits one thing (a scene,
  *  a mesh, a texture, ...), hosts a dock area of MinorTabs as its workspace, fills the editor
  *  tool bar while active, and is listed in the bottom tab bar of its EditorWindow. */
@@ -36,7 +38,10 @@ public:
     static bool IsSpawnableAsset(Asset* InAsset);
     static Node* SpawnFromAsset(Asset* InAsset, Node& InParent);
 
-    World* GetEditedWorld() const { return m_World.Get(); }
+    virtual World* GetEditedWorld() const { return m_World.Get(); }
+    World* GetAuthoringWorld() const { return m_World.Get(); }
+
+    virtual PlayState GetPlayState() const { return PlayState::Editor; }
 
     /** The document-wide selection shared by every MinorTab; any Object can be selected. */
     Array<Object*> GetSelection() const;

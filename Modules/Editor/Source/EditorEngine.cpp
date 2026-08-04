@@ -12,8 +12,38 @@
 #include "InputSystem/InputSystem.h"
 #include "Common/UUID.h"
 
+#include "GameFramework/GameInstance.h"
 #include "GameFramework/UICanvas.h"
 #include "Assets/Font.h"
+
+EditorEngine* EditorEngine::Get() {
+    return Cast<EditorEngine>(&Engine::Get());
+}
+
+GameInstance* EditorEngine::CreatePlayInstance(SceneEditorTab* InTab) {
+    if (SceneEditorTab* previous = m_PlayingTab.Get()) {
+        if (previous != InTab) {
+            previous->StopPlayInEditor();
+        }
+    }
+    m_PlayingTab = InTab;
+    m_GameInstance = new GameInstance();
+    return m_GameInstance.Get();
+}
+
+void EditorEngine::DisposePlayInstance() {
+    m_PlayingTab = nullptr;
+    m_GameInstance = nullptr;
+}
+
+bool EditorEngine::IsGameInputActive() const {
+    SceneEditorTab* tab = m_PlayingTab.Get();
+    if (!tab || tab->GetPlayState() != PlayState::Playing) {
+        return false;
+    }
+    EditorWindow* window = tab->GetOwnerWindow();
+    return window && window->GetActiveTab() == tab && window->IsFocused();
+}
 
 void EditorEngine::Initialize() {
     SharedObjectPtr<EditorWindow> window = EditorWindow::Create(WindowParams{ "Artifact Editor", 1280, 720 });
@@ -42,6 +72,7 @@ void EditorEngine::Initialize() {
 void EditorEngine::TickInput(double InDeltaTime) {
     Window::PollEvents();
     PlatformHooks::Get().SetSystemShortcutsSuppressed(Window::GetFocusedWindow() != nullptr);
+    InputSystem::Get().SetActionsSuppressed(!IsGameInputActive());
     // Refresh devices + evaluate action maps before gameplay reads them.
     InputSystem::Get().Tick((float)InDeltaTime);
 }
@@ -58,6 +89,10 @@ void EditorEngine::RenderFrame(double InDeltaTime) {
 }
 
 bool EditorEngine::MainTick(double InDeltaTime) {
+    if (GameInstance* game = GetGameInstance()) {
+        game->Update(InDeltaTime);
+    }
+
     RenderFrame(InDeltaTime);
 
     // Destroying a window can cascade, so restart the sweep whenever one goes away.
@@ -84,6 +119,7 @@ bool EditorEngine::MainTick(double InDeltaTime) {
 
 void EditorEngine::Shutdown() {
     PlatformHooks::Get().SetSystemShortcutsSuppressed(false);
+    DisposePlayInstance();
     // Tear the windows (and their UI renderers) down before the assets they sample and the RHI.
     ThemedWindow::DestroyAllWindows();
     AssetManager::Get().Shutdown();

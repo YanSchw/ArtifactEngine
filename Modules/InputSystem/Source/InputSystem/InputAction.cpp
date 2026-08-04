@@ -60,12 +60,14 @@ void InputAction::Evaluate() {
     // Disambiguation: the strongest binding wins (e.g. WASD vs gamepad stick).
     InputValue best;
     float bestMagnitude = 0.0f;
-    for (const auto& binding : Bindings) {
-        InputValue value = binding->Read();
-        float magnitude = value.Magnitude();
-        if (magnitude > bestMagnitude) {
-            bestMagnitude = magnitude;
-            best = value;
+    if (!InputSystem::Get().AreActionsSuppressed()) {
+        for (const auto& binding : Bindings) {
+            InputValue value = binding->Read();
+            float magnitude = value.Magnitude();
+            if (magnitude > bestMagnitude) {
+                bestMagnitude = magnitude;
+                best = value;
+            }
         }
     }
     m_Value = best;

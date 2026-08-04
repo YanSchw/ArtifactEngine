@@ -4,6 +4,7 @@
 #include "ViewportTab.gen.h"
 
 class EditorCamera;
+class CameraNode;
 class RenderPipeline;
 class RenderTargetTexture;
 class UIViewportSurface;
@@ -35,6 +36,9 @@ public:
     bool IsDesignMode() const { return m_DesignMode; }
 
 private:
+    bool IsPossessedByPlay() const;
+    CameraNode* GetViewCamera() const;
+
     void BuildToolBar(UINode& InToolBar);
     void BuildSceneTools(UINode& InParent);
     void BuildDesignTools(UINode& InParent);

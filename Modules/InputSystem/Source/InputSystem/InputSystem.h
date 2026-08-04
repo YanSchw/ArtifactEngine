@@ -35,10 +35,14 @@ public:
     WeakObjectPtr<InputDevice> GetLastActiveDevice() const;
     void SetLastActiveDevice(const WeakObjectPtr<InputDevice>& InDevice);
 
+    void SetActionsSuppressed(bool InSuppressed) { m_ActionsSuppressed = InSuppressed; }
+    bool AreActionsSuppressed() const { return m_ActionsSuppressed; }
+
     void Tick(float InDeltatime);
 
 private:
     Array<SharedObjectPtr<InputDevice>> m_Devices;
     Array<SharedObjectPtr<InputActionMapping>> m_ActionMappings;
     WeakObjectPtr<InputDevice> m_LastActiveDevice;
+    bool m_ActionsSuppressed = false;
 };

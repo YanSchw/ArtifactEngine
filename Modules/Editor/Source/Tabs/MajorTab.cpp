@@ -89,7 +89,7 @@ Node* MajorTab::SpawnFromAsset(Asset* InAsset, Node& InParent) {
 void MajorTab::OnBind() {
     Super::OnBind();
 
-    if (World* world = GetEditedWorld()) {
+    if (World* world = GetAuthoringWorld()) {
         world->ResolvePendingKills();
     }
 }
