@@ -21,9 +21,18 @@ public:
     std::vector<VkRenderingAttachmentInfo> GetColorAttachmentInfo() const;
     VkRenderingAttachmentInfo GetDepthAttachmentInfo() const;
 
+    /** Puts every image the pass writes into its attachment layout. The pass always clears, so
+     *  whatever those images held before is discarded. */
+    void TransitionToAttachmentLayout(VkCommandBuffer InCmdBuffer) const;
+    void TransitionToShaderReadLayout(VkCommandBuffer InCmdBuffer) const;
+
     virtual uint32_t ReadPixelUint(int32_t InAttachment, uint32_t InX, uint32_t InY) const override;
 private:
+    void CreateMultisampleAttachments();
+
     VulkanAPI* m_VulkanAPI = nullptr;
     std::vector<VkImageView> m_ColorAttachmentViews;
     VkImageView m_DepthAttachmentView = VK_NULL_HANDLE;
+    Array<SharedObjectPtr<ImageView>> m_MultisampleColorAttachments;
+    SharedObjectPtr<ImageView> m_MultisampleDepthAttachment;
 };

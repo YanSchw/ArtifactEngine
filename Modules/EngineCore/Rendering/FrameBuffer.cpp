@@ -5,3 +5,8 @@ SharedObjectPtr<FrameBuffer> FrameBuffer::Create(const FrameBufferDesc& InFrameB
     AE_ASSERT(RenderingAPI::GetInstance(), "No rendering API instance found!");
     return RenderingAPI::GetInstance()->CreateFrameBuffer(InFrameBufferDesc);
 }
+
+SampleCount FrameBuffer::GetMaxSupportedSampleCount() {
+    AE_ASSERT(RenderingAPI::GetInstance(), "No rendering API instance found!");
+    return RenderingAPI::GetInstance()->GetMaxSupportedSampleCount();
+}

@@ -51,6 +51,13 @@ static std::vector<VkFormat> GetPipelineTargetColorFormats(const PipelineDesc& I
     return { swapChainFormat };
 }
 
+static VkSampleCountFlagBits GetPipelineTargetSampleCount(const PipelineDesc& InDesc) {
+    if (InDesc.IsFrameBufferTarget()) {
+        return VulkanHelpers::SampleCountToVkSampleCount(InDesc.Target->As<FrameBuffer>()->GetSamples());
+    }
+    return InDesc.IsSurfaceTarget() ? swapChainSampleCount : VK_SAMPLE_COUNT_1_BIT;
+}
+
 static VkFormat GetPipelineTargetDepthFormat(const PipelineDesc& InDesc) {
     if (InDesc.IsFrameBufferTarget() && InDesc.Target->As<FrameBuffer>()->GetDesc().DepthAttachment) {
         return VulkanHelpers::ImageFormatToVkFormat(InDesc.Target->As<FrameBuffer>()->GetDesc().DepthAttachment->GetDesc().Format);
@@ -149,11 +156,12 @@ void VulkanPipeline::Invalidate() {
     rasterizationCreateInfo.depthBiasSlopeFactor = 0.0f;
     rasterizationCreateInfo.lineWidth = 1.0f;
 
-    // Describe multisampling. Surface targets render into the multisampled swapchain target, so
-    // their pipelines must rasterize at the same sample count; framebuffer targets stay single-sample.
+    // Describe multisampling. A pipeline must rasterize at the sample count of the attachments it
+    // draws into, which for a surface is the multisampled swapchain target and for a framebuffer is
+    // whatever sample count that framebuffer was created with.
     VkPipelineMultisampleStateCreateInfo multisampleCreateInfo = {};
     multisampleCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleCreateInfo.rasterizationSamples = m_Desc.IsSurfaceTarget() ? swapChainSampleCount : VK_SAMPLE_COUNT_1_BIT;
+    multisampleCreateInfo.rasterizationSamples = GetPipelineTargetSampleCount(m_Desc);
     multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
     multisampleCreateInfo.minSampleShading = 1.0f;
     multisampleCreateInfo.alphaToCoverageEnable = VK_FALSE;

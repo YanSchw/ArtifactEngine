@@ -38,6 +38,7 @@ public:
     VkQueue GetGraphicsQueue() const;
 
     uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+    bool TryFindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t& OutMemoryTypeIndex) const;
 
     virtual class RenderCommandQueue& GetRenderQueue() override;
     virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices) override;
@@ -53,6 +54,7 @@ public:
     virtual SharedObjectPtr<class Texture> CreateTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const TextureDesc& InTextureDesc) override;
     virtual SharedObjectPtr<class Sampler> CreateSampler(const struct SamplerDesc& InSamplerDesc) override;
     virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) override;
+    virtual SampleCount GetMaxSupportedSampleCount() const override;
 
     RenderCommandQueue m_RenderQueue;
 };

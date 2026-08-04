@@ -23,7 +23,7 @@ VulkanImage::VulkanImage(const ImageDesc& InImageDesc, VulkanAPI& InVulkanAPI) {
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = VulkanHelpers::ImageUsageToVkImageUsage(InImageDesc.Usage);
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = VulkanHelpers::SampleCountToVkSampleCount(InImageDesc.Samples);
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     if (vkCreateImage(m_VulkanAPI->GetDevice(), &imageInfo, nullptr, &m_Image) != VK_SUCCESS) {
@@ -33,10 +33,17 @@ VulkanImage::VulkanImage(const ImageDesc& InImageDesc, VulkanAPI& InVulkanAPI) {
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(m_VulkanAPI->GetDevice(), m_Image, &memRequirements);
 
+    // Transient images never leave the render pass, so prefer memory the driver may keep on-chip
+    uint32_t memoryTypeIndex = 0;
+    const bool isTransient = (InImageDesc.Usage & ImageUsage::Transient) != ImageUsage::None;
+    if (!isTransient || !m_VulkanAPI->TryFindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, memoryTypeIndex)) {
+        memoryTypeIndex = m_VulkanAPI->FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    }
+
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = m_VulkanAPI->FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
 
     if (vkAllocateMemory(m_VulkanAPI->GetDevice(), &allocInfo, nullptr, &m_DeviceMemory) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate image memory!");

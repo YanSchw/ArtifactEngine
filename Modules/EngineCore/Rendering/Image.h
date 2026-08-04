@@ -26,8 +26,19 @@ enum class ImageUsage : uint32_t {
     Sampled         = 1 << 2,
     Storage         = 1 << 3,
     ColorAttachment = 1 << 4,
-    DepthStencil    = 1 << 5
+    DepthStencil    = 1 << 5,
+    Transient       = 1 << 6
 };
+
+ARTIFACT_ENUM();
+enum class SampleCount : uint32_t {
+    None = 1,
+    X2   = 2,
+    X4   = 4,
+    X8   = 8
+};
+
+inline bool IsMultisampled(SampleCount InSamples) { return InSamples != SampleCount::None; }
 
 ARTIFACT_ENUM();
 enum class ImageAspect {
@@ -56,6 +67,10 @@ struct ImageDesc {
 
     ImageFormat Format = ImageFormat::RGBA8;
     ImageUsage Usage = ImageUsage::Sampled;
+
+    /** Anything but None makes this a multisampled image. Multisampled images can only be used as
+     *  render pass attachments - they cannot be sampled, copied or read back until resolved. */
+    SampleCount Samples = SampleCount::None;
 
     bool GenerateMips = false;
 };

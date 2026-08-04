@@ -110,6 +110,7 @@ bool GameEngine::MainTick(double InDeltaTime) {
 }
 
 void GameEngine::Shutdown() {
+    m_GameInstance = nullptr;
     AssetManager::Get().Shutdown();
     s_Window = nullptr;
     RenderingAPI::GetInstance()->CleanUp(true);

@@ -1,5 +1,6 @@
 #pragma once
 #include "Rendering/RenderPipeline.h"
+#include "Rendering/Image.h"
 #include "Object/Pointer.h"
 #include "ArtifactRenderPipeline.gen.h"
 
@@ -12,6 +13,7 @@ public:
     ARTIFACT_CLASS();
 
     static constexpr int32_t NodeIdAttachment = 1;
+    static constexpr SampleCount SceneSampleCount = SampleCount::X8;
 
     ArtifactRenderPipeline();
     ~ArtifactRenderPipeline();

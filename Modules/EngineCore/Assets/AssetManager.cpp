@@ -27,6 +27,10 @@ AssetManager& AssetManager::Get() {
     return *s_Instance;
 }
 
+bool AssetManager::IsAvailable() {
+    return s_Instance != nullptr;
+}
+
 void AssetManager::Initialize(bool InLoadAssets) {
     AE_ASSERT(!s_Instance, "AssetManager instance is already initialized!");
     s_Instance = this;

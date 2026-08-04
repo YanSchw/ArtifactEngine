@@ -4,17 +4,89 @@
 
 #include <cstring>
 
+// Sample counts an attachment of this format can be rendered with, as a VkSampleCountFlags mask.
+static VkSampleCountFlags GetSupportedSampleCounts(const VulkanAPI& InVulkanAPI, ImageFormat InFormat, VkImageUsageFlags InUsage) {
+    VkImageFormatProperties properties;
+    if (vkGetPhysicalDeviceImageFormatProperties(InVulkanAPI.GetPhysicalDevice(),
+            VulkanHelpers::ImageFormatToVkFormat(InFormat), VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+            InUsage, 0, &properties) != VK_SUCCESS) {
+        return VK_SAMPLE_COUNT_1_BIT;
+    }
+    return properties.sampleCounts;
+}
+
+// Halves the requested count until every attachment format supports it. SampleCount's values are
+// the sample counts themselves, which is exactly what VkSampleCountFlagBits encodes.
+static SampleCount ClampSampleCount(const VulkanAPI& InVulkanAPI, const FrameBufferDesc& InDesc) {
+    if (!IsMultisampled(InDesc.Samples)) {
+        return SampleCount::None;
+    }
+
+    VkSampleCountFlags supported = ~0u;
+    for (const SharedObjectPtr<ImageView>& colorAttachment : InDesc.ColorAttachments) {
+        supported &= GetSupportedSampleCounts(InVulkanAPI, colorAttachment->GetDesc().Format,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
+    }
+    if (InDesc.DepthAttachment) {
+        supported &= GetSupportedSampleCounts(InVulkanAPI, InDesc.DepthAttachment->GetDesc().Format,
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
+    }
+
+    SampleCount samples = InDesc.Samples;
+    while (IsMultisampled(samples) && (supported & (VkSampleCountFlags)samples) == 0) {
+        samples = (SampleCount)((uint32_t)samples / 2);
+    }
+    if (samples != InDesc.Samples) {
+        AE_WARN("framebuffer sample count {0} is unsupported, falling back to {1}", (uint32_t)InDesc.Samples, (uint32_t)samples);
+    }
+    return samples;
+}
+
+// A multisampled twin of an attachment: same format and aspect, but rendered at InSamples and only
+// ever alive inside the pass, so it may live in transient memory.
+static SharedObjectPtr<ImageView> CreateMultisampleAttachment(const ImageView& InAttachment, ImageUsage InUsage,
+                                                              uint32_t InWidth, uint32_t InHeight, SampleCount InSamples) {
+    ImageDesc imageDesc;
+    imageDesc.Width = InWidth;
+    imageDesc.Height = InHeight;
+    imageDesc.Format = InAttachment.GetDesc().Format;
+    imageDesc.Usage = InUsage | ImageUsage::Transient;
+    imageDesc.Samples = InSamples;
+
+    ImageViewDesc viewDesc = InAttachment.GetDesc();
+    viewDesc.ImagePtr = Image::Create(imageDesc);
+    return ImageView::Create(viewDesc);
+}
+
 VulkanFrameBuffer::VulkanFrameBuffer(const FrameBufferDesc& InFrameBufferDesc, VulkanAPI& InVulkanAPI) {
     m_Desc = InFrameBufferDesc;
     m_VulkanAPI = &InVulkanAPI;
+    m_Desc.Samples = ClampSampleCount(InVulkanAPI, m_Desc);
 
-    // With dynamic rendering, we render directly to VkImageView attachments instead of creating a VkFramebuffer.
-    for (auto& colorAttachment : InFrameBufferDesc.ColorAttachments) {
-        m_ColorAttachmentViews.push_back(static_cast<VulkanImageView*>(colorAttachment.Get())->GetVkImageView());
+    if (IsMultisampled()) {
+        CreateMultisampleAttachments();
     }
 
-    if (InFrameBufferDesc.DepthAttachment) {
-        m_DepthAttachmentView = static_cast<VulkanImageView*>(InFrameBufferDesc.DepthAttachment.Get())->GetVkImageView();
+    // With dynamic rendering, we render directly to VkImageView attachments instead of creating a VkFramebuffer.
+    for (int32_t i = 0; i < m_Desc.ColorAttachments.Size(); i++) {
+        const SharedObjectPtr<ImageView>& colorAttachment = IsMultisampled() ? m_MultisampleColorAttachments[i] : m_Desc.ColorAttachments[i];
+        m_ColorAttachmentViews.push_back(colorAttachment->As<VulkanImageView>()->GetVkImageView());
+    }
+
+    const SharedObjectPtr<ImageView>& depthAttachment = IsMultisampled() ? m_MultisampleDepthAttachment : m_Desc.DepthAttachment;
+    if (depthAttachment) {
+        m_DepthAttachmentView = depthAttachment->As<VulkanImageView>()->GetVkImageView();
+    }
+}
+
+void VulkanFrameBuffer::CreateMultisampleAttachments() {
+    for (const SharedObjectPtr<ImageView>& colorAttachment : m_Desc.ColorAttachments) {
+        m_MultisampleColorAttachments.Add(CreateMultisampleAttachment(*colorAttachment, ImageUsage::ColorAttachment,
+            m_Desc.Width, m_Desc.Height, m_Desc.Samples));
+    }
+    if (m_Desc.DepthAttachment) {
+        m_MultisampleDepthAttachment = CreateMultisampleAttachment(*m_Desc.DepthAttachment, ImageUsage::DepthStencil,
+            m_Desc.Width, m_Desc.Height, m_Desc.Samples);
     }
 }
 
@@ -35,9 +107,45 @@ std::vector<VkRenderingAttachmentInfo> VulkanFrameBuffer::GetColorAttachmentInfo
         } else {
             attachmentInfo.clearValue.color = { clear.r, clear.g, clear.b, clear.a };
         }
+
+        if (IsMultisampled()) {
+            attachmentInfo.resolveMode = isInteger ? VK_RESOLVE_MODE_SAMPLE_ZERO_BIT : VK_RESOLVE_MODE_AVERAGE_BIT;
+            attachmentInfo.resolveImageView = m_Desc.ColorAttachments[(int32_t)i]->As<VulkanImageView>()->GetVkImageView();
+            attachmentInfo.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        }
+
         attachmentInfos.push_back(attachmentInfo);
     }
     return attachmentInfos;
+}
+
+static VkImage GetVkImage(const SharedObjectPtr<ImageView>& InAttachment) {
+    return InAttachment->GetDesc().ImagePtr->As<VulkanImage>()->GetVkImage();
+}
+
+void VulkanFrameBuffer::TransitionToAttachmentLayout(VkCommandBuffer InCmdBuffer) const {
+    for (const SharedObjectPtr<ImageView>& colorAttachment : m_Desc.ColorAttachments) {
+        VulkanHelpers::TransitionImage(InCmdBuffer, GetVkImage(colorAttachment),
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
+    for (const SharedObjectPtr<ImageView>& colorAttachment : m_MultisampleColorAttachments) {
+        VulkanHelpers::TransitionImage(InCmdBuffer, GetVkImage(colorAttachment),
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
+
+    const SharedObjectPtr<ImageView>& depthAttachment = IsMultisampled() ? m_MultisampleDepthAttachment : m_Desc.DepthAttachment;
+    if (depthAttachment) {
+        VulkanHelpers::TransitionImage(InCmdBuffer, GetVkImage(depthAttachment),
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+    }
+}
+
+void VulkanFrameBuffer::TransitionToShaderReadLayout(VkCommandBuffer InCmdBuffer) const {
+    for (const SharedObjectPtr<ImageView>& colorAttachment : m_Desc.ColorAttachments) {
+        VulkanHelpers::TransitionImage(InCmdBuffer, GetVkImage(colorAttachment),
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
 }
 
 uint32_t VulkanFrameBuffer::ReadPixelUint(int32_t InAttachment, uint32_t InX, uint32_t InY) const {

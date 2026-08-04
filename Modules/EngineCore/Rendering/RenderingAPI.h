@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "Rendering/Vertex.h"
 #include "Rendering/RenderingCommand.h"
+#include "Rendering/Image.h"
 #include "RenderingAPI.gen.h"
 
 class RenderingAPI : public Object {
@@ -39,6 +40,8 @@ public:
     virtual SharedObjectPtr<class Texture> CreateTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const struct TextureDesc& InTextureDesc) = 0;
     virtual SharedObjectPtr<class Sampler> CreateSampler(const struct SamplerDesc& InSamplerDesc) = 0;
     virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) = 0;
+
+    virtual SampleCount GetMaxSupportedSampleCount() const = 0;
 
 private:
     inline static RenderingAPI* s_Instance = nullptr;

@@ -59,6 +59,12 @@ void AssetStreamHandle::Release() {
     if (!m_Asset)
         return;
 
+    if (!AssetManager::IsAvailable()) {
+        AE_WARN("AssetStreamHandle released after AssetManager shutdown; asset '{0}' will not be unloaded", m_Asset->GetDisplayName());
+        m_Asset = nullptr;
+        return;
+    }
+
     AE_ASSERT(m_Asset->m_ActiveStreamHandleCount > 0);
 
     --m_Asset->m_ActiveStreamHandleCount;

@@ -14,6 +14,7 @@ public:
     virtual ~AssetManager();
 
     static AssetManager& Get();
+    static bool IsAvailable();
 
     void Initialize(bool InLoadAssets = true);
     void Shutdown();

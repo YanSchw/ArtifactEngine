@@ -126,6 +126,19 @@ uint32_t VulkanAPI::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pr
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
+bool VulkanAPI::TryFindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t& OutMemoryTypeIndex) const {
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            OutMemoryTypeIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 VkSurfaceFormatKHR ChooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     // We can either choose any format
     if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
@@ -1094,10 +1107,6 @@ void VulkanAPI::Draw() {
     }
 }
 
-static VkImage GetColorAttachmentImage(const VulkanFrameBuffer& InFrameBuffer, size_t InIndex) {
-    return InFrameBuffer.GetDesc().ColorAttachments[InIndex]->GetDesc().ImagePtr->As<VulkanImage>()->GetVkImage();
-}
-
 void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer) {
     bool hasRenderPassBegun = false;
     VulkanFrameBuffer* openFrameBuffer = nullptr;
@@ -1111,13 +1120,7 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                     vkCmdEndRendering(InCmdBuffer);
 
                     if (openFrameBuffer) {
-                        for (size_t i = 0; i < openFrameBuffer->GetColorAttachmentCount(); i++) {
-                            VulkanHelpers::TransitionImage(InCmdBuffer,
-                                GetColorAttachmentImage(*openFrameBuffer, i),
-                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                VK_IMAGE_ASPECT_COLOR_BIT);
-                        }
+                        openFrameBuffer->TransitionToShaderReadLayout(InCmdBuffer);
                         openFrameBuffer = nullptr;
                     }
                 }
@@ -1134,22 +1137,8 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                     renderingInfo.pColorAttachments = colorAttachmentInfo.data();
                     renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
-                    for (size_t i = 0; i < framebuffer->GetColorAttachmentCount(); i++) {
-                        VulkanHelpers::TransitionImage(InCmdBuffer,
-                            GetColorAttachmentImage(*framebuffer, i),
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_ASPECT_COLOR_BIT);
-                    }
+                    framebuffer->TransitionToAttachmentLayout(InCmdBuffer);
                     openFrameBuffer = framebuffer;
-
-                    if (depthAttachmentInfo.imageView) {
-                        VulkanHelpers::TransitionImage(InCmdBuffer,
-                            framebuffer->GetDesc().DepthAttachment->GetDesc().ImagePtr->As<VulkanImage>()->GetVkImage(),
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_ASPECT_DEPTH_BIT);
-                    }
 
                     vkCmdBeginRendering(InCmdBuffer, &renderingInfo);
 
@@ -1341,6 +1330,18 @@ SharedObjectPtr<Texture> VulkanAPI::CreateTexture(byte* InPixels, uint32_t InWid
 
 SharedObjectPtr<Sampler> VulkanAPI::CreateSampler(const SamplerDesc& InSamplerDesc) {
     return new VulkanSampler(InSamplerDesc, *this);
+}
+
+SampleCount VulkanAPI::GetMaxSupportedSampleCount() const {
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+    const VkSampleCountFlags counts = properties.limits.framebufferColorSampleCounts
+        & properties.limits.framebufferDepthSampleCounts;
+    if (counts & VK_SAMPLE_COUNT_8_BIT) return SampleCount::X8;
+    if (counts & VK_SAMPLE_COUNT_4_BIT) return SampleCount::X4;
+    if (counts & VK_SAMPLE_COUNT_2_BIT) return SampleCount::X2;
+    return SampleCount::None;
 }
 
 SharedObjectPtr<FrameBuffer> VulkanAPI::CreateFrameBuffer(const FrameBufferDesc& InFrameBufferDesc) {

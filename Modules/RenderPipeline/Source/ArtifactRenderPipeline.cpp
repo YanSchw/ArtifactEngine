@@ -93,6 +93,7 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     FrameBufferDesc frameBufferDesc;
     frameBufferDesc.Width = InWidth;
     frameBufferDesc.Height = InHeight;
+    frameBufferDesc.Samples = SceneSampleCount;
     frameBufferDesc.ColorAttachments.Add(imageView);
     frameBufferDesc.ColorAttachments.Add(idImageView);
     frameBufferDesc.DepthAttachment = depthImageView;

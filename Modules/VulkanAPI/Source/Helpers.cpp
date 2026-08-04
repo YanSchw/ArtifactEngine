@@ -120,5 +120,15 @@ VkImageUsageFlags VulkanHelpers::ImageUsageToVkImageUsage(ImageUsage usage) {
     if ((usage & ImageUsage::Storage) != ImageUsage::None) flags |= VK_IMAGE_USAGE_STORAGE_BIT;
     if ((usage & ImageUsage::ColorAttachment) != ImageUsage::None) flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     if ((usage & ImageUsage::DepthStencil) != ImageUsage::None) flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    if ((usage & ImageUsage::Transient) != ImageUsage::None) flags |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
     return flags;
+}
+
+VkSampleCountFlagBits VulkanHelpers::SampleCountToVkSampleCount(SampleCount samples) {
+    switch (samples) {
+    case SampleCount::X2: return VK_SAMPLE_COUNT_2_BIT;
+    case SampleCount::X4: return VK_SAMPLE_COUNT_4_BIT;
+    case SampleCount::X8: return VK_SAMPLE_COUNT_8_BIT;
+    default: return VK_SAMPLE_COUNT_1_BIT;
+    }
 }
