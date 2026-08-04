@@ -43,6 +43,9 @@ public:
     bool IsMinimized() const;
     void Close();
 
+    void SetFullscreen(bool InFullscreen);
+    bool IsFullscreen() const { return m_Fullscreen; }
+
     void Show();
     void Hide();
     bool IsVisible() const;
@@ -86,6 +89,8 @@ private:
     WindowParams m_Params;
     struct GLFWwindow* m_Window = nullptr;
     bool m_CursorLocked = false;
+    bool m_Fullscreen = false;
+    int32_t m_WindowedRect[4] = {}; // x, y, width, height to restore when leaving fullscreen
     bool m_Resized = false;
     Vec2 m_ScrollAccum = Vec2(0.0f);
     String m_TextInputAccum;

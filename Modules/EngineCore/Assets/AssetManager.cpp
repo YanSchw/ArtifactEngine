@@ -37,7 +37,7 @@ void AssetManager::Initialize(bool InLoadAssets) {
     if (EngineConfig::IsPackagedBuild()) {
         // In packaged builds, we load asset metadata from the "AssetIndex" that lists all assets and their UUIDs.
         auto assetIndexBinary = ChunkedBinary::LoadFromFile(EngineConfig::ResolveContentPath("/AssetIndex"));
-        AE_ASSERT(assetIndexBinary, "Failed to load AssetIndex!");
+        AE_VERIFY(assetIndexBinary, "Failed to load AssetIndex!");
         auto assetIndexChunk0 = assetIndexBinary->GetChunk(0);
         auto assetIndexChunk1 = assetIndexBinary->GetChunk(1);
         uint32_t assetCount;

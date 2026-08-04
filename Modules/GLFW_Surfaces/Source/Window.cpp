@@ -2,6 +2,7 @@
 #include "Core/Log.h"
 #include "Core/EngineConfig.h"
 #include "Platform/Platform.h"
+#include "Platform/PlatformHooks.h"
 #include "Rendering/RenderingAPI.h"
 #include "Serialization/ThirdParty/stb_image/stb_image.h"
 
@@ -13,6 +14,21 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
+#if defined(AE_PLATFORM_MACOS)
+// glfw3native.h drags in the Cocoa headers, whose `Class` typedef collides with the engine's
+// reflection type of the same name; the NSWindow is only ever passed on as an opaque handle.
+extern "C" void* glfwGetCocoaWindow(GLFWwindow* InWindow);
+#endif
+
+static void* GetNativeWindowHandle(GLFWwindow* InWindow) {
+#if defined(AE_PLATFORM_MACOS)
+    return glfwGetCocoaWindow(InWindow);
+#else
+    (void)InWindow;
+    return nullptr;
+#endif
+}
 
 static Window* s_Instance = nullptr;
 static Array<Window*> s_AllWindows;
@@ -34,7 +50,7 @@ static void ApplyIcon(GLFWwindow* InWindow) {
     static bool s_ApplicationIconSet = false;
     if (!s_ApplicationIconSet) {
         s_ApplicationIconSet = true;
-        Platform::SetApplicationIcon(iconPath);
+        PlatformHooks::Get().SetApplicationIcon(iconPath);
     }
 
 #if defined(AE_PLATFORM_MACOS)
@@ -96,6 +112,8 @@ Window::Window(const WindowParams& InParams) {
             *OutHit = (self && self->HitTestTitleBar(Vec2((float)InX, (float)InY))) ? 1 : 0;
         });
     }
+
+    SetFullscreen(m_Params.Fullscreen);
 
     // Spin up the global input devices the first time a window is created.
     static bool s_InputDevicesCreated = false;
@@ -213,6 +231,36 @@ bool Window::IsMinimized() const {
 
 void Window::Close() {
     glfwSetWindowShouldClose(m_Window, GLFW_TRUE);
+}
+
+void Window::SetFullscreen(bool InFullscreen) {
+    if (!m_Window || m_Fullscreen == InFullscreen) {
+        return;
+    }
+    m_Fullscreen = InFullscreen;
+
+    if (PlatformHooks::Get().SetWindowFullscreen(GetNativeWindowHandle(m_Window), InFullscreen)) {
+        return;
+    }
+
+    if (InFullscreen) {
+        glfwGetWindowPos(m_Window, &m_WindowedRect[0], &m_WindowedRect[1]);
+        glfwGetWindowSize(m_Window, &m_WindowedRect[2], &m_WindowedRect[3]);
+
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = monitor ? glfwGetVideoMode(monitor) : nullptr;
+        if (!mode) {
+            AE_WARN("No monitor available to go fullscreen on");
+            m_Fullscreen = false;
+            return;
+        }
+        int monitorX, monitorY;
+        glfwGetMonitorPos(monitor, &monitorX, &monitorY);
+        glfwSetWindowMonitor(m_Window, monitor, monitorX, monitorY, mode->width, mode->height, mode->refreshRate);
+    } else {
+        glfwSetWindowMonitor(m_Window, nullptr, m_WindowedRect[0], m_WindowedRect[1],
+                             m_WindowedRect[2], m_WindowedRect[3], GLFW_DONT_CARE);
+    }
 }
 
 void Window::Show() {

@@ -1,6 +1,7 @@
 #include "EditorEngine.h"
 #include "CoreMinimal.h"
 #include "Platform/Platform.h"
+#include "Platform/PlatformHooks.h"
 
 #include "EditorWindow.h"
 #include "Tabs/SceneEditorTab.h"
@@ -40,7 +41,7 @@ void EditorEngine::Initialize() {
 
 void EditorEngine::TickInput(double InDeltaTime) {
     Window::PollEvents();
-    Platform::SetSystemShortcutsSuppressed(Window::GetFocusedWindow() != nullptr);
+    PlatformHooks::Get().SetSystemShortcutsSuppressed(Window::GetFocusedWindow() != nullptr);
     // Refresh devices + evaluate action maps before gameplay reads them.
     InputSystem::Get().Tick((float)InDeltaTime);
 }
@@ -82,7 +83,7 @@ bool EditorEngine::MainTick(double InDeltaTime) {
 }
 
 void EditorEngine::Shutdown() {
-    Platform::SetSystemShortcutsSuppressed(false);
+    PlatformHooks::Get().SetSystemShortcutsSuppressed(false);
     // Tear the windows (and their UI renderers) down before the assets they sample and the RHI.
     ThemedWindow::DestroyAllWindows();
     AssetManager::Get().Shutdown();

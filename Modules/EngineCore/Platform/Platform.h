@@ -23,12 +23,6 @@ public:
     static String GetResourceDirectory();
     static String GetContentDirectory();
 
-    // Icon the OS shows for the running process.
-    static void SetApplicationIcon(const String& InImagePath);
-
-    // Suspends the OS-level keyboard shortcuts that swallow key combos
-    static void SetSystemShortcutsSuppressed(bool InSuppressed);
-
     struct TemporaryDirectory {
         String Path;
         TemporaryDirectory();

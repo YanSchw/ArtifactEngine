@@ -73,7 +73,7 @@ struct VulkanSwapchainData {
     std::vector<VkImage> Images;
     std::vector<VkImageView> ImageViews;
     VkSemaphore ImageAvailable = VK_NULL_HANDLE;
-    VkSemaphore RenderingFinished = VK_NULL_HANDLE;
+    std::vector<VkSemaphore> RenderingFinished;
     uint32_t ImageIndex = 0;
     bool Acquired = false;
     // Multisampled color target rendered into, then resolved to the swapchain image each frame.
@@ -363,14 +363,26 @@ static void CreateSwapchainForData(VulkanSwapchainData& data) {
         }
     }
 
+    for (VkSemaphore semaphore : data.RenderingFinished) {
+        vkDestroySemaphore(device, semaphore, nullptr);
+    }
+    data.RenderingFinished.assign(data.Images.size(), VK_NULL_HANDLE);
+    for (VkSemaphore& semaphore : data.RenderingFinished) {
+        VkSemaphoreCreateInfo semaphoreInfo = {};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS) {
+            AE_ERROR("failed to create rendering-finished semaphore");
+            exit(1);
+        }
+    }
+
     CreateMsaaTarget(data);
 }
 
 static void CreateSwapchainResources(VulkanSwapchainData& data) {
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &data.ImageAvailable) != VK_SUCCESS ||
-        vkCreateSemaphore(device, &semaphoreInfo, nullptr, &data.RenderingFinished) != VK_SUCCESS) {
+    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &data.ImageAvailable) != VK_SUCCESS) {
         AE_ERROR("failed to create semaphores");
         exit(1);
     }
@@ -419,9 +431,10 @@ static void DestroySwapchainData(VulkanSwapchainData& data) {
     if (data.ImageAvailable != VK_NULL_HANDLE) {
         vkDestroySemaphore(device, data.ImageAvailable, nullptr);
     }
-    if (data.RenderingFinished != VK_NULL_HANDLE) {
-        vkDestroySemaphore(device, data.RenderingFinished, nullptr);
+    for (VkSemaphore semaphore : data.RenderingFinished) {
+        vkDestroySemaphore(device, semaphore, nullptr);
     }
+    data.RenderingFinished.clear();
     if (data.WindowSurface != VK_NULL_HANDLE) {
         vkDestroySurfaceKHR(instance, data.WindowSurface, nullptr);
     }
@@ -987,7 +1000,7 @@ void VulkanAPI::Draw() {
         presentToDrawBarrier.srcAccessMask = 0;
         presentToDrawBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         presentToDrawBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        presentToDrawBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        presentToDrawBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         presentToDrawBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         presentToDrawBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         presentToDrawBarrier.image = swapchain->Images[swapchain->ImageIndex];
@@ -1013,6 +1026,14 @@ void VulkanAPI::Draw() {
 
     RecordCommandBuffer(m_RenderQueue, graphicsCommandBuffer);
 
+    for (VulkanSwapchainData* swapchain : targets) {
+        VulkanHelpers::TransitionImage(graphicsCommandBuffer,
+            swapchain->Images[swapchain->ImageIndex],
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+    }
+
     if (vkEndCommandBuffer(graphicsCommandBuffer) != VK_SUCCESS) {
         AE_ERROR("failed to record command buffer");
         exit(1);
@@ -1025,7 +1046,7 @@ void VulkanAPI::Draw() {
     for (VulkanSwapchainData* swapchain : targets) {
         waitSemaphores.push_back(swapchain->ImageAvailable);
         waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-        signalSemaphores.push_back(swapchain->RenderingFinished);
+        signalSemaphores.push_back(swapchain->RenderingFinished[swapchain->ImageIndex]);
     }
 
     VkSubmitInfo submitInfo = {};
@@ -1073,8 +1094,13 @@ void VulkanAPI::Draw() {
     }
 }
 
+static VkImage GetColorAttachmentImage(const VulkanFrameBuffer& InFrameBuffer, size_t InIndex) {
+    return InFrameBuffer.GetDesc().ColorAttachments[InIndex]->GetDesc().ImagePtr->As<VulkanImage>()->GetVkImage();
+}
+
 void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer) {
     bool hasRenderPassBegun = false;
+    VulkanFrameBuffer* openFrameBuffer = nullptr;
     VulkanPipeline* currentPipeline = nullptr;
 
     for (const RenderCommand& cmd : InQueue.commands) {
@@ -1083,6 +1109,17 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                 const auto& data = std::get<CmdBeginRenderPass>(cmd.Data);
                 if (hasRenderPassBegun) {
                     vkCmdEndRendering(InCmdBuffer);
+
+                    if (openFrameBuffer) {
+                        for (size_t i = 0; i < openFrameBuffer->GetColorAttachmentCount(); i++) {
+                            VulkanHelpers::TransitionImage(InCmdBuffer,
+                                GetColorAttachmentImage(*openFrameBuffer, i),
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                VK_IMAGE_ASPECT_COLOR_BIT);
+                        }
+                        openFrameBuffer = nullptr;
+                    }
                 }
 
                 if (VulkanFrameBuffer* framebuffer = data.Target ? data.Target->As<VulkanFrameBuffer>() : nullptr) {
@@ -1099,11 +1136,12 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
 
                     for (size_t i = 0; i < framebuffer->GetColorAttachmentCount(); i++) {
                         VulkanHelpers::TransitionImage(InCmdBuffer,
-                            framebuffer->GetDesc().ColorAttachments[i]->GetDesc().ImagePtr->As<VulkanImage>()->GetVkImage(),
+                            GetColorAttachmentImage(*framebuffer, i),
+                            VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT);
                     }
+                    openFrameBuffer = framebuffer;
 
                     if (depthAttachmentInfo.imageView) {
                         VulkanHelpers::TransitionImage(InCmdBuffer,

@@ -30,7 +30,8 @@ static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
 static SharedObjectPtr<VertexBuffer> s_FullScreenQuadVertexBuffer;
 
 void GameEngine::Initialize() {
-    s_Window = Window::Create(WindowParams{ "Artifact Engine", 1280, 720 });
+    s_Window = Window::Create(WindowParams{ "Artifact Engine", 1280, 720,
+                                            EngineConfig::GetConfigVar<bool>("Fullscreen") });
     AE_ASSERT(s_Window);
 
     Object::Create(Platform::GetDefaultRenderingAPIClass());

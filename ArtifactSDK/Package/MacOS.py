@@ -132,7 +132,7 @@ def fix_linkage():
     if "/usr/local/lib" in otool:
         print("⚠️ Executable still references /usr/local/lib after relinking")
 
-def create_plist(app_path: Path):
+def create_plist(app_path: Path, game: bool = False):
     plist = {
         "CFBundleName": APP_NAME,
         "CFBundleDisplayName": APP_NAME,
@@ -144,6 +144,10 @@ def create_plist(app_path: Path):
         "CFBundleIconFile": "app.icns",
         "LSMinimumSystemVersion": "10.13",
     }
+
+    if game:
+        plist["LSApplicationCategoryType"] = "public.app-category.games"
+        plist["GCSupportsGameMode"] = True
 
     with open(app_path / "Contents/Info.plist", "wb") as f:
         plistlib.dump(plist, f)
@@ -244,7 +248,7 @@ def package_for_macos(project_path):
     copy_binary()
     copy_content(project_path)
     copy_dependencies()
-    create_plist(APP_PATH)
+    create_plist(APP_PATH, game=True)
     fix_linkage()   # must run after binaries are in place and before signing (it invalidates sigs)
     sign_app()
     verify()
