@@ -64,6 +64,7 @@ private:
     void AddHeroToolButton(UINode& InRow, HeroTool* InTool);
     void AddLogStatusButton(UINode& InRow);
     void HandleShortcuts();
+    void HandlePlayShortcuts(class KeyboardDevice& InKeyboard);
 
     UIStack* m_ToolBarContent = nullptr;
     UINode* m_TabHost = nullptr;

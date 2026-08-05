@@ -457,6 +457,26 @@ void EditorWindow::HandleShortcuts() {
         ToggleHeroTool(m_ConsoleTool);
     } else if (keyboard->IsDown(KeyCode::Escape) && m_ActiveHeroTool) {
         CloseHeroTool();
+    } else {
+        HandlePlayShortcuts(*keyboard);
+    }
+}
+
+void EditorWindow::HandlePlayShortcuts(KeyboardDevice& InKeyboard) {
+    SceneEditorTab* scene = Cast<SceneEditorTab>(m_ActiveTab);
+    if (!scene) {
+        return;
+    }
+
+    const PlayState state = scene->GetPlayState();
+    const bool running = (state != PlayState::Editor);
+
+    if (InKeyboard.IsDown(KeyCode::F5)) {
+        running ? scene->StopPlayInEditor() : scene->PlayInEditor(PlayState::Playing);
+    } else if (InKeyboard.IsDown(KeyCode::F6)) {
+        running ? scene->StopPlayInEditor() : scene->PlayInEditor(PlayState::Simulating);
+    } else if (running && InKeyboard.IsDown(KeyCode::F7)) {
+        scene->SetPlayState(state == PlayState::Playing ? PlayState::Simulating : PlayState::Playing);
     }
 }
 

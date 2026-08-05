@@ -23,6 +23,9 @@ protected:
 private:
     void RenderFrame(double InDeltaTime);
     bool IsGameInputActive() const;
+    void UpdatePlayCursor();
 
     WeakObjectPtr<SceneEditorTab> m_PlayingTab;
+    bool m_GameCursorLocked = false;
+    bool m_HadGameInput = false;
 };

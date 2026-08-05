@@ -47,5 +47,4 @@ private:
     WeakObjectPtr<World> m_PlayWorld;
     WeakObjectPtr<Node> m_PlayRoot;
     PlayState m_PlayState = PlayState::Editor;
-    bool m_CursorWasLocked = false;
 };

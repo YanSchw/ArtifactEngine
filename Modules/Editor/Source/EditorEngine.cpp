@@ -10,11 +10,41 @@
 #include "Assets/Scene.h"
 #include "Core/EngineConfig.h"
 #include "InputSystem/InputSystem.h"
+#include "InputSystem/MouseCodes.h"
 #include "Common/UUID.h"
 
 #include "GameFramework/GameInstance.h"
 #include "GameFramework/UICanvas.h"
 #include "Assets/Font.h"
+
+static bool AnyCursorLocked() {
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        if (window.Get() && window->IsCursorLocked()) {
+            return true;
+        }
+    }
+    Window* primary = Window::GetInstance();
+    return primary && primary->IsCursorLocked();
+}
+
+static void UnlockAllCursors() {
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        if (window.Get() && window->IsCursorLocked()) {
+            window->SetCursorLocked(false);
+        }
+    }
+    if (Window* primary = Window::GetInstance()) {
+        if (primary->IsCursorLocked()) {
+            primary->SetCursorLocked(false);
+        }
+    }
+}
+
+static bool EditorIsDraggingCursor() {
+    Window* focused = Window::GetFocusedWindow();
+    return focused && (focused->IsMouseButtonDown((int32_t)MouseCode::Right)
+                    || focused->IsMouseButtonDown((int32_t)MouseCode::Middle));
+}
 
 EditorEngine* EditorEngine::Get() {
     return Cast<EditorEngine>(&Engine::Get());
@@ -27,13 +57,36 @@ GameInstance* EditorEngine::CreatePlayInstance(SceneEditorTab* InTab) {
         }
     }
     m_PlayingTab = InTab;
+    m_GameCursorLocked = false;
+    m_HadGameInput = false;
     m_GameInstance = new GameInstance();
     return m_GameInstance.Get();
 }
 
 void EditorEngine::DisposePlayInstance() {
+    if (m_GameCursorLocked) {
+        UnlockAllCursors();
+        m_GameCursorLocked = false;
+    }
+    m_HadGameInput = false;
     m_PlayingTab = nullptr;
     m_GameInstance = nullptr;
+}
+
+void EditorEngine::UpdatePlayCursor() {
+    const bool gameInput = IsGameInputActive();
+    if (gameInput && !m_HadGameInput) {
+        SceneEditorTab* tab = m_GameCursorLocked ? m_PlayingTab.Get() : nullptr;
+        if (EditorWindow* window = tab ? tab->GetOwnerWindow() : nullptr) {
+            window->SetCursorLocked(true);
+        }
+    } else if (gameInput) {
+        m_GameCursorLocked = AnyCursorLocked();
+    } else if (AnyCursorLocked() && !EditorIsDraggingCursor()) {
+        m_GameCursorLocked = true;
+        UnlockAllCursors();
+    }
+    m_HadGameInput = gameInput;
 }
 
 bool EditorEngine::IsGameInputActive() const {
@@ -91,6 +144,7 @@ void EditorEngine::RenderFrame(double InDeltaTime) {
 bool EditorEngine::MainTick(double InDeltaTime) {
     if (GameInstance* game = GetGameInstance()) {
         game->Update(InDeltaTime);
+        UpdatePlayCursor();
     }
 
     RenderFrame(InDeltaTime);

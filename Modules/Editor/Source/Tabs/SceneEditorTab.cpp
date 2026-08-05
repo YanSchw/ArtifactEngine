@@ -140,7 +140,6 @@ void SceneEditorTab::PlayInEditor(PlayState InState) {
     m_PlayWorld = world;
     m_PlayRoot = root;
     m_PlayState = InState;
-    m_CursorWasLocked = false;
     EditorWindow::MarkAllChromeDirty();
 }
 
@@ -153,9 +152,6 @@ void SceneEditorTab::StopPlayInEditor() {
     m_PlayRoot = nullptr;
     ClearSelection();
 
-    if (EditorWindow* window = GetOwnerWindow()) {
-        window->SetCursorLocked(false);
-    }
     if (EditorEngine* engine = EditorEngine::Get()) {
         engine->DisposePlayInstance();
     }
@@ -165,14 +161,6 @@ void SceneEditorTab::StopPlayInEditor() {
 void SceneEditorTab::SetPlayState(PlayState InState) {
     if (m_PlayState == PlayState::Editor || m_PlayState == InState) {
         return;
-    }
-
-    EditorWindow* window = GetOwnerWindow();
-    if (window && InState == PlayState::Simulating) {
-        m_CursorWasLocked = window->IsCursorLocked();
-        window->SetCursorLocked(false);
-    } else if (window && m_CursorWasLocked) {
-        window->SetCursorLocked(true);
     }
 
     m_PlayState = InState;
