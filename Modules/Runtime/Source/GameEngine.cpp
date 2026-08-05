@@ -70,10 +70,6 @@ void GameEngine::Initialize() {
         AE_ERROR("DefaultScene {0} could not be found", defaultSceneId.ToString());
     }
 
-    if (!world->GetMainCamera()) {
-        world->Spawn<CameraController>();
-    }
-
     Window::SetRefreshCallback([this]() { RenderFrame(m_DeltaTime); });
 }
 
