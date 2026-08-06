@@ -35,7 +35,7 @@ SubprocessResult Subprocess::Run(const String& InCommand) {
 
     PROCESS_INFORMATION pi{};
 
-    String command = "cmd.exe /C " + InCommand;
+    String command = "cmd.exe /S /C \"" + InCommand + "\"";
 
     if (!CreateProcessA(
             NULL,
