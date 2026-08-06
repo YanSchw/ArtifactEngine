@@ -256,7 +256,7 @@ static void CreateMsaaTarget(VulkanSwapchainData& data) {
     }
 }
 
-static void CreateSwapchainForData(VulkanSwapchainData& data) {
+static bool CreateSwapchainForData(VulkanSwapchainData& data) {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, data.WindowSurface, &surfaceCapabilities) != VK_SUCCESS) {
         AE_ERROR("failed to acquire presentation surface capabilities");
@@ -297,7 +297,13 @@ static void CreateSwapchainForData(VulkanSwapchainData& data) {
         AE_WARN("swapchain format mismatch across windows ({0} vs {1})", (int)surfaceFormat.format, (int)swapChainFormat);
     }
 
-    data.Extent = ChooseSwapExtent(surfaceCapabilities, data.Target);
+    const VkExtent2D extent = ChooseSwapExtent(surfaceCapabilities, data.Target);
+
+    if (extent.width == 0 || extent.height == 0) {
+        return false;
+    }
+
+    data.Extent = extent;
     if (!swapchains.empty() && swapchains[0] == &data) {
         swapChainExtent = data.Extent;
     }
@@ -390,6 +396,7 @@ static void CreateSwapchainForData(VulkanSwapchainData& data) {
     }
 
     CreateMsaaTarget(data);
+    return true;
 }
 
 static void CreateSwapchainResources(VulkanSwapchainData& data) {
@@ -453,9 +460,21 @@ static void DestroySwapchainData(VulkanSwapchainData& data) {
     }
 }
 
-static void RecreateSwapchain(VulkanSwapchainData& data) {
+static bool RecreateSwapchain(VulkanSwapchainData& data) {
     vkDeviceWaitIdle(device);
-    CreateSwapchainForData(data);
+    return CreateSwapchainForData(data);
+}
+
+static void ResetImageAvailableSemaphore(VulkanSwapchainData& data) {
+    vkDestroySemaphore(device, data.ImageAvailable, nullptr);
+    data.ImageAvailable = VK_NULL_HANDLE;
+
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &data.ImageAvailable) != VK_SUCCESS) {
+        AE_ERROR("failed to recreate image-available semaphore");
+        exit(1);
+    }
 }
 
 VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> presentModes) {
@@ -958,6 +977,10 @@ void VulkanAPI::Draw() {
             continue;
         }
         VulkanSwapchainData* swapchain = GetOrCreateSwapchainData(surface);
+        if (swapchain->SwapChain == VK_NULL_HANDLE && !RecreateSwapchain(*swapchain)) {
+            m_RenderQueue.Clear();
+            return;
+        }
         if (std::find(targets.begin(), targets.end(), swapchain) == targets.end()) {
             targets.push_back(swapchain);
         }
@@ -983,6 +1006,12 @@ void VulkanAPI::Draw() {
         if (res == VK_ERROR_OUT_OF_DATE_KHR) {
             AE_TRACE("swapchain out of date on acquire");
             RecreateSwapchain(*swapchain);
+            for (VulkanSwapchainData* acquired : targets) {
+                if (acquired->Acquired) {
+                    ResetImageAvailableSemaphore(*acquired);
+                    acquired->Acquired = false;
+                }
+            }
             m_RenderQueue.Clear();
             return;
         }

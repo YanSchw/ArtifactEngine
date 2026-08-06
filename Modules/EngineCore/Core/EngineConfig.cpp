@@ -22,6 +22,7 @@ void EngineConfig::LoadConfigVars(const Array<String>& InArgs) {
     SetConfigVar("EngineClass", IsPackagedBuild() ? "GameEngine" : "EditorEngine");
     SetConfigVar("RenderPipeline", "ArtifactRenderPipeline");
     SetConfigVar("Fullscreen", IsPackagedBuild() ? "true" : "false");
+    SetConfigVar("CapFPS", "60");
     SetConfigVar("DefaultScene", "a1b2c3d4-0001-4a00-9000-000000000001");
 
     // 2. Load frozen ConfigVars from packaged build

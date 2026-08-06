@@ -35,7 +35,8 @@ void ArtifactRenderPipeline::UpdateUniformData(const RenderParams& InParams) {
     SceneUniformData data;
     data.viewProjectionMatrix = glm::mat4(1.0f);
     if (camera) {
-        camera->SetAspectRatio(InParams.Width / (float) InParams.Height);
+        // A zero height (minimized window) would make this NaN
+        camera->SetAspectRatio(InParams.Width / (float) glm::max(InParams.Height, 1u));
         data.viewProjectionMatrix = camera->GetViewProjectionMatrix();
     }
 

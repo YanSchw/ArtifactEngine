@@ -29,6 +29,10 @@ static SharedObjectPtr<Window> s_Window;
 static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
 static SharedObjectPtr<VertexBuffer> s_FullScreenQuadVertexBuffer;
 
+static bool IsWindowDrawable() {
+    return s_Window && !s_Window->IsMinimized() && s_Window->GetWidth() > 0 && s_Window->GetHeight() > 0;
+}
+
 void GameEngine::Initialize() {
     s_Window = Window::Create(WindowParams{ "Artifact Engine", 1280, 720,
                                             EngineConfig::GetConfigVar<bool>("Fullscreen") });
@@ -81,6 +85,10 @@ void GameEngine::TickInput(double InDeltaTime) {
 }
 
 void GameEngine::RenderFrame(double InDeltaTime) {
+    if (!IsWindowDrawable()) {
+        return;
+    }
+
     m_RenderPipeline->Render(InDeltaTime, RenderParams {
         s_Window->GetWidth(),
         s_Window->GetHeight(),
