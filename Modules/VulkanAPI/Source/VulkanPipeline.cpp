@@ -26,6 +26,49 @@ extern VkExtent2D swapChainExtent;
 extern VkFormat swapChainFormat;
 extern VkSampleCountFlagBits swapChainSampleCount;
 
+static VkCullModeFlags ToVulkanCullMode(CullMode InCullMode) {
+    switch (InCullMode) {
+        case CullMode::Back:  return VK_CULL_MODE_BACK_BIT;
+        case CullMode::Front: return VK_CULL_MODE_FRONT_BIT;
+        case CullMode::None:  return VK_CULL_MODE_NONE;
+    }
+    return VK_CULL_MODE_BACK_BIT;
+}
+
+static void ApplyBlendMode(BlendMode InBlendMode, VkPipelineColorBlendAttachmentState& OutState) {
+    OutState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    OutState.colorBlendOp = VK_BLEND_OP_ADD;
+    OutState.alphaBlendOp = VK_BLEND_OP_ADD;
+    OutState.blendEnable = InBlendMode == BlendMode::Opaque ? VK_FALSE : VK_TRUE;
+
+    switch (InBlendMode) {
+        case BlendMode::Opaque:
+            OutState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            OutState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+            OutState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            OutState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            break;
+        case BlendMode::Alpha:
+            OutState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            OutState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            OutState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            OutState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            break;
+        case BlendMode::Additive:
+            OutState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            OutState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            OutState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            OutState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            break;
+        case BlendMode::Multiply:
+            OutState.srcColorBlendFactor = VK_BLEND_FACTOR_DST_COLOR;
+            OutState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+            OutState.srcAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+            OutState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            break;
+    }
+}
+
 static VkExtent2D GetPipelineTargetExtent(const PipelineDesc& InDesc) {
     if (InDesc.IsFrameBufferTarget()) {
         const auto& frameBuffer = InDesc.Target->As<FrameBuffer>();
@@ -84,6 +127,8 @@ void VulkanPipeline::Invalidate() {
     AE_ASSERT(m_Desc.Shader && m_Desc.Shader->IsA<VulkanShader>(), "Pipeline must have a shader of type VulkanShader!");
     VulkanShader& vulkanShader = *m_Desc.Shader->As<VulkanShader>();
     AE_ASSERT(vulkanShader.IsVertexFragmentShader(), "shader must have vertex and fragment shader modules to be used in graphics pipeline");
+
+    const ShaderRenderState& renderState = vulkanShader.GetRenderState();
 
     // Set up shader stage info
     VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
@@ -148,8 +193,10 @@ void VulkanPipeline::Invalidate() {
     rasterizationCreateInfo.depthClampEnable = VK_FALSE;
     rasterizationCreateInfo.rasterizerDiscardEnable = VK_FALSE;
     rasterizationCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizationCreateInfo.cullMode = m_Desc.DisableBackFaceCulling ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
-    rasterizationCreateInfo.frontFace = m_Desc.ClockwiseFrontFace ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizationCreateInfo.cullMode = ToVulkanCullMode(renderState.Cull);
+    rasterizationCreateInfo.frontFace = renderState.FrontFace == WindingOrder::Clockwise
+        ? VK_FRONT_FACE_CLOCKWISE
+        : VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizationCreateInfo.depthBiasEnable = VK_FALSE;
     rasterizationCreateInfo.depthBiasConstantFactor = 0.0f;
     rasterizationCreateInfo.depthBiasClamp = 0.0f;
@@ -170,13 +217,7 @@ void VulkanPipeline::Invalidate() {
     // Describing color blending
     // Note: all paramaters except blendEnable and colorWriteMask are irrelevant here
     VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
-    colorBlendAttachmentState.blendEnable = m_Desc.EnableBlending ? VK_TRUE : VK_FALSE;
-    colorBlendAttachmentState.srcColorBlendFactor = m_Desc.EnableBlending ? VK_BLEND_FACTOR_SRC_ALPHA : VK_BLEND_FACTOR_ONE;
-    colorBlendAttachmentState.dstColorBlendFactor = m_Desc.EnableBlending ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : VK_BLEND_FACTOR_ZERO;
-    colorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
-    colorBlendAttachmentState.srcAlphaBlendFactor = m_Desc.EnableBlending ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ONE;
-    colorBlendAttachmentState.dstAlphaBlendFactor = m_Desc.EnableBlending ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : VK_BLEND_FACTOR_ZERO;
-    colorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
+    ApplyBlendMode(renderState.Blend, colorBlendAttachmentState);
     colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
     // Note: all attachments must have the same values unless a device feature is enabled
@@ -204,8 +245,8 @@ void VulkanPipeline::Invalidate() {
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = m_Desc.EnableDepthTest ? VK_TRUE : VK_FALSE;
-    depthStencil.depthWriteEnable = m_Desc.EnableDepthTest ? VK_TRUE : VK_FALSE;
+    depthStencil.depthTestEnable = (renderState.Depth == DepthMode::Test || renderState.Depth == DepthMode::TestWrite) ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable = (renderState.Depth == DepthMode::Write || renderState.Depth == DepthMode::TestWrite) ? VK_TRUE : VK_FALSE;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;

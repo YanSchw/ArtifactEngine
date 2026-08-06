@@ -1,15 +1,14 @@
 #include "CoreMinimal.h"
 #include "Platform/Platform.h"
-#include "Platform/FileIO.h"
 
 #include "ArtifactRenderPipeline.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Texture2D.h"
 #include "Assets/Mesh.h"
-#include "Core/EngineConfig.h"
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/VertexBuffer.h"
 #include "Rendering/Shader.h"
+#include "Rendering/ShaderLibrary.h"
 #include "Rendering/Texture.h"
 #include "Rendering/Sampler.h"
 #include "Rendering/Buffer.h"
@@ -112,7 +111,6 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     PipelineDesc pipelineDesc;
     pipelineDesc.Target = m_FrameBuffer;
     pipelineDesc.Shader = s_Shader;
-    pipelineDesc.ClockwiseFrontFace = true;
     pipelineDesc.Buffers.Add(m_UniformBuffer);
     pipelineDesc.ImageBindings.Add({ 16, AssetManager::Get().GetAsset<Texture2D>(UUID::FromString("8c2146d1-c4d7-41b4-b456-9fd071812573"))->GetTexture()->GetDefaultView(), sampler });
     m_Pipeline = Pipeline::Create(pipelineDesc);
@@ -157,7 +155,7 @@ SharedObjectPtr<class ImageView> ArtifactRenderPipeline::GetFinalImageView() con
 
 ArtifactRenderPipeline::ArtifactRenderPipeline() {
     if (!s_Shader.Get()) {
-        s_Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Shader.glsl"));
+        s_Shader = ShaderLibrary::CreateShader("/Shaders/Shader.glsl");
     }
     Invalidate(100, 100);
 }

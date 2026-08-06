@@ -1,14 +1,13 @@
 #include "GizmoRenderer.h"
 #include "GizmoGeometry.h"
 #include "Assets/Mesh.h"
-#include "Core/EngineConfig.h"
 #include "GameFramework/CameraNode.h"
-#include "Platform/FileIO.h"
 #include "Rendering/Buffer.h"
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Pipeline.h"
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/Shader.h"
+#include "Rendering/ShaderLibrary.h"
 #include "Rendering/ShaderData.h"
 #include "Rendering/VertexBuffer.h"
 
@@ -29,12 +28,10 @@ struct GizmoPushData {
 
 GizmoRenderer::GizmoRenderer() {
     if (!s_GizmoShader.Get()) {
-        s_GizmoShader = Shader::Create(FileIO::ReadFileToString(
-            EngineConfig::GetContentDir("Editor") + "/Shaders/Gizmo.glsl"));
+        s_GizmoShader = ShaderLibrary::CreateShader("/Shaders/Gizmo.glsl");
     }
     if (!s_OverlayShader.Get()) {
-        s_OverlayShader = Shader::Create(FileIO::ReadFileToString(
-            EngineConfig::GetContentDir("Editor") + "/Shaders/GizmoOverlay.glsl"));
+        s_OverlayShader = ShaderLibrary::CreateShader("/Shaders/GizmoOverlay.glsl");
     }
     m_UniformBuffer = UniformBuffer::Create(0, sizeof(GizmoUniformData));
 }
@@ -57,7 +54,6 @@ void GizmoRenderer::EnsurePipeline(FrameBuffer* InTarget) {
     PipelineDesc desc;
     desc.Target = InTarget;
     desc.Shader = s_GizmoShader;
-    desc.ClockwiseFrontFace = true;
     desc.Buffers.Add(m_UniformBuffer);
     m_Pipeline = Pipeline::Create(desc);
     m_PipelineTarget = InTarget;
@@ -106,9 +102,6 @@ void GizmoRenderer::EnsureOverlayPipeline(FrameBuffer* InTarget) {
     desc.Target = InTarget;
     desc.Shader = s_OverlayShader;
     desc.VertexLayout = GizmoVertex::GetLayout();
-    desc.EnableBlending = true;
-    desc.EnableDepthTest = false;
-    desc.DisableBackFaceCulling = true;
     desc.Buffers.Add(m_UniformBuffer);
     m_OverlayPipeline = Pipeline::Create(desc);
     m_OverlayTarget = InTarget;

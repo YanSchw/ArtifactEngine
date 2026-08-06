@@ -5,13 +5,6 @@ import subprocess
 from pathlib import Path
 import plistlib
 
-from SDK.Paths import get_engine_path
-from BuildTool.Generate import get_content_mounts
-
-# Non-cooked content copied raw into the bundle, by extension.
-# Cooked assets are handled separately.
-CONTENT_WHITELIST = [".glsl"]
-
 APP_NAME = "Artifact"
 BINARY_PATH = Path("Binaries/Artifact")  # your compiled binary
 OUTPUT_DIR = Path("Dist")
@@ -39,25 +32,13 @@ def copy_binary():
     os.chmod(dest, 0o755)
 
 def copy_content(project_path):
-    # Packaged builds collapse every content mount into one resource dir
+    # Packaged builds collapse every content mount into one resource dir.
+    # Everything shipped is cooked: assets plus the compiled ShaderLibrary.
     content_dest = APP_PATH / "Contents/Resources/Content"
     if content_dest.exists():
         shutil.rmtree(content_dest)
     content_dest.mkdir(parents=True, exist_ok=True)
 
-    for _key, mount_dir in get_content_mounts(get_engine_path(), project_path, "MacOS"):
-        mount_path = Path(mount_dir)
-        if not mount_path.is_dir():
-            continue
-        for src in mount_path.rglob("*"):
-            if src.is_file() and src.suffix in CONTENT_WHITELIST:
-                dest = content_dest / src.relative_to(mount_path)
-                if dest.exists():
-                    continue
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dest)
-
-    # copy cooked assets into content_dest
     cooked_src = OUTPUT_DIR / "Cooked"
     shutil.copytree(cooked_src, content_dest, dirs_exist_ok=True)
 
@@ -68,7 +49,6 @@ def copy_dependencies():
       Contents/Frameworks/libvulkan.1.dylib        - the Vulkan loader (linked via @rpath)
       Contents/Frameworks/libMoltenVK.dylib        - the Metal-backed Vulkan driver
       Contents/Resources/vulkan/icd.d/MoltenVK_icd.json - ICD manifest pointing at the bundled driver
-      Contents/Resources/glslangValidator          - runtime GLSL->SPIR-V compiler
 
     All of these are universal (x86_64 + arm64) and depend only on system libraries, so copying
     them plus rewiring the loader search paths is the entire dependency closure.
@@ -78,10 +58,9 @@ def copy_dependencies():
 
     loader_src = VULKAN_SDK / "lib/libvulkan.1.dylib"
     moltenvk_src = VULKAN_SDK / "lib/libMoltenVK.dylib"
-    glslang_src = VULKAN_SDK / "bin/glslangValidator"
     icd_src = VULKAN_SDK / "share/vulkan/icd.d/MoltenVK_icd.json"
 
-    for required in (loader_src, moltenvk_src, glslang_src, icd_src):
+    for required in (loader_src, moltenvk_src, icd_src):
         if not required.exists():
             raise FileNotFoundError(
                 f"Required Vulkan SDK component not found: {required}\n"
@@ -89,13 +68,9 @@ def copy_dependencies():
             )
 
     # shutil.copy2 follows symlinks, so the bundled files are the real binaries (the SDK ships
-    # libvulkan.1.dylib and glslangValidator as symlinks to versioned/renamed targets).
+    # libvulkan.1.dylib as a symlink to a versioned target).
     shutil.copy2(loader_src, frameworks / "libvulkan.1.dylib", follow_symlinks=True)
     shutil.copy2(moltenvk_src, frameworks / "libMoltenVK.dylib", follow_symlinks=True)
-
-    glslang_dest = resources / "glslangValidator"
-    shutil.copy2(glslang_src, glslang_dest, follow_symlinks=True)
-    os.chmod(glslang_dest, 0o755)
 
     # Rewrite the ICD manifest's library_path to point at the bundled driver, relative to the
     # manifest location (Contents/Resources/vulkan/icd.d -> Contents/Frameworks/libMoltenVK.dylib).

@@ -1,6 +1,6 @@
-#type vert
-#version 450
+#frontface Clockwise
 
+#type vert
 layout(location = 0) in vec3 a_Position;
 layout(location = 1) in vec3 a_Color;
 layout(location = 2) in vec2 a_UV;
@@ -24,8 +24,6 @@ void main() {
 }
 
 #type frag
-#version 450
-
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outNodeId;
 

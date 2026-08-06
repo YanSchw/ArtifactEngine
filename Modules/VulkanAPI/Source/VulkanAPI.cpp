@@ -1292,8 +1292,8 @@ SharedObjectPtr<VertexBuffer> VulkanAPI::CreateDynamicVertexBuffer() {
     return new VulkanVertexBuffer(*this);
 }
 
-SharedObjectPtr<Shader> VulkanAPI::CreateShader(const String& InShaderSource) {
-    return new VulkanShader(InShaderSource, *this);
+SharedObjectPtr<Shader> VulkanAPI::CreateShader(const CompiledShader& InCompiledShader) {
+    return new VulkanShader(InCompiledShader, *this);
 }
 
 SharedObjectPtr<Pipeline> VulkanAPI::CreatePipeline(const PipelineDesc& InPipelineDesc) {

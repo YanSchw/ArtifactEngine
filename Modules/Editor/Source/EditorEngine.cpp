@@ -6,6 +6,7 @@
 #include "EditorWindow.h"
 #include "Tabs/SceneEditorTab.h"
 #include "Rendering/RenderingAPI.h"
+#include "Rendering/ShaderLibrary.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Scene.h"
 #include "Core/EngineConfig.h"
@@ -105,6 +106,7 @@ void EditorEngine::Initialize() {
     Object::Create(Platform::GetDefaultRenderingAPIClass());
     AE_ASSERT(RenderingAPI::GetInstance(), "Failed to create RenderingAPI instance!");
     RenderingAPI::GetInstance()->Initialize();
+    ShaderLibrary::Initialize();
 
     (new AssetManager())->Initialize();
 
@@ -177,5 +179,6 @@ void EditorEngine::Shutdown() {
     // Tear the windows (and their UI renderers) down before the assets they sample and the RHI.
     ThemedWindow::DestroyAllWindows();
     AssetManager::Get().Shutdown();
+    ShaderLibrary::Shutdown();
     RenderingAPI::GetInstance()->CleanUp(true);
 }

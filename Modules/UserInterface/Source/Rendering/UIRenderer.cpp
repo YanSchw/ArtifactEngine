@@ -5,20 +5,19 @@
 
 #include "Rendering/Surface.h"
 #include "Rendering/Shader.h"
+#include "Rendering/ShaderLibrary.h"
 #include "Rendering/Sampler.h"
 #include "Rendering/Texture.h"
 #include "Rendering/Pipeline.h"
 #include "Rendering/VertexBuffer.h"
 #include "Rendering/Buffer.h"
-#include "Core/EngineConfig.h"
-#include "Platform/FileIO.h"
 
 #include <cstring>
 
 void UIRenderer::CreateSharedResources() {
-    m_SolidShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetContentDir("UserInterface") + "/Shaders/UISolid.glsl"));
-    m_TextShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetContentDir("UserInterface") + "/Shaders/UIText.glsl"));
-    m_ImageShader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetContentDir("UserInterface") + "/Shaders/UIImage.glsl"));
+    m_SolidShader = ShaderLibrary::CreateShader("/Shaders/UISolid.glsl");
+    m_TextShader = ShaderLibrary::CreateShader("/Shaders/UIText.glsl");
+    m_ImageShader = ShaderLibrary::CreateShader("/Shaders/UIImage.glsl");
 
     SamplerDesc samplerDesc;
     samplerDesc.MinFilter = FilterMode::Linear;
@@ -45,8 +44,6 @@ void UIRenderer::CreatePipelines(Object* InTarget) {
     solidDesc.Target = InTarget;
     solidDesc.Shader = m_SolidShader;
     solidDesc.VertexLayout = UIVertex::GetLayout();
-    solidDesc.EnableBlending = true;
-    solidDesc.EnableDepthTest = false;
     solidDesc.Buffers.Add(m_ProjectionBuffer);
     solidDesc.ImageBindings.Add({ 16, m_WhiteTexture->GetDefaultView(), m_Sampler });
     m_SolidPipeline = Pipeline::Create(solidDesc);
@@ -58,8 +55,6 @@ void UIRenderer::CreatePipelines(Object* InTarget) {
         textDesc.Target = InTarget;
         textDesc.Shader = m_TextShader;
         textDesc.VertexLayout = UIVertex::GetLayout();
-        textDesc.EnableBlending = true;
-        textDesc.EnableDepthTest = false;
         textDesc.Buffers.Add(m_ProjectionBuffer);
         textDesc.ImageBindings.Add({ 16, font->GetAtlasTexture()->GetDefaultView(), m_Sampler });
         m_TextPipeline = Pipeline::Create(textDesc);
@@ -149,8 +144,6 @@ Pipeline* UIRenderer::GetImagePipeline(Texture* InTexture) {
     imageDesc.Target = (Object*)m_CachedTarget;
     imageDesc.Shader = m_ImageShader;
     imageDesc.VertexLayout = UIVertex::GetLayout();
-    imageDesc.EnableBlending = true;
-    imageDesc.EnableDepthTest = false;
     imageDesc.Buffers.Add(m_ProjectionBuffer);
     imageDesc.ImageBindings.Add({ 16, view, m_Sampler });
     SharedObjectPtr<Pipeline> pipeline = Pipeline::Create(imageDesc);

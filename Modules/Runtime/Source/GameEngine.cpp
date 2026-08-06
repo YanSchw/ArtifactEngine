@@ -1,7 +1,6 @@
 #include "GameEngine.h"
 #include "CoreMinimal.h"
 #include "Platform/Platform.h"
-#include "Platform/FileIO.h"
 
 #include "Window.h"
 #include "InputSystem/InputSystem.h"
@@ -10,6 +9,7 @@
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/VertexBuffer.h"
 #include "Rendering/Shader.h"
+#include "Rendering/ShaderLibrary.h"
 #include "Rendering/Texture.h"
 #include "Rendering/Sampler.h"
 #include "Rendering/Buffer.h"
@@ -37,6 +37,7 @@ void GameEngine::Initialize() {
     Object::Create(Platform::GetDefaultRenderingAPIClass());
     AE_ASSERT(RenderingAPI::GetInstance(), "Failed to create RenderingAPI instance!");
     RenderingAPI::GetInstance()->Initialize();
+    ShaderLibrary::Initialize();
 
     (new AssetManager())->Initialize();
 
@@ -55,7 +56,7 @@ void GameEngine::Initialize() {
 
     PipelineDesc fullscreenDesc;
     fullscreenDesc.Target = s_Window;
-    fullscreenDesc.Shader = Shader::Create(FileIO::ReadFileToString(EngineConfig::GetEngineContentDir() + "/Shaders/Passthrough.glsl"));
+    fullscreenDesc.Shader = ShaderLibrary::CreateShader("/Shaders/Passthrough.glsl");
     fullscreenDesc.ImageBindings.Add({ 16, m_RenderPipeline->GetFinalImageView(), sampler });
     s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
 
@@ -108,6 +109,7 @@ bool GameEngine::MainTick(double InDeltaTime) {
 void GameEngine::Shutdown() {
     m_GameInstance = nullptr;
     AssetManager::Get().Shutdown();
+    ShaderLibrary::Shutdown();
     s_Window = nullptr;
     RenderingAPI::GetInstance()->CleanUp(true);
 }

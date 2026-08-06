@@ -14,14 +14,6 @@ struct PipelineDesc {
     /* Target has to be of class Surface or FrameBuffer */
     SharedObjectPtr<Object> Target = nullptr;
 
-    /* Enable standard alpha blending (src-alpha / one-minus-src-alpha). Off preserves opaque draws. */
-    bool EnableBlending = false;
-    /* Enable depth testing / writing. */
-    bool EnableDepthTest = true;
-    /* Passes whose projection flips Y for Vulkan mirror their on-screen winding. */
-    bool ClockwiseFrontFace = false;
-    bool DisableBackFaceCulling = false;
-
     bool IsFrameBufferTarget() const;
     bool IsSurfaceTarget() const;
 };

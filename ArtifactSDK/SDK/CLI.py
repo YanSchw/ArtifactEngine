@@ -111,6 +111,7 @@ def cmd_cook(args):
                 f"{project_path}/Binaries/Artifact",
                 "-EngineClass=AssetCookerEngine",
                 f"-CookDirectory={cook_dir}",
+                f"-CookPlatform={args.target}",
             ], check=True,  # non-zero exit fails the job
                # AssetCooker logs "[current/total] Cooking asset: ..." (see AssetCooker.cpp).
                progress_pattern=r"\[(\d+)/(\d+)\]")

@@ -10,11 +10,16 @@ class VulkanShader : public Shader {
 public:
     ARTIFACT_CLASS();
 
-    VulkanShader(const String& InShaderSource, VulkanAPI& InVulkanAPI);
+    VulkanShader(const CompiledShader& InCompiledShader, VulkanAPI& InVulkanAPI);
     virtual ~VulkanShader();
     virtual ShaderType GetShaderType() const override;
+    virtual void Reload(const CompiledShader& InCompiledShader) override;
 
     static void DestroyAll();
+
+private:
+    void CreateModules(const CompiledShader& InCompiledShader);
+    void DestroyModules();
 
 private:
     VkShaderModule m_VertexShaderModule = VK_NULL_HANDLE;

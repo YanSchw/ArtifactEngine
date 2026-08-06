@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "CompiledShader.h"
 #include "Shader.gen.h"
 
 enum class ShaderType {
@@ -14,10 +15,15 @@ public:
 
     virtual ~Shader() { }
     virtual ShaderType GetShaderType() const = 0;
+    virtual void Reload(const CompiledShader& InCompiledShader) = 0;
+
     bool IsVertexFragmentShader() const { return GetShaderType() == ShaderType::VertexFragment; }
     bool IsComputeShader() const { return GetShaderType() == ShaderType::Compute; }
 
-    static Map<String, String> PreProcess(const String& InShaderSource);
+    const ShaderRenderState& GetRenderState() const { return m_RenderState; }
 
-    static SharedObjectPtr<Shader> Create(const String& InShaderSource);
+    static SharedObjectPtr<Shader> Create(const CompiledShader& InCompiledShader);
+
+protected:
+    ShaderRenderState m_RenderState;
 };

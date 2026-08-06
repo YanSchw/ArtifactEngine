@@ -4,6 +4,7 @@
 #include "Platform/FileIO.h"
 #include "Core/EngineConfig.h"
 #include "Rendering/RenderingAPI.h"
+#include "Rendering/ShaderLibrary.h"
 #include "Serialization/ChunkedBinary.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Asset.h"
@@ -13,6 +14,17 @@ void AssetCookerEngine::Initialize() {
 
     String cookDir = EngineConfig::GetConfigVar<String>("CookDirectory");
     AE_ASSERT(!cookDir.empty(), "CookedContentDir config variable is not set!");
+
+    PlatformType targetPlatform = Platform::CurrentPlatform();
+    const String targetPlatformName = EngineConfig::GetConfigVar<String>("CookPlatform");
+    if (!targetPlatformName.empty()) {
+        targetPlatform = EPlatformType::ConvertStringToEnum(targetPlatformName);
+    }
+
+    if (!ShaderLibrary::Cook(cookDir, targetPlatform)) {
+        AE_ERROR("Shader cooking failed");
+        std::exit(1);
+    }
 
     ChunkWriter assetIndexBinaryChunk0;
     ChunkWriter assetIndexBinaryChunk1;

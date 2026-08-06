@@ -3,6 +3,7 @@
 #include "Rendering/Vertex.h"
 #include "Rendering/RenderingCommand.h"
 #include "Rendering/Image.h"
+#include "Rendering/CompiledShader.h"
 #include "RenderingAPI.gen.h"
 
 class RenderingAPI : public Object {
@@ -29,7 +30,8 @@ public:
     virtual class RenderCommandQueue& GetRenderQueue() = 0;
     virtual SharedObjectPtr<class VertexBuffer> CreateVertexBuffer(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices) = 0;
     virtual SharedObjectPtr<class VertexBuffer> CreateDynamicVertexBuffer() = 0;
-    virtual SharedObjectPtr<class Shader> CreateShader(const String& InShaderSource) = 0;
+    virtual ShaderAPI GetShaderAPI() const = 0;
+    virtual SharedObjectPtr<class Shader> CreateShader(const CompiledShader& InCompiledShader) = 0;
     virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) = 0;
     virtual void InvalidateAllPipelines() = 0;
     virtual SharedObjectPtr<class UniformBuffer> CreateUniformBuffer(uint32_t InBinding, size_t InSize) = 0;
