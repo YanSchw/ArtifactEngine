@@ -44,7 +44,7 @@ class Class:
         return False
 
     def generate_class_code(self, gen_file):
-        properties_code = generate_properties_registration_code(
+        properties_code = "" if self.is_a("Property") else generate_properties_registration_code(
             self.Name,
             self.Body
         )

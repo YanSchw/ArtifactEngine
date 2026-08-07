@@ -3,12 +3,12 @@
 
 #include "ArtifactRenderPipeline.h"
 #include "Assets/AssetManager.h"
+#include "Assets/Material.h"
 #include "Assets/Texture2D.h"
 #include "Assets/Mesh.h"
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/VertexBuffer.h"
 #include "Rendering/Shader.h"
-#include "Rendering/ShaderLibrary.h"
 #include "Rendering/Texture.h"
 #include "Rendering/Sampler.h"
 #include "Rendering/Buffer.h"
@@ -20,29 +20,76 @@
 #include "GameFramework/CameraNode.h"
 #include "GameFramework/StaticMeshNode.h"
 
-static SharedObjectPtr<Shader> s_Shader;
-
+/** Mirrors the SceneBlock every shader graph template declares. */
 struct SceneUniformData {
-    glm::mat4 viewProjectionMatrix;
+    Mat4 ViewProjection = Mat4(1.0f);
+    float Time = 0.0f;
+    float Padding[3] = { 0.0f, 0.0f, 0.0f };
 };
 
-void ArtifactRenderPipeline::UpdateUniformData(const RenderParams& InParams) {
+void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, const RenderParams& InParams) {
+    m_Time += (float)InDeltaTime;
+
     CameraNode* camera = InParams.CameraOverride;
     if (!camera && InParams.m_World) {
         camera = InParams.m_World->GetMainCamera();
     }
 
     SceneUniformData data;
-    data.viewProjectionMatrix = glm::mat4(1.0f);
+    data.Time = m_Time;
     if (camera) {
         // A zero height (minimized window) would make this NaN
         camera->SetAspectRatio(InParams.Width / (float) glm::max(InParams.Height, 1u));
-        data.viewProjectionMatrix = camera->GetViewProjectionMatrix();
+        data.ViewProjection = camera->GetViewProjectionMatrix();
     }
 
     void* mapped = m_UniformBuffer->MapData(sizeof(data), 0);
     memcpy(mapped, &data, sizeof(data));
     m_UniformBuffer->UnmapData();
+}
+
+Pipeline* ArtifactRenderPipeline::ResolvePipeline(Material* InMaterial) {
+    if (!InMaterial) {
+        return nullptr;
+    }
+
+    AssetManager::Get().LoadAsset(InMaterial);
+    Shader* shader = InMaterial->GetShader();
+    if (!shader) {
+        return nullptr;
+    }
+
+    // A pipeline missing a binding its shader declares is a descriptor-set mismatch, so the mesh
+    // stays unrendered until every texture has streamed in.
+    Array<void*> resources = { shader, InMaterial->GetPropertyBuffer() };
+    Array<std::tuple<uint32_t, SharedObjectPtr<ImageView>, SharedObjectPtr<Sampler>>> imageBindings;
+    for (const MaterialTextureBinding& binding : InMaterial->GetTextureBindings()) {
+        AssetManager::Get().LoadAsset(binding.Texture);
+        Texture* texture = binding.Texture ? binding.Texture->GetTexture() : nullptr;
+        if (!texture) {
+            return nullptr;
+        }
+        resources.Add(texture);
+        imageBindings.Add({ binding.Binding, texture->GetDefaultView(), m_Sampler });
+    }
+
+    MaterialPipeline& cached = m_MaterialPipelines[InMaterial->GetId()];
+    if (cached.Instance.Get() && cached.Resources == resources) {
+        return cached.Instance.Get();
+    }
+
+    PipelineDesc desc;
+    desc.Target = m_FrameBuffer;
+    desc.Shader = shader;
+    desc.Buffers.Add(m_UniformBuffer);
+    if (UniformBuffer* properties = InMaterial->GetPropertyBuffer()) {
+        desc.Buffers.Add(properties);
+    }
+    desc.ImageBindings = imageBindings;
+
+    cached.Instance = Pipeline::Create(desc);
+    cached.Resources = resources;
+    return cached.Instance.Get();
 }
 
 void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
@@ -102,19 +149,16 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     frameBufferDesc.ClearColors.Add(Vec4(0.0f));
     m_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
 
-    SamplerDesc samplerDesc;
-    samplerDesc.MagFilter = FilterMode::Nearest;
-    samplerDesc.MinFilter = FilterMode::Nearest;
-    auto sampler = Sampler::Create(samplerDesc);
+    if (!m_Sampler.Get()) {
+        SamplerDesc samplerDesc;
+        samplerDesc.MagFilter = FilterMode::Linear;
+        samplerDesc.MinFilter = FilterMode::Linear;
+        m_Sampler = Sampler::Create(samplerDesc);
+    }
     if (!m_UniformBuffer.Get()) {
         m_UniformBuffer = UniformBuffer::Create(0, sizeof(SceneUniformData));
     }
-    PipelineDesc pipelineDesc;
-    pipelineDesc.Target = m_FrameBuffer;
-    pipelineDesc.Shader = s_Shader;
-    pipelineDesc.Buffers.Add(m_UniformBuffer);
-    pipelineDesc.ImageBindings.Add({ 16, AssetManager::Get().GetAsset<Texture2D>(UUID::FromString("8c2146d1-c4d7-41b4-b456-9fd071812573"))->GetTexture()->GetDefaultView(), sampler });
-    m_Pipeline = Pipeline::Create(pipelineDesc);
+    m_MaterialPipelines.Clear();
 }
 
 void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InParams) {
@@ -122,25 +166,33 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
         Invalidate(InParams.Width, InParams.Height);
     }
 
-    UpdateUniformData(InParams);
-    m_Pipeline->Bind();
+    UpdateUniformData(InDeltaTime, InParams);
+
+    // Opening the pass here is what clears the target; a material-less world simply draws nothing into it.
+    RenderCommandQueue& renderQueue = RenderingAPI::GetInstance()->GetRenderQueue();
+    renderQueue.Push(RenderCommandType::BeginRenderPass, CmdBeginRenderPass{ m_FrameBuffer });
     if (InParams.m_World == nullptr) {
         return;
     }
 
     for (Node* node : InParams.m_World->GetAllNodes()) {
-        if (StaticMeshNode* staticMesh = node->As<StaticMeshNode>()) {
-            RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData, CmdSetShaderData{ staticMesh->GetPerMeshShaderData() });
-
-            Mesh* mesh = staticMesh->GetMesh();
-            if (staticMesh->IsEnabled() && mesh) {
-                VertexBuffer* vertexBuffer = mesh->GetVertexBuffer();
-                AE_ASSERT(vertexBuffer);
-                vertexBuffer->Draw();
-            }
+        StaticMeshNode* staticMesh = node->As<StaticMeshNode>();
+        Mesh* mesh = staticMesh ? staticMesh->GetMesh() : nullptr;
+        if (!mesh || !staticMesh->IsEnabled()) {
+            continue;
         }
-    }
 
+        Pipeline* pipeline = ResolvePipeline(staticMesh->GetMaterial());
+        if (!pipeline) {
+            continue;
+        }
+        renderQueue.Push(RenderCommandType::BindPipeline, CmdBindPipeline{ pipeline });
+        renderQueue.Push(RenderCommandType::SetShaderData, CmdSetShaderData{ staticMesh->GetPerMeshShaderData() });
+
+        VertexBuffer* vertexBuffer = mesh->GetVertexBuffer();
+        AE_ASSERT(vertexBuffer);
+        vertexBuffer->Draw();
+    }
 }
 
 uint32_t ArtifactRenderPipeline::PickNodeId(uint32_t InX, uint32_t InY) const {
@@ -155,9 +207,6 @@ SharedObjectPtr<class ImageView> ArtifactRenderPipeline::GetFinalImageView() con
 }
 
 ArtifactRenderPipeline::ArtifactRenderPipeline() {
-    if (!s_Shader.Get()) {
-        s_Shader = ShaderLibrary::CreateShader("/Shaders/Shader.glsl");
-    }
     Invalidate(100, 100);
 }
 

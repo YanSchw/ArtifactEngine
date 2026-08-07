@@ -5,7 +5,7 @@
 
 class ShaderGraph;
 class ShaderGraphCanvasTab;
-class ShaderGraphPreviewTab;
+class AssetPreviewTab;
 class VectorImage;
 class UILabel;
 
@@ -38,7 +38,7 @@ private:
 
     WeakObjectPtr<ShaderGraph> m_ShaderGraph;
     ShaderGraphCanvasTab* m_Canvas = nullptr;
-    ShaderGraphPreviewTab* m_Preview = nullptr;
+    AssetPreviewTab* m_Preview = nullptr;
     WeakObjectPtr<UILabel> m_StatusLabel;
 
     String m_CompileError;

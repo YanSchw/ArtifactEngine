@@ -27,12 +27,6 @@ ShaderGraph* ShaderGraph::CreateEmpty(const String& InDirectory, const String& I
     return asset;
 }
 
-String ShaderGraph::GetDisplayName() const {
-    return m_Graph && !m_Graph->GraphName.empty()
-        ? m_Graph->GraphName
-        : DisplayNameFromPath(AssetManager::Get().GetAssetPath(GetId()));
-}
-
 bool ShaderGraph::IsLoaded() const {
     return m_Shader.Get() != nullptr;
 }
@@ -111,8 +105,17 @@ void ShaderGraph::SyncGraph() {
 }
 
 void ShaderGraph::BuildInputs() {
-    m_Inputs = m_Template.GetProperties();
+    m_Inputs.Clear();
     m_InputErrors.Clear();
+
+    // A wired property is the graph's answer, leaving nothing for a material to override.
+    ShaderGraphOutputNode* output = FindOutputNode();
+    for (const ShaderGraphProperty& property : m_Template.GetProperties()) {
+        GraphPin* pin = output ? output->FindPin(property.Name, GraphPinDirection::Input) : nullptr;
+        if (!pin || !m_Graph->IsPinConnected(*output, *pin)) {
+            m_Inputs.Add(property);
+        }
+    }
 
     for (const SharedObjectPtr<GraphNode>& node : m_Graph->Nodes) {
         ShaderGraphValueNode* value = Cast<ShaderGraphValueNode>(node.Get());
@@ -146,18 +149,7 @@ void ShaderGraph::BuildInputs() {
         m_Inputs.Add(input);
     }
 
-    m_InputOffsets.Clear();
-    uint32_t offset = 0;
-    for (const ShaderGraphProperty& input : m_Inputs) {
-        if (input.IsTexture()) {
-            continue;
-        }
-        const uint32_t alignment = ShaderValue::GetAlignment(input.Type);
-        offset = (offset + alignment - 1) / alignment * alignment;
-        m_InputOffsets[input.Name] = offset;
-        offset += ShaderValue::GetSize(input.Type);
-    }
-    m_BlockSize = (offset + 15) / 16 * 16;
+    BuildInputLayout();
 
     for (int32_t i = m_InputNames.Size() - 1; i >= 0; i--) {
         bool live = false;
@@ -173,28 +165,27 @@ void ShaderGraph::BuildInputs() {
     }
 }
 
-Vec4 ShaderGraph::GetInputValue(const String& InName) const {
-    const int32_t index = m_InputNames.IndexOf(InName);
-    if (index >= 0 && index < m_InputValues.Size()) {
-        return m_InputValues[index];
-    }
+void ShaderGraph::BuildInputLayout() {
+    m_InputOffsets.Clear();
+    uint32_t offset = 0;
     for (const ShaderGraphProperty& input : m_Inputs) {
-        if (input.Name == InName) {
-            return input.DefaultValue;
+        if (input.IsTexture()) {
+            continue;
         }
+        const uint32_t alignment = ShaderValue::GetAlignment(input.Type);
+        offset = (offset + alignment - 1) / alignment * alignment;
+        m_InputOffsets[input.Name] = offset;
+        offset += ShaderValue::GetSize(input.Type);
     }
-    return Vec4(0.0f);
+    m_BlockSize = (offset + 15) / 16 * 16;
 }
 
-void ShaderGraph::SetInputValue(const String& InName, const Vec4& InValue) {
-    const int32_t index = m_InputNames.IndexOf(InName);
-    if (index >= 0 && index < m_InputValues.Size()) {
-        m_InputValues[index] = InValue;
-    } else {
-        m_InputNames.Add(InName);
-        m_InputValues.Add(InValue);
+bool ShaderGraph::FindInputOffset(const String& InName, uint32_t& OutOffset) const {
+    if (!m_InputOffsets.ContainsKey(InName)) {
+        return false;
     }
-    UploadPropertyBuffer();
+    OutOffset = m_InputOffsets.At(InName);
+    return true;
 }
 
 String ShaderGraph::GetStateValue(const String& InState) const {
@@ -216,8 +207,8 @@ void ShaderGraph::SetStateValue(const String& InState, const String& InValue) {
     }
 }
 
-Array<ShaderGraphTextureBinding> ShaderGraph::GetTextureBindings() const {
-    Array<ShaderGraphTextureBinding> bindings;
+Array<MaterialTextureBinding> ShaderGraph::GetGraphTextureBindings() const {
+    Array<MaterialTextureBinding> bindings;
     if (!m_Graph) {
         return bindings;
     }
@@ -345,48 +336,21 @@ bool ShaderGraph::Recompile(String& OutError) {
     }
 
     m_Shader = ShaderLibrary::Find(GetShaderKey());
-    UploadPropertyBuffer();
+    RefreshPropertyBuffer();
     return true;
 }
 
-void ShaderGraph::UploadPropertyBuffer() {
-    if (!RenderingAPI::GetInstance() || m_BlockSize == 0) {
-        return;
-    }
-
-    if (!m_PropertyBuffer || m_BufferSize != m_BlockSize) {
-        m_BufferSize = m_BlockSize;
-        m_PropertyBuffer = UniformBuffer::Create(ShaderTemplate::MaterialUniformBinding, m_BlockSize);
-    }
-
-    Array<byte> block;
-    block.Resize(m_BlockSize);
-    memset(block.Data(), 0, block.Size());
-
-    for (const ShaderGraphProperty& input : m_Inputs) {
-        if (input.IsTexture()) {
-            continue;
-        }
-        const Vec4 value = GetInputValue(input.Name);
-        if (m_InputOffsets.ContainsKey(input.Name)) {
-            memcpy(block.Data() + m_InputOffsets.At(input.Name), &value, ShaderValue::GetSize(input.Type));
-        }
-    }
-
-    void* mapped = m_PropertyBuffer->MapData(block.Size(), 0);
-    memcpy(mapped, block.Data(), block.Size());
-    m_PropertyBuffer->UnmapData();
-}
-
 void ShaderGraph::Load() {
-    EnsureTemplateLoaded();
+    Material::Load();
 
     if (EngineConfig::IsPackagedBuild()) {
-        SyncGraph();
+        BuildInputLayout();
         m_Shader = ShaderLibrary::CreateShader(GetShaderKey());
-        UploadPropertyBuffer();
+        RefreshPropertyBuffer();
         return;
     }
+
+    EnsureTemplateLoaded();
 
     String error;
     if (!Recompile(error)) {
@@ -394,7 +358,13 @@ void ShaderGraph::Load() {
     }
 }
 
+void ShaderGraph::Cook(ChunkedBinary& OutChunkedBinary) {
+    EnsureTemplateLoaded();
+    SyncGraph();
+    Super::Cook(OutChunkedBinary);
+}
+
 void ShaderGraph::Unload() {
     m_Shader = nullptr;
-    m_PropertyBuffer = nullptr;
+    Material::Unload();
 }

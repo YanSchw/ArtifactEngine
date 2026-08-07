@@ -3,9 +3,13 @@
 #include "Tabs/SceneEditorTab.h"
 #include "Tabs/BlueprintEditorTab.h"
 #include "Tabs/ShaderGraphEditorTab.h"
+#include "Tabs/MaterialEditorTab.h"
+#include "Tabs/MeshEditorTab.h"
 #include "Assets/Scene.h"
 #include "Assets/Blueprint.h"
 #include "Assets/ShaderGraph.h"
+#include "Assets/Material.h"
+#include "Assets/Mesh.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIContextMenu.h"
@@ -269,6 +273,16 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     if (ShaderGraph* shaderGraph = Cast<ShaderGraph>(InAsset)) {
         ShaderGraphEditorTab* tab = OpenTab<ShaderGraphEditorTab>();
         tab->OpenShaderGraph(shaderGraph);
+        return tab;
+    }
+    if (Material* material = Cast<Material>(InAsset)) {
+        MaterialEditorTab* tab = OpenTab<MaterialEditorTab>();
+        tab->OpenMaterial(material);
+        return tab;
+    }
+    if (Mesh* mesh = Cast<Mesh>(InAsset)) {
+        MeshEditorTab* tab = OpenTab<MeshEditorTab>();
+        tab->OpenMesh(mesh);
         return tab;
     }
 

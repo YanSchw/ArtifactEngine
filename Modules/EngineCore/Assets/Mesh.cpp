@@ -1,4 +1,6 @@
 #include "Mesh.h"
+#include "Assets/AssetManager.h"
+#include "Assets/Material.h"
 #include "Rendering/Vertex.h"
 #include "Rendering/VertexBuffer.h"
 #include "Core/EngineConfig.h"
@@ -7,6 +9,36 @@
 
 Mesh::Mesh() {
     m_StreamType = AssetStreamType::AlwaysLoaded;
+}
+
+bool Mesh::ImportSource(Array<Vertex>& OutVertices, Array<uint32_t>& OutIndices) const {
+    const String path = EngineConfig::ResolveContentPath(m_MeshPath);
+
+    Array<Class> meshLoaderClasses = Class::GetSubclassesOf(MeshLoader::StaticClass());
+    AE_ASSERT(meshLoaderClasses.Size() > 1, "No MeshLoader classes found!");
+    SharedObjectPtr<MeshLoader> meshLoader = Object::Create<MeshLoader>(meshLoaderClasses[1]);
+    if (!meshLoader->LoadMeshFromFile(path, OutVertices, OutIndices)) {
+        AE_WARN("Loading mesh from file {} was unsuccessful!", path);
+        return false;
+    }
+
+    for (Vertex& vertex : OutVertices) {
+        vertex.Position = vertex.Position * m_ImportScale + m_ImportOffset;
+    }
+    return true;
+}
+
+void Mesh::BuildVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) {
+    Vec3 boundsMin = Vec3(0.0f);
+    Vec3 boundsMax = Vec3(0.0f);
+    for (int32_t i = 0; i < InVertices.Size(); i++) {
+        boundsMin = i == 0 ? InVertices[i].Position : glm::min(boundsMin, InVertices[i].Position);
+        boundsMax = i == 0 ? InVertices[i].Position : glm::max(boundsMax, InVertices[i].Position);
+    }
+    m_BoundsCenter = (boundsMin + boundsMax) * 0.5f;
+    m_BoundsRadius = glm::max(glm::length(boundsMax - m_BoundsCenter), 0.001f);
+
+    m_VertexBuffer = VertexBuffer::Create(InVertices, InIndices);
 }
 
 void Mesh::Load() {
@@ -28,26 +60,29 @@ void Mesh::Load() {
         chunkReader.ReadBytes(&indices[0], sizeof(uint32_t) * indexSize);
     }
 
-    m_VertexBuffer = VertexBuffer::Create(vertices, indices);
+    BuildVertexBuffer(vertices, indices);
 #else
     Array<Vertex> vertices;
     Array<uint32_t> indices;
-    String path = EngineConfig::ResolveContentPath(m_MeshPath);
+    ImportSource(vertices, indices);
 
-    Array<Class> meshLoaderClasses = Class::GetSubclassesOf(MeshLoader::StaticClass());
-    AE_ASSERT(meshLoaderClasses.Size() > 1, "No MeshLoader classes found!");
-    SharedObjectPtr<MeshLoader> meshLoader = Object::Create<MeshLoader>(meshLoaderClasses[1]);
-    bool success = meshLoader->LoadMeshFromFile(path, vertices, indices);
-    if (!success) {
-        AE_WARN("Loading mesh from file {} was unsuccessful!", path);
-    }
-
-    m_VertexBuffer = VertexBuffer::Create(vertices, indices);
+    BuildVertexBuffer(vertices, indices);
 #endif
+
+    AssetManager::Get().LoadAsset(m_Material.Get());
 }
 
 void Mesh::Unload() {
     m_VertexBuffer = nullptr;
+}
+
+void Mesh::Reimport() {
+    Array<Vertex> vertices;
+    Array<uint32_t> indices;
+    if (!ImportSource(vertices, indices)) {
+        return;
+    }
+    BuildVertexBuffer(vertices, indices);
 }
 
 void Mesh::Cook(ChunkedBinary& OutChunkedBinary) {
@@ -55,12 +90,7 @@ void Mesh::Cook(ChunkedBinary& OutChunkedBinary) {
 
     Array<Vertex> vertices;
     Array<uint32_t> indices;
-    String path = EngineConfig::ResolveContentPath(m_MeshPath);
-
-    Array<Class> meshLoaderClasses = Class::GetSubclassesOf(MeshLoader::StaticClass());
-    AE_ASSERT(meshLoaderClasses.Size() > 1, "No MeshLoader classes found!");
-    SharedObjectPtr<MeshLoader> meshLoader = Object::Create<MeshLoader>(meshLoaderClasses[1]);
-    meshLoader->LoadMeshFromFile(path, vertices, indices);
+    ImportSource(vertices, indices);
 
     {
         ChunkWriter chunkWriter;
@@ -86,4 +116,13 @@ bool Mesh::IsLoaded() const {
 
 VertexBuffer* Mesh::GetVertexBuffer() const {
     return m_VertexBuffer;
+}
+
+Material* Mesh::GetMaterial() const {
+    return m_Material.Get();
+}
+
+void Mesh::SetMaterial(Material* InMaterial) {
+    m_Material = InMaterial;
+    AssetManager::Get().LoadAsset(InMaterial);
 }

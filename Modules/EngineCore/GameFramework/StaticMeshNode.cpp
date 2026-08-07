@@ -1,4 +1,5 @@
 #include "StaticMeshNode.h"
+#include "Assets/Material.h"
 #include "Assets/Mesh.h"
 #include "Rendering/ShaderData.h"
 
@@ -28,4 +29,16 @@ Mesh* StaticMeshNode::GetMesh() const {
 
 void StaticMeshNode::SetMesh(Mesh* InMesh) {
     m_Mesh = InMesh;
+}
+
+Material* StaticMeshNode::GetMaterial() const {
+    if (Material* material = m_MaterialOverride.Get()) {
+        return material;
+    }
+    return m_Mesh ? m_Mesh->GetMaterial() : nullptr;
+}
+
+void StaticMeshNode::SetMaterialOverride(Material* InMaterial) {
+    m_MaterialOverride = InMaterial;
+    AssetManager::Get().LoadAsset(InMaterial);
 }

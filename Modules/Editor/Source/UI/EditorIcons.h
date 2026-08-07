@@ -39,6 +39,7 @@ public:
     static VectorImage* Stop()          { return Get("0457f0fb-4131-4edf-814f-13986bb58f97"); }
     static VectorImage* Eject()         { return Get("b96bbcd6-154c-4705-a371-db1c7d229b3d"); }
     static VectorImage* Possess()       { return Get("d273a65f-36fb-4737-b30e-85549591eec9"); }
+    static VectorImage* Material()      { return Get("64a96b51-290f-4883-a5fd-b1e7707b4fd8"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
     static VectorImage* GetAssetIcon(const Class& InClass);

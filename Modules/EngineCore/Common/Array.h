@@ -99,6 +99,10 @@ public:
         return std::find(m_Data.begin(), m_Data.end(), item) != m_Data.end();
     }
 
+    bool operator==(const Array<T>& other) const {
+        return m_Data == other.m_Data;
+    }
+
     Array<T> operator+(const Array<T>& other) const {
         Array<T> result = *this;
         result += other;

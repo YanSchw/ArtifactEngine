@@ -24,6 +24,7 @@
 #include "Assets/Scene.h"
 #include "Assets/Blueprint.h"
 #include "Assets/ShaderGraph.h"
+#include "Assets/Material.h"
 #include "Assets/NodeRecord.h"
 #include "GameFramework/Node3D.h"
 #include "EditorWindow.h"
@@ -412,6 +413,11 @@ void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu) {
             return (Asset*)ShaderGraph::CreateEmpty(InDir, InName);
         });
     }).Icon(EditorIcons::GraphEditor());
+    OutMenu.Item("Material", [this] {
+        BeginCreateAsset(Material::StaticClass(), "NewMaterial", [](const String& InDir, const String& InName) {
+            return (Asset*)Material::CreateEmpty(InDir, InName);
+        });
+    }).Icon(EditorIcons::Material());
 }
 
 void ContentDrawer::BuildItemMenu(UIMenuModel& OutMenu, const Item& InItem) {

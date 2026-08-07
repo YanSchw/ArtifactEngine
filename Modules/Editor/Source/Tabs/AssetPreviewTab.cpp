@@ -1,9 +1,9 @@
-#include "ShaderGraphPreviewTab.h"
+#include "AssetPreviewTab.h"
 
 #include "Assets/AssetManager.h"
+#include "Assets/Material.h"
 #include "Assets/Mesh.h"
 #include "Assets/Texture2D.h"
-#include "Assets/ShaderGraph.h"
 #include "Rendering/Buffer.h"
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
@@ -14,13 +14,13 @@
 #include "Rendering/Texture.h"
 #include "Rendering/Shader.h"
 #include "Rendering/ShaderData.h"
-#include "Rendering/ShaderTemplate.h"
 #include "Rendering/VertexBuffer.h"
 #include "GameFramework/UIImage.h"
 #include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
 
-static const UUID s_PreviewMesh = UUID::FromString("c6308770-3a5b-4b2b-9cec-14ba803ff817");
+static const UUID s_DefaultMesh = UUID::FromString("c6308770-3a5b-4b2b-9cec-14ba803ff817");
+static const UUID s_DefaultMaterial = UUID::FromString("b7ab1cea-e97a-4293-8989-31067da658cb");
 static const Vec4 s_ClearColor = HexColor(0x141417);
 
 struct PreviewSceneData {
@@ -35,7 +35,7 @@ struct PreviewPushData {
     uint32_t Padding[3] = { 0, 0, 0 };
 };
 
-ShaderGraphPreviewTab::ShaderGraphPreviewTab() {
+AssetPreviewTab::AssetPreviewTab() {
     m_Texture = Object::Create<RenderTargetTexture>();
 
     m_Image = Add<UIImage>();
@@ -50,20 +50,41 @@ ShaderGraphPreviewTab::ShaderGraphPreviewTab() {
     m_SceneBuffer = UniformBuffer::Create(0, sizeof(PreviewSceneData));
 }
 
-VectorImage* ShaderGraphPreviewTab::GetTabIcon() const {
+VectorImage* AssetPreviewTab::GetTabIcon() const {
     return EditorIcons::Viewport();
 }
 
-void ShaderGraphPreviewTab::SetShaderGraph(ShaderGraph* InShaderGraph) {
-    m_ShaderGraph = InShaderGraph;
+void AssetPreviewTab::SetMaterial(Material* InMaterial) {
+    m_Material = InMaterial;
+    AssetManager::Get().LoadAsset(InMaterial);
     InvalidatePipeline();
 }
 
-void ShaderGraphPreviewTab::InvalidatePipeline() {
+void AssetPreviewTab::SetMesh(Mesh* InMesh) {
+    m_Mesh = InMesh;
+    AssetManager::Get().LoadAsset(InMesh);
+    InvalidatePipeline();
+}
+
+void AssetPreviewTab::InvalidatePipeline() {
     m_PipelineDirty = true;
 }
 
-void ShaderGraphPreviewTab::EnsureTarget(uint32_t InWidth, uint32_t InHeight) {
+Material* AssetPreviewTab::ResolveMaterial() const {
+    if (Material* material = m_Material.Get()) {
+        return material;
+    }
+    Mesh* mesh = ResolveMesh();
+    Material* material = mesh ? mesh->GetMaterial() : nullptr;
+    return material ? material : AssetManager::Get().GetAsset<Material>(s_DefaultMaterial);
+}
+
+Mesh* AssetPreviewTab::ResolveMesh() const {
+    Mesh* mesh = m_Mesh.Get();
+    return mesh ? mesh : AssetManager::Get().GetAsset<Mesh>(s_DefaultMesh);
+}
+
+void AssetPreviewTab::EnsureTarget(uint32_t InWidth, uint32_t InHeight) {
     if (m_Target && m_Width == InWidth && m_Height == InHeight) {
         return;
     }
@@ -114,30 +135,31 @@ void ShaderGraphPreviewTab::EnsureTarget(uint32_t InWidth, uint32_t InHeight) {
     m_PipelineDirty = true;
 }
 
-void ShaderGraphPreviewTab::EnsurePipeline() {
-    ShaderGraph* graph = m_ShaderGraph.Get();
-    if (!m_PipelineDirty || !m_Target || !graph) {
-        return;
-    }
-    Shader* shader = graph->GetShader();
-    if (!shader) {
+void AssetPreviewTab::EnsurePipeline() {
+    Material* material = ResolveMaterial();
+    Shader* shader = material ? material->GetShader() : nullptr;
+    if (!m_Target || !shader) {
         m_Pipeline = nullptr;
         return;
     }
 
-    // A pipeline missing a binding the shader declares is a descriptor-set mismatch, so stay dirty
-    // and retry until every texture has streamed in.
+    // A pipeline missing a binding the shader declares is a descriptor-set mismatch, so keep the
+    // previous one until every texture has streamed in.
+    Array<void*> resources = { shader, material->GetPropertyBuffer() };
     PipelineDesc desc;
-    for (const ShaderGraphTextureBinding& binding : graph->GetTextureBindings()) {
+    for (const MaterialTextureBinding& binding : material->GetTextureBindings()) {
         AssetManager::Get().LoadAsset(binding.Texture);
-        Texture* texture = binding.Texture->GetTexture();
+        Texture* texture = binding.Texture ? binding.Texture->GetTexture() : nullptr;
         if (!texture) {
             return;
         }
+        resources.Add(texture);
         desc.ImageBindings.Add({ binding.Binding, texture->GetDefaultView(), m_Sampler });
     }
 
-    m_PipelineDirty = false;
+    if (!m_PipelineDirty && m_Pipeline && m_PipelineResources == resources) {
+        return;
+    }
 
     if (m_Pipeline) {
         RenderingAPI::GetInstance()->WaitIdle();
@@ -146,19 +168,23 @@ void ShaderGraphPreviewTab::EnsurePipeline() {
     desc.Target = m_Target;
     desc.Shader = shader;
     desc.Buffers.Add(m_SceneBuffer);
-    if (UniformBuffer* properties = graph->GetPropertyBuffer()) {
+    if (UniformBuffer* properties = material->GetPropertyBuffer()) {
         desc.Buffers.Add(properties);
     }
+
     m_Pipeline = Pipeline::Create(desc);
+    m_PipelineResources = resources;
+    m_PipelineDirty = false;
 }
 
-void ShaderGraphPreviewTab::UpdateSceneBuffer(float InDeltaTime) {
+void AssetPreviewTab::UpdateSceneBuffer(float InDeltaTime, const Mesh& InMesh) {
     m_Time += InDeltaTime;
 
+    const float radius = InMesh.GetBoundsRadius();
     const float aspect = m_Height > 0 ? (float)m_Width / (float)m_Height : 1.0f;
-    Mat4 projection = glm::perspectiveLH(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+    Mat4 projection = glm::perspectiveLH(glm::radians(45.0f), aspect, radius * 0.01f, radius * 50.0f);
     projection[1][1] *= -1.0f;
-    const Mat4 view = glm::lookAtLH(Vec3(0.0f, 1.6f, -3.2f), Vec3(0.0f), VecUtils::Up);
+    const Mat4 view = glm::lookAtLH(Vec3(0.0f, radius * 0.9f, -radius * 3.2f), Vec3(0.0f), VecUtils::Up);
 
     PreviewSceneData data;
     data.ViewProjection = projection * view;
@@ -169,7 +195,7 @@ void ShaderGraphPreviewTab::UpdateSceneBuffer(float InDeltaTime) {
     m_SceneBuffer->UnmapData();
 }
 
-void ShaderGraphPreviewTab::OnUIUpdate(const UIFrameContext& InContext) {
+void AssetPreviewTab::OnUIUpdate(const UIFrameContext& InContext) {
     MinorTab::OnUIUpdate(InContext);
 
     const UIRectF rect = GetGeometry();
@@ -179,23 +205,23 @@ void ShaderGraphPreviewTab::OnUIUpdate(const UIFrameContext& InContext) {
         return;
     }
 
-    if (!m_Mesh) {
-        if (Mesh* mesh = AssetManager::Get().GetAsset<Mesh>(s_PreviewMesh)) {
-            AssetManager::Get().LoadAsset(mesh);
-            m_Mesh = mesh->GetVertexBuffer();
-        }
+    Mesh* mesh = ResolveMesh();
+    if (mesh) {
+        AssetManager::Get().LoadAsset(mesh);
     }
+    VertexBuffer* vertexBuffer = mesh ? mesh->GetVertexBuffer() : nullptr;
 
     EnsureTarget(width, height);
     EnsurePipeline();
-    if (!m_Pipeline || !m_Mesh) {
+    if (!m_Pipeline || !vertexBuffer) {
         return;
     }
 
-    UpdateSceneBuffer((float)InContext.DeltaTime);
+    UpdateSceneBuffer((float)InContext.DeltaTime, *mesh);
 
     PreviewPushData push;
-    push.WorldTransform = glm::rotate(Mat4(1.0f), m_Time * 0.6f, VecUtils::Up);
+    push.WorldTransform = glm::rotate(Mat4(1.0f), m_Time * 0.6f, VecUtils::Up)
+                        * glm::translate(Mat4(1.0f), -mesh->GetBoundsCenter());
 
     if (!m_ShaderData) {
         m_ShaderData = new ShaderData();
@@ -205,7 +231,7 @@ void ShaderGraphPreviewTab::OnUIUpdate(const UIFrameContext& InContext) {
     m_Pipeline->Bind();
     RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData,
                                                        CmdSetShaderData{ m_ShaderData.Get() });
-    m_Mesh->Draw();
+    vertexBuffer->Draw();
 
     m_Texture->SetView(m_Target->GetDesc().ColorAttachments[0]);
 }

@@ -2,8 +2,12 @@
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/Image.h"
 #include "Object/Pointer.h"
+#include "Common/Map.h"
+#include "Common/UUID.h"
 #include "ArtifactRenderPipeline.gen.h"
 
+class Material;
+class Sampler;
 class UniformBuffer;
 class Pipeline;
 class FrameBuffer;
@@ -26,11 +30,20 @@ public:
     virtual uint32_t PickNodeId(uint32_t InX, uint32_t InY) const override;
 
 private:
-    void UpdateUniformData(const RenderParams& InParams);
+    /** A material's pipeline, rebuilt whenever the resources it was created from are replaced. */
+    struct MaterialPipeline {
+        SharedObjectPtr<Pipeline> Instance;
+        Array<void*> Resources;
+    };
+
+    void UpdateUniformData(double InDeltaTime, const RenderParams& InParams);
+    Pipeline* ResolvePipeline(Material* InMaterial);
 
     SharedObjectPtr<UniformBuffer> m_UniformBuffer;
-    SharedObjectPtr<Pipeline> m_Pipeline;
     SharedObjectPtr<FrameBuffer> m_FrameBuffer;
+    SharedObjectPtr<Sampler> m_Sampler;
+    Map<UUID, MaterialPipeline> m_MaterialPipelines;
     uint32_t m_Width = 0;
     uint32_t m_Height = 0;
+    float m_Time = 0.0f;
 };

@@ -2,7 +2,7 @@
 
 #include "DetailsTab.h"
 #include "ShaderGraphCanvasTab.h"
-#include "ShaderGraphPreviewTab.h"
+#include "AssetPreviewTab.h"
 #include "UI/UIDockArea.h"
 #include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
@@ -19,7 +19,7 @@
 ShaderGraphEditorTab::ShaderGraphEditorTab() {
     UIDockArea* area = GetDockArea();
     m_Canvas = area->DockNew<ShaderGraphCanvasTab>(UIDockSlot::Center);
-    m_Preview = area->DockNew<ShaderGraphPreviewTab>(UIDockSlot::Left, nullptr, 0.28f);
+    m_Preview = area->DockNew<AssetPreviewTab>(UIDockSlot::Left, nullptr, 0.28f);
     area->DockNew<DetailsTab>(UIDockSlot::Bottom, m_Preview->GetDockNode(), 0.55f);
 }
 
@@ -32,7 +32,7 @@ void ShaderGraphEditorTab::OpenShaderGraph(ShaderGraph* InShaderGraph) {
     }
 
     m_Canvas->SetShaderGraph(InShaderGraph);
-    m_Preview->SetShaderGraph(InShaderGraph);
+    m_Preview->SetMaterial(InShaderGraph);
     RequestRecompile();
 
     if (EditorWindow* window = GetOwnerWindow()) {

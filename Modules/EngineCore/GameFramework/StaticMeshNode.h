@@ -4,6 +4,7 @@
 #include "StaticMeshNode.gen.h"
 
 class ShaderData;
+class Material;
 class Mesh;
 
 /** Mirrors the push-constant block declared by Shader.glsl. */
@@ -24,11 +25,18 @@ public:
     Mesh* GetMesh() const;
     void SetMesh(Mesh* InMesh);
 
+    /** The override, or the mesh's own material when there is none. */
+    Material* GetMaterial() const;
+    void SetMaterialOverride(Material* InMaterial);
+
 private:
     SharedObjectPtr<ShaderData> m_PerMeshShaderData;
 
     PROPERTY()
     WeakObjectPtr<Mesh> m_Mesh;
+
+    PROPERTY()
+    WeakObjectPtr<Material> m_MaterialOverride;
 
     PROPERTY()
     bool m_CastShadow = true;

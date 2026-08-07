@@ -110,9 +110,6 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
 
 
 def generate_properties_registration_code(typename: str, body: str) -> str:
-    if typename.endswith("Property"):
-        return ""
-
     raw_properties = []
     for m in PROPERTY_PATTERN.finditer(body):
         type_name = m.group(1).strip().replace(' ', '')

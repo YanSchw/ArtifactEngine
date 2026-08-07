@@ -1,22 +1,14 @@
 #pragma once
-#include "Asset.h"
+#include "Material.h"
 #include "Graph/NodeGraph.h"
 #include "Rendering/ShaderGraphTypes.h"
 #include "Rendering/ShaderTemplate.h"
 #include "ShaderGraph.gen.h"
 
 class Shader;
-class Texture2D;
-class UniformBuffer;
 class ShaderGraphOutputNode;
 
-struct ShaderGraphTextureBinding {
-    uint32_t Binding = 0;
-    String Name;
-    Texture2D* Texture = nullptr;
-};
-
-class ShaderGraph : public Asset {
+class ShaderGraph : public Material {
 public:
     ARTIFACT_CLASS();
 
@@ -31,14 +23,15 @@ public:
     const ShaderTemplate& GetTemplate() const { return m_Template; }
     void SetTemplatePath(const String& InPath);
 
-    Shader* GetShader() const { return m_Shader.Get(); }
-    UniformBuffer* GetPropertyBuffer() const { return m_PropertyBuffer.Get(); }
-    Array<ShaderGraphTextureBinding> GetTextureBindings() const;
+    virtual ShaderGraph* GetBaseGraph() const override { return const_cast<ShaderGraph*>(this); }
 
-    /** Every value a material instance can override */
-    const Array<ShaderGraphProperty>& GetInputs() const { return m_Inputs; }
-    Vec4 GetInputValue(const String& InName) const;
-    void SetInputValue(const String& InName, const Vec4& InValue);
+    Shader* GetCompiledShader() const { return m_Shader.Get(); }
+
+    /** The inputs this graph publishes: its template's properties plus every exposed value node. */
+    const Array<ShaderGraphProperty>& GetDeclaredInputs() const { return m_Inputs; }
+    uint32_t GetPropertyBlockSize() const { return m_BlockSize; }
+    bool FindInputOffset(const String& InName, uint32_t& OutOffset) const;
+    Array<MaterialTextureBinding> GetGraphTextureBindings() const;
 
     Array<String> GetStateNames() const { return m_Template.GetStateNames(); }
     Array<String> GetStateOptions(const String& InState) const { return m_Template.GetStateOptions(InState); }
@@ -51,18 +44,18 @@ public:
 
     String GetShaderKey() const { return GetId().ToString(); }
 
-    virtual String GetDisplayName() const override;
     virtual bool IsLoaded() const override;
 
 protected:
     virtual void Load() override;
     virtual void Unload() override;
+    virtual void Cook(class ChunkedBinary& OutChunkedBinary) override;
 
 private:
     bool EnsureTemplateLoaded();
     void SyncGraph();
     void BuildInputs();
-    void UploadPropertyBuffer();
+    void BuildInputLayout();
     String BuildDeclarations() const;
     ShaderGraphOutputNode* FindOutputNode() const;
 
@@ -73,10 +66,7 @@ private:
     SharedObjectPtr<NodeGraph> m_Graph;
 
     PROPERTY()
-    Array<String> m_InputNames;
-
-    PROPERTY()
-    Array<Vec4> m_InputValues;
+    Array<ShaderGraphProperty> m_Inputs;
 
     PROPERTY()
     Array<String> m_StateNames;
@@ -88,12 +78,9 @@ private:
     String m_TemplateError;
     bool m_TemplateLoaded = false;
 
-    Array<ShaderGraphProperty> m_Inputs;
     Array<String> m_InputErrors;
     Map<String, uint32_t> m_InputOffsets;
     uint32_t m_BlockSize = 0;
-    uint32_t m_BufferSize = 0;
 
     SharedObjectPtr<Shader> m_Shader;
-    SharedObjectPtr<UniformBuffer> m_PropertyBuffer;
 };
