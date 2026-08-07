@@ -22,13 +22,10 @@ public:
 
     static SharedObjectPtr<class Shader> CreateShader(const String& InKey);
     static SharedObjectPtr<class Shader> Find(const String& InKey);
-    static bool Reload(const String& InKey);
 
-    /** Registers source for a key that has no file behind it, so generated shaders participate in
-     *  live compilation and cooking exactly like the ones on disk. */
+    static bool Reload(const String& InKey, String& OutError);
+
     static void RegisterSource(const String& InKey, const String& InSource);
-
-    static Array<String> GetLoadedKeys();
 
     static bool Cook(const String& InOutputDirectory, PlatformType InTargetPlatform);
 

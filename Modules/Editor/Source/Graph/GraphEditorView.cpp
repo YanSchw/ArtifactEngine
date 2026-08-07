@@ -170,6 +170,7 @@ bool GraphEditorView::IsSelected(uint64_t InNodeId) const {
 void GraphEditorView::SelectOnly(uint64_t InNodeId) {
     m_Selection.Clear();
     m_Selection.Add(InNodeId);
+    NotifySelectionChanged();
 }
 
 void GraphEditorView::ToggleSelection(uint64_t InNodeId) {
@@ -178,6 +179,7 @@ void GraphEditorView::ToggleSelection(uint64_t InNodeId) {
     } else {
         m_Selection.Add(InNodeId);
     }
+    NotifySelectionChanged();
 }
 
 void GraphEditorView::DeleteSelection() {
@@ -188,6 +190,33 @@ void GraphEditorView::DeleteSelection() {
         m_Graph->RemoveNode(nodeId);
     }
     m_Selection.Clear();
+    NotifySelectionChanged();
+    NotifyGraphChanged();
+}
+
+void GraphEditorView::NotifyGraphChanged() {
+    if (OnGraphChanged) {
+        OnGraphChanged();
+    }
+}
+
+void GraphEditorView::NotifySelectionChanged() {
+    if (OnSelectionChanged) {
+        OnSelectionChanged();
+    }
+}
+
+Array<GraphNode*> GraphEditorView::GetSelectedNodes() const {
+    Array<GraphNode*> nodes;
+    if (!m_Graph) {
+        return nodes;
+    }
+    for (uint64_t nodeId : m_Selection) {
+        if (GraphNode* node = m_Graph->FindNode(nodeId)) {
+            nodes.Add(node);
+        }
+    }
+    return nodes;
 }
 
 /* ----------------------------------- Input ----------------------------------- */
@@ -236,6 +265,7 @@ void GraphEditorView::OnPressed(const Vec2& InCursorPos) {
 
     if (!IsShiftHeld()) {
         m_Selection.Clear();
+        NotifySelectionChanged();
     }
     m_DragMode = DragMode::Marquee;
 }
@@ -301,6 +331,7 @@ void GraphEditorView::FinishConnectDrag() {
     GraphPin* pinB = nullptr;
     if (ResolvePin(m_ConnectSource, nodeA, pinA) && ResolvePin(target, nodeB, pinB)) {
         m_Graph->Connect(*nodeA, *pinA, *nodeB, *pinB);
+        NotifyGraphChanged();
     }
 }
 
@@ -324,6 +355,7 @@ void GraphEditorView::FinishMarquee() {
             m_Selection.Add(node->NodeId);
         }
     }
+    NotifySelectionChanged();
 }
 
 bool GraphEditorView::OnScroll(const Vec2& InDelta) {
@@ -439,10 +471,9 @@ bool GraphEditorView::OnSecondaryClick(const Vec2& InCursorPos) {
     };
     Array<Item> items;
     for (const Class& nodeClass : Class::GetSubclassesOf(GraphNode::StaticClass())) {
-        if (nodeClass == GraphNode::StaticClass()) {
+        if (nodeClass == GraphNode::StaticClass() || !m_Graph->AllowsNodeClass(nodeClass)) {
             continue;
         }
-        // Probe an instance for its menu presentation
         Object* probe = Object::Create(nodeClass);
         if (!probe) {
             continue;
@@ -476,6 +507,7 @@ bool GraphEditorView::OnSecondaryClick(const Vec2& InCursorPos) {
             }
             if (GraphNode* node = graphView->m_Graph->CreateNode(nodeClass, spawnPos)) {
                 graphView->SelectOnly(node->NodeId);
+                graphView->NotifyGraphChanged();
             }
         });
     }

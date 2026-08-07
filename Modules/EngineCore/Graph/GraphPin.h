@@ -1,6 +1,7 @@
 #pragma once
 #include "Object/Object.h"
 #include "Object/Enum.h"
+#include "Common/Types.h"
 #include "GraphPin.gen.h"
 
 ARTIFACT_ENUM();
@@ -9,9 +10,6 @@ enum class GraphPinDirection : uint8_t {
     Output = 1
 };
 
-/** One connection point on a GraphNode. Inputs sit on the left edge of a node, outputs on the
- *  right; connections always run from an output into an input. Pins are identified within their
- *  node by Name + Direction, which is how GraphConnection references them. */
 class GraphPin : public Object {
 public:
     ARTIFACT_CLASS();
@@ -27,6 +25,9 @@ public:
      *  and GraphEditorStyle::PinColor give it meaning. */
     PROPERTY()
     String TypeName = "Float";
+
+    PROPERTY()
+    Vec4 DefaultValue = Vec4(0.0f);
 
     bool IsInput() const { return Direction == GraphPinDirection::Input; }
     bool IsOutput() const { return Direction == GraphPinDirection::Output; }

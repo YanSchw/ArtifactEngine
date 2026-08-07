@@ -25,23 +25,23 @@ public:
     T* CreateNode(const Vec2& InPosition) {
         return Cast<T>(CreateNode(T::StaticClass(), InPosition));
     }
-    /** Removes the node and every connection touching it. */
+
     void RemoveNode(uint64_t InNodeId);
     GraphNode* FindNode(uint64_t InNodeId) const;
-    /** Repaints last, i.e. above its siblings, in the editor. */
     void BringToFront(GraphNode& InNode);
 
-    /** Base rules: distinct nodes, an output into an input, compatible types. */
     virtual bool CanConnect(const GraphNode& InNodeA, const GraphPin& InPinA,
                             const GraphNode& InNodeB, const GraphPin& InPinB, String& OutReason) const;
     virtual bool ArePinTypesCompatible(const String& InOutputType, const String& InInputType) const {
         return InOutputType == InInputType;
     }
+    virtual bool AllowsNodeClass(const Class& InNodeClass) const { (void)InNodeClass; return true; }
 
     /** Wires two pins (either order); an input pin's existing connection is replaced, as inputs
      *  accept a single wire. Returns null with a log entry when CanConnect rejects the pair. */
     GraphConnection* Connect(GraphNode& InNodeA, GraphPin& InPinA, GraphNode& InNodeB, GraphPin& InPinB);
     void BreakPinConnections(const GraphNode& InNode, const GraphPin& InPin);
+    void PruneInvalidConnections();
     bool IsPinConnected(const GraphNode& InNode, const GraphPin& InPin) const;
 
     bool SaveToFile(const String& InFilePath) const;

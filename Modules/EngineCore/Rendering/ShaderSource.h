@@ -49,9 +49,6 @@ struct ShaderRenderState {
     WindingOrder FrontFace = WindingOrder::CounterClockwise;
 };
 
-/** Maps a line of generated stage GLSL back to the file and line it was authored in, so compiler
- *  diagnostics can be reported against the shader the developer wrote rather than the flattened
- *  translation unit handed to the backend compiler. */
 struct ShaderSourceLocation {
     String File;
     uint32_t Line = 0;
@@ -73,7 +70,6 @@ public:
     const String& GetPath() const { return m_Path; }
     const ShaderRenderState& GetRenderState() const { return m_RenderState; }
     const Array<ShaderStageSource>& GetStages() const { return m_Stages; }
-    const Array<String>& GetDependencies() const { return m_Dependencies; }
 
     const ShaderStageSource* FindStage(ShaderStage InStage) const;
     bool HasStage(ShaderStage InStage) const { return FindStage(InStage) != nullptr; }

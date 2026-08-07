@@ -244,6 +244,12 @@ bool ShaderSource::PreprocessSource(const String& InPath, const String& InSource
                     continue;
                 }
 
+                if (directive.Name == "shadergraph") {
+                    OutError = std::format("{0}:{1}: this shader is a shader-graph template and cannot be compiled on its own",
+                                           InFilePath, lineNumber);
+                    return false;
+                }
+
                 if (directive.Name == "version") {
                     if (versionDirective.empty()) {
                         versionDirective = "#version " + directive.Arguments;
@@ -326,6 +332,12 @@ bool ShaderSource::PreprocessSource(const String& InPath, const String& InSource
                 }
 
                 const String argument = Trim(directive.Arguments);
+                if (argument.starts_with("(")) {
+                    OutError = std::format("{0}:{1}: #{2} option lists are only valid in a shader-graph template",
+                                           line.File, line.Line, directive.Name);
+                    return false;
+                }
+
                 bool parsed = false;
                 String enumName;
                 if (directive.Name == "blend") {

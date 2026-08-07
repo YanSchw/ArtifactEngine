@@ -12,6 +12,11 @@ GraphNode* NodeGraph::CreateNode(const Class& InNodeClass, const Vec2& InPositio
         return nullptr;
     }
 
+    for (const SharedObjectPtr<GraphNode>& existing : Nodes) {
+        if (existing && existing->NodeId >= NextNodeId) {
+            NextNodeId = existing->NodeId + 1;
+        }
+    }
     node->NodeId = NextNodeId++;
     node->SetPosition(InPosition);
     node->ConstructPins();
@@ -104,6 +109,21 @@ void NodeGraph::BreakPinConnections(const GraphNode& InNode, const GraphPin& InP
             ? Connections[i]->UsesOutput(InNode.NodeId, InPin.Name)
             : Connections[i]->UsesInput(InNode.NodeId, InPin.Name);
         if (matches) {
+            Connections.RemoveAt(i);
+        }
+    }
+}
+
+void NodeGraph::PruneInvalidConnections() {
+    for (int32_t i = Connections.Size() - 1; i >= 0; i--) {
+        const SharedObjectPtr<GraphConnection>& connection = Connections[i];
+        GraphNode* from = connection ? FindNode(connection->FromNodeId) : nullptr;
+        GraphNode* to = connection ? FindNode(connection->ToNodeId) : nullptr;
+
+        const bool valid = from && to
+            && from->FindPin(connection->FromPinName, GraphPinDirection::Output)
+            && to->FindPin(connection->ToPinName, GraphPinDirection::Input);
+        if (!valid) {
             Connections.RemoveAt(i);
         }
     }

@@ -18,6 +18,8 @@ public:
     ARTIFACT_CLASS();
 
     virtual Class GetSupportedClass() const { return Class::None; }
+    /** True when editing this property changes which rows the view should show. */
+    virtual bool RebuildsOnEdit(const String& InPropertyName) const { (void)InPropertyName; return false; }
     virtual float BuildHeader(UINode& InHeader, Object* InObject, DetailsTab& InTab);
     /** Default: one category per class of the inheritance chain (base first), rows per PROPERTY. */
     virtual void BuildContent(UINode& InList, Object* InObject, DetailsTab& InTab);
@@ -25,7 +27,7 @@ public:
     static DetailsCustomization* FindFor(const Class& InClass);
 
     static void BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName);
-    static std::function<void()> MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty);
+    static std::function<void()> MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab = nullptr);
     static String PrettyClassName(const Class& InClass);
     static String PrettyPropertyName(const String& InName);
 
@@ -37,5 +39,5 @@ protected:
     static DetailsRow& AddRow(UINode& InParent, DetailsTab& InTab, const String& InLabel, int32_t InDepth);
     static void AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
                                uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
-                               Property* InRootProperty = nullptr);
+                               Property* InRootProperty = nullptr, const String& InLabel = String());
 };

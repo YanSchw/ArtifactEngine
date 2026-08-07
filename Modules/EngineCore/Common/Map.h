@@ -24,6 +24,9 @@ public:
     const V& At(const K& key) {
         return m_Map.at(key);
     }
+    const V& At(const K& key) const {
+        return m_Map.at(key);
+    }
     V GetOrDefault(const K& key, V&& InDefault) {
         return ContainsKey(key) ? At(key) : InDefault;
     }

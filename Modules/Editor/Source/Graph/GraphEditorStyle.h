@@ -71,6 +71,11 @@ private:
         colors["Vec4"] = HexColor(0xF2C94C);
         colors["Color"] = HexColor(0x3F8FFF);
         colors["String"] = HexColor(0xD75DD7);
+        colors["float"] = HexColor(0x9BE64A);
+        colors["vec2"] = HexColor(0x6FE0C0);
+        colors["vec3"] = HexColor(0xF2C94C);
+        colors["vec4"] = HexColor(0xF28C4C);
+        colors["sampler2D"] = HexColor(0xD75DD7);
         return colors;
     }
 };

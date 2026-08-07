@@ -7,6 +7,7 @@
 #include "Rendering/Shader.h"
 #include "Rendering/ShaderCompiler.h"
 #include "Rendering/ShaderSource.h"
+#include "Rendering/ShaderTemplate.h"
 #include "Serialization/ChunkedBinary.h"
 
 #include <filesystem>
@@ -166,26 +167,32 @@ SharedObjectPtr<Shader> ShaderLibrary::CreateShader(const String& InKey) {
     return shader;
 }
 
-bool ShaderLibrary::Reload(const String& InKey) {
+bool ShaderLibrary::Reload(const String& InKey, String& OutError) {
     const String key = NormalizeKey(InKey);
 
-    if (!s_Shaders.ContainsKey(key)) {
-        return CreateShader(key) != nullptr;
-    }
-
     if (EngineConfig::IsPackagedBuild()) {
+        OutError = "shaders cannot be recompiled in a packaged build";
         return false;
     }
 
     CompiledShader compiled;
-    String error;
-    if (!CompileForKey(key, GetActiveShaderAPI(), compiled, error)) {
-        AE_ERROR("Failed to reload shader '{0}':\n{1}", key, error);
+    if (!CompileForKey(key, GetActiveShaderAPI(), compiled, OutError)) {
         return false;
     }
 
     if (RenderingAPI* renderingAPI = RenderingAPI::GetInstance()) {
         renderingAPI->WaitIdle();
+    }
+
+    if (!s_Shaders.ContainsKey(key)) {
+        SharedObjectPtr<Shader> shader = Shader::Create(compiled);
+        if (!shader) {
+            OutError = std::format("failed to create shader '{0}'", key);
+            return false;
+        }
+        s_Shaders[key] = shader;
+        TrackKey(key);
+        return true;
     }
 
     s_Shaders[key]->Reload(compiled);
@@ -197,10 +204,6 @@ void ShaderLibrary::RegisterSource(const String& InKey, const String& InSource) 
     const String key = NormalizeKey(InKey);
     s_RegisteredSources[key] = InSource;
     TrackKey(key);
-}
-
-Array<String> ShaderLibrary::GetLoadedKeys() {
-    return s_KeyOrder;
 }
 
 bool ShaderLibrary::CompileForKey(const String& InKey, ShaderAPI InAPI, CompiledShader& OutCompiled, String& OutError) {
@@ -230,6 +233,10 @@ Array<String> ShaderLibrary::DiscoverShaderKeys() {
         for (const String& file : FileIO::ListFilesInDirectory(mountDir, true)) {
             const std::filesystem::path filePath(file);
             if (filePath.extension().string() != s_ShaderExtension) {
+                continue;
+            }
+
+            if (ShaderTemplate::IsTemplateSource(FileIO::ReadFileToString(file))) {
                 continue;
             }
 

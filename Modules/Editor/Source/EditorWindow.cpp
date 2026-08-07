@@ -2,8 +2,10 @@
 #include "Tabs/MajorTab.h"
 #include "Tabs/SceneEditorTab.h"
 #include "Tabs/BlueprintEditorTab.h"
+#include "Tabs/ShaderGraphEditorTab.h"
 #include "Assets/Scene.h"
 #include "Assets/Blueprint.h"
+#include "Assets/ShaderGraph.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIContextMenu.h"
@@ -262,6 +264,11 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     if (Blueprint* blueprint = Cast<Blueprint>(InAsset)) {
         BlueprintEditorTab* tab = OpenTab<BlueprintEditorTab>();
         tab->OpenBlueprint(blueprint);
+        return tab;
+    }
+    if (ShaderGraph* shaderGraph = Cast<ShaderGraph>(InAsset)) {
+        ShaderGraphEditorTab* tab = OpenTab<ShaderGraphEditorTab>();
+        tab->OpenShaderGraph(shaderGraph);
         return tab;
     }
 

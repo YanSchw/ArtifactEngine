@@ -2,6 +2,7 @@
 #include "DetailsCategory.h"
 #include "DetailsRow.h"
 #include "Tabs/DetailsTab.h"
+#include "Tabs/MajorTab.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIDragNumber.h"
@@ -298,8 +299,9 @@ DetailsRow& DetailsCustomization::AddRow(UINode& InParent, DetailsTab& InTab, co
     return *row;
 }
 
-std::function<void()> DetailsCustomization::MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty) {
-    return [InObject, InRootProperty] {
+std::function<void()> DetailsCustomization::MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab) {
+    const WeakObjectPtr<DetailsTab> tab = InTab;
+    return [InObject, InRootProperty, tab] {
         Object* object = InObject.Get();
         if (!object || !InRootProperty) {
             return;
@@ -307,6 +309,15 @@ std::function<void()> DetailsCustomization::MakeEditHandler(const WeakObjectPtr<
         InRootProperty->NotifyChanged(object);
         if (Node* node = Cast<Node>(object)) {
             node->MarkPropertyOverridden(InRootProperty->Name);
+        }
+        if (DetailsTab* details = tab.Get()) {
+            if (MajorTab* owner = details->GetMajorTab()) {
+                owner->OnObjectEdited(object);
+            }
+            DetailsCustomization* customization = FindFor(object->GetClass());
+            if (customization && customization->RebuildsOnEdit(InRootProperty->Name)) {
+                details->MarkDirty();
+            }
         }
     };
 }
@@ -328,10 +339,10 @@ void DetailsCustomization::BindOverride(DetailsRow& InRow, const WeakObjectPtr<O
 
 void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
                                           uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
-                                          Property* InRootProperty) {
+                                          Property* InRootProperty, const String& InLabel) {
     const uint64_t offset = InBaseOffset + InProperty->Offset;
     Property* root = InRootProperty ? InRootProperty : InProperty;
-    const String label = PrettyPropertyName(InProperty->Name);
+    const String label = InLabel.empty() ? PrettyPropertyName(InProperty->Name) : InLabel;
 
     if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
         const Array<Property*> inner = Property::GetTypeProperties(structProperty->InnerStructTypename);
@@ -348,7 +359,7 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
 
     DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
     BindOverride(row, InObject, root->Name);
-    const std::function<void()> onEdited = MakeEditHandler(InObject, root);
+    const std::function<void()> onEdited = MakeEditHandler(InObject, root, &InTab);
 
     if (Cast<IntProperty>(InProperty) || Cast<FloatProperty>(InProperty)) {
         BuildNumberRow(row, InObject, offset, InProperty, onEdited);

@@ -19,6 +19,14 @@ public:
     /** Invoked on Ctrl/Cmd+S while the cursor is over the view. */
     std::function<void()> OnSaveRequested;
 
+    /** Invoked after any edit to the document (node added/removed, wire made or broken). */
+    std::function<void()> OnGraphChanged;
+
+    /** Invoked when the set of selected nodes changes. */
+    std::function<void()> OnSelectionChanged;
+
+    Array<GraphNode*> GetSelectedNodes() const;
+
     virtual void Paint(UIDrawList& OutDrawList) override;
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
     virtual bool OnSecondaryClick(const Vec2& InCursorPos) override;
@@ -65,6 +73,8 @@ private:
     bool GetPinCenter(GraphNode& InNode, const GraphPin& InPin, Vec2& OutGraphCenter) const;
 
     bool IsSelected(uint64_t InNodeId) const;
+    void NotifyGraphChanged();
+    void NotifySelectionChanged();
     void SelectOnly(uint64_t InNodeId);
     void ToggleSelection(uint64_t InNodeId);
     void DeleteSelection();

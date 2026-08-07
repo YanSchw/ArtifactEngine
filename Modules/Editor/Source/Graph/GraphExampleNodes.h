@@ -1,5 +1,5 @@
 #pragma once
-#include "NodeGraph.h"
+#include "Graph/NodeGraph.h"
 #include "UI/EditorStyle.h"
 #include "GraphExampleNodes.gen.h"
 

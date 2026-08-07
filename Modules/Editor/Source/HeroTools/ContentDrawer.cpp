@@ -23,6 +23,7 @@
 #include "Assets/VectorImage.h"
 #include "Assets/Scene.h"
 #include "Assets/Blueprint.h"
+#include "Assets/ShaderGraph.h"
 #include "Assets/NodeRecord.h"
 #include "GameFramework/Node3D.h"
 #include "EditorWindow.h"
@@ -406,6 +407,11 @@ void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu) {
     OutMenu.Item("Blueprint...", [this] { OpenNewBlueprintDialog(); })
            .Icon(EditorIcons::Node())
            .Tooltip("Pick a parent class and a name for the new Blueprint");
+    OutMenu.Item("Shader Graph", [this] {
+        BeginCreateAsset(ShaderGraph::StaticClass(), "NewShaderGraph", [](const String& InDir, const String& InName) {
+            return (Asset*)ShaderGraph::CreateEmpty(InDir, InName);
+        });
+    }).Icon(EditorIcons::GraphEditor());
 }
 
 void ContentDrawer::BuildItemMenu(UIMenuModel& OutMenu, const Item& InItem) {

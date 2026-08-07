@@ -29,6 +29,8 @@ public:
 
     class ThumbnailRenderer& GetThumbnails();
 
+    void MarkDirty() { m_Inspected = nullptr; }
+
 private:
     void Refresh();
     void RebuildInspector(Object* InObject, DetailsCustomization* InCustomization);

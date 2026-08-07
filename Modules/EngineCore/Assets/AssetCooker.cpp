@@ -8,6 +8,7 @@
 #include "Serialization/ChunkedBinary.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Asset.h"
+#include "Assets/ShaderGraph.h"
 
 void AssetCookerEngine::Initialize() {
     (new AssetManager())->Initialize(false);
@@ -19,6 +20,12 @@ void AssetCookerEngine::Initialize() {
     const String targetPlatformName = EngineConfig::GetConfigVar<String>("CookPlatform");
     if (!targetPlatformName.empty()) {
         targetPlatform = EPlatformType::ConvertStringToEnum(targetPlatformName);
+    }
+
+    for (Asset* asset : AssetManager::Get().GetAssetsOfClass(ShaderGraph::StaticClass())) {
+        if (!Cast<ShaderGraph>(asset)->RegisterGeneratedSource()) {
+            std::exit(1);
+        }
     }
 
     if (!ShaderLibrary::Cook(cookDir, targetPlatform)) {
