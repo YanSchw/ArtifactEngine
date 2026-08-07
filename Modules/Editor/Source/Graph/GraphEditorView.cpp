@@ -28,7 +28,7 @@ void GraphEditorView::SetGraph(const SharedObjectPtr<NodeGraph>& InGraph) {
     m_Graph = InGraph;
     m_Selection.Clear();
     m_DragMode = DragMode::None;
-    m_ConnectSource.Reset();
+    m_ConnectSources.Clear();
     UIContextMenu::CloseAll(*this);
     m_PendingFrameContent = true;
 }
@@ -161,6 +161,38 @@ bool GraphEditorView::GetPinCenter(GraphNode& InNode, const GraphPin& InPin, Vec
     return false;
 }
 
+Array<GraphEditorView::PinRef> GraphEditorView::CollectConnectedEnds(const GraphNode& InNode, const GraphPin& InPin) const {
+    Array<PinRef> ends;
+    if (!m_Graph) {
+        return ends;
+    }
+    for (const SharedObjectPtr<GraphConnection>& connection : m_Graph->Connections) {
+        if (!connection) {
+            continue;
+        }
+        if (InPin.IsOutput() && connection->UsesOutput(InNode.NodeId, InPin.Name)) {
+            ends.Add({ connection->ToNodeId, connection->ToPinName, GraphPinDirection::Input });
+        } else if (InPin.IsInput() && connection->UsesInput(InNode.NodeId, InPin.Name)) {
+            ends.Add({ connection->FromNodeId, connection->FromPinName, GraphPinDirection::Output });
+        }
+    }
+    return ends;
+}
+
+void GraphEditorView::BreakConnectionsAt(const Vec2& InScreenPos) {
+    PinRef ref;
+    GraphNode* node = nullptr;
+    GraphPin* pin = nullptr;
+    if (!m_Graph || !FindPinAt(InScreenPos, ref) || !ResolvePin(ref, node, pin)) {
+        return;
+    }
+    if (!m_Graph->IsPinConnected(*node, *pin)) {
+        return;
+    }
+    m_Graph->BreakPinConnections(*node, *pin);
+    NotifyGraphChanged();
+}
+
 /* --------------------------------- Selection --------------------------------- */
 
 bool GraphEditorView::IsSelected(uint64_t InNodeId) const {
@@ -240,10 +272,20 @@ void GraphEditorView::OnPressed(const Vec2& InCursorPos) {
             return;
         }
         if (IsAltHeld()) {
-            m_Graph->BreakPinConnections(*node, *pinPtr);
+            BreakConnectionsAt(InCursorPos);
             return;
         }
-        m_ConnectSource = pin;
+        m_ConnectSources.Clear();
+        if (IsShiftHeld()) {
+            m_ConnectSources = CollectConnectedEnds(*node, *pinPtr);
+            if (!m_ConnectSources.IsEmpty()) {
+                m_Graph->BreakPinConnections(*node, *pinPtr);
+                NotifyGraphChanged();
+            }
+        }
+        if (m_ConnectSources.IsEmpty()) {
+            m_ConnectSources.Add(pin);
+        }
         m_DragMode = DragMode::Connect;
         return;
     }
@@ -316,21 +358,28 @@ void GraphEditorView::OnReleased(bool InInside) {
             break;
     }
     m_DragMode = DragMode::None;
-    m_ConnectSource.Reset();
+    m_ConnectSources.Clear();
     m_MoveStartPositions.Clear();
 }
 
 void GraphEditorView::FinishConnectDrag() {
     PinRef target;
-    if (!m_Graph || !FindPinAt(m_CursorScreen, target) || target == m_ConnectSource) {
+    GraphNode* targetNode = nullptr;
+    GraphPin* targetPin = nullptr;
+    if (!m_Graph || !FindPinAt(m_CursorScreen, target) || !ResolvePin(target, targetNode, targetPin)) {
         return;
     }
-    GraphNode* nodeA = nullptr;
-    GraphPin* pinA = nullptr;
-    GraphNode* nodeB = nullptr;
-    GraphPin* pinB = nullptr;
-    if (ResolvePin(m_ConnectSource, nodeA, pinA) && ResolvePin(target, nodeB, pinB)) {
-        m_Graph->Connect(*nodeA, *pinA, *nodeB, *pinB);
+
+    bool connected = false;
+    for (const PinRef& source : m_ConnectSources) {
+        GraphNode* sourceNode = nullptr;
+        GraphPin* sourcePin = nullptr;
+        if (source == target || !ResolvePin(source, sourceNode, sourcePin)) {
+            continue;
+        }
+        connected |= m_Graph->Connect(*sourceNode, *sourcePin, *targetNode, *targetPin) != nullptr;
+    }
+    if (connected) {
         NotifyGraphChanged();
     }
 }
@@ -388,14 +437,23 @@ void GraphEditorView::UpdateHoverPin() {
     if (UIContextMenu::IsOpen(*this) || !FindPinAt(m_CursorScreen, m_HoverPin)) {
         return;
     }
-    if (m_DragMode == DragMode::Connect && m_ConnectSource.IsValid() && !(m_HoverPin == m_ConnectSource)) {
-        GraphNode* nodeA = nullptr;
-        GraphPin* pinA = nullptr;
-        GraphNode* nodeB = nullptr;
-        GraphPin* pinB = nullptr;
-        if (ResolvePin(m_ConnectSource, nodeA, pinA) && ResolvePin(m_HoverPin, nodeB, pinB)) {
-            String reason;
-            m_HoverPinCompatible = m_Graph->CanConnect(*nodeA, *pinA, *nodeB, *pinB, reason);
+    if (m_DragMode != DragMode::Connect || m_ConnectSources.IsEmpty() || m_ConnectSources.Contains(m_HoverPin)) {
+        return;
+    }
+
+    GraphNode* targetNode = nullptr;
+    GraphPin* targetPin = nullptr;
+    if (!ResolvePin(m_HoverPin, targetNode, targetPin)) {
+        return;
+    }
+    for (const PinRef& source : m_ConnectSources) {
+        GraphNode* sourceNode = nullptr;
+        GraphPin* sourcePin = nullptr;
+        String reason;
+        if (!ResolvePin(source, sourceNode, sourcePin)
+            || !m_Graph->CanConnect(*sourceNode, *sourcePin, *targetNode, *targetPin, reason)) {
+            m_HoverPinCompatible = false;
+            return;
         }
     }
 }
@@ -408,6 +466,7 @@ void GraphEditorView::UpdatePanning() {
 
     if (panDown && !m_WasPanButtonDown && IsHovered() && m_DragMode == DragMode::None) {
         m_PanCandidate = true;
+        m_PanIsMiddle = middleDown;
         m_Panning = false;
         m_PanPressScreen = m_CursorScreen;
         m_LastPanCursor = m_CursorScreen;
@@ -427,7 +486,11 @@ void GraphEditorView::UpdatePanning() {
     }
 
     if (!panDown && m_WasPanButtonDown) {
+        if (m_PanCandidate && m_PanIsMiddle && !m_Panning) {
+            BreakConnectionsAt(m_PanPressScreen);
+        }
         m_PanCandidate = false;
+        m_PanIsMiddle = false;
         m_Panning = false;
     }
 
@@ -608,25 +671,27 @@ void GraphEditorView::PaintConnections(UIDrawList& OutDrawList) const {
 }
 
 void GraphEditorView::PaintPendingWire(UIDrawList& OutDrawList) const {
-    if (m_DragMode != DragMode::Connect || !m_ConnectSource.IsValid()) {
+    if (m_DragMode != DragMode::Connect) {
         return;
     }
-    GraphNode* node = nullptr;
-    GraphPin* pin = nullptr;
-    Vec2 pinCenter;
-    if (!ResolvePin(m_ConnectSource, node, pin) || !GetPinCenter(*node, *pin, pinCenter)) {
-        return;
-    }
+    for (const PinRef& source : m_ConnectSources) {
+        GraphNode* node = nullptr;
+        GraphPin* pin = nullptr;
+        Vec2 pinCenter;
+        if (!ResolvePin(source, node, pin) || !GetPinCenter(*node, *pin, pinCenter)) {
+            continue;
+        }
 
-    Vec4 color = GraphEditorStyle::PinColor(pin->TypeName);
-    if (m_HoverPin.IsValid() && !(m_HoverPin == m_ConnectSource) && !m_HoverPinCompatible) {
-        color = GraphEditorStyle::InvalidTargetWire;
-    }
-    const Vec2 pinScreen = GraphToScreen(pinCenter);
-    if (pin->IsOutput()) {
-        PaintWire(OutDrawList, pinScreen, m_CursorScreen, color, color);
-    } else {
-        PaintWire(OutDrawList, m_CursorScreen, pinScreen, color, color);
+        Vec4 color = GraphEditorStyle::PinColor(pin->TypeName);
+        if (m_HoverPin.IsValid() && !m_ConnectSources.Contains(m_HoverPin) && !m_HoverPinCompatible) {
+            color = GraphEditorStyle::InvalidTargetWire;
+        }
+        const Vec2 pinScreen = GraphToScreen(pinCenter);
+        if (pin->IsOutput()) {
+            PaintWire(OutDrawList, pinScreen, m_CursorScreen, color, color);
+        } else {
+            PaintWire(OutDrawList, m_CursorScreen, pinScreen, color, color);
+        }
     }
 }
 

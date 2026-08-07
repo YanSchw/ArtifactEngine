@@ -71,6 +71,8 @@ private:
     bool FindPinAt(const Vec2& InScreenPos, PinRef& OutPin) const;
     bool ResolvePin(const PinRef& InRef, GraphNode*& OutNode, GraphPin*& OutPin) const;
     bool GetPinCenter(GraphNode& InNode, const GraphPin& InPin, Vec2& OutGraphCenter) const;
+    Array<PinRef> CollectConnectedEnds(const GraphNode& InNode, const GraphPin& InPin) const;
+    void BreakConnectionsAt(const Vec2& InScreenPos);
 
     bool IsSelected(uint64_t InNodeId) const;
     void NotifyGraphChanged();
@@ -106,13 +108,14 @@ private:
     uint64_t m_PressedNodeId = 0;
     bool m_PressedNodeWasSelected = false;
     Map<uint64_t, Vec2> m_MoveStartPositions;
-    PinRef m_ConnectSource;
+    Array<PinRef> m_ConnectSources;
     PinRef m_HoverPin;
     bool m_HoverPinCompatible = true;
 
     // Right/middle mouse dragging is not routed through UICanvas, so panning is tracked here from
     // polled buttons.
     bool m_WasPanButtonDown = false;
+    bool m_PanIsMiddle = false;
     bool m_PanCandidate = false;
     bool m_Panning = false;
     Vec2 m_PanPressScreen = Vec2(0.0f);
