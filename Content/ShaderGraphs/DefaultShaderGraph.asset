@@ -1,0 +1,101 @@
+{
+    "$type": "ShaderGraph",
+    "AssetClass": "ShaderGraph",
+    "m_BaseGraph": null,
+    "m_Graph": {
+        "$type": "ShaderNodeGraph",
+        "Connections": [],
+        "GraphName": "Node Graph",
+        "NextNodeId": 3,
+        "Nodes": [
+            {
+                "$type": "ShaderGraphOutputNode",
+                "NodeId": 1,
+                "Pins": [
+                    {
+                        "$type": "GraphPin",
+                        "DefaultValue": {
+                            "W": 1.0,
+                            "X": 0.800000011920929,
+                            "Y": 0.800000011920929,
+                            "Z": 0.800000011920929
+                        },
+                        "Direction": "Input",
+                        "Name": "BaseColor",
+                        "TypeName": "vec4"
+                    },
+                    {
+                        "$type": "GraphPin",
+                        "DefaultValue": {
+                            "W": 0.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Direction": "Input",
+                        "Name": "Emissive",
+                        "TypeName": "vec3"
+                    },
+                    {
+                        "$type": "GraphPin",
+                        "DefaultValue": {
+                            "W": 1.0,
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        },
+                        "Direction": "Input",
+                        "Name": "Opacity",
+                        "TypeName": "float"
+                    }
+                ],
+                "PositionX": 320.0,
+                "PositionY": 40.0
+            }
+        ]
+    },
+    "m_Id": "d351ca39-9ab6-43cf-9921-4965ec126be8",
+    "m_InputNames": [],
+    "m_InputValues": [],
+    "m_Inputs": [
+        {
+            "DefaultValue": {
+                "W": 1.0,
+                "X": 0.800000011920929,
+                "Y": 0.800000011920929,
+                "Z": 0.800000011920929
+            },
+            "Identifier": "BaseColor_",
+            "Name": "BaseColor",
+            "Type": "Vec4"
+        },
+        {
+            "DefaultValue": {
+                "W": 0.0,
+                "X": 0.0,
+                "Y": 0.0,
+                "Z": 0.0
+            },
+            "Identifier": "Emissive_",
+            "Name": "Emissive",
+            "Type": "Vec3"
+        },
+        {
+            "DefaultValue": {
+                "W": 1.0,
+                "X": 1.0,
+                "Y": 1.0,
+                "Z": 1.0
+            },
+            "Identifier": "Opacity_",
+            "Name": "Opacity",
+            "Type": "Float"
+        }
+    ],
+    "m_StateNames": [],
+    "m_StateValues": [],
+    "m_StreamType": "Referenced",
+    "m_TemplatePath": "/Shaders/Templates/Surface.glsl",
+    "m_TextureNames": [],
+    "m_TextureValues": []
+}

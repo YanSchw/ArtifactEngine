@@ -1,7 +1,7 @@
 {
     "$type": "Mesh",
     "AssetClass": "Mesh",
-    "m_Id": "c6308770-3a5b-4b2b-9cec-14ba803ff817",
+    "m_Id": "a7db9be3-2add-4a91-8ff6-06e75619ebd8",
     "m_ImportOffset": {
         "X": 0.0,
         "Y": 0.0,
@@ -13,6 +13,6 @@
         "Z": 1.0
     },
     "m_Material": "d351ca39-9ab6-43cf-9921-4965ec126be8",
-    "m_MeshPath": "/Meshes/Cube.obj",
+    "m_MeshPath": "/Meshes/Quad.obj",
     "m_StreamType": "AlwaysLoaded"
 }
