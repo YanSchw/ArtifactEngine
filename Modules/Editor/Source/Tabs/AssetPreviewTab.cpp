@@ -20,7 +20,7 @@
 #include "UI/EditorStyle.h"
 
 static const UUID s_DefaultMesh = UUID::FromString("c6308770-3a5b-4b2b-9cec-14ba803ff817");
-static const UUID s_DefaultMaterial = UUID::FromString("b7ab1cea-e97a-4293-8989-31067da658cb");
+static const UUID s_DefaultShaderGraph = UUID::FromString("d351ca39-9ab6-43cf-9921-4965ec126be8");
 static const Vec4 s_ClearColor = HexColor(0x141417);
 
 struct PreviewSceneData {
@@ -76,7 +76,7 @@ Material* AssetPreviewTab::ResolveMaterial() const {
     }
     Mesh* mesh = ResolveMesh();
     Material* material = mesh ? mesh->GetMaterial() : nullptr;
-    return material ? material : AssetManager::Get().GetAsset<Material>(s_DefaultMaterial);
+    return material ? material : AssetManager::Get().GetAsset<Material>(s_DefaultShaderGraph);
 }
 
 Mesh* AssetPreviewTab::ResolveMesh() const {
