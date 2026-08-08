@@ -32,5 +32,5 @@ public:
 private:
     static bool CompileForKey(const String& InKey, ShaderAPI InAPI, CompiledShader& OutCompiled, String& OutError);
     static bool LoadCookedLibrary();
-    static Array<String> DiscoverShaderKeys();
+    static Array<String> DiscoverCookableShaderKeys();
 };

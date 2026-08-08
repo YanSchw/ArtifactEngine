@@ -8,12 +8,13 @@ from BuildTool.Target import TargetType, get_cpp_target_macro
 from BuildTool.Module import ArtifactModule
 from SDK.Util import smart_open
 
-def discover_modules(engine_path: str, project_path: str, target_platform: str):
+def discover_modules(engine_path: str, project_path: str, target_platform: str, is_packaged: bool = False):
     """Every module the build should include, resolved across the engine and the project.
 
     Returns a list of (name, module_dir, ArtifactModule, owning_root). Engine modules come
-    first; a project module with the same name as an engine one is not overridden (engine-first). 
-    `owning_root` is the engine or project directory the module lives under."""
+    first; a project module with the same name as an engine one is not overridden (engine-first).
+    `owning_root` is the engine or project directory the module lives under. A packaged build
+    leaves out the modules marked IsNonPackageOnly."""
     engine_path = engine_path.replace("\\", "/").rstrip("/")
     project_path = project_path.replace("\\", "/").rstrip("/")
     same_repo = os.path.normcase(os.path.normpath(engine_path)) == os.path.normcase(os.path.normpath(project_path))
@@ -33,6 +34,8 @@ def discover_modules(engine_path: str, project_path: str, target_platform: str):
             module = ArtifactModule.load_from_json(module_dir)
             if not module.supports_platform(target_platform):
                 continue
+            if is_packaged and module.IsNonPackageOnly:
+                continue
             seen.add(name)
             modules.append((name, module_dir, module, owning_root))
 
@@ -42,15 +45,18 @@ def discover_modules(engine_path: str, project_path: str, target_platform: str):
 
     return modules
 
-def get_content_mounts(engine_path: str, project_path: str, target_platform: str) -> list[tuple[str, str]]:
+def get_content_mounts(engine_path: str, project_path: str, target_platform: str) -> list[tuple[str, str, bool]]:
     """Content directories to mount by key: EngineContent, ProjectContent, and one per module that
-    declares a MountContentDir in its Module.json (keyed by module name)."""
+    declares a MountContentDir in its Module.json (keyed by module name).
+
+    Returns (key, directory, packaged) triples
+    """
     engine_path = engine_path.replace("\\", "/").rstrip("/")
     project_path = project_path.replace("\\", "/").rstrip("/")
-    mounts = [("EngineContent", f"{engine_path}/Content"), ("ProjectContent", f"{project_path}/Content")]
+    mounts = [("EngineContent", f"{engine_path}/Content", True), ("ProjectContent", f"{project_path}/Content", True)]
     for module_name, module_dir, module, _ in discover_modules(engine_path, project_path, target_platform):
         if module.MountContentDir:
-            mounts.append((module_name, f"{module_dir}/{module.MountContentDir}"))
+            mounts.append((module_name, f"{module_dir}/{module.MountContentDir}", not module.IsNonPackageOnly))
     return mounts
 
 def expand_indirect_module_dependencies(module_dirs: dict[str, str], import_modules: list[str]) -> set[str]:
@@ -83,7 +89,7 @@ def generate_cmake(project_path: str, args):
     project_path = project_path.replace("\\", "/").rstrip("/")
 
     engine_path = get_engine_path().replace("\\", "/").rstrip("/")
-    modules = discover_modules(engine_path, project_path, target_platform)
+    modules = discover_modules(engine_path, project_path, target_platform, is_packaged)
     module_dirs = {name: module_dir for name, module_dir, _, _ in modules}
 
     global_definitions = [get_cpp_platform_macro(get_current_platform()), get_cpp_target_macro(target_configuration)]
@@ -188,11 +194,11 @@ endif()
     # Content directories are mounted by key at runtime (non-packaged).
     content_mounts = get_content_mounts(engine_path, project_path, target_platform)
 
-    __MountContent = "#include <vector>\n#include <string>\n#include <utility>\n\n#if !defined(AE_PACKAGED)\n\n"
-    __MountContent += "void __MountContentDirs(std::vector<std::pair<std::string, std::string>>& mounts) {\n"
-    for key, directory in content_mounts:
+    __MountContent = "#include <vector>\n#include <string>\n#include <tuple>\n\n#if !defined(AE_PACKAGED)\n\n"
+    __MountContent += "void __MountContentDirs(std::vector<std::tuple<std::string, std::string, bool>>& mounts) {\n"
+    for key, directory, packaged in content_mounts:
         escaped = directory.replace("\\", "\\\\")
-        __MountContent += f'    mounts.push_back({{"{key}", "{escaped}"}});\n'
+        __MountContent += f'    mounts.push_back({{"{key}", "{escaped}", {"true" if packaged else "false"}}});\n'
     __MountContent += "}\n#endif\n"
 
     os.makedirs(f"{project_path}/Build/Intermediate/Modules", exist_ok=True)

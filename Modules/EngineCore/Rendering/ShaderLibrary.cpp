@@ -225,10 +225,10 @@ bool ShaderLibrary::CompileForKey(const String& InKey, ShaderAPI InAPI, Compiled
     return compiler->Compile(source, OutCompiled, OutError);
 }
 
-Array<String> ShaderLibrary::DiscoverShaderKeys() {
+Array<String> ShaderLibrary::DiscoverCookableShaderKeys() {
     Array<String> keys;
 
-    for (const String& mountDir : EngineConfig::GetContentMountDirs()) {
+    for (const String& mountDir : EngineConfig::GetPackagedContentMountDirs()) {
         const std::filesystem::path mountPath(mountDir);
         for (const String& file : FileIO::ListFilesInDirectory(mountDir, true)) {
             const std::filesystem::path filePath(file);
@@ -269,7 +269,7 @@ bool ShaderLibrary::Cook(const String& InOutputDirectory, PlatformType InTargetP
         return false;
     }
 
-    const Array<String> keys = DiscoverShaderKeys();
+    const Array<String> keys = DiscoverCookableShaderKeys();
     bool succeeded = true;
 
     ChunkWriter headerChunk;
@@ -285,7 +285,7 @@ bool ShaderLibrary::Cook(const String& InOutputDirectory, PlatformType InTargetP
 
         for (int32_t i = 0; i < keys.Size(); i++) {
             const String& key = keys[i];
-            AE_INFO("Cooking shader {0}/{1}: {2}", i + 1, keys.Size(), key);
+            AE_INFO("[{0}/{1}] Cooking shader: {2}", apiIndex * keys.Size() + i + 1, apis.Size() * keys.Size(), key);
 
             CompiledShader compiled;
             String error;

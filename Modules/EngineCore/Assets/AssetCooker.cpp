@@ -14,7 +14,7 @@ void AssetCookerEngine::Initialize() {
     (new AssetManager())->Initialize(false);
 
     String cookDir = EngineConfig::GetConfigVar<String>("CookDirectory");
-    AE_ASSERT(!cookDir.empty(), "CookedContentDir config variable is not set!");
+    AE_ASSERT(!cookDir.empty(), "CookDirectory config variable is not set!");
 
     PlatformType targetPlatform = Platform::CurrentPlatform();
     const String targetPlatformName = EngineConfig::GetConfigVar<String>("CookPlatform");
@@ -22,9 +22,19 @@ void AssetCookerEngine::Initialize() {
         targetPlatform = EPlatformType::ConvertStringToEnum(targetPlatformName);
     }
 
-    for (Asset* asset : AssetManager::Get().GetAssetsOfClass(ShaderGraph::StaticClass())) {
-        if (!Cast<ShaderGraph>(asset)->RegisterGeneratedSource()) {
-            std::exit(1);
+    Array<Asset*> assets;
+    for (Asset* asset : AssetManager::Get().GetAllAssets()) {
+        if (EngineConfig::IsPackagedContentPath(AssetManager::Get().GetAssetPath(asset->GetId()))) {
+            assets.Add(asset);
+        }
+    }
+
+    for (Asset* asset : assets) {
+        if (ShaderGraph* graph = Cast<ShaderGraph>(asset)) {
+            if (!graph->RegisterGeneratedSource()) {
+                AE_ERROR("Shader graph cooking failed");
+                std::exit(1);
+            }
         }
     }
 
@@ -37,7 +47,6 @@ void AssetCookerEngine::Initialize() {
     ChunkWriter assetIndexBinaryChunk1;
     ChunkedBinary assetIndexBinary;
 
-    Array<Asset*> assets = AssetManager::Get().GetAllAssets();
     uint32_t counter = 0;
     for (Asset* asset : assets) {
         AE_INFO("[{0}/{1}] Cooking asset: {2}", ++counter, assets.Size(), asset->GetId().ToString());

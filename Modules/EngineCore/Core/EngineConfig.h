@@ -20,13 +20,15 @@ public:
     static Class EngineClass();
     static Class RenderPipelineClass();
 
-    static void MountContent(const String& InKey, const String& InDir);
+    static void MountContent(const String& InKey, const String& InDir, bool InPackaged = true);
     static String GetEngineContentDir();
     static String GetProjectContentDir();
     static String GetContentDir(const String& InKey);
     static String ResolveContentPath(const String& InRelativePath);
     static Array<String> GetContentMountDirs();
+    static Array<String> GetPackagedContentMountDirs();
     static Array<String> GetContentMountKeys();
+    static bool IsPackagedContentPath(const String& InPath);
 
 private:
     static void Initialize(const Array<String>& InArgs);
@@ -35,6 +37,7 @@ private:
 
     inline static Map<String, String> s_ContentMounts;
     inline static Array<String> s_ContentMountKeys; // registration order, for deterministic search
+    inline static Array<String> s_NonPackagedMountKeys;
 
     friend int ArtifactMain(const Array<String>& InArgs);
 };

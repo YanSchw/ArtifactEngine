@@ -21,6 +21,7 @@ class ArtifactModule:
         AddAdditionalCMakeProjects: Optional[List[str]] = None,
         LinkLibraries: Optional[List[str]] = None,
         MountContentDir: Optional[str] = None,
+        IsNonPackageOnly: bool = False,
     ):
         """
         Initialize an ArtifactModule with metadata.
@@ -36,6 +37,7 @@ class ArtifactModule:
             AddAdditionalCMakeProjects: Additional CMake projects to include
             LinkLibraries: System link libraries/flags passed straight to the linker
             MountContentDir: Module-local content directory to mount at runtime (relative to the module)
+            IsNonPackageOnly: Strip the module (and its content) from packaged builds
         """
         self.name = name
         self.path = path
@@ -47,6 +49,7 @@ class ArtifactModule:
         self.AddAdditionalCMakeProjects = AddAdditionalCMakeProjects if AddAdditionalCMakeProjects is not None else []
         self.LinkLibraries = LinkLibraries if LinkLibraries is not None else []
         self.MountContentDir = MountContentDir
+        self.IsNonPackageOnly = IsNonPackageOnly
 
     @classmethod
     def load_from_json(cls, module_path: str) -> "ArtifactModule":
@@ -85,6 +88,7 @@ class ArtifactModule:
             AddAdditionalCMakeProjects=data.get("AddAdditionalCMakeProjects", None),
             LinkLibraries=data.get("LinkLibraries", None),
             MountContentDir=data.get("MountContentDir", None),
+            IsNonPackageOnly=data.get("IsNonPackageOnly", False),
         )
 
     def supports_platform(self, platform: str) -> bool:
@@ -106,6 +110,7 @@ class ArtifactModule:
             "AddAdditionalCMakeProjects": self.AddAdditionalCMakeProjects,
             "LinkLibraries": self.LinkLibraries,
             "MountContentDir": self.MountContentDir,
+            "IsNonPackageOnly": self.IsNonPackageOnly or None,
         }
     
     def write_to_json(self):

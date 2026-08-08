@@ -2,7 +2,7 @@
 
 #include <filesystem>
 #include <vector>
-#include <utility>
+#include <tuple>
 #include "Log.h"
 #include "Object/Pointer.h"
 #include "Common/ConfigVar.h"
@@ -63,21 +63,24 @@ bool EngineConfig::SetConfigVar(const String& InName, const String& InValue) {
 void EngineConfig::ResolvePaths() {
 #if !defined(AE_PACKAGED)
     // In non-package builds mount the Content dirs
-    std::vector<std::pair<std::string, std::string>> mounts;
-    extern void __MountContentDirs(std::vector<std::pair<std::string, std::string>>& outMounts);
+    std::vector<std::tuple<std::string, std::string, bool>> mounts;
+    extern void __MountContentDirs(std::vector<std::tuple<std::string, std::string, bool>>& outMounts);
     __MountContentDirs(mounts);
-    for (const auto& [key, dir] : mounts) {
-        MountContent(String(key), String(dir));
+    for (const auto& [key, dir, packaged] : mounts) {
+        MountContent(String(key), String(dir), packaged);
     }
 #endif
 }
 
-void EngineConfig::MountContent(const String& InKey, const String& InDir) {
+void EngineConfig::MountContent(const String& InKey, const String& InDir, bool InPackaged) {
     AE_INFO("Mounted content '{0}' -> {1}", InKey, InDir);
     if (!s_ContentMounts.ContainsKey(InKey)) {
         s_ContentMountKeys.Add(InKey);
     }
     s_ContentMounts[InKey] = InDir;
+    if (!InPackaged && !s_NonPackagedMountKeys.Contains(InKey)) {
+        s_NonPackagedMountKeys.Add(InKey);
+    }
 }
 
 String EngineConfig::GetEngineContentDir() {
@@ -119,8 +122,27 @@ Array<String> EngineConfig::GetContentMountDirs() {
     return dirs;
 }
 
+Array<String> EngineConfig::GetPackagedContentMountDirs() {
+    Array<String> dirs = GetContentMountDirs();
+    for (const String& key : s_NonPackagedMountKeys) {
+        dirs.Remove(s_ContentMounts[key]);
+    }
+    return dirs;
+}
+
 Array<String> EngineConfig::GetContentMountKeys() {
     return s_ContentMountKeys;
+}
+
+bool EngineConfig::IsPackagedContentPath(const String& InPath) {
+    const String path = std::filesystem::path(InPath).generic_string();
+    for (const String& key : s_NonPackagedMountKeys) {
+        const String prefix = std::filesystem::path(s_ContentMounts[key]).generic_string() + "/";
+        if (path.compare(0, prefix.size(), prefix) == 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 String EngineConfig::ResolveContentPath(const String& InRelativePath) {

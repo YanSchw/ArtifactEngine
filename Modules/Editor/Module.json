@@ -10,5 +10,6 @@
         "GLFW_Surfaces",
         "UserInterface"
     ],
-    "MountContentDir": "Content"
+    "MountContentDir": "Content",
+    "IsNonPackageOnly": true
 }
