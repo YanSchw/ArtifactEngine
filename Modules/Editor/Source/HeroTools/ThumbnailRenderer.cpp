@@ -9,6 +9,7 @@
 #include "GameFramework/World.h"
 #include "GameFramework/StaticMeshNode.h"
 #include "GameFramework/CameraNode.h"
+#include "GameFramework/DirectionalLightNode.h"
 
 static constexpr uint32_t s_ThumbnailSize = 128;
 static constexpr int32_t s_MaxCache = 128;
@@ -77,6 +78,10 @@ void ThumbnailRenderer::RenderEntry(const UUID& InId, Entry& InEntry) {
         camera->SetPosition(direction * 3.4f);
         camera->SetLookDirection(-direction);
         scene->SetMainCamera(camera);
+
+        DirectionalLightNode* light = scene->Spawn<DirectionalLightNode>();
+        light->SetCastShadows(false);
+        light->SetLookDirection(glm::normalize(Vec3(-0.6f, -0.9f, -1.0f)));
 
         InEntry.Scene = scene;
     }

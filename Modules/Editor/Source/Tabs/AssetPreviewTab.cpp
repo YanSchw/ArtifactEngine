@@ -14,6 +14,8 @@
 #include "Rendering/Texture.h"
 #include "Rendering/Shader.h"
 #include "Rendering/ShaderData.h"
+#include "Rendering/SceneUniforms.h"
+#include "Rendering/ShaderTemplate.h"
 #include "Rendering/VertexBuffer.h"
 #include "GameFramework/UIImage.h"
 #include "UI/EditorIcons.h"
@@ -23,11 +25,7 @@ static const UUID s_DefaultMesh = UUID::FromString("c6308770-3a5b-4b2b-9cec-14ba
 static const UUID s_DefaultShaderGraph = UUID::FromString("d351ca39-9ab6-43cf-9921-4965ec126be8");
 static const Vec4 s_ClearColor = HexColor(0x141417);
 
-struct PreviewSceneData {
-    Mat4 ViewProjection = Mat4(1.0f);
-    float Time = 0.0f;
-    float Padding[3] = { 0.0f, 0.0f, 0.0f };
-};
+static const Vec3 s_KeyLightDirection = glm::normalize(Vec3(0.45f, -0.8f, 0.4f));
 
 struct PreviewPushData {
     Mat4 WorldTransform = Mat4(1.0f);
@@ -47,7 +45,8 @@ AssetPreviewTab::AssetPreviewTab() {
     samplerDesc.MagFilter = FilterMode::Linear;
     m_Sampler = Sampler::Create(samplerDesc);
 
-    m_SceneBuffer = UniformBuffer::Create(0, sizeof(PreviewSceneData));
+    m_SceneBuffer = UniformBuffer::Create(0, sizeof(SceneUniformData));
+    m_ShadowMap.Create();
 }
 
 VectorImage* AssetPreviewTab::GetTabIcon() const {
@@ -147,6 +146,7 @@ void AssetPreviewTab::EnsurePipeline() {
     // previous one until every texture has streamed in.
     Array<void*> resources = { shader, material->GetPropertyBuffer() };
     PipelineDesc desc;
+    desc.ImageBindings.Add({ ShaderTemplate::ShadowMapBinding, m_ShadowMap.GetView(), m_ShadowMap.GetSampler() });
     for (const MaterialTextureBinding& binding : material->GetTextureBindings()) {
         AssetManager::Get().LoadAsset(binding.Texture);
         Texture* texture = binding.Texture ? binding.Texture->GetTexture() : nullptr;
@@ -186,9 +186,12 @@ void AssetPreviewTab::UpdateSceneBuffer(float InDeltaTime, const Mesh& InMesh) {
     projection[1][1] *= -1.0f;
     const Mat4 view = glm::lookAtLH(Vec3(0.0f, radius * 0.9f, -radius * 3.2f), Vec3(0.0f), VecUtils::Up);
 
-    PreviewSceneData data;
+    SceneUniformData data;
     data.ViewProjection = projection * view;
     data.Time = m_Time;
+    data.SunDirection = Vec4(s_KeyLightDirection, 0.0f);
+    data.SunColor = Vec4(1.15f, 1.13f, 1.06f, 0.0f);
+    data.AmbientColor = Vec4(0.16f, 0.19f, 0.23f, 0.0f);
 
     void* mapped = m_SceneBuffer->MapData(sizeof(data), 0);
     memcpy(mapped, &data, sizeof(data));
@@ -216,6 +219,8 @@ void AssetPreviewTab::OnUIUpdate(const UIFrameContext& InContext) {
     if (!m_Pipeline || !vertexBuffer) {
         return;
     }
+
+    m_ShadowMap.Clear();
 
     UpdateSceneBuffer((float)InContext.DeltaTime, *mesh);
 

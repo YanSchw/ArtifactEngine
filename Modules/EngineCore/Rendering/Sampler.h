@@ -15,6 +15,14 @@ enum class AddressMode {
     Mirror
 };
 
+enum class CompareOp {
+    None,
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual
+};
+
 struct SamplerDesc {
     FilterMode MinFilter = FilterMode::Linear;
     FilterMode MagFilter = FilterMode::Linear;
@@ -22,6 +30,8 @@ struct SamplerDesc {
     AddressMode AddressU = AddressMode::Repeat;
     AddressMode AddressV = AddressMode::Repeat;
     AddressMode AddressW = AddressMode::Repeat;
+
+    CompareOp Compare = CompareOp::None;
 };
 
 class Sampler : public Object {

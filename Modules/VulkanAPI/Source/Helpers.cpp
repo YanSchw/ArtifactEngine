@@ -42,6 +42,15 @@ static ImageTransitionInfo GetTransitionInfo(
         info.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         info.dstAccess = VK_ACCESS_SHADER_READ_BIT;
     }
+    else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        info.srcStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        info.srcAccess = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        info.dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        info.dstAccess = VK_ACCESS_SHADER_READ_BIT;
+    }
     else if (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR &&
              newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
     {
@@ -62,7 +71,7 @@ static ImageTransitionInfo GetTransitionInfo(
     return info;
 }
 
-void VulkanHelpers::TransitionImage(VkCommandBuffer InCmd, VkImage InImage, VkImageLayout InOldLayout, VkImageLayout InNewLayout, VkImageAspectFlags InAspectMask) {
+void VulkanHelpers::TransitionImage(VkCommandBuffer InCmd, VkImage InImage, VkImageLayout InOldLayout, VkImageLayout InNewLayout, VkImageAspectFlags InAspectMask, uint32_t InBaseLayer, uint32_t InLayerCount) {
     if (InOldLayout == InNewLayout)
         return; // no-op
 
@@ -82,7 +91,7 @@ void VulkanHelpers::TransitionImage(VkCommandBuffer InCmd, VkImage InImage, VkIm
     barrier.subresourceRange = {
         InAspectMask,
         0, 1,
-        0, 1
+        InBaseLayer, InLayerCount
     };
 
     barrier.srcAccessMask = t.srcAccess;

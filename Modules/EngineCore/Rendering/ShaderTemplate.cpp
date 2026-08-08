@@ -2,6 +2,7 @@
 
 #include "Core/EngineConfig.h"
 #include "Platform/FileIO.h"
+#include "SceneUniforms.h"
 
 #include <cctype>
 #include <format>
@@ -121,15 +122,27 @@ Vec4 ParseDefaultValue(const String& InText, ShaderValueType InType) {
     return value;
 }
 
-const char* s_SceneBlock =
-    "layout(binding = 0, std140) uniform SceneBlock {\n"
-    "    mat4 u_ViewProjection;\n"
-    "    float u_Time;\n"
-    "};\n"
-    "layout(push_constant) uniform ShaderDataBlock {\n"
-    "    mat4 WorldTransform;\n"
-    "    uint NodeId;\n"
-    "} u_ShaderData;\n";
+String GetSceneBlock() {
+    return std::format(
+        "layout(binding = 0, std140) uniform SceneBlock {{\n"
+        "    mat4 u_ViewProjection;\n"
+        "    mat4 u_ShadowMatrices[{0}];\n"
+        "    vec4 u_SunDirection;\n"
+        "    vec4 u_SunColor;\n"
+        "    vec4 u_AmbientColor;\n"
+        "    vec4 u_CascadeTexelSizes;\n"
+        "    vec4 u_ShadowParams;\n"
+        "    vec4 u_PointLightPositions[{1}];\n"
+        "    vec4 u_PointLightColors[{1}];\n"
+        "    float u_PointLightCount;\n"
+        "    float u_Time;\n"
+        "}};\n"
+        "layout(push_constant) uniform ShaderDataBlock {{\n"
+        "    mat4 WorldTransform;\n"
+        "    uint NodeId;\n"
+        "}} u_ShaderData;\n",
+        SceneUniformData::ShadowCascadeCount, SceneUniformData::MaxPointLights);
+}
 
 } // namespace
 
@@ -139,17 +152,21 @@ String ShaderTemplate::GetStageDeclarations(ShaderStage InStage) {
             "layout(location = 0) in vec3 a_Position;\n"
             "layout(location = 1) in vec3 a_Color;\n"
             "layout(location = 2) in vec2 a_UV;\n"
+            "layout(location = 3) in vec3 a_Normal;\n"
             "layout(location = 1) out vec4 v_Color;\n"
             "layout(location = 2) out vec2 v_UV;\n"
-            "layout(location = 3) out vec3 v_WorldPosition;\n") + s_SceneBlock;
+            "layout(location = 3) out vec3 v_WorldPosition;\n"
+            "layout(location = 4) out vec3 v_Normal;\n") + GetSceneBlock();
     }
 
     return String(
         "layout(location = 1) in vec4 v_Color;\n"
         "layout(location = 2) in vec2 v_UV;\n"
         "layout(location = 3) in vec3 v_WorldPosition;\n"
+        "layout(location = 4) in vec3 v_Normal;\n"
         "layout(location = 0) out vec4 outColor;\n"
-        "layout(location = 1) out vec4 outNodeId;\n") + s_SceneBlock;
+        "layout(location = 1) out vec4 outNodeId;\n") + GetSceneBlock() +
+        std::format("layout(binding = {0}) uniform sampler2DArrayShadow u_ShadowMap;\n", ShadowMapBinding);
 }
 
 String ShaderTemplate::GetStageAliases(ShaderStage InStage) {
@@ -157,12 +174,14 @@ String ShaderTemplate::GetStageAliases(ShaderStage InStage) {
         return "#define sg_UV a_UV\n"
                "#define sg_VertexColor vec4(a_Color, 1.0)\n"
                "#define sg_WorldPosition (u_ShaderData.WorldTransform * vec4(a_Position, 1.0)).xyz\n"
+               "#define sg_Normal normalize(mat3(u_ShaderData.WorldTransform) * a_Normal)\n"
                "#define sg_Time u_Time\n";
     }
 
     return "#define sg_UV v_UV\n"
            "#define sg_VertexColor v_Color\n"
            "#define sg_WorldPosition v_WorldPosition\n"
+           "#define sg_Normal normalize(v_Normal)\n"
            "#define sg_Time u_Time\n";
 }
 

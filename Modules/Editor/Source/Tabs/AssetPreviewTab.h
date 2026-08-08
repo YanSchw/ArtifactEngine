@@ -1,6 +1,7 @@
 #pragma once
 #include "MinorTab.h"
 #include "Object/Pointer.h"
+#include "GameFramework/DirectionalLightNode.h"
 #include "AssetPreviewTab.gen.h"
 
 class Material;
@@ -49,6 +50,7 @@ private:
     SharedObjectPtr<RenderTargetTexture> m_Texture;
     SharedObjectPtr<Sampler> m_Sampler;
     SharedObjectPtr<class ShaderData> m_ShaderData;
+    ShadowMapPlaceholder m_ShadowMap;
     Array<void*> m_PipelineResources;
     UIImage* m_Image = nullptr;
 

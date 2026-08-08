@@ -22,8 +22,12 @@ bool Mesh::ImportSource(Array<Vertex>& OutVertices, Array<uint32_t>& OutIndices)
         return false;
     }
 
+    // A non-uniform import scale skews the surface, so normals follow the inverse scale.
+    const Vec3 normalScale = 1.0f / glm::max(glm::abs(m_ImportScale), Vec3(1e-4f));
     for (Vertex& vertex : OutVertices) {
         vertex.Position = vertex.Position * m_ImportScale + m_ImportOffset;
+        const Vec3 normal = vertex.Normal * normalScale;
+        vertex.Normal = glm::dot(normal, normal) > 0.0f ? glm::normalize(normal) : VecUtils::Up;
     }
     return true;
 }

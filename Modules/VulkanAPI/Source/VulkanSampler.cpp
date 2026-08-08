@@ -20,6 +20,16 @@ VkSamplerAddressMode AddressModeToVkAddressMode(AddressMode mode) {
     }
 }
 
+VkCompareOp CompareOpToVkCompareOp(CompareOp op) {
+    switch (op) {
+        case CompareOp::Less: return VK_COMPARE_OP_LESS;
+        case CompareOp::LessOrEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case CompareOp::Greater: return VK_COMPARE_OP_GREATER;
+        case CompareOp::GreaterOrEqual: return VK_COMPARE_OP_GREATER_OR_EQUAL;
+        default: return VK_COMPARE_OP_ALWAYS;
+    }
+}
+
 VulkanSampler::VulkanSampler(const SamplerDesc& InSamplerDesc, VulkanAPI& InVulkanAPI) {
     s_Samplers.Add(this);
     m_VulkanAPI = &InVulkanAPI;
@@ -36,8 +46,8 @@ VulkanSampler::VulkanSampler(const SamplerDesc& InSamplerDesc, VulkanAPI& InVulk
     samplerInfo.maxAnisotropy = 1.0f;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.compareEnable = InSamplerDesc.Compare != CompareOp::None ? VK_TRUE : VK_FALSE;
+    samplerInfo.compareOp = CompareOpToVkCompareOp(InSamplerDesc.Compare);
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = 0.0f;

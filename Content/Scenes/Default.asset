@@ -18,16 +18,8 @@
                 }
             },
             {
-                "Class": "Node3D",
-                "Name": "Directional Light",
-                "Overrides": {
-                    "m_LocalRotation": {
-                        "W": 0.9238795042037964,
-                        "X": 0.3826833963394165,
-                        "Y": 0.0,
-                        "Z": 0.0
-                    }
-                }
+                "Class": "DirectionalLightNode",
+                "Name": "Directional Light"
             },
             {
                 "Class": "Node3D",

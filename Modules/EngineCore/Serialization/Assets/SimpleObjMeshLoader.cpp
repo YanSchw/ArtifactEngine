@@ -10,19 +10,44 @@ namespace {
 struct ObjVertexKey {
     int PositionIndex = -1;
     int TexCoordIndex = -1;
+    int NormalIndex = -1;
 
     bool operator==(const ObjVertexKey& Other) const {
         return PositionIndex == Other.PositionIndex &&
-               TexCoordIndex == Other.TexCoordIndex;
+               TexCoordIndex == Other.TexCoordIndex &&
+               NormalIndex == Other.NormalIndex;
     }
 };
 
 struct ObjVertexKeyHasher {
     size_t operator()(const ObjVertexKey& Key) const {
         return std::hash<int>()(Key.PositionIndex) ^
-               (std::hash<int>()(Key.TexCoordIndex) << 1);
+               (std::hash<int>()(Key.TexCoordIndex) << 1) ^
+               (std::hash<int>()(Key.NormalIndex) << 2);
     }
 };
+
+// Area-weighted face normals, for sources that carry none.
+static void GenerateNormals(Array<Vertex>& OutVertices, const Array<uint32_t>& InIndices) {
+    for (Vertex& vertex : OutVertices) {
+        vertex.Normal = Vec3(0.0f);
+    }
+
+    for (int32_t i = 0; i + 2 < InIndices.Size(); i += 3) {
+        Vertex& a = OutVertices[InIndices[i]];
+        Vertex& b = OutVertices[InIndices[i + 1]];
+        Vertex& c = OutVertices[InIndices[i + 2]];
+
+        const Vec3 faceNormal = glm::cross(b.Position - a.Position, c.Position - a.Position);
+        a.Normal += faceNormal;
+        b.Normal += faceNormal;
+        c.Normal += faceNormal;
+    }
+
+    for (Vertex& vertex : OutVertices) {
+        vertex.Normal = glm::length(vertex.Normal) > 0.0f ? glm::normalize(vertex.Normal) : VecUtils::Up;
+    }
+}
 
 static int ResolveObjIndex(int Index, int Count) {
     if (Index > 0) {
@@ -147,6 +172,7 @@ bool SimpleObjMeshLoader::LoadMeshFromFile(const String& InFilePath, Array<Verte
                 ObjVertexKey Key;
                 Key.PositionIndex = PositionIndex;
                 Key.TexCoordIndex = TexCoordIndex;
+                Key.NormalIndex = NormalIndex;
 
                 auto ExistingVertex = VertexMap.find(Key);
 
@@ -163,6 +189,10 @@ bool SimpleObjMeshLoader::LoadMeshFromFile(const String& InFilePath, Array<Verte
                     VertexData.TexCoord = TexCoords[TexCoordIndex];
                 } else {
                     VertexData.TexCoord = Vec2(0.0f, 0.0f);
+                }
+
+                if (NormalIndex >= 0 && NormalIndex < static_cast<int>(Normals.Size())) {
+                    VertexData.Normal = Normals[NormalIndex];
                 }
 
                 uint32_t NewVertexIndex = static_cast<uint32_t>(OutVertices.Size());
@@ -182,6 +212,10 @@ bool SimpleObjMeshLoader::LoadMeshFromFile(const String& InFilePath, Array<Verte
                 OutIndices.Add(FaceIndices[i + 1]);
             }
         }
+    }
+
+    if (Normals.IsEmpty()) {
+        GenerateNormals(OutVertices, OutIndices);
     }
 
     return !OutVertices.IsEmpty() && !OutIndices.IsEmpty();

@@ -29,6 +29,9 @@ public:
     Material* GetMaterial() const;
     void SetMaterialOverride(Material* InMaterial);
 
+    bool GetCastShadow() const { return m_CastShadow; }
+    void SetCastShadow(bool InCastShadow) { m_CastShadow = InCastShadow; }
+
 private:
     SharedObjectPtr<ShaderData> m_PerMeshShaderData;
 

@@ -26,6 +26,7 @@ public:
     static constexpr const char* Directive = "#shadergraph";
     static constexpr uint32_t MaterialTextureBase = 17;
     static constexpr uint32_t MaterialUniformBinding = 1;
+    static constexpr uint32_t ShadowMapBinding = 2;
 
     static bool IsTemplateSource(const String& InSource);
     static Array<ShaderTemplateInfo> FindAll();

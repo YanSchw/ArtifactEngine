@@ -15,32 +15,66 @@
 #include "Rendering/Pipeline.h"
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
+#include "Rendering/SceneUniforms.h"
 #include "Rendering/ShaderData.h"
+#include "Rendering/ShaderTemplate.h"
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
+#include "GameFramework/PointLightNode.h"
 #include "GameFramework/StaticMeshNode.h"
 
-/** Mirrors the SceneBlock every shader graph template declares. */
-struct SceneUniformData {
-    Mat4 ViewProjection = Mat4(1.0f);
-    float Time = 0.0f;
-    float Padding[3] = { 0.0f, 0.0f, 0.0f };
-};
-
-void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, const RenderParams& InParams) {
-    m_Time += (float)InDeltaTime;
-
-    CameraNode* camera = InParams.CameraOverride;
-    if (!camera && InParams.m_World) {
-        camera = InParams.m_World->GetMainCamera();
+CameraNode* ArtifactRenderPipeline::ResolveCamera(const RenderParams& InParams) const {
+    if (InParams.CameraOverride) {
+        return InParams.CameraOverride;
     }
+    return InParams.m_World ? InParams.m_World->GetMainCamera() : nullptr;
+}
+
+DirectionalLightNode* ArtifactRenderPipeline::FindSunLight(const RenderParams& InParams) const {
+    if (!InParams.m_World) {
+        return nullptr;
+    }
+    for (Node* node : InParams.m_World->GetAllNodes()) {
+        DirectionalLightNode* light = node->As<DirectionalLightNode>();
+        if (light && light->IsEnabled()) {
+            return light;
+        }
+    }
+    return nullptr;
+}
+
+void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, CameraNode* InCamera,
+                                               DirectionalLightNode* InSun, const RenderParams& InParams) {
+    m_Time += (float)InDeltaTime;
 
     SceneUniformData data;
     data.Time = m_Time;
-    if (camera) {
-        // A zero height (minimized window) would make this NaN
-        camera->SetAspectRatio(InParams.Width / (float) glm::max(InParams.Height, 1u));
-        data.ViewProjection = camera->GetViewProjectionMatrix();
+    if (InCamera) {
+        data.ViewProjection = InCamera->GetViewProjectionMatrix();
+    }
+
+    if (InSun) {
+        data.SunDirection = Vec4(InSun->GetDirection(), 0.0f);
+        data.SunColor = Vec4(InSun->GetColor() * InSun->GetIntensity(), 0.0f);
+        data.AmbientColor = Vec4(InSun->GetAmbientColor() * InSun->GetAmbientIntensity(), 0.0f);
+        data.CascadeTexelSizes = InSun->GetCascadeTexelSizes();
+        data.ShadowParams = m_ShadowSource.Get() == InSun ? InSun->GetShadowParams() : Vec4(0.0f);
+        for (int32_t cascade = 0; cascade < SceneUniformData::ShadowCascadeCount; cascade++) {
+            data.ShadowMatrices[cascade] = InSun->GetCascadeMatrix(cascade);
+        }
+    }
+
+    if (InParams.m_World) {
+        for (Node* node : InParams.m_World->GetAllNodes()) {
+            PointLightNode* light = node->As<PointLightNode>();
+            if (!light || !light->IsEnabled() || data.PointLightCount >= SceneUniformData::MaxPointLights) {
+                continue;
+            }
+            const int32_t index = (int32_t)data.PointLightCount;
+            data.PointLightPositions[index] = Vec4(light->GetPosition(), light->GetRadius());
+            data.PointLightColors[index] = Vec4(light->GetColor() * light->GetIntensity(), 0.0f);
+            data.PointLightCount += 1.0f;
+        }
     }
 
     void* mapped = m_UniformBuffer->MapData(sizeof(data), 0);
@@ -59,10 +93,15 @@ Pipeline* ArtifactRenderPipeline::ResolvePipeline(Material* InMaterial) {
         return nullptr;
     }
 
+    DirectionalLightNode* sun = m_ShadowSource.Get();
+    ImageView* shadowMap = sun ? sun->GetShadowMapView() : m_ShadowPlaceholder.GetView();
+    Sampler* shadowSampler = sun ? sun->GetShadowSampler() : m_ShadowPlaceholder.GetSampler();
+
     // A pipeline missing a binding its shader declares is a descriptor-set mismatch, so the mesh
     // stays unrendered until every texture has streamed in.
-    Array<void*> resources = { shader, InMaterial->GetPropertyBuffer() };
+    Array<void*> resources = { shader, InMaterial->GetPropertyBuffer(), shadowMap };
     Array<std::tuple<uint32_t, SharedObjectPtr<ImageView>, SharedObjectPtr<Sampler>>> imageBindings;
+    imageBindings.Add({ ShaderTemplate::ShadowMapBinding, shadowMap, shadowSampler });
     for (const MaterialTextureBinding& binding : InMaterial->GetTextureBindings()) {
         AssetManager::Get().LoadAsset(binding.Texture);
         Texture* texture = binding.Texture ? binding.Texture->GetTexture() : nullptr;
@@ -158,6 +197,9 @@ void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
     if (!m_UniformBuffer.Get()) {
         m_UniformBuffer = UniformBuffer::Create(0, sizeof(SceneUniformData));
     }
+    if (!m_ShadowPlaceholder.GetView()) {
+        m_ShadowPlaceholder.Create();
+    }
     m_MaterialPipelines.Clear();
 }
 
@@ -166,7 +208,25 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
         Invalidate(InParams.Width, InParams.Height);
     }
 
-    UpdateUniformData(InDeltaTime, InParams);
+    CameraNode* camera = ResolveCamera(InParams);
+    if (camera) {
+        // A zero height (minimized window) would make this NaN
+        camera->SetAspectRatio(InParams.Width / (float) glm::max(InParams.Height, 1u));
+    }
+
+    DirectionalLightNode* sun = FindSunLight(InParams);
+    const bool shadowsRendered = sun && camera && sun->RenderShadowMaps(*InParams.m_World, *camera);
+    if (!shadowsRendered) {
+        m_ShadowPlaceholder.Clear();
+    }
+
+    DirectionalLightNode* previousShadowSource = m_ShadowSource.Get();
+    m_ShadowSource = shadowsRendered ? sun : nullptr;
+    if (m_ShadowSource.Get() != previousShadowSource) {
+        m_MaterialPipelines.Clear();
+    }
+
+    UpdateUniformData(InDeltaTime, camera, sun, InParams);
 
     // Opening the pass here is what clears the target; a material-less world simply draws nothing into it.
     RenderCommandQueue& renderQueue = RenderingAPI::GetInstance()->GetRenderQueue();

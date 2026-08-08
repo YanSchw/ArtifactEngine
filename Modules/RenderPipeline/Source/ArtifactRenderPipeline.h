@@ -4,6 +4,7 @@
 #include "Object/Pointer.h"
 #include "Common/Map.h"
 #include "Common/UUID.h"
+#include "GameFramework/DirectionalLightNode.h"
 #include "ArtifactRenderPipeline.gen.h"
 
 class Material;
@@ -11,6 +12,7 @@ class Sampler;
 class UniformBuffer;
 class Pipeline;
 class FrameBuffer;
+class CameraNode;
 
 class ArtifactRenderPipeline : public RenderPipeline {
 public:
@@ -36,13 +38,18 @@ private:
         Array<void*> Resources;
     };
 
-    void UpdateUniformData(double InDeltaTime, const RenderParams& InParams);
+    CameraNode* ResolveCamera(const RenderParams& InParams) const;
+    DirectionalLightNode* FindSunLight(const RenderParams& InParams) const;
+    void UpdateUniformData(double InDeltaTime, CameraNode* InCamera, DirectionalLightNode* InSun,
+                           const RenderParams& InParams);
     Pipeline* ResolvePipeline(Material* InMaterial);
 
     SharedObjectPtr<UniformBuffer> m_UniformBuffer;
     SharedObjectPtr<FrameBuffer> m_FrameBuffer;
     SharedObjectPtr<Sampler> m_Sampler;
     Map<UUID, MaterialPipeline> m_MaterialPipelines;
+    ShadowMapPlaceholder m_ShadowPlaceholder;
+    WeakObjectPtr<DirectionalLightNode> m_ShadowSource;
     uint32_t m_Width = 0;
     uint32_t m_Height = 0;
     float m_Time = 0.0f;

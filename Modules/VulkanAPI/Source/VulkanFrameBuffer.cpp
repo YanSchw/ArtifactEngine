@@ -120,31 +120,42 @@ std::vector<VkRenderingAttachmentInfo> VulkanFrameBuffer::GetColorAttachmentInfo
     return attachmentInfos;
 }
 
-static VkImage GetVkImage(const SharedObjectPtr<ImageView>& InAttachment) {
-    return InAttachment->GetDesc().ImagePtr->As<VulkanImage>()->GetVkImage();
+static void TransitionAttachment(VkCommandBuffer InCmdBuffer, const SharedObjectPtr<ImageView>& InAttachment,
+                                 VkImageLayout InOldLayout, VkImageLayout InNewLayout, VkImageAspectFlags InAspect) {
+    const ImageViewDesc& viewDesc = InAttachment->GetDesc();
+    VulkanHelpers::TransitionImage(InCmdBuffer, viewDesc.ImagePtr->As<VulkanImage>()->GetVkImage(),
+        InOldLayout, InNewLayout, InAspect, viewDesc.BaseLayer, viewDesc.LayerCount);
+}
+
+static bool IsDepthSampled(const SharedObjectPtr<ImageView>& InDepthAttachment) {
+    return InDepthAttachment && (InDepthAttachment->GetDesc().ImagePtr->GetDesc().Usage & ImageUsage::Sampled) != ImageUsage::None;
 }
 
 void VulkanFrameBuffer::TransitionToAttachmentLayout(VkCommandBuffer InCmdBuffer) const {
     for (const SharedObjectPtr<ImageView>& colorAttachment : m_Desc.ColorAttachments) {
-        VulkanHelpers::TransitionImage(InCmdBuffer, GetVkImage(colorAttachment),
+        TransitionAttachment(InCmdBuffer, colorAttachment,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
     }
     for (const SharedObjectPtr<ImageView>& colorAttachment : m_MultisampleColorAttachments) {
-        VulkanHelpers::TransitionImage(InCmdBuffer, GetVkImage(colorAttachment),
+        TransitionAttachment(InCmdBuffer, colorAttachment,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
     }
 
     const SharedObjectPtr<ImageView>& depthAttachment = IsMultisampled() ? m_MultisampleDepthAttachment : m_Desc.DepthAttachment;
     if (depthAttachment) {
-        VulkanHelpers::TransitionImage(InCmdBuffer, GetVkImage(depthAttachment),
+        TransitionAttachment(InCmdBuffer, depthAttachment,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
     }
 }
 
 void VulkanFrameBuffer::TransitionToShaderReadLayout(VkCommandBuffer InCmdBuffer) const {
     for (const SharedObjectPtr<ImageView>& colorAttachment : m_Desc.ColorAttachments) {
-        VulkanHelpers::TransitionImage(InCmdBuffer, GetVkImage(colorAttachment),
+        TransitionAttachment(InCmdBuffer, colorAttachment,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
+    if (IsDepthSampled(m_Desc.DepthAttachment)) {
+        TransitionAttachment(InCmdBuffer, m_Desc.DepthAttachment,
+            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
     }
 }
 
@@ -253,7 +264,8 @@ VkRenderingAttachmentInfo VulkanFrameBuffer::GetDepthAttachmentInfo() const {
     attachmentInfo.imageView = m_DepthAttachmentView;
     attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
     attachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachmentInfo.storeOp = IsDepthSampled(m_Desc.DepthAttachment) ? VK_ATTACHMENT_STORE_OP_STORE
+                                                                    : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachmentInfo.clearValue.depthStencil = {1.0f, 0};
 
     return attachmentInfo;

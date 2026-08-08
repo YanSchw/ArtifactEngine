@@ -84,7 +84,6 @@ static VkExtent2D GetPipelineTargetExtent(const PipelineDesc& InDesc) {
 static std::vector<VkFormat> GetPipelineTargetColorFormats(const PipelineDesc& InDesc) {
     if (InDesc.IsFrameBufferTarget()) {
         const auto& attachments = InDesc.Target->As<FrameBuffer>()->GetDesc().ColorAttachments;
-        AE_ASSERT(!attachments.IsEmpty(), "Framebuffer target must include at least one color attachment");
         std::vector<VkFormat> formats;
         for (const auto& attachment : attachments) {
             formats.push_back(VulkanHelpers::ImageFormatToVkFormat(attachment->GetDesc().Format));
