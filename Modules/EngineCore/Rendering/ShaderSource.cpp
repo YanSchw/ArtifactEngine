@@ -170,6 +170,16 @@ bool ShaderSource::ParseStageName(const String& InName, ShaderStage& OutStage) {
     return false;
 }
 
+bool ShaderSource::DeclaresStage(const String& InSource) {
+    for (const String& line : SplitLines(InSource)) {
+        Directive directive;
+        if (ParseDirective(line, directive) && (directive.Name == "type" || directive.Name == "stage")) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const ShaderStageSource* ShaderSource::FindStage(ShaderStage InStage) const {
     for (const ShaderStageSource& stage : m_Stages) {
         if (stage.Stage == InStage) {

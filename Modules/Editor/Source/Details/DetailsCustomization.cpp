@@ -9,6 +9,7 @@
 #include "UI/UIDropdown.h"
 #include "UI/UIAssetSlot.h"
 #include "UI/UICheckbox.h"
+#include "UI/UIColorSwatch.h"
 #include "HeroTools/ThumbnailRenderer.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UIQuad.h"
@@ -133,6 +134,23 @@ static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
             }
         };
     }
+}
+
+static void BuildColorRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                          const String& InTitle, const std::function<void()>& InOnEdited) {
+    UIColorSwatch* swatch = InRow.GetValueHost()->Add<UIColorSwatch>();
+    swatch->Fill();
+    swatch->Title = InTitle;
+    swatch->Get = [InObject, InOffset]() -> Color {
+        char* base = ResolveBase(InObject, InOffset);
+        return base ? *(Color*)base : Color(0.0f);
+    };
+    swatch->Set = [InObject, InOffset, InOnEdited](const Color& InValue) {
+        if (char* base = ResolveBase(InObject, InOffset)) {
+            *(Color*)base = InValue;
+            InOnEdited();
+        }
+    };
 }
 
 static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
@@ -345,6 +363,13 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
     const String label = InLabel.empty() ? PrettyPropertyName(InProperty->Name) : InLabel;
 
     if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
+        if (structProperty->InnerStructTypename == "Color") {
+            DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
+            BindOverride(row, InObject, root->Name);
+            BuildColorRow(row, InObject, offset, label, MakeEditHandler(InObject, root, &InTab));
+            return;
+        }
+
         const Array<Property*> inner = Property::GetTypeProperties(structProperty->InnerStructTypename);
         if (!inner.IsEmpty()) {
             DetailsCategory& category = AddCategory(InParent, InTab, label, InDepth + 1);

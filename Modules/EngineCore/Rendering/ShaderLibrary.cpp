@@ -236,7 +236,8 @@ Array<String> ShaderLibrary::DiscoverCookableShaderKeys() {
                 continue;
             }
 
-            if (ShaderTemplate::IsTemplateSource(FileIO::ReadFileToString(file))) {
+            const String source = FileIO::ReadFileToString(file);
+            if (ShaderTemplate::IsTemplateSource(source) || !ShaderSource::DeclaresStage(source)) {
                 continue;
             }
 

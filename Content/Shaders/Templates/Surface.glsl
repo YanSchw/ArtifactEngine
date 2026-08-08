@@ -23,12 +23,12 @@ void main() {
 #include "/Shaders/Common/Lighting.glsl"
 
 void main() {
-    #property(BaseColor_, "BaseColor", vec4, vec4(0.8, 0.8, 0.8, 1.0))
-    #property(Emissive_, "Emissive", vec3, vec3(0.0))
+    #property(BaseColor_, "BaseColor", Color, vec4(0.8, 0.8, 0.8, 1.0))
+    #property(Emissive_, "Emissive", Color, vec4(0.0, 0.0, 0.0, 1.0))
     #property(Opacity_, "Opacity", float, 1.0)
 
     vec3 shaded = ShadeSurface(BaseColor_.rgb, v_Normal, v_WorldPosition);
-    outColor = vec4(shaded + Emissive_, BaseColor_.a * Opacity_);
+    outColor = vec4(shaded + Emissive_.rgb, BaseColor_.a * Opacity_);
 
     uint id = u_ShaderData.NodeId;
     outNodeId = vec4(float(id & 0xFFu),

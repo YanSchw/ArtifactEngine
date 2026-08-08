@@ -5,6 +5,7 @@
 #include "Tabs/DetailsTab.h"
 #include "Tabs/MajorTab.h"
 #include "UI/UIAssetSlot.h"
+#include "UI/UIColorSwatch.h"
 #include "UI/UIDragNumber.h"
 #include "HeroTools/ThumbnailRenderer.h"
 #include "Assets/ShaderGraph.h"
@@ -103,6 +104,28 @@ void MaterialDetailsCustomization::AddInputRows(UINode& InBody, DetailsTab& InTa
             NotifyEdited(*tab, *current);
         };
         slot->Build();
+        return;
+    }
+
+    if (InInput.IsColor()) {
+        DetailsRow& row = AddRow(InBody, InTab, PrettyPropertyName(name), 1);
+        bindOverride(row);
+
+        UIColorSwatch* swatch = row.GetValueHost()->Add<UIColorSwatch>();
+        swatch->Fill();
+        swatch->Title = PrettyPropertyName(name);
+        swatch->Get = [weak, name]() -> Color {
+            Material* current = weak.Get();
+            return current ? current->GetInputValue(name) : Color(0.0f);
+        };
+        swatch->Set = [weak, name, tab = &InTab](const Color& InValue) {
+            Material* current = weak.Get();
+            if (!current) {
+                return;
+            }
+            current->SetInputValue(name, InValue);
+            NotifyEdited(*tab, *current);
+        };
         return;
     }
 

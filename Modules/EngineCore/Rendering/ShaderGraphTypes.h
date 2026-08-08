@@ -8,7 +8,8 @@ enum class ShaderValueType : uint32_t {
     Vec2,
     Vec3,
     Vec4,
-    Texture2D
+    Texture2D,
+    Color
 };
 
 struct ShaderGraphProperty {
@@ -27,6 +28,7 @@ struct ShaderGraphProperty {
     Vec4 DefaultValue = Vec4(0.0f);
 
     bool IsTexture() const { return Type == ShaderValueType::Texture2D; }
+    bool IsColor() const { return Type == ShaderValueType::Color; }
 };
 
 class ShaderValue {

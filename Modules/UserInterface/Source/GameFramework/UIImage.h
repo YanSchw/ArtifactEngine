@@ -18,7 +18,7 @@ public:
     ARTIFACT_CLASS();
 
     SharedObjectPtr<Texture> Image;
-    Vec4 Tint = Vec4(1.0f);
+    Color Tint = Color(1.0f);
     UIImageFill FillMethod = UIImageFill::None;
     float FillAmount = 1.0f;
     bool FillClockwise = true;

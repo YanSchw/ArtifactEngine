@@ -31,7 +31,7 @@ ARRAY_LAMBDAS = """
 }}
 """
 
-BUILTIN_STRUCTS = ["Vec2", "Vec3", "Vec4", "Quat", "UIValue", "UIVec2", "UIPadding"]
+BUILTIN_STRUCTS = ["Vec2", "Vec3", "Vec4", "Color", "Quat", "UIValue", "UIVec2", "UIPadding"]
 
 def _enum_underlying_byte_size(underlying: str) -> int:
     sizes = {

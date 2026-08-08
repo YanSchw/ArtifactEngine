@@ -56,6 +56,7 @@ struct RegisterMathProperties {
         Property::RegisterTypeProperties("Vec3", { axis("X", 0), axis("Y", 4), axis("Z", 8) });
         Property::RegisterTypeProperties("Vec4", { axis("X", 0), axis("Y", 4), axis("Z", 8), axis("W", 12) });
         Property::RegisterTypeProperties("Quat", { axis("X", 0), axis("Y", 4), axis("Z", 8), axis("W", 12) });
+        Property::RegisterTypeProperties("Color", { axis("R", 0), axis("G", 4), axis("B", 8), axis("A", 12) });
     }
 };
 static RegisterMathProperties s_RegisterMathProperties;

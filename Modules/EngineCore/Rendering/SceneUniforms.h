@@ -13,8 +13,8 @@ struct SceneUniformData {
     /** xyz: the direction the sun light travels in. */
     Vec4 SunDirection = Vec4(0.0f, -1.0f, 0.0f, 0.0f);
     /** rgb: color premultiplied by intensity. */
-    Vec4 SunColor = Vec4(0.0f);
-    Vec4 AmbientColor = Vec4(0.0f);
+    Color SunColor = Color(0.0f);
+    Color AmbientColor = Color(0.0f);
 
     /** World-space size of one shadow texel, per cascade. */
     Vec4 CascadeTexelSizes = Vec4(0.0f);
@@ -24,7 +24,7 @@ struct SceneUniformData {
     /** xyz: world position, w: attenuation radius. */
     Vec4 PointLightPositions[MaxPointLights] = {};
     /** rgb: color premultiplied by intensity. */
-    Vec4 PointLightColors[MaxPointLights] = {};
+    Color PointLightColors[MaxPointLights] = {};
 
     float PointLightCount = 0.0f;
     float Time = 0.0f;

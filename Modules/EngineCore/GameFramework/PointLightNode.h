@@ -7,8 +7,8 @@ class PointLightNode : public Node3D {
 public:
     ARTIFACT_CLASS();
 
-    Vec3 GetColor() const { return m_Color; }
-    void SetColor(const Vec3& InColor) { m_Color = InColor; }
+    Color GetColor() const { return m_Color; }
+    void SetColor(const Color& InColor) { m_Color = InColor; }
 
     float GetIntensity() const { return m_Intensity; }
     void SetIntensity(float InIntensity) { m_Intensity = InIntensity; }
@@ -18,7 +18,7 @@ public:
 
 private:
     PROPERTY()
-    Vec3 m_Color = Vec3(1.0f, 0.85f, 0.7f);
+    Color m_Color = Color(1.0f, 0.85f, 0.7f, 1.0f);
 
     PROPERTY()
     float m_Intensity = 5.0f;

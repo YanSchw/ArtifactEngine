@@ -76,6 +76,7 @@ public:
 
     static String GetStageName(ShaderStage InStage);
     static bool ParseStageName(const String& InName, ShaderStage& OutStage);
+    static bool DeclaresStage(const String& InSource);
 
 private:
     String m_Path;

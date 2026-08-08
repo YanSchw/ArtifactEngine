@@ -10,7 +10,7 @@ public:
     ARTIFACT_CLASS();
 
     WeakObjectPtr<VectorImage> Image;
-    Vec4 Tint = Vec4(1.0f);
+    Color Tint = Color(1.0f);
     bool PreserveAspect = true;
 
     virtual void Paint(UIDrawList& OutDrawList) override;

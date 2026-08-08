@@ -8,6 +8,7 @@ String ShaderValue::GetGlslType(ShaderValueType InType) {
         case ShaderValueType::Vec2:  return "vec2";
         case ShaderValueType::Vec3:  return "vec3";
         case ShaderValueType::Vec4:  return "vec4";
+        case ShaderValueType::Color: return "vec4";
         case ShaderValueType::Texture2D: return "sampler2D";
     }
     return "float";
@@ -18,12 +19,21 @@ bool ShaderValue::ParseGlslType(const String& InText, ShaderValueType& OutType) 
     if (InText == "vec2")  { OutType = ShaderValueType::Vec2; return true; }
     if (InText == "vec3")  { OutType = ShaderValueType::Vec3; return true; }
     if (InText == "vec4")  { OutType = ShaderValueType::Vec4; return true; }
+    if (InText == "Color") { OutType = ShaderValueType::Color; return true; }
     if (InText == "sampler2D" || InText == "Texture2D") { OutType = ShaderValueType::Texture2D; return true; }
     return false;
 }
 
 uint32_t ShaderValue::GetComponentCount(ShaderValueType InType) {
-    return InType == ShaderValueType::Texture2D ? 0 : (uint32_t)InType + 1;
+    switch (InType) {
+        case ShaderValueType::Float: return 1;
+        case ShaderValueType::Vec2:  return 2;
+        case ShaderValueType::Vec3:  return 3;
+        case ShaderValueType::Vec4:  return 4;
+        case ShaderValueType::Color: return 4;
+        case ShaderValueType::Texture2D: return 0;
+    }
+    return 1;
 }
 
 uint32_t ShaderValue::GetAlignment(ShaderValueType InType) {
@@ -63,7 +73,8 @@ String ShaderValue::Literal(const Vec4& InValue, ShaderValueType InType) {
         case ShaderValueType::Float: return std::format("{:.6}", InValue.x);
         case ShaderValueType::Vec2:  return std::format("vec2({:.6}, {:.6})", InValue.x, InValue.y);
         case ShaderValueType::Vec3:  return std::format("vec3({:.6}, {:.6}, {:.6})", InValue.x, InValue.y, InValue.z);
-        case ShaderValueType::Vec4:  return std::format("vec4({:.6}, {:.6}, {:.6}, {:.6})", InValue.x, InValue.y, InValue.z, InValue.w);
+        case ShaderValueType::Vec4:
+        case ShaderValueType::Color: return std::format("vec4({:.6}, {:.6}, {:.6}, {:.6})", InValue.x, InValue.y, InValue.z, InValue.w);
         default: break;
     }
     return "0.0";

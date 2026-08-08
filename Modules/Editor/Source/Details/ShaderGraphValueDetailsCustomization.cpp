@@ -1,6 +1,10 @@
 #include "ShaderGraphValueDetailsCustomization.h"
 
 #include "DetailsCategory.h"
+#include "DetailsRow.h"
+#include "Tabs/DetailsTab.h"
+#include "Tabs/MajorTab.h"
+#include "UI/UIColorSwatch.h"
 
 void ShaderGraphValueDetailsCustomization::BuildClassCategory(DetailsCategory& InCategory, const Class& InClass,
                                                               Object* InObject, DetailsTab& InTab) {
@@ -23,6 +27,28 @@ void ShaderGraphValueDetailsCustomization::BuildClassCategory(DetailsCategory& I
 
     if (node->IsTexture()) {
         addRow("Texture");
+    } else if (node->ValueType == ShaderValueType::Color) {
+        Property* value = Property::FindTypeProperty(InClass, "Value");
+        UIColorSwatch* swatch = AddRow(body, InTab, "Value", 0).GetValueHost()->Add<UIColorSwatch>();
+        swatch->Fill();
+        swatch->Title = "Value";
+        swatch->Get = [weak]() -> Color {
+            ShaderGraphValueNode* current = Cast<ShaderGraphValueNode>(weak.Get());
+            return current ? current->Value : Color(0.0f);
+        };
+        swatch->Set = [weak, value, tab = &InTab](const Color& InValue) {
+            ShaderGraphValueNode* current = Cast<ShaderGraphValueNode>(weak.Get());
+            if (!current) {
+                return;
+            }
+            current->Value = InValue;
+            if (value) {
+                value->NotifyChanged(current);
+            }
+            if (MajorTab* owner = tab->GetMajorTab()) {
+                owner->OnObjectEdited(current);
+            }
+        };
     } else if (Property* value = Property::FindTypeProperty(InClass, "Value")) {
         static const char* s_Axes[] = { "X", "Y", "Z", "W" };
         const Array<Property*> axes = Property::GetTypeProperties("Vec4");

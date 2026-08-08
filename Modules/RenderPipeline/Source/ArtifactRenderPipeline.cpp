@@ -55,8 +55,8 @@ void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, CameraNode* I
 
     if (InSun) {
         data.SunDirection = Vec4(InSun->GetDirection(), 0.0f);
-        data.SunColor = Vec4(InSun->GetColor() * InSun->GetIntensity(), 0.0f);
-        data.AmbientColor = Vec4(InSun->GetAmbientColor() * InSun->GetAmbientIntensity(), 0.0f);
+        data.SunColor = InSun->GetColor() * InSun->GetIntensity();
+        data.AmbientColor = InSun->GetAmbientColor() * InSun->GetAmbientIntensity();
         data.CascadeTexelSizes = InSun->GetCascadeTexelSizes();
         data.ShadowParams = m_ShadowSource.Get() == InSun ? InSun->GetShadowParams() : Vec4(0.0f);
         for (int32_t cascade = 0; cascade < SceneUniformData::ShadowCascadeCount; cascade++) {
@@ -72,7 +72,7 @@ void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, CameraNode* I
             }
             const int32_t index = (int32_t)data.PointLightCount;
             data.PointLightPositions[index] = Vec4(light->GetPosition(), light->GetRadius());
-            data.PointLightColors[index] = Vec4(light->GetColor() * light->GetIntensity(), 0.0f);
+            data.PointLightColors[index] = light->GetColor() * light->GetIntensity();
             data.PointLightCount += 1.0f;
         }
     }

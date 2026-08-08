@@ -42,14 +42,14 @@ public:
 
     Vec3 GetDirection() const { return GetForwardVector(); }
 
-    Vec3 GetColor() const { return m_Color; }
-    void SetColor(const Vec3& InColor) { m_Color = InColor; }
+    Color GetColor() const { return m_Color; }
+    void SetColor(const Color& InColor) { m_Color = InColor; }
 
     float GetIntensity() const { return m_Intensity; }
     void SetIntensity(float InIntensity) { m_Intensity = InIntensity; }
 
-    Vec3 GetAmbientColor() const { return m_AmbientColor; }
-    void SetAmbientColor(const Vec3& InColor) { m_AmbientColor = InColor; }
+    Color GetAmbientColor() const { return m_AmbientColor; }
+    void SetAmbientColor(const Color& InColor) { m_AmbientColor = InColor; }
 
     float GetAmbientIntensity() const { return m_AmbientIntensity; }
     void SetAmbientIntensity(float InIntensity) { m_AmbientIntensity = InIntensity; }
@@ -80,13 +80,13 @@ private:
     void RecordCascadePass(World& InWorld, int32_t InCascade);
 
     PROPERTY()
-    Vec3 m_Color = Vec3(1.0f, 0.97f, 0.91f);
+    Color m_Color = Color(1.0f, 0.97f, 0.91f, 1.0f);
 
     PROPERTY()
     float m_Intensity = 1.2f;
 
     PROPERTY()
-    Vec3 m_AmbientColor = Vec3(0.42f, 0.5f, 0.62f);
+    Color m_AmbientColor = Color(0.42f, 0.5f, 0.62f, 1.0f);
 
     PROPERTY()
     float m_AmbientIntensity = 0.35f;
