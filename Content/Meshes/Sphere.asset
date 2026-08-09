@@ -1,0 +1,19 @@
+{
+    "$type": "Mesh",
+    "AssetClass": "Mesh",
+    "m_Id": "f70b2731-f584-44ec-9ccb-d6c9eb7f01b6",
+    "m_ImportOffset": {
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 0.0
+    },
+    "m_ImportScale": {
+        "X": 1.0,
+        "Y": 1.0,
+        "Z": 1.0
+    },
+    "m_Material": "d351ca39-9ab6-43cf-9921-4965ec126be8",
+    "m_MeshPath": "/Meshes/Sphere.obj",
+    "m_StreamType": "AlwaysLoaded",
+    "m_NormalMode": "Smooth"
+}
