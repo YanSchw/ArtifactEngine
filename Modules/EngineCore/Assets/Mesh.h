@@ -8,6 +8,12 @@ class Material;
 class VertexBuffer;
 struct Vertex;
 
+ARTIFACT_ENUM();
+enum class MeshNormalMode : uint8_t {
+    Import = 0,
+    Smooth = 1
+};
+
 class Mesh : public Asset {
 public:
     ARTIFACT_CLASS();
@@ -52,4 +58,7 @@ private:
 
     PROPERTY()
     Vec3 m_ImportOffset = Vec3(0.0f);
+
+    PROPERTY()
+    MeshNormalMode m_NormalMode = MeshNormalMode::Import;
 };

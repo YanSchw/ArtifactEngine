@@ -10,6 +10,9 @@ struct SceneUniformData {
     Mat4 ViewProjection = Mat4(1.0f);
     Mat4 ShadowMatrices[ShadowCascadeCount] = { Mat4(1.0f), Mat4(1.0f), Mat4(1.0f), Mat4(1.0f) };
 
+    /** xyz: the world position the scene is viewed from. */
+    Vec4 CameraPosition = Vec4(0.0f);
+
     /** xyz: the direction the sun light travels in. */
     Vec4 SunDirection = Vec4(0.0f, -1.0f, 0.0f, 0.0f);
     /** rgb: color premultiplied by intensity. */

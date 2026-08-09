@@ -27,28 +27,6 @@ struct ObjVertexKeyHasher {
     }
 };
 
-// Area-weighted face normals, for sources that carry none.
-static void GenerateNormals(Array<Vertex>& OutVertices, const Array<uint32_t>& InIndices) {
-    for (Vertex& vertex : OutVertices) {
-        vertex.Normal = Vec3(0.0f);
-    }
-
-    for (int32_t i = 0; i + 2 < InIndices.Size(); i += 3) {
-        Vertex& a = OutVertices[InIndices[i]];
-        Vertex& b = OutVertices[InIndices[i + 1]];
-        Vertex& c = OutVertices[InIndices[i + 2]];
-
-        const Vec3 faceNormal = glm::cross(b.Position - a.Position, c.Position - a.Position);
-        a.Normal += faceNormal;
-        b.Normal += faceNormal;
-        c.Normal += faceNormal;
-    }
-
-    for (Vertex& vertex : OutVertices) {
-        vertex.Normal = glm::length(vertex.Normal) > 0.0f ? glm::normalize(vertex.Normal) : VecUtils::Up;
-    }
-}
-
 static int ResolveObjIndex(int Index, int Count) {
     if (Index > 0) {
         return Index - 1;
@@ -212,10 +190,6 @@ bool SimpleObjMeshLoader::LoadMeshFromFile(const String& InFilePath, Array<Verte
                 OutIndices.Add(FaceIndices[i + 1]);
             }
         }
-    }
-
-    if (Normals.IsEmpty()) {
-        GenerateNormals(OutVertices, OutIndices);
     }
 
     return !OutVertices.IsEmpty() && !OutIndices.IsEmpty();

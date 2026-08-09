@@ -51,6 +51,7 @@ void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, CameraNode* I
     data.Time = m_Time;
     if (InCamera) {
         data.ViewProjection = InCamera->GetViewProjectionMatrix();
+        data.CameraPosition = Vec4(InCamera->GetPosition(), 1.0f);
     }
 
     if (InSun) {

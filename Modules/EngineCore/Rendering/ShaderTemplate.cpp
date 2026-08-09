@@ -127,6 +127,7 @@ String GetSceneBlock() {
         "layout(binding = 0, std140) uniform SceneBlock {{\n"
         "    mat4 u_ViewProjection;\n"
         "    mat4 u_ShadowMatrices[{0}];\n"
+        "    vec4 u_CameraPosition;\n"
         "    vec4 u_SunDirection;\n"
         "    vec4 u_SunColor;\n"
         "    vec4 u_AmbientColor;\n"

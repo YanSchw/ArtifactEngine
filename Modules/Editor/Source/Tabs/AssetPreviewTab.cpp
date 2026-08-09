@@ -20,12 +20,30 @@
 #include "GameFramework/UIImage.h"
 #include "UI/EditorIcons.h"
 #include "UI/EditorStyle.h"
+#include "UI/UIContextMenu.h"
 
 static const UUID s_DefaultMesh = UUID::FromString("c6308770-3a5b-4b2b-9cec-14ba803ff817");
 static const UUID s_DefaultShaderGraph = UUID::FromString("d351ca39-9ab6-43cf-9921-4965ec126be8");
 static const Vec4 s_ClearColor = HexColor(0x141417);
 
 static const Vec3 s_KeyLightDirection = glm::normalize(Vec3(0.45f, -0.8f, 0.4f));
+
+static const char* const s_PrimitiveMeshes[] = { "Sphere", "Cube", "Quad" };
+static constexpr float s_SwayAmplitude = glm::radians(45.0f);
+static constexpr float s_SwaySpeed = 0.9f;
+static constexpr float s_SpinSpeed = 0.6f;
+static constexpr float s_DragSpeed = 0.008f;
+static constexpr float s_PitchLimit = 1.4f;
+
+static Mesh* FindMeshNamed(const String& InName) {
+    for (Asset* asset : AssetManager::Get().GetAssetsOfClass(Mesh::StaticClass())) {
+        Mesh* mesh = Cast<Mesh>(asset);
+        if (mesh && mesh->GetDisplayName() == InName) {
+            return mesh;
+        }
+    }
+    return nullptr;
+}
 
 struct PreviewPushData {
     Mat4 WorldTransform = Mat4(1.0f);
@@ -34,6 +52,7 @@ struct PreviewPushData {
 };
 
 AssetPreviewTab::AssetPreviewTab() {
+    Interactable = true;
     m_Texture = Object::Create<RenderTargetTexture>();
 
     m_Image = Add<UIImage>();
@@ -177,6 +196,93 @@ void AssetPreviewTab::EnsurePipeline() {
     m_PipelineDirty = false;
 }
 
+void AssetPreviewTab::BuildMeshMenu(UIMenuModel& OutMenu) {
+    WeakObjectPtr<AssetPreviewTab> self = this;
+    const Mesh* current = ResolveMesh();
+
+    for (const char* const name : s_PrimitiveMeshes) {
+        WeakObjectPtr<Mesh> mesh = FindMeshNamed(name);
+        OutMenu.Item(name, [self, mesh] {
+            if (AssetPreviewTab* tab = self.Get()) {
+                tab->SetMesh(mesh.Get());
+            }
+        }).Enabled(mesh.Get() != nullptr).Checked(mesh.Get() && mesh.Get() == current);
+    }
+
+    OutMenu.Separator();
+    OutMenu.Submenu("Custom Mesh", [self, current](UIMenuModel& OutSub) {
+        OutSub.Searchable("Search meshes");
+        for (Asset* asset : AssetManager::Get().GetAssetsOfClass(Mesh::StaticClass())) {
+            WeakObjectPtr<Mesh> mesh = Cast<Mesh>(asset);
+            if (!mesh.Get()) {
+                continue;
+            }
+            OutSub.Item(mesh.Get()->GetDisplayName(), [self, mesh] {
+                if (AssetPreviewTab* tab = self.Get()) {
+                    tab->SetMesh(mesh.Get());
+                }
+            }).Checked(mesh.Get() == current);
+        }
+    });
+}
+
+void AssetPreviewTab::BuildPanMenu(UIMenuModel& OutMenu) {
+    WeakObjectPtr<AssetPreviewTab> self = this;
+    const PreviewPanMode modes[] = { PreviewPanMode::Rotate, PreviewPanMode::PanLeftRight, PreviewPanMode::None };
+    const char* const labels[] = { "Rotate", "Pan Left-Right", "None" };
+
+    for (int32_t i = 0; i < 3; i++) {
+        const PreviewPanMode mode = modes[i];
+        OutMenu.Item(labels[i], [self, mode] {
+            if (AssetPreviewTab* tab = self.Get()) {
+                tab->m_PanMode = mode;
+                tab->m_SwayPhase = 0.0f;
+            }
+        }).Checked(m_PanMode == mode);
+    }
+}
+
+void AssetPreviewTab::AdvanceMotion(float InDeltaTime) {
+    if (m_PanMode == PreviewPanMode::Rotate) {
+        m_Yaw += InDeltaTime * s_SpinSpeed;
+    } else if (m_PanMode == PreviewPanMode::PanLeftRight) {
+        const float previous = glm::sin(m_SwayPhase);
+        m_SwayPhase += InDeltaTime * s_SwaySpeed;
+        m_Yaw += (glm::sin(m_SwayPhase) - previous) * s_SwayAmplitude;
+    }
+}
+
+Mat4 AssetPreviewTab::GetMeshRotation() const {
+    return glm::rotate(Mat4(1.0f), m_Pitch, VecUtils::Right)
+         * glm::rotate(Mat4(1.0f), m_Yaw, VecUtils::Up);
+}
+
+void AssetPreviewTab::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
+    (void)InCursorPos;
+    m_Yaw += InDelta.x * s_DragSpeed;
+    m_Pitch = glm::clamp(m_Pitch + InDelta.y * s_DragSpeed, -s_PitchLimit, s_PitchLimit);
+}
+
+bool AssetPreviewTab::OnSecondaryClick(const Vec2& InCursorPos) {
+    WeakObjectPtr<AssetPreviewTab> self = this;
+
+    UIMenuModel menu;
+    menu.Section("Preview");
+    menu.Submenu("Mesh", [self](UIMenuModel& OutSub) {
+        if (AssetPreviewTab* tab = self.Get()) {
+            tab->BuildMeshMenu(OutSub);
+        }
+    });
+    menu.Submenu("Panning Mode", [self](UIMenuModel& OutSub) {
+        if (AssetPreviewTab* tab = self.Get()) {
+            tab->BuildPanMenu(OutSub);
+        }
+    });
+
+    UIContextMenu::OpenAt(*this, InCursorPos, menu);
+    return true;
+}
+
 void AssetPreviewTab::UpdateSceneBuffer(float InDeltaTime, const Mesh& InMesh) {
     m_Time += InDeltaTime;
 
@@ -184,10 +290,12 @@ void AssetPreviewTab::UpdateSceneBuffer(float InDeltaTime, const Mesh& InMesh) {
     const float aspect = m_Height > 0 ? (float)m_Width / (float)m_Height : 1.0f;
     Mat4 projection = glm::perspectiveLH(glm::radians(45.0f), aspect, radius * 0.01f, radius * 50.0f);
     projection[1][1] *= -1.0f;
-    const Mat4 view = glm::lookAtLH(Vec3(0.0f, radius * 0.9f, -radius * 3.2f), Vec3(0.0f), VecUtils::Up);
+    const Vec3 eye = Vec3(0.0f, radius * 0.9f, -radius * 3.2f);
+    const Mat4 view = glm::lookAtLH(eye, Vec3(0.0f), VecUtils::Up);
 
     SceneUniformData data;
     data.ViewProjection = projection * view;
+    data.CameraPosition = Vec4(eye, 1.0f);
     data.Time = m_Time;
     data.SunDirection = Vec4(s_KeyLightDirection, 0.0f);
     data.SunColor = Vec4(1.15f, 1.13f, 1.06f, 0.0f);
@@ -222,11 +330,11 @@ void AssetPreviewTab::OnUIUpdate(const UIFrameContext& InContext) {
 
     m_ShadowMap.Clear();
 
+    AdvanceMotion((float)InContext.DeltaTime);
     UpdateSceneBuffer((float)InContext.DeltaTime, *mesh);
 
     PreviewPushData push;
-    push.WorldTransform = glm::rotate(Mat4(1.0f), m_Time * 0.6f, VecUtils::Up)
-                        * glm::translate(Mat4(1.0f), -mesh->GetBoundsCenter());
+    push.WorldTransform = GetMeshRotation() * glm::translate(Mat4(1.0f), -mesh->GetBoundsCenter());
 
     if (!m_ShaderData) {
         m_ShaderData = new ShaderData();
