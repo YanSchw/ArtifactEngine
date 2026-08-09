@@ -27,9 +27,9 @@ static void EnforceLinkingStaticLibraries() {
 }
 
 int ArtifactMain(const Array<String>& InArgs) {
+    AE_INFO("Artifact Engine Version {0}", Version::GetVersionString());
     MainThread::Register();
     EnforceLinkingStaticLibraries();
-    AE_INFO("Artifact Engine Version {0}", Version::GetVersionString());
 
     EngineConfig::Initialize(InArgs);
 
