@@ -106,6 +106,19 @@ static String Ellipsize(const String& InText, float InFontSize, float InMaxWidth
     return trimmed + "...";
 }
 
+static void ReadAssetHeader(const String& InPath, Class& OutClass, Asset*& OutAsset) {
+    try {
+        nlohmann::json json = nlohmann::json::parse(FileIO::ReadFileToString(InPath));
+        if (json.contains("AssetClass")) {
+            OutClass = Class(json["AssetClass"].get<String>());
+        }
+        if (json.contains("m_Id")) {
+            OutAsset = AssetManager::Get().GetAsset(UUID::FromString(json["m_Id"].get<String>()));
+        }
+    } catch (...) {
+    }
+}
+
 /** Strips whatever would turn a typed name into a path or an invalid file name. */
 static String SanitizeName(const String& InName) {
     String name;
@@ -382,6 +395,38 @@ String ContentDrawer::MakeUniqueName(const String& InDir, const String& InBaseNa
     return name;
 }
 
+Asset* ContentDrawer::GetSelectedAsset() {
+    if (m_ResolvedSelection != m_SelectedPath) {
+        m_ResolvedSelection = m_SelectedPath;
+        Class assetClass;
+        Asset* asset = nullptr;
+        if (fs::path(m_SelectedPath).extension().string() == ".asset") {
+            ReadAssetHeader(m_SelectedPath, assetClass, asset);
+        }
+        m_SelectedAsset = asset;
+    }
+    return m_SelectedAsset.Get();
+}
+
+void ContentDrawer::RevealAsset(Asset* InAsset) {
+    if (!InAsset) {
+        return;
+    }
+    const String path = AssetManager::Get().GetAssetPath(InAsset->GetId());
+    const String dir = fs::path(path).parent_path().string();
+
+    for (const String& mount : EngineConfig::GetContentMountKeys()) {
+        const String root = DirFor(mount, "");
+        if (dir != root && dir.compare(0, root.size() + 1, root + "/") != 0) {
+            continue;
+        }
+        NavigateTo(mount, dir == root ? String() : dir.substr(root.size() + 1));
+        m_SelectedPath = path;
+        return;
+    }
+    AE_WARN("'{0}' is not inside a mounted content directory", path);
+}
+
 void ContentDrawer::OpenAsset(Asset* InAsset) {
     EditorWindow* window = GetOwnerWindow();
     if (!window) {
@@ -584,16 +629,7 @@ Array<ContentDrawer::Item> ContentDrawer::CollectItems() const {
             Item asset;
             asset.Path = entry.path().string();
             asset.Name = entry.path().stem().string();
-            try {
-                nlohmann::json json = nlohmann::json::parse(FileIO::ReadFileToString(asset.Path));
-                if (json.contains("AssetClass")) {
-                    asset.AssetClass = Class(json["AssetClass"].get<String>());
-                }
-                if (json.contains("m_Id")) {
-                    asset.AssetPtr = AssetManager::Get().GetAsset(UUID::FromString(json["m_Id"].get<String>()));
-                }
-            } catch (...) {
-            }
+            ReadAssetHeader(asset.Path, asset.AssetClass, asset.AssetPtr);
             items.Add(asset);
         }
     }

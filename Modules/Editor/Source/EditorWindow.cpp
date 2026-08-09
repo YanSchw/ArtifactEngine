@@ -58,6 +58,26 @@ SharedObjectPtr<EditorWindow> EditorWindow::Create(WindowParams InParams) {
     return window;
 }
 
+EditorWindow* EditorWindow::FindFor(const UINode& InNode) {
+    const UICanvas* canvas = InNode.GetCanvas();
+    EditorWindow* fallback = nullptr;
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        EditorWindow* editorWindow = window.Get() ? window->As<EditorWindow>() : nullptr;
+        if (!editorWindow) {
+            continue;
+        }
+        if (editorWindow->GetCanvas() == canvas) {
+            return editorWindow;
+        }
+        fallback = fallback ? fallback : editorWindow;
+    }
+    return fallback;
+}
+
+ContentDrawer* EditorWindow::GetContentDrawer() const {
+    return Cast<ContentDrawer>(m_ContentDrawerTool);
+}
+
 void EditorWindow::RegisterHeroTools() {
     SharedObjectPtr<ContentDrawer> contentDrawer = Object::Create<ContentDrawer>();
     contentDrawer->SetOwnerWindow(this);

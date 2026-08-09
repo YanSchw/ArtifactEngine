@@ -14,5 +14,6 @@
     },
     "m_Material": "d351ca39-9ab6-43cf-9921-4965ec126be8",
     "m_MeshPath": "/Meshes/Quad.obj",
+    "m_NormalMode": "Import",
     "m_StreamType": "AlwaysLoaded"
 }

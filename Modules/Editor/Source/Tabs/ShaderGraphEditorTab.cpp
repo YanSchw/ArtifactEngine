@@ -119,8 +119,8 @@ void ShaderGraphEditorTab::BuildTemplateDropdown(UINode& InToolBar) {
 
     UIDropdown* dropdown = InToolBar.Add<UIDropdown>();
     dropdown->Size = { 150.0_px, 1.0_rel };
-    dropdown->GetOptions = [this, paths] {
-        Array<String> labels;
+    dropdown->GetOptions = [paths] {
+        Array<UIDropdownOption> labels;
         paths->Clear();
         for (const ShaderTemplateInfo& info : ShaderTemplate::FindAll()) {
             paths->Add(info.Path);
@@ -159,7 +159,13 @@ void ShaderGraphEditorTab::BuildStateDropdowns(UINode& InToolBar) {
 
         UIDropdown* dropdown = InToolBar.Add<UIDropdown>();
         dropdown->Size = { 110.0_px, 1.0_rel };
-        dropdown->GetOptions = [options] { return *options; };
+        dropdown->GetOptions = [options] {
+            Array<UIDropdownOption> labels;
+            for (const String& option : *options) {
+                labels.Add(option);
+            }
+            return labels;
+        };
         dropdown->GetSelectedLabel = [this, state] {
             ShaderGraph* current = m_ShaderGraph.Get();
             return current ? current->GetStateValue(state) : String();

@@ -22,6 +22,10 @@ public:
     virtual void BuildDrawer(UINode& InBody) override;
     virtual void Tick(float InDeltaTime) override;
 
+    Asset* GetSelectedAsset();
+    /** Navigates to the asset's folder and selects it there. */
+    void RevealAsset(Asset* InAsset);
+
 private:
     struct Location {
         String Mount;
@@ -102,6 +106,8 @@ private:
     String m_Mount;
     String m_RelPath;
     String m_SelectedPath;
+    String m_ResolvedSelection;
+    WeakObjectPtr<Asset> m_SelectedAsset;
     Array<String> m_Expanded;
     Array<Location> m_History;
     int32_t m_HistoryPos = -1;

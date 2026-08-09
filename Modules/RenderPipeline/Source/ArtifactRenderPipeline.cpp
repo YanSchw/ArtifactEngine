@@ -2,7 +2,6 @@
 #include "Platform/Platform.h"
 
 #include "ArtifactRenderPipeline.h"
-#include "Assets/AssetManager.h"
 #include "Assets/Material.h"
 #include "Assets/Texture2D.h"
 #include "Assets/Mesh.h"
@@ -84,13 +83,7 @@ void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, CameraNode* I
 }
 
 Pipeline* ArtifactRenderPipeline::ResolvePipeline(Material* InMaterial) {
-    if (!InMaterial) {
-        return nullptr;
-    }
-
-    AssetManager::Get().LoadAsset(InMaterial);
-    Shader* shader = InMaterial->GetShader();
-    if (!shader) {
+    if (!InMaterial || !InMaterial->IsReadyToRender()) {
         return nullptr;
     }
 
@@ -98,13 +91,11 @@ Pipeline* ArtifactRenderPipeline::ResolvePipeline(Material* InMaterial) {
     ImageView* shadowMap = sun ? sun->GetShadowMapView() : m_ShadowPlaceholder.GetView();
     Sampler* shadowSampler = sun ? sun->GetShadowSampler() : m_ShadowPlaceholder.GetSampler();
 
-    // A pipeline missing a binding its shader declares is a descriptor-set mismatch, so the mesh
-    // stays unrendered until every texture has streamed in.
+    Shader* shader = InMaterial->GetShader();
     Array<void*> resources = { shader, InMaterial->GetPropertyBuffer(), shadowMap };
     Array<std::tuple<uint32_t, SharedObjectPtr<ImageView>, SharedObjectPtr<Sampler>>> imageBindings;
     imageBindings.Add({ ShaderTemplate::ShadowMapBinding, shadowMap, shadowSampler });
     for (const MaterialTextureBinding& binding : InMaterial->GetTextureBindings()) {
-        AssetManager::Get().LoadAsset(binding.Texture);
         Texture* texture = binding.Texture ? binding.Texture->GetTexture() : nullptr;
         if (!texture) {
             return nullptr;

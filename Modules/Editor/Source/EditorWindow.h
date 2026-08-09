@@ -9,6 +9,7 @@ class UIStack;
 class UINode;
 class MajorTab;
 class HeroTool;
+class ContentDrawer;
 class UIMenuModel;
 
 /** The editor's main window. */
@@ -21,6 +22,8 @@ public:
     virtual ~EditorWindow();
 
     static SharedObjectPtr<EditorWindow> Create(WindowParams InParams);
+    /** The editor window a UI node is shown in; the first one when its window is not one. */
+    static EditorWindow* FindFor(const UINode& InNode);
 
     template<typename T>
     T* OpenTab() {
@@ -47,6 +50,7 @@ public:
     void ToggleHeroTool(HeroTool* InTool);
     void OpenHeroTool(HeroTool* InTool);
     void CloseHeroTool();
+    ContentDrawer* GetContentDrawer() const;
     bool IsHeroToolOpen(const HeroTool* InTool) const { return m_ActiveHeroTool == InTool; }
 
 private:

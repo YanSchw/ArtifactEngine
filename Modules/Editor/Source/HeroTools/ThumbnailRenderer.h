@@ -25,6 +25,7 @@ private:
         SharedObjectPtr<RenderPipeline> Pipeline;
         SharedObjectPtr<World> Scene;
         SharedObjectPtr<RenderTargetTexture> Texture;
+        int32_t Attempts = 0;
         bool Rendered = false;
     };
 

@@ -33,6 +33,8 @@ public:
     UniformBuffer* GetPropertyBuffer() const { return m_PropertyBuffer.Get(); }
     Array<MaterialTextureBinding> GetTextureBindings() const;
 
+    bool IsReadyToRender();
+
     const Array<ShaderGraphProperty>& GetInputs() const;
 
     Vec4 GetInputValue(const String& InName) const;

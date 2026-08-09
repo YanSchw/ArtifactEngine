@@ -216,7 +216,7 @@ static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
         return Enum(InProperty->InnerEnumTypename).ConvertValueToString(read());
     };
     dropdown->GetOptions = [InProperty] {
-        Array<String> options;
+        Array<UIDropdownOption> options;
         for (const Enum::EnumValue& value : Enum(InProperty->InnerEnumTypename).GetValues()) {
             options.Add(value.Name);
         }

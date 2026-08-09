@@ -218,7 +218,7 @@ void BlueprintEditorTab::BuildToolBar(UINode& InToolBar) {
     parent->GetSelectedLabel = [this] { return GetParentClass().GetDisplayName(); };
     parent->GetOptions = [this, options] {
         *options = GetSelectableParentClasses();
-        Array<String> labels;
+        Array<UIDropdownOption> labels;
         for (const Class& parentClass : *options) {
             labels.Add(parentClass.GetDisplayName());
         }

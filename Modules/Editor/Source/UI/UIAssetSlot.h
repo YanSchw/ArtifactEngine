@@ -5,6 +5,7 @@
 #include "UIAssetSlot.gen.h"
 
 class Asset;
+class ContentDrawer;
 class ThumbnailRenderer;
 
 class UIAssetSlot : public UINode {
@@ -19,6 +20,11 @@ public:
     void Build();
 
 private:
+    void BuildThumbnail();
+    void BuildDropdown();
+    void BuildActionButtons();
+
     bool Accepts(Asset* InAsset) const;
     Asset* ReadAsset() const { return GetAsset ? GetAsset() : nullptr; }
+    ContentDrawer* GetContentDrawer() const;
 };

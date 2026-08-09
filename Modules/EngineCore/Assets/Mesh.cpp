@@ -125,6 +125,7 @@ void Mesh::BuildVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32
         boundsMax = i == 0 ? InVertices[i].Position : glm::max(boundsMax, InVertices[i].Position);
     }
     m_BoundsCenter = (boundsMin + boundsMax) * 0.5f;
+    m_BoundsExtents = (boundsMax - boundsMin) * 0.5f;
     m_BoundsRadius = glm::max(glm::length(boundsMax - m_BoundsCenter), 0.001f);
 
     m_VertexBuffer = VertexBuffer::Create(InVertices, InIndices);

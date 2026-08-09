@@ -69,6 +69,20 @@ Array<MaterialTextureBinding> Material::GetTextureBindings() const {
     return bindings;
 }
 
+bool Material::IsReadyToRender() {
+    AssetManager::Get().LoadAsset(this);
+    if (!GetShader()) {
+        return false;
+    }
+    for (const MaterialTextureBinding& binding : GetTextureBindings()) {
+        AssetManager::Get().LoadAsset(binding.Texture);
+        if (!binding.Texture || !binding.Texture->GetTexture()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 Vec4 Material::GetInputValue(const String& InName) const {
     const int32_t index = m_InputNames.IndexOf(InName);
     if (index >= 0 && index < m_InputValues.Size()) {

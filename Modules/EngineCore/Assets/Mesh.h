@@ -35,6 +35,8 @@ public:
 
     Vec3 GetBoundsCenter() const { return m_BoundsCenter; }
     float GetBoundsRadius() const { return m_BoundsRadius; }
+    /** Half the size of the axis-aligned bounding box around GetBoundsCenter(). */
+    Vec3 GetBoundsExtents() const { return m_BoundsExtents; }
 
     /** Rebuilds the vertex buffer from the source file, applying the current import transform. */
     void Reimport();
@@ -45,6 +47,7 @@ private:
 
     SharedObjectPtr<VertexBuffer> m_VertexBuffer = nullptr;
     Vec3 m_BoundsCenter = Vec3(0.0f);
+    Vec3 m_BoundsExtents = Vec3(1.0f);
     float m_BoundsRadius = 1.0f;
 
     PROPERTY()
