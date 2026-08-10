@@ -1,6 +1,7 @@
 #include "GraphEditorView.h"
 #include "GraphEditorStyle.h"
 #include "ThemedWindow.h"
+#include "Tabs/MajorTab.h"
 #include "UI/UIContextMenu.h"
 #include "GameFramework/UICanvas.h"
 #include "Rendering/UIDrawList.h"
@@ -189,6 +190,7 @@ void GraphEditorView::BreakConnectionsAt(const Vec2& InScreenPos) {
     if (!m_Graph->IsPinConnected(*node, *pin)) {
         return;
     }
+    RecordEdit("Break Connections");
     m_Graph->BreakPinConnections(*node, *pin);
     NotifyGraphChanged();
 }
@@ -215,15 +217,22 @@ void GraphEditorView::ToggleSelection(uint64_t InNodeId) {
 }
 
 void GraphEditorView::DeleteSelection() {
-    if (!m_Graph) {
+    if (!m_Graph || m_Selection.IsEmpty()) {
         return;
     }
+    RecordEdit("Delete Nodes");
     for (uint64_t nodeId : m_Selection) {
         m_Graph->RemoveNode(nodeId);
     }
     m_Selection.Clear();
     NotifySelectionChanged();
     NotifyGraphChanged();
+}
+
+void GraphEditorView::RecordEdit(const String& InTitle) {
+    if (MajorTab* document = MajorTab::FindFor(*this)) {
+        document->BeginTransaction(InTitle, m_Graph.Get());
+    }
 }
 
 void GraphEditorView::NotifyGraphChanged() {
@@ -279,6 +288,7 @@ void GraphEditorView::OnPressed(const Vec2& InCursorPos) {
         if (IsShiftHeld()) {
             m_ConnectSources = CollectConnectedEnds(*node, *pinPtr);
             if (!m_ConnectSources.IsEmpty()) {
+                RecordEdit("Connect");
                 m_Graph->BreakPinConnections(*node, *pinPtr);
                 NotifyGraphChanged();
             }
@@ -329,7 +339,8 @@ void GraphEditorView::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
         m_PressMoved = true;
     }
 
-    if (m_DragMode == DragMode::MoveNodes && m_Graph) {
+    if (m_DragMode == DragMode::MoveNodes && m_Graph && m_MoveStartPositions.Size() > 0) {
+        RecordEdit("Move Nodes");
         const Vec2 graphDelta = (InCursorPos - m_PressScreen) / m_Zoom;
         for (const auto& [nodeId, startPosition] : m_MoveStartPositions) {
             if (GraphNode* node = m_Graph->FindNode(nodeId)) {
@@ -370,6 +381,7 @@ void GraphEditorView::FinishConnectDrag() {
         return;
     }
 
+    RecordEdit("Connect");
     bool connected = false;
     for (const PinRef& source : m_ConnectSources) {
         GraphNode* sourceNode = nullptr;
@@ -568,6 +580,7 @@ bool GraphEditorView::OnSecondaryClick(const Vec2& InCursorPos) {
             if (!graphView || !graphView->m_Graph) {
                 return;
             }
+            graphView->RecordEdit("Add Node");
             if (GraphNode* node = graphView->m_Graph->CreateNode(nodeClass, spawnPos)) {
                 graphView->SelectOnly(node->NodeId);
                 graphView->NotifyGraphChanged();

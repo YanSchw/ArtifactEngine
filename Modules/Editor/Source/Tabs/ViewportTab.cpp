@@ -439,11 +439,21 @@ void ViewportTab::OnViewportDragged(const Vec2& InRenderPixel) {
     }
     if (m_DesignMode) {
         if (!m_PreviewInput) {
+            RecordSelectionEdit("Layout");
             m_LayoutGizmo->Drag(CanvasFromViewport(InRenderPixel));
         }
         return;
     }
+    RecordSelectionEdit("Transform");
     m_TransformGizmo->Drag(InRenderPixel);
+}
+
+void ViewportTab::RecordSelectionEdit(const String& InTitle) {
+    if (MajorTab* major = GetMajorTab()) {
+        for (Object* selected : major->GetSelection()) {
+            RecordEdit(InTitle, selected);
+        }
+    }
 }
 
 void ViewportTab::OnViewportReleased() {
@@ -524,6 +534,7 @@ void ViewportTab::SpawnDroppedAsset(Asset* InAsset, const Vec2& InCursorPos) {
         return;
     }
 
+    RecordEdit("Add Node", root);
     Node* spawned = MajorTab::SpawnFromAsset(InAsset, *root);
     if (!spawned) {
         return;

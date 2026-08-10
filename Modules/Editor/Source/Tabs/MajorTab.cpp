@@ -2,11 +2,15 @@
 #include "MinorTab.h"
 #include "MinorTabStandaloneWindow.h"
 #include "EditorWindow.h"
+#include "EditorTransaction.h"
 #include "UI/UIDockArea.h"
 #include "UI/EditorIcons.h"
 #include "Assets/Mesh.h"
 #include "Assets/Blueprint.h"
 #include "GameFramework/StaticMeshNode.h"
+
+static constexpr float s_TransactionTimeout = 0.35f;
+static constexpr int32_t s_HistoryDepth = 256;
 
 static void AssignWorldToTabs(UIDockNode* InNode, World* InWorld) {
     if (!InNode) {
@@ -92,6 +96,91 @@ void MajorTab::OnBind() {
     if (World* world = GetAuthoringWorld()) {
         world->ResolvePendingKills();
     }
+}
+
+void MajorTab::OnUIUpdate(const UIFrameContext& InContext) {
+    Super::OnUIUpdate(InContext);
+
+    if (m_OpenTransaction) {
+        m_TransactionIdle += InContext.DeltaTime;
+        if (m_TransactionIdle > s_TransactionTimeout) {
+            EndTransaction();
+        }
+    }
+}
+
+MajorTab* MajorTab::FindFor(const UINode& InNode) {
+    for (Node* current = const_cast<UINode*>(&InNode); current; current = current->GetParent()) {
+        if (MajorTab* major = Cast<MajorTab>(current)) {
+            return major;
+        }
+        if (MinorTab* minor = Cast<MinorTab>(current)) {
+            return minor->GetMajorTab();
+        }
+    }
+    return nullptr;
+}
+
+void MajorTab::BeginTransaction(const String& InTitle, Object* InObject) {
+    if (!InObject) {
+        return;
+    }
+    if (m_OpenTransaction && m_OpenTransaction->Title != InTitle) {
+        EndTransaction();
+    }
+    if (!m_OpenTransaction) {
+        m_OpenTransaction = SharedObjectPtr<EditorTransaction>(new EditorTransaction(InTitle));
+    }
+    m_OpenTransaction->Record(InObject);
+    m_TransactionIdle = 0.0f;
+}
+
+void MajorTab::EndTransaction() {
+    SharedObjectPtr<EditorTransaction> transaction = m_OpenTransaction;
+    m_OpenTransaction = nullptr;
+    m_TransactionIdle = 0.0f;
+    if (!transaction || transaction->IsUnchanged()) {
+        return;
+    }
+
+    m_UndoStack.Add(transaction);
+    if (m_UndoStack.Size() > s_HistoryDepth) {
+        m_UndoStack.RemoveFirstItem();
+    }
+    m_RedoStack.Clear();
+}
+
+String MajorTab::GetUndoTitle() const {
+    if (m_OpenTransaction) {
+        return m_OpenTransaction->Title;
+    }
+    return m_UndoStack.IsEmpty() ? String() : m_UndoStack[m_UndoStack.Last()]->Title;
+}
+
+String MajorTab::GetRedoTitle() const {
+    return m_RedoStack.IsEmpty() ? String() : m_RedoStack[m_RedoStack.Last()]->Title;
+}
+
+void MajorTab::Undo() {
+    EndTransaction();
+    if (m_UndoStack.IsEmpty()) {
+        return;
+    }
+    SharedObjectPtr<EditorTransaction> transaction = m_UndoStack.LastItem();
+    m_UndoStack.RemoveLastItem();
+    transaction->Restore(*this);
+    m_RedoStack.Add(transaction);
+}
+
+void MajorTab::Redo() {
+    EndTransaction();
+    if (m_RedoStack.IsEmpty()) {
+        return;
+    }
+    SharedObjectPtr<EditorTransaction> transaction = m_RedoStack.LastItem();
+    m_RedoStack.RemoveLastItem();
+    transaction->Restore(*this);
+    m_UndoStack.Add(transaction);
 }
 
 Array<Object*> MajorTab::GetSelection() const {

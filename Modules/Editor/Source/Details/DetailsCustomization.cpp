@@ -96,7 +96,7 @@ static UILabel& AddValueLabel(UINode& InHost, const String& InText) {
 }
 
 static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, Property* InProperty,
-                           const std::function<void()>& InOnEdited) {
+                           const DetailsEditHandler& InOnEdited) {
     UIDragNumber* drag = InRow.GetValueHost()->Add<UIDragNumber>();
     drag->Fill();
     if (IntProperty* intProperty = Cast<IntProperty>(InProperty)) {
@@ -111,6 +111,7 @@ static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
         };
         drag->Set = [InObject, InOffset, intProperty, InOnEdited](double InValue) {
             if (char* base = ResolveBase(InObject, InOffset)) {
+                InOnEdited.Record();
                 WriteIntValue(*intProperty, base, InValue);
                 InOnEdited();
             }
@@ -125,6 +126,7 @@ static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
         };
         drag->Set = [InObject, InOffset, floatProperty, InOnEdited](double InValue) {
             if (char* base = ResolveBase(InObject, InOffset)) {
+                InOnEdited.Record();
                 if (floatProperty->IsDouble) {
                     *(double*)base = InValue;
                 } else {
@@ -137,7 +139,7 @@ static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
 }
 
 static void BuildColorRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                          const String& InTitle, const std::function<void()>& InOnEdited) {
+                          const String& InTitle, const DetailsEditHandler& InOnEdited) {
     UIColorSwatch* swatch = InRow.GetValueHost()->Add<UIColorSwatch>();
     swatch->Fill();
     swatch->Title = InTitle;
@@ -147,6 +149,7 @@ static void BuildColorRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObje
     };
     swatch->Set = [InObject, InOffset, InOnEdited](const Color& InValue) {
         if (char* base = ResolveBase(InObject, InOffset)) {
+            InOnEdited.Record();
             *(Color*)base = InValue;
             InOnEdited();
         }
@@ -154,7 +157,7 @@ static void BuildColorRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObje
 }
 
 static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                         const std::function<void()>& InOnEdited) {
+                         const DetailsEditHandler& InOnEdited) {
     UICheckbox* checkbox = InRow.GetValueHost()->Add<UICheckbox>();
     checkbox->Anchor = checkbox->Pivot = Vec2(0.0f, 0.5f);
     checkbox->Position = Vec2(2.0f, 0.0f);
@@ -165,6 +168,7 @@ static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
     };
     checkbox->Changed = [InObject, InOffset, InOnEdited](bool InValue) {
         if (char* base = ResolveBase(InObject, InOffset)) {
+            InOnEdited.Record();
             *(bool*)base = InValue;
             InOnEdited();
         }
@@ -172,7 +176,7 @@ static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
 }
 
 static void BuildStringRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                           const std::function<void()>& InOnEdited) {
+                           const DetailsEditHandler& InOnEdited) {
     UITextArea* field = InRow.GetValueHost()->Add<UITextArea>();
     field->Fill();
     field->SingleLine = true;
@@ -192,6 +196,7 @@ static void BuildStringRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
     };
     const auto commit = [InObject, InOffset, InOnEdited](const String& InText) {
         if (char* base = ResolveBase(InObject, InOffset)) {
+            InOnEdited.Record();
             *(String*)base = InText;
             InOnEdited();
         }
@@ -201,7 +206,7 @@ static void BuildStringRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
 }
 
 static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, EnumProperty* InProperty,
-                         const std::function<void()>& InOnEdited) {
+                         const DetailsEditHandler& InOnEdited) {
     const auto read = [InObject, InOffset, InProperty]() -> int64_t {
         int64_t value = 0;
         if (char* base = ResolveBase(InObject, InOffset)) {
@@ -237,6 +242,7 @@ static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
             return;
         }
         if (char* base = ResolveBase(InObject, InOffset)) {
+            InOnEdited.Record();
             std::memcpy(base, &values[InIndex].Value, InProperty->ByteSize);
             InOnEdited();
         }
@@ -244,7 +250,7 @@ static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
 }
 
 static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                          const Class& InAssetClass, bool InIsWeak, const std::function<void()>& InOnEdited) {
+                          const Class& InAssetClass, bool InIsWeak, const DetailsEditHandler& InOnEdited) {
     InRow.Height = AssetRowHeight;
 
     UIAssetSlot* slot = InRow.GetValueHost()->Add<UIAssetSlot>();
@@ -257,6 +263,7 @@ static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObject
     };
     slot->SetAsset = [InObject, InOffset, InIsWeak, InOnEdited](Asset* InAsset) {
         if (char* base = ResolveBase(InObject, InOffset)) {
+            InOnEdited.Record();
             WriteObjectPtr(base, InIsWeak, InAsset);
             InOnEdited();
         }
@@ -317,9 +324,15 @@ DetailsRow& DetailsCustomization::AddRow(UINode& InParent, DetailsTab& InTab, co
     return *row;
 }
 
-std::function<void()> DetailsCustomization::MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab) {
+DetailsEditHandler DetailsCustomization::MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab) {
     const WeakObjectPtr<DetailsTab> tab = InTab;
-    return [InObject, InRootProperty, tab] {
+    DetailsEditHandler handler;
+    handler.BeginEdit = [InObject, InRootProperty, tab] {
+        if (InRootProperty && tab.Get()) {
+            tab.Get()->RecordEdit("Edit " + PrettyPropertyName(InRootProperty->Name), InObject.Get());
+        }
+    };
+    handler.CommitEdit = [InObject, InRootProperty, tab] {
         Object* object = InObject.Get();
         if (!object || !InRootProperty) {
             return;
@@ -338,6 +351,7 @@ std::function<void()> DetailsCustomization::MakeEditHandler(const WeakObjectPtr<
             }
         }
     };
+    return handler;
 }
 
 void DetailsCustomization::BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName) {
@@ -348,8 +362,9 @@ void DetailsCustomization::BindOverride(DetailsRow& InRow, const WeakObjectPtr<O
         Node* node = Cast<Node>(InObject.Get());
         return node && node->IsPropertyOverridden(InPropertyName);
     };
-    InRow.ResetAction = [InObject, InPropertyName] {
+    InRow.ResetAction = [InObject, InPropertyName, tab = InRow.OwnerTab] {
         if (Node* node = Cast<Node>(InObject.Get())) {
+            tab->RecordEdit("Reset " + PrettyPropertyName(InPropertyName), node);
             node->ResetPropertyToDefault(InPropertyName);
         }
     };
@@ -384,7 +399,7 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
 
     DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
     BindOverride(row, InObject, root->Name);
-    const std::function<void()> onEdited = MakeEditHandler(InObject, root, &InTab);
+    const DetailsEditHandler onEdited = MakeEditHandler(InObject, root, &InTab);
 
     if (Cast<IntProperty>(InProperty) || Cast<FloatProperty>(InProperty)) {
         BuildNumberRow(row, InObject, offset, InProperty, onEdited);

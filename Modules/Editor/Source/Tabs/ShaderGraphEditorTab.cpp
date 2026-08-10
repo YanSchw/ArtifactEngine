@@ -15,6 +15,7 @@
 #include "EditorWindow.h"
 #include "Assets/ShaderGraph.h"
 #include "Graph/GraphNode.h"
+#include "Graph/NodeGraph.h"
 
 ShaderGraphEditorTab::ShaderGraphEditorTab() {
     UIDockArea* area = GetDockArea();
@@ -79,7 +80,7 @@ void ShaderGraphEditorTab::Save() {
 }
 
 void ShaderGraphEditorTab::OnObjectEdited(Object* InObject) {
-    if (Cast<GraphNode>(InObject)) {
+    if (Cast<GraphNode>(InObject) || Cast<NodeGraph>(InObject)) {
         RequestRecompile();
     }
 }

@@ -134,6 +134,12 @@ void EditorWindow::AddTitleBarMenu(UINode& InRow, const String& InTitle, std::fu
 }
 
 void EditorWindow::BuildFileMenu(UIMenuModel& OutMenu) {
+    MajorTab* tab = m_ActiveTab;
+    OutMenu.Item("Undo " + (tab ? tab->GetUndoTitle() : String()), [tab] { tab->Undo(); })
+           .Shortcut(s_CommandKey + "+Z").Enabled(tab && tab->CanUndo());
+    OutMenu.Item("Redo " + (tab ? tab->GetRedoTitle() : String()), [tab] { tab->Redo(); })
+           .Shortcut(s_CommandKey + "+Y").Enabled(tab && tab->CanRedo());
+
     OutMenu.Section("Editor");
     OutMenu.Item("New Scene Tab", [this] { OpenTab<SceneEditorTab>(); }).Icon(EditorIcons::Level());
     OutMenu.Item("New Window", [this] {
@@ -492,7 +498,12 @@ void EditorWindow::HandleShortcuts() {
     }
     const bool ctrl = keyboard->IsPressed(KeyCode::LeftControl) || keyboard->IsPressed(KeyCode::RightControl)
                    || keyboard->IsPressed(KeyCode::LeftSuper) || keyboard->IsPressed(KeyCode::RightSuper);
-    if (ctrl && keyboard->IsDown(KeyCode::Space)) {
+    const bool shift = keyboard->IsPressed(KeyCode::LeftShift) || keyboard->IsPressed(KeyCode::RightShift);
+    if (ctrl && m_ActiveTab && keyboard->IsDown(KeyCode::Z)) {
+        shift ? m_ActiveTab->Redo() : m_ActiveTab->Undo();
+    } else if (ctrl && m_ActiveTab && keyboard->IsDown(KeyCode::Y)) {
+        m_ActiveTab->Redo();
+    } else if (ctrl && keyboard->IsDown(KeyCode::Space)) {
         ToggleHeroTool(m_ContentDrawerTool);
     } else if (ctrl && keyboard->IsDown(KeyCode::Period)) {
         ToggleHeroTool(m_ConsoleTool);

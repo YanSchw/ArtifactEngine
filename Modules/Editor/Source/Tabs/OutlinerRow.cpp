@@ -216,6 +216,7 @@ static void AttachChildFromMenu(const WeakObjectPtr<OutlinerTab>& InOwner, const
     if (!owner || !parent) {
         return;
     }
+    owner->RecordEdit("Add Child", parent);
     Node* child = parent->AttachChild(InClass);
     if (!child) {
         return;
@@ -294,9 +295,10 @@ bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
             owner.Get()->BeginRename(target.Get());
         }
     }).Shortcut("F2").Icon(EditorIcons::GetNodeIcon(node->GetClass()));
-    menu.Item("Enabled", [target] {
-        if (Node* bound = target.Get()) {
-            bound->SetEnabled(!bound->IsSelfEnabled());
+    menu.Item("Enabled", [owner, target] {
+        if (owner.Get() && target.Get()) {
+            owner.Get()->RecordEdit("Edit Enabled", target.Get());
+            target.Get()->SetEnabled(!target.Get()->IsSelfEnabled());
         }
     }).Checked(node->IsSelfEnabled()).Tooltip("Disabled nodes and their children stop updating and rendering");
     if (node->HasChildren()) {
@@ -323,9 +325,10 @@ bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
     }).Enabled(!node->IsInherited() && node->GetParent() != nullptr)
       .Tooltip("Saves this node and its children as a reusable Blueprint asset");
     menu.Separator();
-    menu.Item("Delete", [target] {
-        if (Node* bound = target.Get()) {
-            bound->Destroy();
+    menu.Item("Delete", [owner, target] {
+        if (owner.Get() && target.Get()) {
+            owner.Get()->RecordEdit("Delete", target.Get()->GetParent());
+            target.Get()->Destroy();
         }
     }).Enabled(!node->IsInherited())
       .Tooltip(node->IsInherited() ? "Inherited nodes are owned by the class or Blueprint that creates them"
@@ -345,6 +348,7 @@ void OutlinerRow::OnPressed(const Vec2& InCursorPos) {
     }
 
     if (m_Eye->IsEnabled() && m_Eye->HitTest(InCursorPos)) {
+        Owner->RecordEdit("Edit Enabled", node);
         node->SetEnabled(!node->IsSelfEnabled());
         return;
     }

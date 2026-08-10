@@ -43,8 +43,9 @@ float NodeDetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, 
             enabled->IsOn = bound->IsSelfEnabled();
         }
     };
-    enabled->Changed = [weak](bool InValue) {
+    enabled->Changed = [weak, tab = &InTab](bool InValue) {
         if (Node* bound = weak.Get()) {
+            tab->RecordEdit("Edit Enabled", bound);
             bound->SetEnabled(InValue);
             bound->MarkPropertyOverridden("m_Enabled");
         }
@@ -77,9 +78,10 @@ float NodeDetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, 
         return 44.0f;
     }
 
-    const auto commitName = [weak](const String& InName) {
+    const auto commitName = [weak, tab = &InTab](const String& InName) {
         if (Node* bound = weak.Get()) {
             if (!InName.empty()) {
+                tab->RecordEdit("Rename", bound);
                 bound->SetName(InName);
             }
         }
@@ -126,11 +128,14 @@ static void AddVectorRow(UINode& InBody, DetailsTab& InTab, const String& InLabe
     row->SetLabel(InLabel);
     DetailsCustomization::BindOverride(*row, InNode, InPropertyName);
 
-    const auto apply = [InSet, InNode, InPropertyName](const Vec3& InValue) {
-        InSet(InValue);
-        if (Node* node = InNode.Get()) {
-            node->MarkPropertyOverridden(InPropertyName);
+    const auto apply = [InSet, InNode, InPropertyName, InLabel, tab = &InTab](const Vec3& InValue) {
+        Node* node = InNode.Get();
+        if (!node) {
+            return;
         }
+        tab->RecordEdit("Edit " + InLabel, node);
+        InSet(InValue);
+        node->MarkPropertyOverridden(InPropertyName);
     };
 
     UIHStack* stack = row->GetValueHost()->Add<UIHStack>();

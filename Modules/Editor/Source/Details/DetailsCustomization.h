@@ -11,6 +11,14 @@ class DetailsCategory;
 class DetailsRow;
 class UINode;
 
+struct DetailsEditHandler {
+    std::function<void()> BeginEdit;
+    std::function<void()> CommitEdit;
+
+    void Record() const { if (BeginEdit) BeginEdit(); }
+    void operator()() const { if (CommitEdit) CommitEdit(); }
+};
+
 /** Builds the Details view for one class of inspected object. Subclassing is the registration:
  *  the panel picks the customization whose supported class is the closest base of the object. */
 class DetailsCustomization : public Object {
@@ -27,7 +35,7 @@ public:
     static DetailsCustomization* FindFor(const Class& InClass);
 
     static void BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName);
-    static std::function<void()> MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab = nullptr);
+    static DetailsEditHandler MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab = nullptr);
     static String PrettyClassName(const Class& InClass);
     static String PrettyPropertyName(const String& InName);
 

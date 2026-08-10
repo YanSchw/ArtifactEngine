@@ -8,6 +8,7 @@ class UIDockArea;
 class MinorTab;
 class MinorTabStandaloneWindow;
 class EditorWindow;
+class EditorTransaction;
 class VectorImage;
 class Asset;
 
@@ -28,6 +29,19 @@ public:
     virtual void BuildToolBar(UINode& InToolBar) { (void)InToolBar; }
 
     virtual void OnBind() override;
+    virtual void OnUIUpdate(const UIFrameContext& InContext) override;
+
+    static MajorTab* FindFor(const UINode& InNode);
+
+    void BeginTransaction(const String& InTitle, Object* InObject);
+    void EndTransaction();
+
+    bool CanUndo() const { return m_OpenTransaction || !m_UndoStack.IsEmpty(); }
+    bool CanRedo() const { return !m_RedoStack.IsEmpty(); }
+    String GetUndoTitle() const;
+    String GetRedoTitle() const;
+    void Undo();
+    void Redo();
 
     virtual Asset* GetEditedAsset() const { return nullptr; }
     virtual Node* GetAssetRootNode() const { return nullptr; }
@@ -74,4 +88,9 @@ private:
     Array<WeakObjectPtr<MinorTabStandaloneWindow>> m_FloatingWindows;
     SharedObjectPtr<World> m_World;
     Array<WeakObjectPtr<Object>> m_Selection;
+
+    SharedObjectPtr<EditorTransaction> m_OpenTransaction;
+    float m_TransactionIdle = 0.0f;
+    Array<SharedObjectPtr<EditorTransaction>> m_UndoStack;
+    Array<SharedObjectPtr<EditorTransaction>> m_RedoStack;
 };

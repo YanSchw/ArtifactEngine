@@ -45,6 +45,7 @@ void MaterialDetailsCustomization::BuildContent(UINode& InList, Object* InObject
             if (!current) {
                 return;
             }
+            tab->RecordEdit("Edit Shader Graph", current);
             current->SetBaseGraph(Cast<ShaderGraph>(InAsset));
             NotifyEdited(*tab, *current);
             tab->MarkDirty();
@@ -77,6 +78,7 @@ void MaterialDetailsCustomization::AddInputRows(UINode& InBody, DetailsTab& InTa
             if (!current) {
                 return;
             }
+            tab->RecordEdit("Reset " + PrettyPropertyName(name), current);
             current->ClearInputOverride(name);
             NotifyEdited(*tab, *current);
         };
@@ -100,6 +102,7 @@ void MaterialDetailsCustomization::AddInputRows(UINode& InBody, DetailsTab& InTa
             if (!current) {
                 return;
             }
+            tab->RecordEdit("Edit " + PrettyPropertyName(name), current);
             current->SetInputTexture(name, Cast<Texture2D>(InAsset));
             NotifyEdited(*tab, *current);
         };
@@ -123,6 +126,7 @@ void MaterialDetailsCustomization::AddInputRows(UINode& InBody, DetailsTab& InTa
             if (!current) {
                 return;
             }
+            tab->RecordEdit("Edit " + PrettyPropertyName(name), current);
             current->SetInputValue(name, InValue);
             NotifyEdited(*tab, *current);
         };
@@ -153,6 +157,7 @@ void MaterialDetailsCustomization::AddInputRows(UINode& InBody, DetailsTab& InTa
             if (!current) {
                 return;
             }
+            tab->RecordEdit("Edit " + PrettyPropertyName(name), current);
             Vec4 value = current->GetInputValue(name);
             value[i] = (float)InValue;
             current->SetInputValue(name, value);

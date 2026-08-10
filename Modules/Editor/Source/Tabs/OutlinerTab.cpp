@@ -265,6 +265,7 @@ void OutlinerTab::SpawnDroppedAsset(Asset* InAsset, const Vec2& InCursorPos) {
         }
     }
 
+    RecordEdit("Add Node", parent);
     Node* spawned = MajorTab::SpawnFromAsset(InAsset, *parent);
     if (!spawned) {
         return;
@@ -327,6 +328,7 @@ void OutlinerTab::BeginRename(Node* InNode) {
 void OutlinerTab::CommitRename(const String& InName) {
     if (Node* node = m_Renaming.Get()) {
         if (!InName.empty()) {
+            RecordEdit("Rename", node);
             node->SetName(InName);
         }
     }
@@ -362,6 +364,8 @@ void OutlinerTab::EndDrag() {
     if (!source || !ref || ref == source || source->IsInherited()) {
         return;
     }
+
+    RecordEdit("Move Node", source->GetRootNode());
 
     if (mode == DropMode::Onto) {
         // ForceSetParent already rejects reparenting under a descendant.

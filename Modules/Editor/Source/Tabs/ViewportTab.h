@@ -36,6 +36,7 @@ public:
     bool IsDesignMode() const { return m_DesignMode; }
 
 private:
+    void RecordSelectionEdit(const String& InTitle);
     bool IsPossessedByPlay() const;
     CameraNode* GetViewCamera() const;
 

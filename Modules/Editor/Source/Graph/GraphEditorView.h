@@ -75,6 +75,7 @@ private:
     void BreakConnectionsAt(const Vec2& InScreenPos);
 
     bool IsSelected(uint64_t InNodeId) const;
+    void RecordEdit(const String& InTitle);
     void NotifyGraphChanged();
     void NotifySelectionChanged();
     void SelectOnly(uint64_t InNodeId);

@@ -41,6 +41,7 @@ void ShaderGraphValueDetailsCustomization::BuildClassCategory(DetailsCategory& I
             if (!current) {
                 return;
             }
+            tab->RecordEdit("Edit Value", current);
             current->Value = InValue;
             if (value) {
                 value->NotifyChanged(current);

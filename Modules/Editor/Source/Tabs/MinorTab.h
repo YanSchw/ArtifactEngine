@@ -29,6 +29,8 @@ public:
     MajorTab* GetMajorTab() const { return m_MajorTab.Get(); }
     void SetMajorTab(MajorTab* InMajorTab) { m_MajorTab = InMajorTab; }
 
+    void RecordEdit(const String& InTitle, Object* InObject);
+
     UIDockNode* GetDockNode() const;
 
 private:
