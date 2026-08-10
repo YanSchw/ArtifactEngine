@@ -8,6 +8,7 @@ enum class PlatformType : uint32_t {
     Win64,
     MacOS,
     Linux,
+    Web,
 };
 
 class Platform {
@@ -16,6 +17,9 @@ public:
     static PlatformType CurrentPlatform();
 
     static Class GetDefaultRenderingAPIClass();
+
+    /** Class of the Surface the application presents into. */
+    static Class GetMainSurfaceClass();
 
     // Directory holding the application's bundled resources. In packaged builds this is the
     // platform's resource location (e.g. Contents/Resources inside a macOS .app); otherwise it is

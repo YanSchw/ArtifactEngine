@@ -33,6 +33,15 @@ static constexpr bool IsPackagedBuild() {
 #endif
 }
 
+static constexpr bool ShouldLogToConsole() {
+#if defined(AE_PLATFORM_WEB)
+    // A log file inside the browser's virtual filesystem is unreachable; its console is the log.
+    return true;
+#else
+    return !IsPackagedBuild();
+#endif
+}
+
 static std::filesystem::path GetPackagedBuildLogFileDirectory() {
     std::filesystem::path logFilePath;
 #if defined(AE_PLATFORM_WINDOWS)
@@ -123,7 +132,7 @@ static void CreateLoggerIfNotExists(const std::string& name) {
 
     std::vector<spdlog::sink_ptr> logSinks;
 
-    if (!IsPackagedBuild() /* || IsFlagSet("--LogToConsole") */) {
+    if (ShouldLogToConsole()) {
         logSinks.emplace_back(GetConsoleSink());
     }
     if (spdlog::sink_ptr fileSink = GetFileSink()) {

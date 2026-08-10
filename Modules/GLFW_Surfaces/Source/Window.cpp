@@ -71,6 +71,14 @@ static void ApplyIcon(GLFWwindow* InWindow) {
 }
 
 Window::Window(const WindowParams& InParams) {
+    Setup(InParams);
+}
+
+void Window::Initialize(const SurfaceParams& InParams) {
+    Setup(WindowParams{ InParams.Title, InParams.Width, InParams.Height, InParams.Fullscreen });
+}
+
+void Window::Setup(const WindowParams& InParams) {
     if (!s_Instance) {
         s_Instance = this;
     }

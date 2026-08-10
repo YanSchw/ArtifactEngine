@@ -30,6 +30,10 @@ Class Platform::GetDefaultRenderingAPIClass() {
     return Class("VulkanAPI");
 }
 
+Class Platform::GetMainSurfaceClass() {
+    return Class("Window");
+}
+
 String Platform::GetResourceDirectory() {
     auto resources = GetMacOSResourcesPath();
     if (resources.empty()) {

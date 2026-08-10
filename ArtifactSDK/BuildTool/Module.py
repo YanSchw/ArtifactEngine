@@ -20,6 +20,7 @@ class ArtifactModule:
         ExportIncludePaths: Optional[List[str]] = None,
         AddAdditionalCMakeProjects: Optional[List[str]] = None,
         LinkLibraries: Optional[List[str]] = None,
+        PlatformSourceDirectories: Optional[dict] = None,
         MountContentDir: Optional[str] = None,
         IsNonPackageOnly: bool = False,
     ):
@@ -36,6 +37,9 @@ class ArtifactModule:
             ExportIncludePaths: Include directories exported to dependents
             AddAdditionalCMakeProjects: Additional CMake projects to include
             LinkLibraries: System link libraries/flags passed straight to the linker
+            PlatformSourceDirectories: Extra source directories per target platform, compiled only
+                when building for it. Keep them out of SourceDirectories, which is globbed
+                recursively for every platform.
             MountContentDir: Module-local content directory to mount at runtime (relative to the module)
             IsNonPackageOnly: Strip the module (and its content) from packaged builds
         """
@@ -48,6 +52,7 @@ class ArtifactModule:
         self.ExportIncludePaths = ExportIncludePaths if ExportIncludePaths is not None else []
         self.AddAdditionalCMakeProjects = AddAdditionalCMakeProjects if AddAdditionalCMakeProjects is not None else []
         self.LinkLibraries = LinkLibraries if LinkLibraries is not None else []
+        self.PlatformSourceDirectories = PlatformSourceDirectories if PlatformSourceDirectories is not None else {}
         self.MountContentDir = MountContentDir
         self.IsNonPackageOnly = IsNonPackageOnly
 
@@ -87,6 +92,7 @@ class ArtifactModule:
             ExportIncludePaths=data.get("ExportIncludePaths", None),
             AddAdditionalCMakeProjects=data.get("AddAdditionalCMakeProjects", None),
             LinkLibraries=data.get("LinkLibraries", None),
+            PlatformSourceDirectories=data.get("PlatformSourceDirectories", None),
             MountContentDir=data.get("MountContentDir", None),
             IsNonPackageOnly=data.get("IsNonPackageOnly", False),
         )
@@ -95,9 +101,20 @@ class ArtifactModule:
         """Check if this module supports a specific platform."""
         return platform in self.TargetPlatforms if len(self.TargetPlatforms) > 0 else True
 
-    def get_source_files_pattern(self) -> List[str]:
+    def get_source_directories(self, platform: str) -> List[str]:
+        """Source directories compiled when building for the given target platform."""
+        directories = list(self.SourceDirectories) if self.SourceDirectories is not None else ["."]
+        return directories + list(self.PlatformSourceDirectories.get(platform, []))
+
+    def get_foreign_source_directories(self, platform: str) -> List[str]:
+        """Source directories belonging to a target platform other than the given one."""
+        return [directory
+                for target, directories in self.PlatformSourceDirectories.items() if target != platform
+                for directory in directories]
+
+    def get_source_files_pattern(self, platform: str) -> List[str]:
         """Get glob patterns for source files."""
-        return [f"{sd}/*.cpp" for sd in self.SourceDirectories]
+        return [f"{sd}/*.cpp" for sd in self.get_source_directories(platform)]
 
     def to_dict(self) -> dict:
         """Convert module to dictionary representation."""
@@ -109,6 +126,7 @@ class ArtifactModule:
             "ExportIncludePaths": self.ExportIncludePaths,
             "AddAdditionalCMakeProjects": self.AddAdditionalCMakeProjects,
             "LinkLibraries": self.LinkLibraries,
+            "PlatformSourceDirectories": self.PlatformSourceDirectories or None,
             "MountContentDir": self.MountContentDir,
             "IsNonPackageOnly": self.IsNonPackageOnly or None,
         }

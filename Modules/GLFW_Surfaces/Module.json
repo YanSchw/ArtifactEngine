@@ -15,5 +15,10 @@
     ],
     "AddAdditionalCMakeProjects": [
         "ThirdParty/glfw-3.4"
+    ],
+    "TargetPlatforms": [
+        "Win64",
+        "Linux",
+        "MacOS"
     ]
 }

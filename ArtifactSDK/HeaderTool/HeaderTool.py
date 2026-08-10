@@ -5,14 +5,21 @@ from HeaderTool.Class import Class
 from HeaderTool.Struct import Struct
 from HeaderTool.Enum import Enum
 from SDK.Util import get_module_name_from_path, smart_open
+from BuildTool.Module import ArtifactModule
 
 class HeaderTool:
-    def __init__(self):
+    def __init__(self, target_platform: str):
+        self.target_platform = target_platform
         self.headers_per_module = {} # dict[module_name: str, list[absolute_header_file_path: str]]
         self.types_per_header = {} # dict[header_name: str, list[Enum | Struct | Class]]
         self.visited_header = set()  # set of absolute header file paths to avoid processing the same header multiple times
         self.module_output_root = {}  # dict[module_name: str, owning_root_dir: str]
         self.header_output_root = {}  # dict[header_name: str, owning_root_dir: str]
+        self.skipped_dirs = set()  # absolute dirs belonging to another target platform
+
+    def _skips(self, dirpath: str) -> bool:
+        dirpath = os.path.normpath(dirpath)
+        return any(dirpath == skipped or dirpath.startswith(skipped + os.sep) for skipped in self.skipped_dirs)
 
     def collect_headers(self, dir, output_root):
         # if dir is not an absolute path, make it absolute by joining with current working directory
@@ -20,13 +27,30 @@ class HeaderTool:
             dir = os.path.join(os.getcwd(), dir)
         output_root = output_root.replace("\\", "/").rstrip("/")
 
-        # Register every module under the scanned root, so class-less modules are still reflected.
+        # Register every module the target platform builds, so class-less modules are still
+        # reflected. A module (or a source directory) belonging to another platform is not compiled,
+        # and its headers would not compile here either, so it is left out entirely.
         for module in os.listdir(dir):
-            if os.path.isdir(f"{dir}/{module}") and module not in self.headers_per_module:
+            module_dir = f"{dir}/{module}"
+            if not os.path.isdir(module_dir):
+                continue
+
+            if os.path.exists(f"{module_dir}/Module.json"):
+                metadata = ArtifactModule.load_from_json(module_dir)
+                if not metadata.supports_platform(self.target_platform):
+                    self.skipped_dirs.add(os.path.normpath(module_dir))
+                    continue
+                for foreign in metadata.get_foreign_source_directories(self.target_platform):
+                    self.skipped_dirs.add(os.path.normpath(f"{module_dir}/{foreign}"))
+
+            if module not in self.headers_per_module:
                 self.headers_per_module[module] = []
                 self.module_output_root[module] = output_root
 
         for dirpath, dirnames, filenames in os.walk(dir):
+            if self._skips(dirpath):
+                dirnames[:] = []
+                continue
             for filename in filenames:
                 if filename.endswith('.h') or filename.endswith('.hpp'):
                     header_path = f"{dirpath}/{filename}"

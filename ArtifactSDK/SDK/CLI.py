@@ -7,7 +7,7 @@ from BuildTool.Generate import generate_cmake
 from BuildTool.Build import build_cmake
 from BuildTool.IDEGen import generate_ide_project
 from SDK.Paths import get_engine_path, get_project_path
-from SDK.Platforms import get_current_platform, PlatformType
+from SDK.Platforms import get_current_platform, get_platform, get_platform_names, PlatformType
 from SDK.Util import png_to_ico
 from SDK.Job import Job, JobError
 from Lint.Lint import lint_files
@@ -31,7 +31,7 @@ def _generate(args):
         generate_cmake(project_path, args)
 
         # Generate reflection code for classes in Modules
-        header_tool = HeaderTool()
+        header_tool = HeaderTool(args.target)
         header_tool.collect_headers(f"{engine_path}/Modules", engine_path)
         header_tool.collect_headers(f"{project_path}/Modules", project_path)
         header_tool.generate()
@@ -45,7 +45,7 @@ def _generate(args):
     # IDE-triggered builds pass --skip-ide-project: regenerating the .xcodeproj /
     # .vcxproj while the IDE is mid-build rewrites the project file under it,
     # failing the build phase and invalidating the index.
-    if not getattr(args, "skip_ide_project", False):
+    if not getattr(args, "skip_ide_project", False) and get_platform(args.target) == get_current_platform():
         with Job("Generating IDE project files"):
             generate_ide_project(engine_path, project_path, args)
 
@@ -66,9 +66,9 @@ def cmd_build(args):
         _generate(args)
 
         with Job("Building", dump_on_error=False) as job:
-            build_cmake(job)
+            build_cmake(job, args.target)
 
-        if get_current_platform() == PlatformType.MacOS:
+        if get_platform(args.target) == PlatformType.MacOS == get_current_platform():
             from Package.MacOS import create_dev_bundle
             create_dev_bundle(get_project_path())
     except KeyboardInterrupt:
@@ -97,32 +97,57 @@ def cmd_run(args):
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while running the engine: {e}")
 
-def cmd_cook(args):
+def _cook(args, cook_platform: str):
+    """Cook the project's content for a target platform.
+
+    The cooker is the engine itself, so this always builds and runs a host binary; only the assets
+    and shaders it produces belong to the target.
+    """
     args.target = get_current_platform().name
     args.configuration = "Dev"
+    args.packaged = False
     args.clean = args.clean if hasattr(args, "clean") else False
     cmd_build(args)  # Ensure the engine is built before running the AssetCooker
     project_path = os.getcwd()
     cook_dir = f"{project_path}/Build/Intermediate/Cooked"
     os.makedirs(cook_dir, exist_ok=True)
+    with Job(f"Cooking for {cook_platform}") as job:
+        job.run([
+            f"{project_path}/Binaries/Artifact",
+            "-EngineClass=AssetCookerEngine",
+            f"-CookDirectory={cook_dir}",
+            f"-CookPlatform={cook_platform}",
+        ], check=True,  # non-zero exit fails the job
+           # AssetCooker logs "[current/total] Cooking asset: ..." (see AssetCooker.cpp).
+           progress_pattern=r"\[(\d+)/(\d+)\]")
+
+
+def cmd_cook(args):
     try:
-        with Job("Cooking") as job:
-            job.run([
-                f"{project_path}/Binaries/Artifact",
-                "-EngineClass=AssetCookerEngine",
-                f"-CookDirectory={cook_dir}",
-                f"-CookPlatform={args.target}",
-            ], check=True,  # non-zero exit fails the job
-               # AssetCooker logs "[current/total] Cooking asset: ..." (see AssetCooker.cpp).
-               progress_pattern=r"\[(\d+)/(\d+)\]")
+        _cook(args, get_platform(args.target).name)
     except KeyboardInterrupt:
         pass  # Allow graceful exit on Ctrl+C
     except JobError as e:
         sys.exit(e.returncode)
 
+PACKAGERS = {
+    PlatformType.MacOS: ("Package.MacOS", "package_for_macos"),
+    PlatformType.Win64: ("Package.Win64", "package_for_win64"),
+    PlatformType.Web: ("Package.Web", "package_for_web"),
+}
+
 def cmd_package(args):
     project_path = os.getcwd()
-    cmd_cook(args)  # Ensure assets are cooked before packaging
+    target = get_platform(args.target)
+    if target not in PACKAGERS:
+        print(f"Packaging for {target.name} is not implemented yet")
+        sys.exit(1)
+
+    try:
+        _cook(args, target.name)  # Ensure assets are cooked before packaging
+    except JobError as e:
+        sys.exit(e.returncode)
+
     # copy cooked assets to Content directory so they get included in the package
     cooked_src = f"{project_path}/Build/Intermediate/Cooked"
     content_dest = f"{project_path}/Dist/Cooked"
@@ -130,25 +155,18 @@ def cmd_package(args):
         shutil.rmtree(content_dest)
     shutil.copytree(cooked_src, content_dest)
 
-    args.target = get_current_platform().name
+    args.target = target.name
     args.configuration = "Dist"  # Always package the Dist configuration
     args.packaged = True  # Ensure the AE_PACKAGED macro is defined for packaging
     args.clean = True # Clean build artifacts before packaging to ensure a clean package
     cmd_build(args)
-    
+
     os.makedirs(f"{project_path}/Dist", exist_ok=True)
-    
-    if args.target == "MacOS":
-        from Package.MacOS import package_for_macos
-        with Job("Packaging"):
-            package_for_macos(project_path)
-    elif args.target == "Win64":
-        from Package.Win64 import package_for_win64
-        with Job("Packaging"):
-            package_for_win64(project_path)
-    else:
-        print("Only MacOS and Win64 packaging are implemented so far")
-        exit(1)
+
+    module_name, function_name = PACKAGERS[target]
+    package = getattr(__import__(module_name, fromlist=[function_name]), function_name)
+    with Job("Packaging"):
+        package(project_path)
 
 def cmd_docs(args):
     from DocsGen.DocsGen import generate_docs_json
@@ -214,12 +232,18 @@ def cmd_create_type(args):
     from SDK.Create import create_reflected_type
     create_reflected_type(args.kind, args.name, args.parent, args.module)
 
+def _target_platform(value: str) -> str:
+    try:
+        return get_platform(value).name
+    except RuntimeError:
+        raise argparse.ArgumentTypeError(f"unknown platform '{value}'")
+
 def main():
     parser = argparse.ArgumentParser(description="Artifact Engine Build Tool")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     generate_args_parser = argparse.ArgumentParser(add_help=False)
-    generate_args_parser.add_argument("--target", choices=["Win64", "MacOS", "Linux"], default=get_current_platform().name, help="Target platform to generate/build for")
+    generate_args_parser.add_argument("--target", type=_target_platform, choices=get_platform_names(), default=get_current_platform().name, help="Target platform to generate/build for")
     generate_args_parser.add_argument("--configuration", choices=["Debug", "Dev", "Dist"], default="Dev", help="Build configuration")
     generate_args_parser.add_argument("--packaged", action="store_true", default=False, help="Whether to build a packaged version (binary may be embedded into an application bundle)")
     generate_args_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before generating/building")
@@ -235,10 +259,10 @@ def main():
     run_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before running")
     run_parser.set_defaults(func=cmd_run)
 
-    cook_parser = subparsers.add_parser("cook", help="Cook assets")
+    cook_parser = subparsers.add_parser("cook", parents=[generate_args_parser], help="Cook assets")
     cook_parser.set_defaults(func=cmd_cook)
 
-    package_parser = subparsers.add_parser("package", help="Package project")
+    package_parser = subparsers.add_parser("package", parents=[generate_args_parser], help="Package project")
     package_parser.set_defaults(func=cmd_package)
 
     docs_parser = subparsers.add_parser("docs", help="Dump reflection data (classes, structs, enums, modules) as JSON for the Docs frontend")

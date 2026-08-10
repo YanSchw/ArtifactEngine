@@ -2,7 +2,7 @@
 #include "CoreMinimal.h"
 #include "Platform/Platform.h"
 
-#include "Window.h"
+#include "Rendering/Surface.h"
 #include "InputSystem/InputSystem.h"
 #include "Core/EngineConfig.h"
 #include "Rendering/RenderPipeline.h"
@@ -25,18 +25,18 @@
 #include "CameraController.h"
 #include "GameFramework/StaticMeshNode.h"
 
-static SharedObjectPtr<Window> s_Window;
+static SharedObjectPtr<Surface> s_Surface;
 static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
 static SharedObjectPtr<VertexBuffer> s_FullScreenQuadVertexBuffer;
 
-static bool IsWindowDrawable() {
-    return s_Window && !s_Window->IsMinimized() && s_Window->GetWidth() > 0 && s_Window->GetHeight() > 0;
+static bool IsSurfaceDrawable() {
+    return s_Surface && !s_Surface->IsMinimized() && s_Surface->GetWidth() > 0 && s_Surface->GetHeight() > 0;
 }
 
 void GameEngine::Initialize() {
-    s_Window = Window::Create(WindowParams{ "Artifact Engine", 1280, 720,
-                                            EngineConfig::GetConfigVar<bool>("Fullscreen") });
-    AE_ASSERT(s_Window);
+    s_Surface = Surface::CreateMain(SurfaceParams{ "Artifact Engine", 1280, 720,
+                                                   EngineConfig::GetConfigVar<bool>("Fullscreen") });
+    AE_ASSERT(s_Surface);
 
     Object::Create(Platform::GetDefaultRenderingAPIClass());
     AE_ASSERT(RenderingAPI::GetInstance(), "Failed to create RenderingAPI instance!");
@@ -59,7 +59,7 @@ void GameEngine::Initialize() {
     auto sampler = Sampler::Create({ FilterMode::Nearest, FilterMode::Nearest, AddressMode::Repeat, AddressMode::Repeat, AddressMode::Repeat });
 
     PipelineDesc fullscreenDesc;
-    fullscreenDesc.Target = s_Window;
+    fullscreenDesc.Target = s_Surface;
     fullscreenDesc.Shader = ShaderLibrary::CreateShader("/Shaders/Passthrough.glsl");
     fullscreenDesc.ImageBindings.Add({ 16, m_RenderPipeline->GetFinalImageView(), sampler });
     s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
@@ -75,23 +75,23 @@ void GameEngine::Initialize() {
         AE_ERROR("DefaultScene {0} could not be found", defaultSceneId.ToString());
     }
 
-    Window::SetRefreshCallback([this]() { RenderFrame(m_DeltaTime); });
+    s_Surface->SetRedrawCallback([this]() { RenderFrame(m_DeltaTime); });
 }
 
 void GameEngine::TickInput(double InDeltaTime) {
-    Window::PollEvents();
+    s_Surface->ProcessEvents();
     // Refresh devices + evaluate action maps before gameplay reads them.
     InputSystem::Get().Tick((float)InDeltaTime);
 }
 
 void GameEngine::RenderFrame(double InDeltaTime) {
-    if (!IsWindowDrawable()) {
+    if (!IsSurfaceDrawable()) {
         return;
     }
 
     m_RenderPipeline->Render(InDeltaTime, RenderParams {
-        s_Window->GetWidth(),
-        s_Window->GetHeight(),
+        s_Surface->GetWidth(),
+        s_Surface->GetHeight(),
         GetGameInstance()->GetCurrentWorld()
     });
 
@@ -111,13 +111,13 @@ void GameEngine::RenderFrame(double InDeltaTime) {
 bool GameEngine::MainTick(double InDeltaTime) {
     GetGameInstance()->Update(InDeltaTime);
     RenderFrame(InDeltaTime);
-    return !s_Window->ShouldClose();
+    return !s_Surface->ShouldClose();
 }
 
 void GameEngine::Shutdown() {
     m_GameInstance = nullptr;
     AssetManager::Get().Shutdown();
     ShaderLibrary::Shutdown();
-    s_Window = nullptr;
+    s_Surface = nullptr;
     RenderingAPI::GetInstance()->CleanUp(true);
 }

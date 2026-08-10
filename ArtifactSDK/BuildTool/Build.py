@@ -68,15 +68,18 @@ class BuildError(JobError):
         super().__init__(f"Build failed with return code {returncode}", returncode)
 
 
-def build_environment():
+def build_environment(target=None):
     """Return the environment used for CMake/Ninja invocations.
 
-    On macOS and Linux this is just the current environment (Ninja finds clang/
-    gcc on PATH). On Windows the Ninja generator needs the MSVC toolchain on
-    PATH; if cl.exe isn't already available we source vcvarsall.bat and merge in
-    the resulting environment so `artifact build` works from a plain shell.
+    Building for the Web replaces the host toolchain with emscripten's. Otherwise, on macOS and
+    Linux this is just the current environment (Ninja finds clang/gcc on PATH); on Windows the
+    Ninja generator needs the MSVC toolchain on PATH, so if cl.exe isn't already available we
+    source vcvarsall.bat and merge in the resulting environment.
     """
     env = os.environ.copy()
+    if target is not None and get_platform(target) == PlatformType.Web:
+        from SetupTool.Emscripten import get_build_environment
+        return get_build_environment(env)
     if get_current_platform() != PlatformType.Win64:
         return env
     if shutil.which("cl"):
@@ -94,7 +97,18 @@ def build_environment():
     return env
 
 
-def build_cmake(job=None):
+def get_toolchain_file(target):
+    """The CMake toolchain a cross-compiled target needs, or None to build for the host."""
+    if target is None or get_platform(target) != PlatformType.Web:
+        return None
+    from SetupTool.Emscripten import get_emsdk_root, get_toolchain_file as get_emscripten_toolchain
+    root = get_emsdk_root()
+    if root is None:
+        raise JobError("No emscripten SDK found. Run `artifact setup emscripten` to install one.", 1)
+    return str(get_emscripten_toolchain(root)).replace("\\", "/")
+
+
+def build_cmake(job=None, target=None):
     """Configure and build via CMake + Ninja.
 
     When a ``job`` is supplied, subprocess output is streamed into the job's
@@ -105,10 +119,13 @@ def build_cmake(job=None):
     if os.path.exists("Binaries"):
         shutil.rmtree("Binaries")
 
-    env = build_environment()
-    _clear_stale_cache()
+    env = build_environment(target)
+    toolchain = get_toolchain_file(target)
+    _clear_stale_cache(toolchain)
 
     configure_cmd = ["cmake", "-S", ".", "-G", CMAKE_GENERATOR, "-B", "Build"]
+    if toolchain is not None:
+        configure_cmd.append(f"-DCMAKE_TOOLCHAIN_FILE={toolchain}")
     build_cmd = ["cmake", "--build", "Build", "--config", "Debug"]
 
     if job is not None:
@@ -136,23 +153,26 @@ def build_cmake(job=None):
         raise BuildError(returncode)
 
 
-def _clear_stale_cache():
-    """Wipe the CMake cache if it was configured with a different generator.
+def _clear_stale_cache(toolchain=None):
+    """Wipe the CMake cache if it was configured for a different generator or toolchain.
 
-    Switching generators (e.g. the old Xcode/VS setup -> Ninja) leaves a
-    CMakeCache.txt that CMake refuses to reuse. Only the cache and CMakeFiles
-    are removed; the generated Intermediate sources are kept.
+    Switching generators (e.g. the old Xcode/VS setup -> Ninja) or targets (host <-> Web) leaves a
+    CMakeCache.txt that CMake refuses to reuse. Only the cache and CMakeFiles are removed; the
+    generated Intermediate sources are kept.
     """
     cache = os.path.join("Build", "CMakeCache.txt")
     if not os.path.exists(cache):
         return
-    previous_generator = None
+    entries = {}
     with open(cache) as f:
         for line in f:
-            if line.startswith("CMAKE_GENERATOR:"):
-                previous_generator = line.split("=", 1)[1].strip()
-                break
-    if previous_generator and previous_generator != CMAKE_GENERATOR:
+            name, separator, value = line.partition(":")
+            if separator:
+                entries[name] = value.split("=", 1)[-1].strip()
+
+    generator_changed = entries.get("CMAKE_GENERATOR", CMAKE_GENERATOR) != CMAKE_GENERATOR
+    toolchain_changed = entries.get("CMAKE_TOOLCHAIN_FILE", "") != (toolchain or "")
+    if generator_changed or toolchain_changed:
         os.remove(cache)
         cmake_files = os.path.join("Build", "CMakeFiles")
         if os.path.isdir(cmake_files):

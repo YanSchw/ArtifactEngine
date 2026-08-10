@@ -1,6 +1,6 @@
 #include "CameraController.h"
 
-#include "Window.h"
+#include "Rendering/Surface.h"
 #include "Assets/AssetManager.h"
 #include "Common/UUID.h"
 #include "InputSystem/InputSystem.h"
@@ -16,7 +16,7 @@ static const UUID s_InputMappingId = UUID::FromString("f47ac10b-58cc-4372-a567-0
 void CameraController::BeginPlay() {
     Super::BeginPlay();
 
-    Window::GetInstance()->SetCursorLocked(true);
+    Surface::GetMain()->SetCursorLocked(true);
 
     // Drive the camera every frame.
     SetUpdateFlag(UpdateFlag::WorldUpdate);
@@ -45,7 +45,8 @@ void CameraController::WorldUpdate(float InDeltatime) {
 
     // --- Look (mouse delta is already per-frame, so no deltatime here) ---
     Vec2 look = m_LookAction->ReadVec2() * LOOK_SENSITIVITY;
-    bool gamepad = InputSystem::Get().GetLastActiveDevice()->As<GamepadDevice>() != nullptr;
+    InputDevice* activeDevice = InputSystem::Get().GetLastActiveDevice().Get();
+    bool gamepad = activeDevice && activeDevice->As<GamepadDevice>();
     m_Yaw += look.x * m_LookSensitivity;
     m_Pitch += look.y * m_LookSensitivity * (gamepad ? -1 : 1);
     m_Pitch = glm::clamp(m_Pitch, -89.0f, 89.0f);

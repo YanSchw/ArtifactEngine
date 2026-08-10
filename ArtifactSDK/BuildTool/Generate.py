@@ -2,7 +2,7 @@ import os
 import json
 
 from SDK.Version import VERSION_MAJOR, VERSION_MINOR, get_patch_version
-from SDK.Platforms import PlatformType, get_current_platform, get_cpp_platform_macro
+from SDK.Platforms import PlatformType, get_platform, get_cpp_platform_macro
 from SDK.Paths import get_engine_path
 from BuildTool.Target import TargetType, get_cpp_target_macro
 from BuildTool.Module import ArtifactModule
@@ -80,6 +80,41 @@ def expand_indirect_module_dependencies(module_dirs: dict[str, str], import_modu
 
     return expanded
 
+def get_emscripten_setup(project_path: str, target_configuration: str, is_packaged: bool) -> str:
+    """Compile settings the whole tree needs under emscripten, including the vendored projects.
+
+    The binary is emitted as Artifact.js (plus the .wasm and .data next to it); `artifact package`
+    turns those into the hostable Dist/Artifact directory.
+    """
+    # The build always drives the Debug CMake configuration, whose -g would otherwise leave the
+    # DWARF for the whole engine in the shipped wasm.
+    optimization = "-O3 -g0" if target_configuration == "Dist" else "-O1"
+    return f"""set(CMAKE_EXECUTABLE_SUFFIX ".js")
+# Wasm exceptions rather than the JavaScript emulation: the engine throws, and every object in the
+# link has to agree on the model.
+add_compile_options(-fwasm-exceptions {optimization})
+"""
+
+
+def get_emscripten_link_options(project_path: str, target_configuration: str, is_packaged: bool) -> str:
+    options = [
+        "-fwasm-exceptions",
+        "-O3 -g0" if target_configuration == "Dist" else "-O1",
+        "-sMIN_WEBGL_VERSION=2",
+        "-sMAX_WEBGL_VERSION=2",
+        "-sALLOW_MEMORY_GROWTH=1",
+        "-sINITIAL_MEMORY=134217728",
+        "-sSTACK_SIZE=4194304",
+        "-sENVIRONMENT=web",
+        "-sEXIT_RUNTIME=0",
+    ]
+    if is_packaged:
+        # Everything the package ships is cooked; emscripten bakes it into Artifact.data and mounts
+        # it at the path Platform::GetContentDirectory() resolves to.
+        options.append(f'--preload-file "{project_path}/Dist/Cooked@/Content"')
+    return "target_link_options(Artifact PRIVATE\n    " + "\n    ".join(options) + "\n)\n"
+
+
 def generate_cmake(project_path: str, args):
     target_platform = args.target
     target_configuration = args.configuration
@@ -92,7 +127,7 @@ def generate_cmake(project_path: str, args):
     modules = discover_modules(engine_path, project_path, target_platform, is_packaged)
     module_dirs = {name: module_dir for name, module_dir, _, _ in modules}
 
-    global_definitions = [get_cpp_platform_macro(get_current_platform()), get_cpp_target_macro(target_configuration)]
+    global_definitions = [get_cpp_platform_macro(target_platform), get_cpp_target_macro(target_configuration)]
     if is_packaged:
         global_definitions.append("AE_PACKAGED")
 
@@ -124,8 +159,10 @@ endif()
 
 add_compile_definitions({" ".join(global_definitions)})
 
+{get_emscripten_setup(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}
 add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp)
 
+{get_emscripten_link_options(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}
 if (WIN32)
     set(APP_ICON_RESOURCE "{project_path}/Build/Intermediate/Resources/Win64IconResource.rc")
     target_sources(Artifact PRIVATE ${{APP_ICON_RESOURCE}})
@@ -139,7 +176,7 @@ endif()
 
         for module_name, module_dir, module, owning_root in modules:
             with smart_open(f"{module_dir}/CMakeLists.txt") as mf:
-                cpp_src = 'file(GLOB_RECURSE cpp_src "*.cpp")' if module.SourceDirectories is None else f'file(GLOB_RECURSE cpp_src {" ".join(module.get_source_files_pattern())})'
+                cpp_src = f'file(GLOB_RECURSE cpp_src {" ".join(module.get_source_files_pattern(target_platform))})'
                 mf.write(f"""# Generated using Artifact Build Tool for {module_name}
 {cpp_src}
 add_library({module_name} ${{cpp_src}} {owning_root}/Build/Intermediate/Modules/{module_name}.gen.cpp)

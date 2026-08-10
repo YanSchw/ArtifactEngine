@@ -36,6 +36,30 @@ void CompiledShader::Serialize(ChunkWriter& OutWriter) const {
         OutWriter << (uint64_t)stage.ByteCode->GetSizeInBytes();
         OutWriter.WriteBytes(stage.ByteCode->GetData(), stage.ByteCode->GetSizeInBytes());
     }
+
+    SerializeBindings(OutWriter, UniformBlocks);
+    SerializeBindings(OutWriter, Samplers);
+}
+
+void CompiledShader::SerializeBindings(ChunkWriter& OutWriter, const Array<CompiledShaderBinding>& InBindings) {
+    OutWriter << (uint32_t)InBindings.Size();
+    for (const CompiledShaderBinding& binding : InBindings) {
+        OutWriter << binding.Name;
+        OutWriter << binding.Binding;
+    }
+}
+
+void CompiledShader::DeserializeBindings(ChunkReader& InReader, Array<CompiledShaderBinding>& OutBindings) {
+    uint32_t count = 0;
+    InReader >> count;
+
+    OutBindings.Clear();
+    for (uint32_t i = 0; i < count; i++) {
+        CompiledShaderBinding binding;
+        InReader >> binding.Name;
+        InReader >> binding.Binding;
+        OutBindings.Add(binding);
+    }
 }
 
 bool CompiledShader::Deserialize(ChunkReader& InReader) {
@@ -78,6 +102,9 @@ bool CompiledShader::Deserialize(ChunkReader& InReader) {
         compiledStage.ByteCode = new ByteString((size_t)size, data);
         Stages.Add(compiledStage);
     }
+
+    DeserializeBindings(InReader, UniformBlocks);
+    DeserializeBindings(InReader, Samplers);
 
     return IsValid();
 }

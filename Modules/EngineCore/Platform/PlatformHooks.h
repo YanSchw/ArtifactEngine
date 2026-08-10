@@ -1,6 +1,7 @@
 #pragma once
 #include "Object/Object.h"
 #include "Common/String.h"
+#include <functional>
 #include "PlatformHooks.gen.h"
 
 /* Behaviour only some platforms have. Every hook defaults to doing nothing. */
@@ -9,6 +10,13 @@ public:
     ARTIFACT_CLASS();
 
     static PlatformHooks& Get();
+
+    /** Drives the engine's frame loop until the tick returns false. The default runs it inline,
+     *  paced by the CapFPS budget; hosts that own the main thread hand the tick to them instead. */
+    virtual void RunMainLoop(const std::function<bool()>& InTick);
+
+    /** Whether work can run off the main thread. */
+    virtual bool SupportsBackgroundThreads() const { return true; }
 
     virtual void SetApplicationIcon(const String& InImagePath) { (void)InImagePath; }
 

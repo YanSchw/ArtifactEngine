@@ -33,7 +33,9 @@ int ArtifactMain(const Array<String>& InArgs) {
 
     EngineConfig::Initialize(InArgs);
 
-    SharedObjectPtr<Engine> engine = Object::Create<Engine>(EngineConfig::EngineClass());
+    // Owned for the lifetime of the process: a host that drives the frame loop
+    // itself leaves ArtifactMain before the engine is finished with.
+    static SharedObjectPtr<Engine> engine = Object::Create<Engine>(EngineConfig::EngineClass());
     AE_ASSERT(engine, "Failed to create engine instance!");
     engine->Initialize();
     engine->MainLoop();

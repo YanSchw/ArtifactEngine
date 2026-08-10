@@ -1,6 +1,29 @@
 #include "GamepadDevice.h"
 #include "InputSystem.h"
 
+// Radius around the stick centre that reads as no input at all.
+static constexpr float s_StickDeadzone = 0.15f;
+
+Vec2 GamepadDevice::ApplyStickDeadzone(const Vec2& InStick) {
+    const float length = glm::length(InStick);
+    if (length < s_StickDeadzone) {
+        return Vec2(0.0f);
+    }
+    const float rescaled = (length - s_StickDeadzone) / (1.0f - s_StickDeadzone);
+    return InStick * (rescaled / length);
+}
+
+void GamepadDevice::ResetState() {
+    m_Connected = false;
+    for (auto& [button, pressed] : m_Buttons) {
+        pressed = false;
+    }
+    m_LeftStick = Vec2(0.0f);
+    m_RightStick = Vec2(0.0f);
+    m_LeftTrigger = 0.0f;
+    m_RightTrigger = 0.0f;
+}
+
 GamepadDevice::GamepadDevice() {
     for (GamepadCode button : EGamepadCode::GetValues()) {
         m_Buttons[button] = false;

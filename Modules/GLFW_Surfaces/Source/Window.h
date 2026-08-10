@@ -20,6 +20,8 @@ struct WindowParams {
 class Window : public Surface {
 public:
     ARTIFACT_CLASS();
+
+    Window() = default;
 protected:
     Window(const WindowParams& InParams);
 public:
@@ -27,12 +29,16 @@ public:
 
     void TickWindow();
 
+    virtual void Initialize(const SurfaceParams& InParams) override;
+    virtual void ProcessEvents() override { PollEvents(); }
+    virtual void SetRedrawCallback(const std::function<void()>& InCallback) override { SetRefreshCallback(InCallback); }
+
     virtual uint32_t GetWidth() const override;
     virtual uint32_t GetHeight() const override;
     void SetResizedFlag(bool InFlag);
     bool WasWindowResized() const;
 
-    bool ShouldClose() const;
+    virtual bool ShouldClose() const override;
     static void PollEvents();
 
     static void SetRefreshCallback(const std::function<void()>& InCallback);
@@ -40,7 +46,7 @@ public:
     void Minimize();
     void ToggleMaximize();
     bool IsMaximized() const;
-    bool IsMinimized() const;
+    virtual bool IsMinimized() const override;
     void Close();
 
     void SetFullscreen(bool InFullscreen);
@@ -71,10 +77,8 @@ public:
      *  then handles dragging, snapping and double-click itself. */
     virtual bool HitTestTitleBar(const Vec2& InPoint) const { (void)InPoint; return false; }
 
-    // Lock + hide the cursor for relative mouse look (GLFW_CURSOR_DISABLED),
-    // or restore the normal visible cursor.
-    void SetCursorLocked(bool InLocked);
-    bool IsCursorLocked() const;
+    virtual void SetCursorLocked(bool InLocked) override;
+    virtual bool IsCursorLocked() const override;
 
     /** Pointer shape shown while the cursor is over this window. */
     void SetCursorIcon(CursorIcon InIcon);
@@ -86,6 +90,8 @@ public:
     static struct GLFWwindow* GetGLFWwindow();
     struct GLFWwindow* GetNativeWindow() const { return m_Window; }
 private:
+    void Setup(const WindowParams& InParams);
+
     WindowParams m_Params;
     struct GLFWwindow* m_Window = nullptr;
     bool m_CursorLocked = false;

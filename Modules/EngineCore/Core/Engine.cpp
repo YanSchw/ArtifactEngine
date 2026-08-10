@@ -1,8 +1,7 @@
 #include "Engine.h"
 
 #include "EngineConfig.h"
-
-#include <thread>
+#include "Platform/PlatformHooks.h"
 
 static Engine* s_Instance = nullptr;
 
@@ -24,39 +23,19 @@ void Engine::RequestExit(bool InForce) {
     }
 }
 
-static void WaitForFrameBudget(std::chrono::steady_clock::time_point InFrameStart) {
-    const int capFPS = EngineConfig::GetConfigVar<int>("CapFPS");
-    if (capFPS <= 0) {
-        return;
-    }
+bool Engine::Tick() {
+    const auto frameStart = std::chrono::steady_clock::now();
+    m_DeltaTime = std::chrono::duration<double>(frameStart - m_PreviousTime).count();
+    m_PreviousTime = frameStart;
 
-    using namespace std::chrono;
-    const auto frameEnd = InFrameStart + duration_cast<steady_clock::duration>(duration<double>(1.0 / capFPS));
-
-    constexpr auto sleepMargin = milliseconds(2);
-    const auto remaining = frameEnd - steady_clock::now();
-    if (remaining > sleepMargin) {
-        std::this_thread::sleep_for(remaining - sleepMargin);
-    }
-    while (steady_clock::now() < frameEnd) {
-        std::this_thread::yield();
-    }
+    // Refresh input before gameplay reads it this frame.
+    TickInput(m_DeltaTime);
+    return MainTick(m_DeltaTime) && s_IsRunning;
 }
 
 void Engine::MainLoop() {
     m_PreviousTime = std::chrono::steady_clock::now();
-    bool keepRunning = true;
-    do {
-        const auto frameStart = std::chrono::steady_clock::now();
-        m_DeltaTime = std::chrono::duration<double>(frameStart - m_PreviousTime).count();
-        m_PreviousTime = frameStart;
-
-        // Refresh input before gameplay reads it this frame.
-        TickInput(m_DeltaTime);
-        keepRunning = MainTick(m_DeltaTime) && s_IsRunning;
-
-        WaitForFrameBudget(frameStart);
-    } while (keepRunning);
+    PlatformHooks::Get().RunMainLoop([this] { return Tick(); });
 }
 
 Engine& Engine::Get() {

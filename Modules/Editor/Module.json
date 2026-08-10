@@ -11,5 +11,10 @@
         "UserInterface"
     ],
     "MountContentDir": "Content",
-    "IsNonPackageOnly": true
+    "IsNonPackageOnly": true,
+    "TargetPlatforms": [
+        "Win64",
+        "Linux",
+        "MacOS"
+    ]
 }

@@ -38,6 +38,13 @@ public:
 protected:
     virtual void Tick() override;
 
+    /** Sticks never rest at exactly zero; anything inside the deadzone reads as centered and the
+     *  rest is rescaled so motion still starts smoothly at its edge. */
+    static Vec2 ApplyStickDeadzone(const Vec2& InStick);
+
+    /** Centers every control. */
+    void ResetState();
+
 protected:
     Map<GamepadCode, bool> m_Buttons;
     Vec2 m_LeftStick = {0.0f, 0.0f};

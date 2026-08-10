@@ -29,6 +29,8 @@ protected:
     // module dependency), so engine modules override this to tick it.
     virtual void TickInput(double InDeltaTime) {}
 
+    /** One frame; false once the engine wants to stop. */
+    bool Tick();
     void MainLoop();
 
 protected:

@@ -6,6 +6,7 @@
 #include "Serialization/Binary.h"
 #include "Serialization/Json.h"
 #include "Core/EngineConfig.h"
+#include "Platform/PlatformHooks.h"
 
 #include <thread>
 #include <mutex>
@@ -36,7 +37,9 @@ void AssetManager::Initialize(bool InLoadAssets) {
     s_Instance = this;
 
     // Spawn a separate thread to load assets
-    s_AssetLoadingThread = std::thread(AssetManager::AssetStreamingThreadFunc);
+    if (PlatformHooks::Get().SupportsBackgroundThreads()) {
+        s_AssetLoadingThread = std::thread(AssetManager::AssetStreamingThreadFunc);
+    }
 
     if (EngineConfig::IsPackagedBuild()) {
         // In packaged builds, we load asset metadata from the "AssetIndex" that lists all assets and their UUIDs.

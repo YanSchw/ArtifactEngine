@@ -11,5 +11,10 @@
     ],
     "AddAdditionalCMakeProjects": [
         "ThirdParty/VulkanSDK"
+    ],
+    "TargetPlatforms": [
+        "Win64",
+        "Linux",
+        "MacOS"
     ]
 }

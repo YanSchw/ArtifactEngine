@@ -1,0 +1,20 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "PlatformSourceDirectories": {
+        "Web": [
+            "Browser"
+        ]
+    },
+    "IncludePaths": [
+        "Source"
+    ],
+    "ExportIncludePaths": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore",
+        "InputSystem"
+    ]
+}
