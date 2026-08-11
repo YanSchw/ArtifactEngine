@@ -1,6 +1,7 @@
 #include "World.h"
 #include "Node.h"
 #include "Component.h"
+#include "WorldSubsystem.h"
 #include "Assets/Scene.h"
 #include "Common/Map.h"
 #include "Core/Assert.h"
@@ -118,6 +119,24 @@ static int32_t LiveCount(const Array<Node*>& InNodes) {
     return count;
 }
 
+World::World() {
+    for (const Class& subsystemClass : Class::GetSubclassesOf(WorldSubsystem::StaticClass())) {
+        if (subsystemClass == WorldSubsystem::StaticClass()) {
+            continue;
+        }
+
+        WorldSubsystem* subsystem = Cast<WorldSubsystem>(Object::Create(subsystemClass));
+        if (!subsystem) {
+            AE_ERROR("Cannot create WorldSubsystem '{0}'", subsystemClass.Name);
+            continue;
+        }
+
+        subsystem->m_World = this;
+        m_Subsystems.Add(subsystem);
+        subsystem->Initialize();
+    }
+}
+
 World::~World() {
     for (Node* node : m_WorldNodes) {
         if (!node->IsPendingKill()) {
@@ -125,6 +144,20 @@ World::~World() {
         }
     }
     ResolvePendingKills();
+
+    for (const SharedObjectPtr<WorldSubsystem>& subsystem : m_Subsystems) {
+        subsystem->Shutdown();
+    }
+    m_Subsystems.Clear();
+}
+
+WorldSubsystem* World::GetSubsystem(const Class& InClass) const {
+    for (const SharedObjectPtr<WorldSubsystem>& subsystem : m_Subsystems) {
+        if (subsystem->IsA(InClass)) {
+            return subsystem.Get();
+        }
+    }
+    return nullptr;
 }
 
 void World::Update(double InDeltatime) {
@@ -132,7 +165,9 @@ void World::Update(double InDeltatime) {
 
     ResolveAllBeginPlayIssues();
 
-    // GetPhysicsWorld()->Update(deltaTime);
+    for (const SharedObjectPtr<WorldSubsystem>& subsystem : m_Subsystems) {
+        subsystem->WorldUpdate((float)InDeltatime);
+    }
 
     WorldUpdate((float)InDeltatime);
     HalfWorldUpdate((float)InDeltatime);

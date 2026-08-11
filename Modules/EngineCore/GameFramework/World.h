@@ -7,15 +7,23 @@ class Node;
 class CameraNode;
 class Scene;
 class SceneRootNode;
+class WorldSubsystem;
 
 /** Container for all Nodes during Gameplay */
 class World final : public Object {
 public:
     ARTIFACT_CLASS();
 
+    World();
     virtual ~World();
 
     void Update(double InDeltatime);
+
+    WorldSubsystem* GetSubsystem(const Class& InClass) const;
+    template<typename T>
+    T* GetSubsystem() const {
+        return Cast<T>(GetSubsystem(T::StaticClass()));
+    }
 
     void ResolvePendingKills();
 
@@ -68,6 +76,8 @@ private:
     Array<Node*> m_PendingKills;
 
     WeakObjectPtr<CameraNode> m_MainCamera;
+
+    Array<SharedObjectPtr<WorldSubsystem>> m_Subsystems;
 
     friend class Node;
 };
