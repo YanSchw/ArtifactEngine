@@ -22,6 +22,12 @@ VectorImage* EditorIcons::GetNodeIcon(const Class& InClass) {
         s_NodeIcons["StaticMeshNode"] = Get("b1c2d3e4-000f-4a00-9000-00000000000f");
         s_NodeIcons["CameraNode"] = Get("f1c0210c-a27e-4d46-8b20-9fdf39a88193");
         s_NodeIcons["Component"] = Get("b1c2d3e4-0009-4a00-9000-000000000012");
+        s_NodeIcons["BoxShapeNode"] = BoxShape();
+        s_NodeIcons["SphereShapeNode"] = SphereShape();
+        s_NodeIcons["CapsuleShapeNode"] = CapsuleShape();
+        s_NodeIcons["CylinderShapeNode"] = CylinderShape();
+        s_NodeIcons["RigidBodyNode"] = RigidBody();
+        s_NodeIcons["CharacterNode"] = Character();
     }
 
     VectorImage* icon = nullptr;

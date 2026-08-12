@@ -42,6 +42,12 @@ public:
     static VectorImage* Eject()         { return Get("b96bbcd6-154c-4705-a371-db1c7d229b3d"); }
     static VectorImage* Possess()       { return Get("d273a65f-36fb-4737-b30e-85549591eec9"); }
     static VectorImage* Material()      { return Get("64a96b51-290f-4883-a5fd-b1e7707b4fd8"); }
+    static VectorImage* BoxShape()      { return Get("8b08ff80-2548-494d-b6dd-ef63ae979485"); }
+    static VectorImage* SphereShape()   { return Get("09560261-b21c-45b0-952a-6c80331d2fe4"); }
+    static VectorImage* CapsuleShape()  { return Get("ca8c7b74-272d-41a5-bde0-3b4496ff5dc9"); }
+    static VectorImage* CylinderShape() { return Get("1e9a2e01-2f2f-4873-b28a-947f2f69c2c3"); }
+    static VectorImage* RigidBody()     { return Get("d06d74b9-dfa5-4126-981a-4b9872ab540a"); }
+    static VectorImage* Character()     { return Get("37661651-475f-4abb-9aab-8d05e8da1fc0"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
     static VectorImage* GetAssetIcon(const Class& InClass);

@@ -1,0 +1,16 @@
+{
+    "SourceDirectories": [
+        "Source",
+        "ThirdParty/JoltPhysics/Jolt"
+    ],
+    "ImportModules": [
+        "EngineCore"
+    ],
+    "IncludePaths": [
+        "Source",
+        "ThirdParty/JoltPhysics"
+    ],
+    "ExportIncludePaths": [
+        "Source"
+    ]
+}
