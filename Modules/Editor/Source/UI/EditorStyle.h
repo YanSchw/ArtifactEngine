@@ -50,6 +50,13 @@ public:
     inline static const Vec4 TransformY = HexColor(0x71B33C);
     inline static const Vec4 TransformZ = HexColor(0x3D7BD8);
 
+    // Shortcuts
+#if defined(AE_PLATFORM_MACOS)
+    inline static const String CommandKey = "Cmd";
+#else
+    inline static const String CommandKey = "Ctrl";
+#endif
+
     // Metrics
     inline static constexpr float TitleBarHeight = 36.0f;
     inline static constexpr float ToolBarHeight = 40.0f;

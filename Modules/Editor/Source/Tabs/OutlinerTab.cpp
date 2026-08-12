@@ -1,6 +1,7 @@
 #include "OutlinerTab.h"
 #include "OutlinerRow.h"
 #include "MajorTab.h"
+#include "ThemedWindow.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/EditorDragDrop.h"
@@ -11,14 +12,37 @@
 #include "GameFramework/UITextArea.h"
 #include "GameFramework/UICanvas.h"
 #include "Assets/AssetManager.h"
+#include "Assets/NodeRecord.h"
 #include "Assets/VectorImage.h"
 #include "Common/UUID.h"
+#include "InputSystem/Clipboard.h"
 #include "InputSystem/KeyboardDevice.h"
 #include <algorithm>
 #include <cctype>
 
+static const char* s_ClipboardKey = "ArtifactNodes";
+
 VectorImage* OutlinerTab::GetTabIcon() const {
     return EditorIcons::Outliner();
+}
+
+static bool IsCommandHeld(KeyboardDevice& InKeyboard) {
+    return InKeyboard.IsPressed(KeyCode::LeftControl) || InKeyboard.IsPressed(KeyCode::RightControl)
+        || InKeyboard.IsPressed(KeyCode::LeftSuper) || InKeyboard.IsPressed(KeyCode::RightSuper);
+}
+
+static Array<SharedObjectPtr<NodeRecord>> ReadClipboardRecords() {
+    Array<SharedObjectPtr<NodeRecord>> records;
+    const nlohmann::json clipboard = nlohmann::json::parse(Clipboard::GetText(), nullptr, false);
+    if (!clipboard.is_object() || !clipboard.contains(s_ClipboardKey) || !clipboard[s_ClipboardKey].is_array()) {
+        return records;
+    }
+    for (const nlohmann::json& entry : clipboard[s_ClipboardKey]) {
+        if (SharedObjectPtr<NodeRecord> record = NodeRecord::FromJson(entry)) {
+            records.Add(record);
+        }
+    }
+    return records;
 }
 
 OutlinerTab::OutlinerTab() {
@@ -276,21 +300,159 @@ void OutlinerTab::SpawnDroppedAsset(Asset* InAsset, const Vec2& InCursorPos) {
     major->SetSelection(spawned);
 }
 
+Array<Node*> OutlinerTab::GetCopyableSelection() const {
+    Array<Node*> nodes;
+    MajorTab* major = GetMajorTab();
+    if (!major) {
+        return nodes;
+    }
+    for (Object* selected : major->GetSelection()) {
+        Node* node = Cast<Node>(selected);
+        if (node && !major->IsAssetRootNode(node)) {
+            nodes.Add(node);
+        }
+    }
+    // A node a selected ancestor already brings along must not be copied a second time.
+    for (int32_t i = nodes.Size() - 1; i >= 0; i--) {
+        for (Node* other : nodes) {
+            if (other != nodes[i] && nodes[i]->IsChildOf(other)) {
+                nodes.RemoveAt(i);
+                break;
+            }
+        }
+    }
+    return nodes;
+}
+
+void OutlinerTab::CopySelection() {
+    const Array<Node*> nodes = GetCopyableSelection();
+    if (nodes.IsEmpty()) {
+        return;
+    }
+    nlohmann::json records = nlohmann::json::array();
+    for (Node* node : nodes) {
+        records.push_back(NodeRecord::Capture(*node)->ToJson());
+    }
+    nlohmann::json clipboard = nlohmann::json::object();
+    clipboard[s_ClipboardKey] = records;
+    Clipboard::SetText(clipboard.dump());
+}
+
+bool OutlinerTab::ClipboardHasNodes() {
+    return !ReadClipboardRecords().IsEmpty();
+}
+
+Node* OutlinerTab::GetPasteParent() const {
+    MajorTab* major = GetMajorTab();
+    if (!major) {
+        return nullptr;
+    }
+    Node* selected = Cast<Node>(major->GetSoleSelection());
+    return (selected && selected->GetParent()) ? selected->GetParent() : major->GetAssetRootNode();
+}
+
+Node* OutlinerTab::PasteRecord(const NodeRecord& InRecord, Node& InParent) {
+    Node* node = InRecord.Instantiate(&InParent);
+    if (!node) {
+        return nullptr;
+    }
+    if (!IsExpanded(&InParent)) {
+        ToggleExpanded(&InParent);
+    }
+    return node;
+}
+
+void OutlinerTab::PasteInto(Node* InParent) {
+    MajorTab* major = GetMajorTab();
+    Node* parent = InParent ? InParent : GetPasteParent();
+    const Array<SharedObjectPtr<NodeRecord>> records = ReadClipboardRecords();
+    if (!major || !parent || records.IsEmpty()) {
+        return;
+    }
+
+    RecordEdit("Paste", parent);
+    Array<Object*> pasted;
+    for (const SharedObjectPtr<NodeRecord>& record : records) {
+        if (Node* node = PasteRecord(*record, *parent)) {
+            pasted.Add(node);
+        }
+    }
+    if (!pasted.IsEmpty()) {
+        major->SetSelection(pasted);
+    }
+}
+
+void OutlinerTab::DuplicateSelection() {
+    MajorTab* major = GetMajorTab();
+    const Array<Node*> nodes = GetCopyableSelection();
+    if (!major || nodes.IsEmpty()) {
+        return;
+    }
+
+    Array<SharedObjectPtr<NodeRecord>> records;
+    Array<Node*> parents;
+    for (Node* node : nodes) {
+        if (Node* parent = node->GetParent()) {
+            records.Add(NodeRecord::Capture(*node));
+            parents.Add(parent);
+        }
+    }
+    for (Node* parent : parents) {
+        RecordEdit("Duplicate", parent);
+    }
+
+    Array<Object*> duplicates;
+    for (int32_t i = 0; i < records.Size(); i++) {
+        if (Node* node = PasteRecord(*records[i], *parents[i])) {
+            duplicates.Add(node);
+        }
+    }
+    if (!duplicates.IsEmpty()) {
+        major->SetSelection(duplicates);
+    }
+}
+
+bool OutlinerTab::AcceptsShortcuts() const {
+    UICanvas* canvas = GetCanvas();
+    if (!canvas) {
+        return false;
+    }
+    // Shortcuts must not fire while typing in this (or any) text field.
+    UINode* focused = canvas->GetFocusedNode();
+    if (focused && focused->As<UITextArea>()) {
+        return false;
+    }
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        if (window.Get() && window->GetCanvas() == canvas) {
+            return window->IsFocused();
+        }
+    }
+    return false;
+}
+
 void OutlinerTab::OnUIUpdate(const UIFrameContext& InContext) {
     (void)InContext;
     KeyboardDevice* keyboard = KeyboardDevice::Instance();
-    if (!keyboard || !keyboard->IsDown(KeyCode::F2)) {
+    if (!keyboard || !AcceptsShortcuts()) {
         return;
     }
-    // F2 must not fire while typing in this (or any) text field.
-    UICanvas* canvas = GetCanvas();
-    UINode* focused = canvas ? canvas->GetFocusedNode() : nullptr;
-    if (focused && focused->As<UITextArea>()) {
+
+    if (IsCommandHeld(*keyboard)) {
+        if (keyboard->IsDown(KeyCode::C)) {
+            CopySelection();
+        } else if (keyboard->IsDown(KeyCode::V)) {
+            PasteInto(nullptr);
+        } else if (keyboard->IsDown(KeyCode::D)) {
+            DuplicateSelection();
+        }
         return;
     }
-    Node* selected = GetMajorTab() ? Cast<Node>(GetMajorTab()->GetSoleSelection()) : nullptr;
-    if (selected && m_Renaming.Get() != selected) {
-        BeginRename(selected);
+
+    if (keyboard->IsDown(KeyCode::F2)) {
+        Node* selected = GetMajorTab() ? Cast<Node>(GetMajorTab()->GetSoleSelection()) : nullptr;
+        if (selected && m_Renaming.Get() != selected) {
+            BeginRename(selected);
+        }
     }
 }
 

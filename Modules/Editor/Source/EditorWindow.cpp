@@ -36,12 +36,6 @@ static void ClearChildren(UINode* InNode) {
     }
 }
 
-#if defined(AE_PLATFORM_MACOS)
-static const String s_CommandKey = "Cmd";
-#else
-static const String s_CommandKey = "Ctrl";
-#endif
-
 EditorWindow::EditorWindow(const WindowParams& InParams)
     : ThemedWindow(InParams) {
     RegisterHeroTools();
@@ -136,9 +130,9 @@ void EditorWindow::AddTitleBarMenu(UINode& InRow, const String& InTitle, std::fu
 void EditorWindow::BuildFileMenu(UIMenuModel& OutMenu) {
     MajorTab* tab = m_ActiveTab;
     OutMenu.Item("Undo " + (tab ? tab->GetUndoTitle() : String()), [tab] { tab->Undo(); })
-           .Shortcut(s_CommandKey + "+Z").Enabled(tab && tab->CanUndo());
+           .Shortcut(EditorStyle::CommandKey + "+Z").Enabled(tab && tab->CanUndo());
     OutMenu.Item("Redo " + (tab ? tab->GetRedoTitle() : String()), [tab] { tab->Redo(); })
-           .Shortcut(s_CommandKey + "+Y").Enabled(tab && tab->CanRedo());
+           .Shortcut(EditorStyle::CommandKey + "+Y").Enabled(tab && tab->CanRedo());
 
     OutMenu.Section("Editor");
     OutMenu.Item("New Scene Tab", [this] { OpenTab<SceneEditorTab>(); }).Icon(EditorIcons::Level());
@@ -161,9 +155,9 @@ void EditorWindow::BuildWindowMenu(UIMenuModel& OutMenu) {
         HeroTool* toolPtr = tool.Get();
         String shortcut;
         if (toolPtr == m_ContentDrawerTool) {
-            shortcut = s_CommandKey + "+Space";
+            shortcut = EditorStyle::CommandKey + "+Space";
         } else if (toolPtr == m_ConsoleTool) {
-            shortcut = s_CommandKey + "+.";
+            shortcut = EditorStyle::CommandKey + "+.";
         }
         OutMenu.Item(toolPtr->GetTitle(), [this, toolPtr] { ToggleHeroTool(toolPtr); })
                .Shortcut(shortcut)

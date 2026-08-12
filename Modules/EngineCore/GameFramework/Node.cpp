@@ -5,6 +5,8 @@
 #include "Core/Log.h"
 #include "Core/MainThread.h"
 
+#include <charconv>
+
 static Map<uint32_t, Node*>& GetNodeRegistry() {
     static Map<uint32_t, Node*> registry;
     return registry;
@@ -66,7 +68,21 @@ static bool DoesNameExistInHierarchy(const String& InName, Node* InRoot, Node* I
 }
 
 static String IncrementNameIndex(const String& InName) {
-    return InName + "|";
+    const size_t openBracket = InName.find_last_of('[');
+
+    if (openBracket != String::npos && InName.back() == ']' && openBracket + 2 < InName.size()) {
+        const char* first = InName.data() + openBracket + 1;
+        const char* last = InName.data() + InName.size() - 1;
+
+        uint32_t index = 0;
+        const std::from_chars_result result = std::from_chars(first, last, index);
+
+        if (result.ec == std::errc() && result.ptr == last && index > 0) {
+            return InName.substr(0, openBracket + 1) + std::to_string(index + 1) + "]";
+        }
+    }
+
+    return InName + " [1]";
 }
 
 void Node::SetName(const String& InName) {

@@ -38,8 +38,8 @@ void EditorTransaction::Apply(const EditorSnapshot& InSnapshot) {
         return;
     }
 
-    while (node->HasChildren()) {
-        node->GetChild(0)->Destroy();
+    for (int32_t i = (int32_t)node->GetChildCount() - 1; i >= 0; i--) {
+        node->GetChild(i)->Destroy();
     }
     world->ResolvePendingKills();
     record->Apply(*node);

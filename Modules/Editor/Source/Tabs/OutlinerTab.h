@@ -5,6 +5,7 @@
 #include "OutlinerTab.gen.h"
 
 class Node;
+class NodeRecord;
 class VectorImage;
 class UITextArea;
 class UILabel;
@@ -46,6 +47,13 @@ public:
     /** A search filter is active; the tree shows matches (and their ancestors) fully expanded. */
     bool HasFilter() const { return !m_Filter.empty(); }
 
+    /** Copy / paste / duplicate of whole node subtrees. Copies travel through the system clipboard as JSON. */
+    void CopySelection();
+    void PasteInto(Node* InParent);
+    void DuplicateSelection();
+    bool HasCopyableSelection() const { return !GetCopyableSelection().IsEmpty(); }
+    static bool ClipboardHasNodes();
+
     Node* GetRenamingNode() const { return m_Renaming.Get(); }
     void BeginRename(Node* InNode);
     void CommitRename(const String& InName);
@@ -64,6 +72,10 @@ public:
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
 
 private:
+    bool AcceptsShortcuts() const;
+    Array<Node*> GetCopyableSelection() const;
+    Node* GetPasteParent() const;
+    Node* PasteRecord(const NodeRecord& InRecord, Node& InParent);
     void SpawnDroppedAsset(class Asset* InAsset, const Vec2& InCursorPos);
     void RebuildVisible();
     void AppendSubtree(Node* InNode, int InDepth);

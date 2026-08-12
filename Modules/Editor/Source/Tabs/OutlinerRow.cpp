@@ -310,6 +310,25 @@ bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
         }).Icon(Owner->GetArrowIcon(expanded));
     }
     menu.Separator();
+    menu.Item("Copy", [owner] {
+        if (owner.Get()) {
+            owner.Get()->CopySelection();
+        }
+    }).Shortcut(EditorStyle::CommandKey + "+C").Enabled(Owner->HasCopyableSelection());
+    menu.Item("Paste", [owner, target] {
+        if (owner.Get() && target.Get()) {
+            owner.Get()->PasteInto(target.Get()->GetParent());
+        }
+    }).Shortcut(EditorStyle::CommandKey + "+V")
+      .Enabled(OutlinerTab::ClipboardHasNodes())
+      .Tooltip("Pastes the copied nodes next to " + node->GetName());
+    menu.Item("Duplicate", [owner] {
+        if (owner.Get()) {
+            owner.Get()->DuplicateSelection();
+        }
+    }).Shortcut(EditorStyle::CommandKey + "+D").Enabled(Owner->HasCopyableSelection());
+
+    menu.Separator();
     menu.Submenu("Add Child", [owner, target](UIMenuModel& OutSub) { BuildAddChildMenu(OutSub, owner, target); })
         .Tooltip("Attach a new node to " + node->GetName());
     menu.Item("Create Blueprint...", [owner, target] {
