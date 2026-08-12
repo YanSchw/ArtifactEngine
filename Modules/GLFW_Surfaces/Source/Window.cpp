@@ -43,8 +43,13 @@ static void OnWindowResized(GLFWwindow* InWindow, int InWidth, int InHeight) {
 
 static void OnWindowScroll(GLFWwindow* InWindow, double InOffsetX, double InOffsetY);
 static void OnWindowChar(GLFWwindow* InWindow, unsigned int InCodepoint);
+static void OnWindowKey(GLFWwindow* InWindow, int InKey, int InScancode, int InAction, int InMods);
 
 static void ApplyIcon(GLFWwindow* InWindow) {
+#if defined(AE_PLATFORM_WIN64)
+    // Windows takes the window icon from the GLFW_ICON resource embedded in the executable.
+    (void)InWindow;
+#else
     const String iconPath = EngineConfig::ResolveContentPath("/Icons/Icon.png");
 
     static bool s_ApplicationIconSet = false;
@@ -67,6 +72,7 @@ static void ApplyIcon(GLFWwindow* InWindow) {
     } else {
         AE_WARN("Failed to load window icon '{0}'", iconPath);
     }
+#endif
 #endif
 }
 
@@ -108,6 +114,7 @@ void Window::Setup(const WindowParams& InParams) {
     glfwSetWindowSizeCallback(m_Window, OnWindowResized);
     glfwSetScrollCallback(m_Window, OnWindowScroll);
     glfwSetCharCallback(m_Window, OnWindowChar);
+    glfwSetKeyCallback(m_Window, OnWindowKey);
     glfwSetWindowRefreshCallback(m_Window, [](GLFWwindow*) {
         if (s_RefreshCallback) {
             s_RefreshCallback();
@@ -166,6 +173,31 @@ static void OnWindowScroll(GLFWwindow* InWindow, double InOffsetX, double InOffs
 static void OnWindowChar(GLFWwindow* InWindow, unsigned int InCodepoint) {
     if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
         self->AccumulateTextInput((uint32_t)InCodepoint);
+    }
+}
+
+/* The fullscreen shortcuts a shipped game is expected to answer to. Keyboard state itself is
+ * polled by GLFWKeyboardDevice, so this callback exists purely for the window-level chords. */
+static void OnWindowKey(GLFWwindow* InWindow, int InKey, int InScancode, int InAction, int InMods) {
+    (void)InScancode;
+    (void)InMods;
+    if (InAction != GLFW_PRESS || !EngineConfig::IsPackagedBuild()) {
+        return;
+    }
+
+    bool toggleFullscreen = (InKey == GLFW_KEY_F11);
+#if defined(AE_PLATFORM_WIN64)
+    // Alt+Enter is the fullscreen toggle Windows users reach for.
+    // GLFW swallows the WM_SYSCHAR it comes with, so it does not also ring the menu bell.
+    toggleFullscreen = toggleFullscreen
+        || ((InKey == GLFW_KEY_ENTER || InKey == GLFW_KEY_KP_ENTER) && (InMods & GLFW_MOD_ALT) != 0);
+#endif
+
+    if (!toggleFullscreen) {
+        return;
+    }
+    if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
+        self->SetFullscreen(!self->IsFullscreen());
     }
 }
 
