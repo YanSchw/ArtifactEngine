@@ -111,7 +111,7 @@ void EditorEngine::Initialize() {
     (new AssetManager())->Initialize();
 
     // Set the default UI font once (see Content/Fonts/Default.asset)
-    UINode::SetDefaultFont(AssetManager::Get().GetAsset<Font>(UUID::FromString("f0e1d2c3-b4a5-4967-8899-aabbccddeeff")));
+    UINode::SetDefaultFont(AssetManager::Get().GetAsset<Font>(UUID::FromString("3e50e8a9-df79-4e81-89be-189a15ca838b")));
 
     Scene* scene = AssetManager::Get().GetAsset<Scene>(EngineConfig::GetConfigVar<UUID>("DefaultScene"));
     if (!scene) {
