@@ -48,6 +48,8 @@ public:
     static VectorImage* CylinderShape() { return Get("1e9a2e01-2f2f-4873-b28a-947f2f69c2c3"); }
     static VectorImage* RigidBody()     { return Get("d06d74b9-dfa5-4126-981a-4b9872ab540a"); }
     static VectorImage* Character()     { return Get("37661651-475f-4abb-9aab-8d05e8da1fc0"); }
+    static VectorImage* Animation()     { return Get("3f0e57a2-1c4b-4d90-9d0e-7a1b2c3d4e5f"); }
+    static VectorImage* Record()        { return Get("5b2c8e14-9d33-4f61-8a72-6c0d51e9b3a4"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
     static VectorImage* GetAssetIcon(const Class& InClass);

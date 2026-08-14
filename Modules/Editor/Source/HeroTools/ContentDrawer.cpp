@@ -5,7 +5,6 @@
 #include "UI/EditorIcons.h"
 #include "UI/UIGrid.h"
 #include "UI/UIRoundedQuad.h"
-#include "UI/UIModalDialog.h"
 #include "UI/EditorDragDrop.h"
 #include "Assets/Font.h"
 #include "GameFramework/UINode.h"
@@ -22,14 +21,14 @@
 #include "Assets/Asset.h"
 #include "Assets/VectorImage.h"
 #include "Assets/Scene.h"
-#include "Assets/Blueprint.h"
 #include "Assets/ShaderGraph.h"
 #include "Assets/Material.h"
-#include "Assets/NodeRecord.h"
-#include "GameFramework/Node3D.h"
 #include "EditorWindow.h"
+#include "NewAnimationWindow.h"
+#include "NewBlueprintWindow.h"
 #include "Tabs/SceneEditorTab.h"
 #include "Tabs/BlueprintEditorTab.h"
+#include "Tabs/AnimationEditorTab.h"
 #include "UI/UIContextMenu.h"
 #include "UI/UIMenuModel.h"
 #include "Rendering/Texture.h"
@@ -41,7 +40,6 @@
 #include <algorithm>
 #include <cctype>
 #include <functional>
-#include <memory>
 
 namespace fs = std::filesystem;
 
@@ -266,6 +264,8 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
                 sceneTab->Save();
             } else if (BlueprintEditorTab* blueprintTab = tab->As<BlueprintEditorTab>()) {
                 blueprintTab->Save();
+            } else if (AnimationEditorTab* animationTab = tab->As<AnimationEditorTab>()) {
+                animationTab->Save();
             }
         }
     });
@@ -450,9 +450,12 @@ void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu) {
             return (Asset*)Scene::CreateEmpty(InDir, InName);
         });
     }).Icon(EditorIcons::Level());
-    OutMenu.Item("Blueprint...", [this] { OpenNewBlueprintDialog(); })
+    OutMenu.Item("Blueprint...", [this] { BeginCreateBlueprint(); })
            .Icon(EditorIcons::Node())
            .Tooltip("Pick a parent class and a name for the new Blueprint");
+    OutMenu.Item("Animation...", [this] { BeginCreateAnimation(); })
+           .Icon(EditorIcons::Animation())
+           .Tooltip("Pick the placeholder root to author against; it is stripped from packaged builds");
     OutMenu.Item("Shader Graph", [this] {
         BeginCreateAsset(ShaderGraph::StaticClass(), "NewShaderGraph", [](const String& InDir, const String& InName) {
             return (Asset*)ShaderGraph::CreateEmpty(InDir, InName);
@@ -939,98 +942,30 @@ void ContentDrawer::CancelEdit() {
     m_NavDirty = true;
 }
 
-void ContentDrawer::OpenNewBlueprintDialog() {
-    if (!m_Grid) {
-        return;
-    }
-    UIModalDialog* dialog = UIModalDialog::Open(*m_Grid, "New Blueprint", Vec2(430.0f, 172.0f));
-    if (!dialog) {
-        return;
-    }
-
+void ContentDrawer::BeginCreateBlueprint() {
     const String dir = DirFor(m_Mount, m_RelPath);
-
-    struct Draft {
-        Class ParentClass = Node3D::StaticClass();
-        String Name;
-    };
-    std::shared_ptr<Draft> draft = std::make_shared<Draft>();
-    draft->Name = MakeUniqueName(dir, "NewBlueprint", false);
-
-    UINode* classField = dialog->AddField("Parent Class", 26.0f);
-    UIButton* classButton = classField->Add<UIButton>();
-    classButton->Fill();
-    classButton->SetCaption(draft->ParentClass.GetDisplayName());
-    EditorStyle::ApplyButtonStyle(*classButton);
-    classButton->Bind = [classButton, draft] { classButton->SetCaption(draft->ParentClass.GetDisplayName()); };
-    classButton->Clicked = [classButton, draft] {
-        UIMenuModel menu;
-        menu.Searchable("Search classes");
-        menu.MinWidth(260.0f);
-
-        Array<Class> classes = Class::GetSubclassesOf(Node::StaticClass());
-        classes.Sort([](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
-        for (const Class& nodeClass : classes) {
-            // Reflected classes without a default constructor cannot be spawned, and probing is
-            // the only way to tell them apart.
-            Object* probe = Object::Create(nodeClass);
-            if (!probe) {
-                continue;
-            }
-            delete probe;
-            menu.Item(nodeClass.Name, [draft, nodeClass] { draft->ParentClass = nodeClass; })
-                .Icon(EditorIcons::GetNodeIcon(nodeClass))
-                .Checked(draft->ParentClass == nodeClass);
+    WeakObjectPtr<ContentDrawer> self = this;
+    NewBlueprintWindow::Open(dir, MakeUniqueName(dir, "NewBlueprint", false), [self](Asset* InAsset) {
+        if (ContentDrawer* drawer = self.Get()) {
+            drawer->OnAssetCreated(InAsset);
         }
-        UIContextMenu::OpenUnder(*classButton, menu);
-    };
+    });
+}
 
-    UINode* nameField = dialog->AddField("Name", 24.0f);
-    UITextArea* nameInput = nameField->Add<UITextArea>();
-    nameInput->Fill();
-    nameInput->Padding = UIPadding(5.0f, 0.0f);
-    nameInput->SingleLine = true;
-    nameInput->FontSize = EditorStyle::FontSize;
-    nameInput->TextColor = EditorStyle::TextBright;
-    nameInput->CaretColor = EditorStyle::TextBright;
-    nameInput->BackgroundColor = EditorStyle::PanelDark;
-    nameInput->FocusedBorderColor = EditorStyle::Accent;
-    nameInput->CornerRadius = 3.0f;
-    nameInput->Text = draft->Name;
-    nameInput->TextChanged = [draft](const String& InText) { draft->Name = InText; };
-    nameInput->SelectAll();
-    nameInput->RequestFocus();
-
-    const auto create = [this, dialog, draft, dir] {
-        const String name = SanitizeName(draft->Name);
-        if (name.empty()) {
-            AE_WARN("A Blueprint needs a name");
-            return;
+void ContentDrawer::BeginCreateAnimation() {
+    const String dir = DirFor(m_Mount, m_RelPath);
+    WeakObjectPtr<ContentDrawer> self = this;
+    NewAnimationWindow::Open(dir, MakeUniqueName(dir, "NewAnimation", false), [self](Asset* InAsset) {
+        if (ContentDrawer* drawer = self.Get()) {
+            drawer->OnAssetCreated(InAsset);
         }
-        const String path = dir + "/" + name + ".asset";
-        if (fs::exists(path)) {
-            AE_WARN("'{0}' already exists", path);
-            return;
-        }
+    });
+}
 
-        Blueprint* blueprint = Cast<Blueprint>(AssetManager::Get().CreateAsset(Blueprint::StaticClass(), dir, name));
-        if (!blueprint) {
-            return;
-        }
-        NodeRecord* record = new NodeRecord();
-        record->ClassName = draft->ParentClass.Name;
-        blueprint->SetRoot(SharedObjectPtr<NodeRecord>(record));
-        AssetManager::Get().SaveAsset(blueprint);
-
-        m_SelectedPath = path;
-        m_NavDirty = true;
-        dialog->Close();
-        OpenAsset(blueprint);
-    };
-    nameInput->Submitted = [create](const String&) { create(); };
-
-    dialog->AddButton("Cancel", false, [dialog] { dialog->Close(); });
-    dialog->AddButton("Create", true, create);
+void ContentDrawer::OnAssetCreated(Asset* InAsset) {
+    m_SelectedPath = AssetManager::Get().GetAssetPath(InAsset->GetId());
+    m_NavDirty = true;
+    OpenAsset(InAsset);
 }
 
 /* -------------------------------- File operations -------------------------------- */

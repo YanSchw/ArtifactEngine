@@ -133,6 +133,10 @@ void OutlinerRow::Refresh() {
         m_Label->Color = Owner->IsSelected(node) ? EditorStyle::TextBright : EditorStyle::Text;
     }
 
+    if (Owner->GetMode() == OutlinerMode::Animation && Owner->IsAnimationRoot(node)) {
+        m_Label->Color = EditorStyle::AccentBright;
+    }
+
     m_TypeLabel->Text = node->GetSerializedClass().GetDisplayName();
     if (node->GetBlueprintId().IsValid()) {
         m_TypeLabel->Color = m_TypeHovered ? EditorStyle::TextBright : EditorStyle::AccentBright;
@@ -200,6 +204,11 @@ void OutlinerRow::Paint(UIDrawList& OutDrawList) {
         const UIRectF line(Vec2(m_Geometry.Min().x + indent, y - 1.0f),
                            Vec2(m_Geometry.Size.x - indent - 4.0f, 2.0f));
         OutDrawList.AddRect(line, EditorStyle::AccentBright, m_WorldMatrix);
+    }
+
+    if (Owner->GetMode() == OutlinerMode::Animation && Owner->IsAnimationRoot(node)) {
+        const UIRectF marker(m_Geometry.Min(), Vec2(2.0f, m_Geometry.Size.y));
+        OutDrawList.AddRect(marker, EditorStyle::AccentBright, m_WorldMatrix);
     }
 
     if (m_TypeHovered) {
@@ -309,6 +318,16 @@ bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
             }
         }).Icon(Owner->GetArrowIcon(expanded));
     }
+    if (Owner->GetMode() == OutlinerMode::Animation) {
+        menu.Item("Root of Animation", [owner, target] {
+            if (owner.Get() && target.Get()) {
+                owner.Get()->SetAnimationRoot(target.Get());
+            }
+        }).Checked(Owner->IsAnimationRoot(node))
+          .Icon(EditorIcons::Animation())
+          .Tooltip("Keyframe paths are stored relative to this node");
+    }
+
     menu.Separator();
     menu.Item("Copy", [owner] {
         if (owner.Get()) {

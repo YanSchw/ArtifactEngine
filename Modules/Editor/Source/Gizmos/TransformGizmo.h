@@ -46,6 +46,7 @@ private:
 
     void CollectTargets(MajorTab* InMajorTab);
     void ComputeFrame();
+    void MarkEdited(Node3D& OutNode, const String& InPropertyName);
 
     float WorldPerPixel(const Vec3& InPoint) const;
     Vec3 Axis(int32_t InIndex) const { return m_Basis[InIndex]; }
@@ -74,6 +75,7 @@ private:
     void BuildScaleGeometry();
     void BuildPlaneHandle(int32_t InNormalAxis, Handle InHandle);
 
+    WeakObjectPtr<MajorTab> m_Owner;
     Array<WeakObjectPtr<Node3D>> m_Targets;
     WeakObjectPtr<Node3D> m_ActiveTarget;
 

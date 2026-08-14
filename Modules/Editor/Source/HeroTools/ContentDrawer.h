@@ -81,7 +81,10 @@ private:
     void BeginRename(const Item& InItem);
     void CommitEdit(const String& InName);
     void CancelEdit();
-    void OpenNewBlueprintDialog();
+    void BeginCreateBlueprint();
+    void BeginCreateAnimation();
+    /** Selects an asset a creation window just wrote and opens its editor. */
+    void OnAssetCreated(Asset* InAsset);
 
     bool RenameItem(const Item& InItem, const String& InNewName);
     bool MoveItem(const Item& InItem, const String& InMount, const String& InRel);

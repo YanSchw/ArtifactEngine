@@ -64,6 +64,7 @@ static bool IsPointInTriangle(const Vec2& InPoint, const Vec2& InA, const Vec2& 
 }
 
 void TransformGizmo::Update(MajorTab* InMajorTab, CameraNode* InViewCamera, const Vec2& InViewportSize) {
+    m_Owner = InMajorTab;
     m_ViewportSize = Vec2(glm::max(InViewportSize.x, 1.0f), glm::max(InViewportSize.y, 1.0f));
 
     if (!InViewCamera) {
@@ -122,6 +123,13 @@ void TransformGizmo::CollectTargets(MajorTab* InMajorTab) {
     }
     if (!m_Targets.IsEmpty()) {
         m_ActiveTarget = m_Targets.LastItem();
+    }
+}
+
+void TransformGizmo::MarkEdited(Node3D& OutNode, const String& InPropertyName) {
+    OutNode.MarkPropertyOverridden(InPropertyName);
+    if (MajorTab* owner = m_Owner.Get()) {
+        owner->OnPropertyEdited(&OutNode, InPropertyName);
     }
 }
 
@@ -578,7 +586,7 @@ void TransformGizmo::ApplyTranslate(const Vec3& InDelta) {
     for (const DragTarget& target : m_DragTargets) {
         if (Node3D* node = target.Node.Get()) {
             node->SetPosition(target.StartPosition + InDelta);
-            node->MarkPropertyOverridden("m_LocalPosition");
+            MarkEdited(*node, "m_LocalPosition");
         }
     }
     m_Pivot = m_DragPivot + InDelta;
@@ -592,12 +600,12 @@ void TransformGizmo::ApplyRotate(float InAngle) {
             continue;
         }
         node->SetRotation(rotation * target.StartRotation);
-        node->MarkPropertyOverridden("m_LocalRotation");
+        MarkEdited(*node, "m_LocalRotation");
 
         const Vec3 offset = target.StartPosition - m_DragPivot;
         if (glm::dot(offset, offset) > 1e-10f) {
             node->SetPosition(m_DragPivot + rotation * offset);
-            node->MarkPropertyOverridden("m_LocalPosition");
+            MarkEdited(*node, "m_LocalPosition");
         }
     }
 }
@@ -614,7 +622,7 @@ void TransformGizmo::ApplyScale(const Vec3& InFactor) {
             continue;
         }
         node->SetLocalScale(target.StartLocalScale * factor);
-        node->MarkPropertyOverridden("m_LocalScale");
+        MarkEdited(*node, "m_LocalScale");
 
         const Vec3 offset = target.StartPosition - m_DragPivot;
         if (glm::dot(offset, offset) > 1e-10f) {
@@ -622,7 +630,7 @@ void TransformGizmo::ApplyScale(const Vec3& InFactor) {
                               + Axis(1) * (glm::dot(offset, Axis(1)) * factor.y)
                               + Axis(2) * (glm::dot(offset, Axis(2)) * factor.z);
             node->SetPosition(m_DragPivot + scaled);
-            node->MarkPropertyOverridden("m_LocalPosition");
+            MarkEdited(*node, "m_LocalPosition");
         }
     }
 }

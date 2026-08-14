@@ -47,7 +47,7 @@ float NodeDetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, 
         if (Node* bound = weak.Get()) {
             tab->RecordEdit("Edit Enabled", bound);
             bound->SetEnabled(InValue);
-            bound->MarkPropertyOverridden("m_Enabled");
+            DetailsCustomization::NotifyPropertyEdited(tab, bound, "m_Enabled");
         }
     };
 
@@ -135,7 +135,7 @@ static void AddVectorRow(UINode& InBody, DetailsTab& InTab, const String& InLabe
         }
         tab->RecordEdit("Edit " + InLabel, node);
         InSet(InValue);
-        node->MarkPropertyOverridden(InPropertyName);
+        DetailsCustomization::NotifyPropertyEdited(tab, node, InPropertyName);
     };
 
     UIHStack* stack = row->GetValueHost()->Add<UIHStack>();

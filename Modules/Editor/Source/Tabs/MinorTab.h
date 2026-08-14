@@ -31,6 +31,9 @@ public:
 
     void RecordEdit(const String& InTitle, Object* InObject);
 
+    /** True while this tab's window is focused and no text field is swallowing the keyboard. */
+    bool AcceptsShortcuts() const;
+
     UIDockNode* GetDockNode() const;
 
 private:

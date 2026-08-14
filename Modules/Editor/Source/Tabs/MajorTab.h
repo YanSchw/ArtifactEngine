@@ -48,6 +48,7 @@ public:
     bool IsAssetRootNode(Object* InObject) const { return InObject && InObject == (Object*)GetAssetRootNode(); }
     virtual void OnAssetSaved(Asset* InAsset) { (void)InAsset; }
     virtual void OnObjectEdited(Object* InObject) { (void)InObject; }
+    virtual void OnPropertyEdited(Object* InObject, const String& InPropertyName) { (void)InObject; (void)InPropertyName; }
     static void BroadcastAssetSaved(Asset* InAsset, MajorTab* InSource);
 
     static bool IsSpawnableAsset(Asset* InAsset);

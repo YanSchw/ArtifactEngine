@@ -338,20 +338,33 @@ DetailsEditHandler DetailsCustomization::MakeEditHandler(const WeakObjectPtr<Obj
             return;
         }
         InRootProperty->NotifyChanged(object);
-        if (Node* node = Cast<Node>(object)) {
-            node->MarkPropertyOverridden(InRootProperty->Name);
-        }
-        if (DetailsTab* details = tab.Get()) {
-            if (MajorTab* owner = details->GetMajorTab()) {
-                owner->OnObjectEdited(object);
-            }
-            DetailsCustomization* customization = FindFor(object->GetClass());
-            if (customization && customization->RebuildsOnEdit(InRootProperty->Name)) {
-                details->MarkDirty();
-            }
-        }
+        NotifyPropertyEdited(tab.Get(), object, InRootProperty->Name);
     };
     return handler;
+}
+
+void DetailsCustomization::NotifyPropertyEdited(MajorTab* InTab, Object* InObject, const String& InPropertyName) {
+    if (!InObject) {
+        return;
+    }
+    if (Node* node = Cast<Node>(InObject)) {
+        node->MarkPropertyOverridden(InPropertyName);
+    }
+    if (InTab) {
+        InTab->OnObjectEdited(InObject);
+        InTab->OnPropertyEdited(InObject, InPropertyName);
+    }
+}
+
+void DetailsCustomization::NotifyPropertyEdited(DetailsTab* InTab, Object* InObject, const String& InPropertyName) {
+    NotifyPropertyEdited(InTab ? InTab->GetMajorTab() : nullptr, InObject, InPropertyName);
+    if (!InTab || !InObject) {
+        return;
+    }
+    DetailsCustomization* customization = FindFor(InObject->GetClass());
+    if (customization && customization->RebuildsOnEdit(InPropertyName)) {
+        InTab->MarkDirty();
+    }
 }
 
 void DetailsCustomization::BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName) {

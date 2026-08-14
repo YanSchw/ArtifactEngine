@@ -10,6 +10,8 @@ class VectorImage;
 class UITextArea;
 class UILabel;
 
+enum class OutlinerMode : uint8_t { Scene = 0, Animation };
+
 /** Lists the nodes of the edited scene. */
 class OutlinerTab : public MinorTab {
 public:
@@ -19,6 +21,13 @@ public:
 
     virtual String GetTabTitle() const override { return "Outliner"; }
     virtual VectorImage* GetTabIcon() const override;
+
+    OutlinerMode GetMode() const { return m_Mode; }
+    void SetMode(OutlinerMode InMode) { m_Mode = InMode; }
+
+    /** Animation mode only: which node the open Animation's keys are rooted at. */
+    bool IsAnimationRoot(Node* InNode) const;
+    void SetAnimationRoot(Node* InNode);
 
     /** Where a dragged row lands: onto a node (become its child) or between rows (become a sibling
      *  just above/below the reference node). */
@@ -72,7 +81,6 @@ public:
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
 
 private:
-    bool AcceptsShortcuts() const;
     Array<Node*> GetCopyableSelection() const;
     Node* GetPasteParent() const;
     Node* PasteRecord(const NodeRecord& InRecord, Node& InParent);
@@ -83,6 +91,8 @@ private:
     bool SubtreeMatches(Node* InNode) const;
     void AppendFilteredSubtree(Node* InNode, int InDepth);
     void RefreshFooter();
+
+    OutlinerMode m_Mode = OutlinerMode::Scene;
 
     UINode* m_List = nullptr;
     UITextArea* m_SearchField = nullptr;

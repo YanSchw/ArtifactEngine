@@ -1,6 +1,7 @@
 #include "OutlinerTab.h"
 #include "OutlinerRow.h"
 #include "MajorTab.h"
+#include "AnimationEditorTab.h"
 #include "ThemedWindow.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
@@ -24,6 +25,17 @@ static const char* s_ClipboardKey = "ArtifactNodes";
 
 VectorImage* OutlinerTab::GetTabIcon() const {
     return EditorIcons::Outliner();
+}
+
+bool OutlinerTab::IsAnimationRoot(Node* InNode) const {
+    AnimationEditorTab* animation = GetMajorTab() ? GetMajorTab()->As<AnimationEditorTab>() : nullptr;
+    return animation && animation->IsAnimationRoot(InNode);
+}
+
+void OutlinerTab::SetAnimationRoot(Node* InNode) {
+    if (AnimationEditorTab* animation = GetMajorTab() ? GetMajorTab()->As<AnimationEditorTab>() : nullptr) {
+        animation->SetAnimationRoot(InNode);
+    }
 }
 
 static bool IsCommandHeld(KeyboardDevice& InKeyboard) {
@@ -410,24 +422,6 @@ void OutlinerTab::DuplicateSelection() {
     if (!duplicates.IsEmpty()) {
         major->SetSelection(duplicates);
     }
-}
-
-bool OutlinerTab::AcceptsShortcuts() const {
-    UICanvas* canvas = GetCanvas();
-    if (!canvas) {
-        return false;
-    }
-    // Shortcuts must not fire while typing in this (or any) text field.
-    UINode* focused = canvas->GetFocusedNode();
-    if (focused && focused->As<UITextArea>()) {
-        return false;
-    }
-    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
-        if (window.Get() && window->GetCanvas() == canvas) {
-            return window->IsFocused();
-        }
-    }
-    return false;
 }
 
 void OutlinerTab::OnUIUpdate(const UIFrameContext& InContext) {

@@ -36,6 +36,10 @@ public:
 
     static void BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName);
     static DetailsEditHandler MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab = nullptr);
+    /** Marks the override and tells the owning MajorTab. Every row that writes a property itself,
+     *  instead of going through MakeEditHandler, has to end with this. */
+    static void NotifyPropertyEdited(DetailsTab* InTab, Object* InObject, const String& InPropertyName);
+    static void NotifyPropertyEdited(class MajorTab* InTab, Object* InObject, const String& InPropertyName);
     static String PrettyClassName(const Class& InClass);
     static String PrettyPropertyName(const String& InName);
 

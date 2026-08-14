@@ -46,6 +46,7 @@ VectorImage* EditorIcons::GetAssetIcon(const Class& InClass) {
         s_AssetIcons["Blueprint"] = Node();
         s_AssetIcons["Material"] = Material();
         s_AssetIcons["ShaderGraph"] = GraphEditor();
+        s_AssetIcons["Animation"] = Animation();
     }
 
     VectorImage* icon = nullptr;
@@ -64,6 +65,7 @@ Vec4 EditorIcons::GetAssetColor(const Class& InClass) {
         s_AssetColors["Blueprint"] = HexColor(0x3D8BE0);
         s_AssetColors["Material"] = HexColor(0xC98BE0);
         s_AssetColors["ShaderGraph"] = HexColor(0xD86BA9);
+        s_AssetColors["Animation"] = HexColor(0x6FD84A);
     }
 
     Vec4 color(0.0f);
