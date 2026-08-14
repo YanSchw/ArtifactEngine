@@ -8,12 +8,12 @@
 #include "UI/UIMenuModel.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UISvg.h"
-#include "UI/UIDragNumber.h"
 #include "GameFramework/Node.h"
 #include "Assets/Animation.h"
 #include "Assets/Font.h"
 #include "Rendering/UIDrawList.h"
 #include "InputSystem/KeyboardDevice.h"
+#include <algorithm>
 #include <cmath>
 
 static const Vec4 s_RowEven = HexColor(0x232323);
@@ -30,6 +30,7 @@ static const Vec4 s_OutOfRange = Vec4(0.0f, 0.0f, 0.0f, 0.35f);
 static const Vec4 s_OutOfRangeText = HexColor(0x585858);
 
 static constexpr float s_KeyRadius = 5.0f;
+static constexpr float s_MinThumbWidth = 16.0f;
 
 static bool IsShiftHeld() {
     KeyboardDevice* keyboard = KeyboardDevice::Instance();
@@ -249,34 +250,38 @@ AnimationTimelineRow::AnimationTimelineRow() {
     m_Expander->Size = Vec2(11.0f, 11.0f);
     m_Expander->Tint = EditorStyle::TextDim;
 
+    m_Icon = Add<UISvg>();
+    m_Icon->Anchor = m_Icon->Pivot = Vec2(0.0f, 0.5f);
+    m_Icon->Size = Vec2(14.0f, 14.0f);
+    m_Icon->Tint = EditorStyle::Text;
+
     m_Label = Add<UILabel>();
     m_Label->Anchor = m_Label->Pivot = Vec2(0.0f, 0.5f);
     m_Label->FontSize = EditorStyle::FontSize - 1.0f;
     m_Label->Color = EditorStyle::Text;
     m_Label->VAlign = UIVAlign::Middle;
 
-    m_ValueLabel = Add<UILabel>();
-    m_ValueLabel->Anchor = m_ValueLabel->Pivot = Vec2(0.0f, 0.5f);
-    m_ValueLabel->Size = { AnimationTimelineTab::ValueColumnWidth, AnimationTimelineTab::RowHeight };
-    m_ValueLabel->FontSize = EditorStyle::FontSize - 2.0f;
-    m_ValueLabel->Color = EditorStyle::TextDim;
-    m_ValueLabel->VAlign = UIVAlign::Middle;
-
-    m_ValueField = Add<UIDragNumber>();
-    m_ValueField->Anchor = m_ValueField->Pivot = Vec2(0.0f, 0.5f);
-    m_ValueField->Size = Vec2(AnimationTimelineTab::ValueColumnWidth, AnimationTimelineTab::RowHeight - 4.0f);
-    m_ValueField->Decimals = 3;
-    m_ValueField->Sensitivity = 0.02;
-    m_ValueField->Get = [this] {
-        return Owner ? Owner->ReadRowValue(Owner->ResolveRow(RowIndex)) : 0.0;
-    };
-    m_ValueField->Set = [this](double InValue) {
-        if (Owner) {
-            Owner->WriteRowValue(Owner->ResolveRow(RowIndex), InValue);
-        }
-    };
+    m_ValueHost = Add<UINode>();
+    m_ValueHost->Anchor = m_ValueHost->Pivot = Vec2(0.0f, 0.5f);
+    m_ValueHost->Position = Vec2(AnimationTimelineTab::LabelColumnWidth - AnimationTimelineTab::ValueColumnWidth - 6.0f, 0.0f);
+    m_ValueHost->Size = Vec2(AnimationTimelineTab::ValueColumnWidth, AnimationTimelineTab::RowHeight - 5.0f);
 
     Bind = [this] { Refresh(); };
+}
+
+void AnimationTimelineRow::SetEditor(Node* InTarget, Property* InLeaf) {
+    if (InTarget == m_EditorTarget.Get() && InLeaf == m_EditorLeaf) {
+        return;
+    }
+    m_EditorTarget = InTarget;
+    m_EditorLeaf = InLeaf;
+
+    while (m_ValueHost->GetChildCount() > 0) {
+        delete m_ValueHost->GetChild(0);
+    }
+    if (InLeaf) {
+        Owner->BuildRowEditor(*m_ValueHost, RowIndex);
+    }
 }
 
 void AnimationTimelineRow::Refresh() {
@@ -284,33 +289,31 @@ void AnimationTimelineRow::Refresh() {
     const AnimationTrack* track = Owner ? Owner->GetRowTrack(RowIndex) : nullptr;
     if (!row || !track) {
         m_Expander->SetEnabled(false);
+        m_Icon->SetEnabled(false);
         m_Label->Text.clear();
-        m_ValueLabel->SetEnabled(false);
-        m_ValueField->SetEnabled(false);
+        SetEditor(nullptr, nullptr);
         return;
     }
 
-    const float indent = 8.0f + (row->Component >= 0 ? AnimationTimelineTab::IndentStep : 0.0f);
+    const float indent = 6.0f + (float)row->Depth * AnimationTimelineTab::IndentStep;
     m_Expander->SetEnabled(row->Expandable);
     m_Expander->Position = Vec2(indent, 0.0f);
     m_Expander->Image = row->Expanded ? EditorIcons::ArrowDown() : EditorIcons::ArrowRight();
 
-    const float textLeft = indent + (row->Expandable ? 15.0f : 2.0f);
+    VectorImage* icon = Owner->GetRowIcon(RowIndex);
+    m_Icon->SetEnabled(icon != nullptr);
+    m_Icon->Image = icon;
+    m_Icon->Position = Vec2(indent + 13.0f, 0.0f);
+
+    const float textLeft = indent + 30.0f;
     m_Label->Position = Vec2(textLeft, 0.0f);
-    m_Label->Size = { AnimationTimelineTab::LabelColumnWidth - AnimationTimelineTab::ValueColumnWidth - textLeft - 6.0f,
+    m_Label->Size = { AnimationTimelineTab::LabelColumnWidth - AnimationTimelineTab::ValueColumnWidth - textLeft - 10.0f,
                       AnimationTimelineTab::RowHeight };
     m_Label->Text = row->Label;
     m_Label->Color = Owner->GetTrackNode(*track) ? EditorStyle::Text : EditorStyle::TextDim;
 
-    const float valueLeft = AnimationTimelineTab::LabelColumnWidth - AnimationTimelineTab::ValueColumnWidth - 4.0f;
-    const bool numeric = Owner->ResolveRow(RowIndex).Numeric != nullptr;
-    m_ValueField->SetEnabled(numeric);
-    m_ValueField->Position = Vec2(valueLeft, 0.0f);
-
-    const String text = numeric ? String() : Owner->RowValueText(RowIndex);
-    m_ValueLabel->SetEnabled(!text.empty());
-    m_ValueLabel->Position = Vec2(valueLeft + 2.0f, 0.0f);
-    m_ValueLabel->Text = text;
+    const TimelineValueRef ref = Owner->ResolveRow(RowIndex);
+    SetEditor(ref.Target, ref.Leaf);
 }
 
 int32_t AnimationTimelineRow::KeyAt(const Vec2& InCursorPos) const {
@@ -493,29 +496,20 @@ AnimationTimelineScrollBar::AnimationTimelineScrollBar() {
     Cursor = CursorIcon::ResizeH;
 }
 
-void AnimationTimelineScrollBar::Domain(float& OutStart, float& OutSpan) const {
-    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
-    const float total = animation ? (float)animation->GetFrameCount() : 1.0f;
-    // The bar covers the animation plus however far the view has been pushed outside it.
-    OutStart = Owner->GetViewStart() < 0.0f ? Owner->GetViewStart() : 0.0f;
-    const float end = Owner->GetViewEnd() > total ? Owner->GetViewEnd() : total;
-    OutSpan = end - OutStart;
-    if (OutSpan <= 0.0f) {
-        OutSpan = 1.0f;
-    }
-}
-
 UIRectF AnimationTimelineScrollBar::ThumbRect() const {
     const UIRectF track = AnimationTimelineTab::StripOf(m_Geometry);
     float domainStart = 0.0f;
-    float domainSpan = 1.0f;
-    Domain(domainStart, domainSpan);
+    float domainEnd = 1.0f;
+    Owner->GetScrollDomain(domainStart, domainEnd);
 
-    const float start = (Owner->GetViewStart() - domainStart) / domainSpan;
-    const float end = (Owner->GetViewEnd() - domainStart) / domainSpan;
-    const float width = (end - start) * track.Size.x;
-    return UIRectF(Vec2(track.Min().x + start * track.Size.x, track.Min().y + 2.0f),
-                   Vec2(width < 16.0f ? 16.0f : width, track.Size.y - 4.0f));
+    // Zoomed out past the domain the view reaches beyond both ends, and the thumb fills the track.
+    const auto share = [domainStart, domainEnd](float InFrame) {
+        return std::clamp((InFrame - domainStart) / (domainEnd - domainStart), 0.0f, 1.0f);
+    };
+    const float left = share(Owner->GetViewStart()) * track.Size.x;
+    const float width = std::max(share(Owner->GetViewEnd()) * track.Size.x - left, s_MinThumbWidth);
+    return UIRectF(Vec2(track.Min().x + std::max(std::min(left, track.Size.x - width), 0.0f), track.Min().y + 2.0f),
+                   Vec2(width, track.Size.y - 4.0f));
 }
 
 void AnimationTimelineScrollBar::Paint(UIDrawList& OutDrawList) {
@@ -544,7 +538,11 @@ void AnimationTimelineScrollBar::OnDrag(const Vec2& InCursorPos, const Vec2& InD
         return;
     }
     float domainStart = 0.0f;
-    float domainSpan = 1.0f;
-    Domain(domainStart, domainSpan);
-    Owner->SetViewStart(domainStart + (InCursorPos.x - m_GrabOffset - track.Min().x) / track.Size.x * domainSpan);
+    float domainEnd = 1.0f;
+    Owner->GetScrollDomain(domainStart, domainEnd);
+
+    // The thumb travels the track minus its own width, and the view the domain minus what it shows.
+    const float travel = track.Size.x - ThumbRect().Size.x;
+    const float alpha = travel > 0.0f ? (InCursorPos.x - m_GrabOffset - track.Min().x) / travel : 0.0f;
+    Owner->SetViewStart(domainStart + alpha * (domainEnd - domainStart - (Owner->GetViewEnd() - Owner->GetViewStart())));
 }

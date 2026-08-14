@@ -36,6 +36,11 @@ public:
 
     static void BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName);
     static DetailsEditHandler MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab = nullptr);
+    /** The members a struct property is edited through, empty for anything edited as one value. */
+    static Array<Property*> GetInnerProperties(Property* InProperty);
+    /** Builds the widget one property is edited with into InHost. False for types that have none. */
+    static bool BuildValueEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                                 Property* InProperty, const DetailsEditHandler& InOnEdited, const String& InTitle = String());
     /** Marks the override and tells the owning MajorTab. Every row that writes a property itself,
      *  instead of going through MakeEditHandler, has to end with this. */
     static void NotifyPropertyEdited(DetailsTab* InTab, Object* InObject, const String& InPropertyName);

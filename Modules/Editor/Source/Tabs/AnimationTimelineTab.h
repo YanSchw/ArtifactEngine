@@ -9,23 +9,25 @@ class UIVStack;
 class UITextArea;
 class VectorImage;
 struct AnimationTrack;
+struct DetailsEditHandler;
 struct Property;
 
 /** One line of the track list: a whole property, or one component of it while expanded. */
 struct TimelineRow {
     int32_t Track = 0;
     int32_t Component = -1;
+    int32_t Depth = 0;
     bool Expandable = false;
     bool Expanded = false;
     String Label;
 };
 
-/** Where a row's number lives, so it can be shown and edited in place. */
+/** What a row edits: the animated property, or one member of it. */
 struct TimelineValueRef {
     Node* Target = nullptr;
     Property* Root = nullptr;
-    Property* Numeric = nullptr;
-    char* Address = nullptr;
+    Property* Leaf = nullptr;
+    uint64_t Offset = 0;
 };
 
 /** The key editor of an AnimationEditorTab. */
@@ -33,16 +35,17 @@ class AnimationTimelineTab : public MinorTab {
 public:
     ARTIFACT_CLASS();
 
-    static constexpr float LabelColumnWidth = 240.0f;
-    static constexpr float ValueColumnWidth = 62.0f;
-    static constexpr float IndentStep = 14.0f;
-    static constexpr float RowHeight = 20.0f;
+    static constexpr float LabelColumnWidth = 300.0f;
+    static constexpr float ValueColumnWidth = 92.0f;
+    static constexpr float IndentStep = 11.0f;
+    static constexpr float RowHeight = 22.0f;
     static constexpr float RulerHeight = 24.0f;
     static constexpr float SummaryHeight = 18.0f;
     static constexpr float ScrollBarHeight = 10.0f;
     static constexpr float StripMargin = 10.0f;
     static constexpr float MinVisibleFrames = 2.0f;
     static constexpr float MaxZoomOutFactor = 8.0f;
+    static constexpr float OverscrollFraction = 0.25f;
 
     AnimationTimelineTab();
 
@@ -64,6 +67,7 @@ public:
     void ZoomAt(const UIRectF& InStrip, float InX, float InSteps);
     void PanByPixels(const UIRectF& InStrip, float InPixels);
     void FrameAll();
+    void GetScrollDomain(float& OutStart, float& OutEnd) const;
 
     int32_t GetTrackCount() const;
     const AnimationTrack* GetTrack(int32_t InIndex) const;
@@ -76,9 +80,8 @@ public:
     void ToggleExpanded(int32_t InIndex);
 
     TimelineValueRef ResolveRow(int32_t InIndex) const;
-    double ReadRowValue(const TimelineValueRef& InRef) const;
-    void WriteRowValue(const TimelineValueRef& InRef, double InValue);
-    String RowValueText(int32_t InIndex) const;
+    VectorImage* GetRowIcon(int32_t InIndex) const;
+    void BuildRowEditor(UINode& InHost, int32_t InIndex);
 
     /** Frames outside [0, length] are shown, dimmed, once the view is zoomed out past the end. */
     float GetOutOfRangeStartX(const UIRectF& InStrip) const { return FrameToX(InStrip, 0.0f); }
@@ -99,6 +102,12 @@ private:
     void RebuildVisible();
     void ClampView();
     void HandleShortcuts();
+    float GetTotalFrames() const;
+    /** Where the property sits in the node's Details layout, so tracks list in that order. */
+    int32_t GetPropertyOrder(const AnimationTrack& InTrack) const;
+    /** Writing through a timeline row keys the property at the playhead. */
+    DetailsEditHandler MakeRowEditHandler(const TimelineValueRef& InRef);
+    String RowValueText(int32_t InIndex) const;
 
     Array<TimelineRow> m_Visible;
     Array<String> m_ExpandedTracks;

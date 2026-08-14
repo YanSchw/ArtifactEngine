@@ -95,9 +95,9 @@ static UILabel& AddValueLabel(UINode& InHost, const String& InText) {
     return *label;
 }
 
-static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, Property* InProperty,
-                           const DetailsEditHandler& InOnEdited) {
-    UIDragNumber* drag = InRow.GetValueHost()->Add<UIDragNumber>();
+static void BuildNumberEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, Property* InProperty,
+                              const DetailsEditHandler& InOnEdited) {
+    UIDragNumber* drag = InHost.Add<UIDragNumber>();
     drag->Fill();
     if (IntProperty* intProperty = Cast<IntProperty>(InProperty)) {
         drag->Integer = true;
@@ -138,11 +138,11 @@ static void BuildNumberRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
     }
 }
 
-static void BuildColorRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                          const String& InTitle, const DetailsEditHandler& InOnEdited) {
-    UIColorSwatch* swatch = InRow.GetValueHost()->Add<UIColorSwatch>();
+static void BuildColorEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                             const String& InTitle, const DetailsEditHandler& InOnEdited) {
+    UIColorSwatch* swatch = InHost.Add<UIColorSwatch>();
     swatch->Fill();
-    swatch->Title = InTitle;
+    swatch->Title = InTitle.empty() ? String("Color") : InTitle;
     swatch->Get = [InObject, InOffset]() -> Color {
         char* base = ResolveBase(InObject, InOffset);
         return base ? *(Color*)base : Color(0.0f);
@@ -156,9 +156,9 @@ static void BuildColorRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObje
     };
 }
 
-static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                         const DetailsEditHandler& InOnEdited) {
-    UICheckbox* checkbox = InRow.GetValueHost()->Add<UICheckbox>();
+static void BuildBoolEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                            const DetailsEditHandler& InOnEdited) {
+    UICheckbox* checkbox = InHost.Add<UICheckbox>();
     checkbox->Anchor = checkbox->Pivot = Vec2(0.0f, 0.5f);
     checkbox->Position = Vec2(2.0f, 0.0f);
     checkbox->Bind = [checkbox, InObject, InOffset] {
@@ -175,9 +175,9 @@ static void BuildBoolRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
     };
 }
 
-static void BuildStringRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                           const DetailsEditHandler& InOnEdited) {
-    UITextArea* field = InRow.GetValueHost()->Add<UITextArea>();
+static void BuildStringEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                              const DetailsEditHandler& InOnEdited) {
+    UITextArea* field = InHost.Add<UITextArea>();
     field->Fill();
     field->SingleLine = true;
     field->FontSize = EditorStyle::FontSize;
@@ -205,8 +205,8 @@ static void BuildStringRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObj
     field->FocusLost = [field, commit] { commit(field->Text); };
 }
 
-static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, EnumProperty* InProperty,
-                         const DetailsEditHandler& InOnEdited) {
+static void BuildEnumEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, EnumProperty* InProperty,
+                            const DetailsEditHandler& InOnEdited) {
     const auto read = [InObject, InOffset, InProperty]() -> int64_t {
         int64_t value = 0;
         if (char* base = ResolveBase(InObject, InOffset)) {
@@ -215,7 +215,7 @@ static void BuildEnumRow(DetailsRow& InRow, const WeakObjectPtr<Object>& InObjec
         return value;
     };
 
-    UIDropdown* dropdown = InRow.GetValueHost()->Add<UIDropdown>();
+    UIDropdown* dropdown = InHost.Add<UIDropdown>();
     dropdown->Fill();
     dropdown->GetSelectedLabel = [read, InProperty] {
         return Enum(InProperty->InnerEnumTypename).ConvertValueToString(read());
@@ -269,6 +269,35 @@ static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObject
         }
     };
     slot->Build();
+}
+
+Array<Property*> DetailsCustomization::GetInnerProperties(Property* InProperty) {
+    StructProperty* structProperty = Cast<StructProperty>(InProperty);
+    if (!structProperty || structProperty->InnerStructTypename == "Color") {
+        return Array<Property*>();
+    }
+    return Property::GetTypeProperties(structProperty->InnerStructTypename);
+}
+
+bool DetailsCustomization::BuildValueEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                                            Property* InProperty, const DetailsEditHandler& InOnEdited, const String& InTitle) {
+    if (Cast<IntProperty>(InProperty) || Cast<FloatProperty>(InProperty)) {
+        BuildNumberEditor(InHost, InObject, InOffset, InProperty, InOnEdited);
+    } else if (Cast<BoolProperty>(InProperty)) {
+        BuildBoolEditor(InHost, InObject, InOffset, InOnEdited);
+    } else if (Cast<StringProperty>(InProperty)) {
+        BuildStringEditor(InHost, InObject, InOffset, InOnEdited);
+    } else if (EnumProperty* enumProperty = Cast<EnumProperty>(InProperty)) {
+        BuildEnumEditor(InHost, InObject, InOffset, enumProperty, InOnEdited);
+    } else if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
+        if (structProperty->InnerStructTypename != "Color") {
+            return false;
+        }
+        BuildColorEditor(InHost, InObject, InOffset, InTitle, InOnEdited);
+    } else {
+        return false;
+    }
+    return true;
 }
 
 float DetailsCustomization::BuildHeader(UINode& InHeader, Object* InObject, DetailsTab& InTab) {
@@ -390,23 +419,12 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
     Property* root = InRootProperty ? InRootProperty : InProperty;
     const String label = InLabel.empty() ? PrettyPropertyName(InProperty->Name) : InLabel;
 
-    if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
-        if (structProperty->InnerStructTypename == "Color") {
-            DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
-            BindOverride(row, InObject, root->Name);
-            BuildColorRow(row, InObject, offset, label, MakeEditHandler(InObject, root, &InTab));
-            return;
+    const Array<Property*> inner = GetInnerProperties(InProperty);
+    if (!inner.IsEmpty()) {
+        DetailsCategory& category = AddCategory(InParent, InTab, label, InDepth + 1);
+        for (Property* property : inner) {
+            AddPropertyRow(*category.GetBody(), InTab, InObject, offset, property, InDepth + 1, root);
         }
-
-        const Array<Property*> inner = Property::GetTypeProperties(structProperty->InnerStructTypename);
-        if (!inner.IsEmpty()) {
-            DetailsCategory& category = AddCategory(InParent, InTab, label, InDepth + 1);
-            for (Property* property : inner) {
-                AddPropertyRow(*category.GetBody(), InTab, InObject, offset, property, InDepth + 1, root);
-            }
-            return;
-        }
-        AddValueLabel(*AddRow(InParent, InTab, label, InDepth).GetValueHost(), structProperty->InnerStructTypename);
         return;
     }
 
@@ -414,14 +432,12 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
     BindOverride(row, InObject, root->Name);
     const DetailsEditHandler onEdited = MakeEditHandler(InObject, root, &InTab);
 
-    if (Cast<IntProperty>(InProperty) || Cast<FloatProperty>(InProperty)) {
-        BuildNumberRow(row, InObject, offset, InProperty, onEdited);
-    } else if (Cast<BoolProperty>(InProperty)) {
-        BuildBoolRow(row, InObject, offset, onEdited);
-    } else if (Cast<StringProperty>(InProperty)) {
-        BuildStringRow(row, InObject, offset, onEdited);
-    } else if (EnumProperty* enumProperty = Cast<EnumProperty>(InProperty)) {
-        BuildEnumRow(row, InObject, offset, enumProperty, onEdited);
+    if (BuildValueEditor(*row.GetValueHost(), InObject, offset, InProperty, onEdited, label)) {
+        return;
+    }
+
+    if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
+        AddValueLabel(*row.GetValueHost(), structProperty->InnerStructTypename);
     } else if (SharedObjectPtrProperty* sharedProperty = Cast<SharedObjectPtrProperty>(InProperty)) {
         if (sharedProperty->InnerClass.IsSubclassOf(Asset::StaticClass())) {
             BuildAssetRow(row, InTab, InObject, offset, sharedProperty->InnerClass, false, onEdited);

@@ -19,13 +19,17 @@
 #include "Object/Property.h"
 #include "Serialization/Json.h"
 #include "Serialization/ThirdParty/nlohmann/json.hpp"
-#include <cstring>
 #include "InputSystem/KeyboardDevice.h"
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 
 static const Vec4 s_RecordingBar = HexColor(0x4A1A18);
 static const int32_t s_NiceSteps[] = { 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200 };
+
+static float Clamped(float InValue, float InMin, float InMax) {
+    return InValue < InMin ? InMin : (InValue > InMax ? InMax : InValue);
+}
 
 AnimationTimelineTab::AnimationTimelineTab() {
     UIVStack* layout = Add<UIVStack>();
@@ -136,18 +140,27 @@ float AnimationTimelineTab::XToFrame(const UIRectF& InStrip, float InX) const {
     return m_ViewStart + alpha * (m_ViewEnd - m_ViewStart);
 }
 
-void AnimationTimelineTab::ClampView() {
+float AnimationTimelineTab::GetTotalFrames() const {
     Animation* animation = GetAnimation();
-    const float total = animation ? (float)animation->GetFrameCount() : MinVisibleFrames;
-    const float maxSpan = total * MaxZoomOutFactor;
+    return animation ? (float)animation->GetFrameCount() : MinVisibleFrames;
+}
 
-    float span = m_ViewEnd - m_ViewStart;
-    span = span < MinVisibleFrames ? MinVisibleFrames : (span > maxSpan ? maxSpan : span);
+void AnimationTimelineTab::GetScrollDomain(float& OutStart, float& OutEnd) const {
+    const float margin = (m_ViewEnd - m_ViewStart) * OverscrollFraction;
+    OutStart = -margin;
+    OutEnd = GetTotalFrames() + margin;
+}
 
-    // The view may sit past either end, but never so far that the animation leaves the screen.
-    const float minStart = -total * 0.5f;
-    const float maxStart = total;
-    m_ViewStart = m_ViewStart < minStart ? minStart : (m_ViewStart > maxStart ? maxStart : m_ViewStart);
+void AnimationTimelineTab::ClampView() {
+    const float span = Clamped(m_ViewEnd - m_ViewStart, MinVisibleFrames, GetTotalFrames() * MaxZoomOutFactor);
+    m_ViewEnd = m_ViewStart + span;
+
+    float start = 0.0f;
+    float end = 0.0f;
+    GetScrollDomain(start, end);
+
+    // Zoomed out past the whole domain there is nothing left to pan, so the animation sits centred.
+    m_ViewStart = end - start <= span ? (start + end - span) * 0.5f : Clamped(m_ViewStart, start, end - span);
     m_ViewEnd = m_ViewStart + span;
 }
 
@@ -223,18 +236,6 @@ String AnimationTimelineTab::GetTrackLabel(const AnimationTrack& InTrack) const 
     return name + " : " + DetailsCustomization::PrettyPropertyName(InTrack.PropertyName);
 }
 
-static const char* s_ExpandableStructs[] = { "Vec2", "Vec3", "Vec4", "Color" };
-
-static Array<Property*> ComponentsOf(Property* InProperty) {
-    StructProperty* structProperty = Cast<StructProperty>(InProperty);
-    for (const char* expandable : s_ExpandableStructs) {
-        if (structProperty && structProperty->InnerStructTypename == expandable) {
-            return Property::GetTypeProperties(structProperty->InnerStructTypename);
-        }
-    }
-    return Array<Property*>();
-}
-
 static String TrackKey(const AnimationTrack& InTrack) {
     String key;
     for (int32_t index : InTrack.Path) {
@@ -265,6 +266,36 @@ void AnimationTimelineTab::ToggleExpanded(int32_t InIndex) {
     }
 }
 
+int32_t AnimationTimelineTab::GetPropertyOrder(const AnimationTrack& InTrack) const {
+    Node* node = GetTrackNode(InTrack);
+    if (!node) {
+        return INT32_MAX;
+    }
+    const Array<Property*> properties = Property::GetAllTypeProperties(node->GetClass());
+    for (int32_t index = 0; index < properties.Size(); index++) {
+        if (properties[index]->Name == InTrack.PropertyName) {
+            return index;
+        }
+    }
+    return INT32_MAX;
+}
+
+/** Sort key of one track: its node's place in the hierarchy, then its place in the Details layout. */
+struct TimelineOrder {
+    int32_t Track = 0;
+    int32_t Property = 0;
+};
+
+/** Child indices compared left to right, which is the order a hierarchy walk visits the nodes in. */
+static bool PathBefore(const Array<int32_t>& InA, const Array<int32_t>& InB) {
+    for (int32_t index = 0; index < InA.Size() && index < InB.Size(); index++) {
+        if (InA[index] != InB[index]) {
+            return InA[index] < InB[index];
+        }
+    }
+    return InA.Size() < InB.Size();
+}
+
 void AnimationTimelineTab::RebuildVisible() {
     m_Visible.Clear();
     Animation* animation = GetAnimation();
@@ -272,14 +303,29 @@ void AnimationTimelineTab::RebuildVisible() {
         return;
     }
 
-    for (int32_t index = 0; index < animation->GetTracks().Size(); index++) {
-        const AnimationTrack& track = animation->GetTracks()[index];
+    const Array<AnimationTrack>& tracks = animation->GetTracks();
+    Array<TimelineOrder> order;
+    for (int32_t index = 0; index < tracks.Size(); index++) {
+        TimelineOrder entry;
+        entry.Track = index;
+        entry.Property = GetPropertyOrder(tracks[index]);
+        order.Add(entry);
+    }
+    order.Sort([&tracks](const TimelineOrder& InA, const TimelineOrder& InB) {
+        return tracks[InA.Track].Path == tracks[InB.Track].Path
+             ? InA.Property < InB.Property
+             : PathBefore(tracks[InA.Track].Path, tracks[InB.Track].Path);
+    });
+
+    for (const TimelineOrder& entry : order) {
+        const AnimationTrack& track = tracks[entry.Track];
         Node* node = GetTrackNode(track);
         Property* property = node ? Property::FindTypeProperty(node->GetClass(), track.PropertyName) : nullptr;
-        const Array<Property*> components = ComponentsOf(property);
+        const Array<Property*> components = DetailsCustomization::GetInnerProperties(property);
 
         TimelineRow row;
-        row.Track = index;
+        row.Track = entry.Track;
+        row.Depth = track.Path.Size();
         row.Label = GetTrackLabel(track);
         row.Expandable = !components.IsEmpty();
         row.Expanded = row.Expandable && m_ExpandedTracks.Contains(TrackKey(track));
@@ -290,8 +336,9 @@ void AnimationTimelineTab::RebuildVisible() {
         }
         for (int32_t component = 0; component < components.Size(); component++) {
             TimelineRow leaf;
-            leaf.Track = index;
+            leaf.Track = entry.Track;
             leaf.Component = component;
+            leaf.Depth = row.Depth + 1;
             leaf.Label = DetailsCustomization::PrettyPropertyName(track.PropertyName) + "." + components[component]->Name;
             m_Visible.Add(leaf);
         }
@@ -303,86 +350,106 @@ TimelineValueRef AnimationTimelineTab::ResolveRow(int32_t InIndex) const {
     const TimelineRow* row = GetRow(InIndex);
     const AnimationTrack* track = GetRowTrack(InIndex);
     Node* node = track ? GetTrackNode(*track) : nullptr;
-    if (!row || !node) {
+    Property* root = node ? Property::FindTypeProperty(node->GetClass(), track->PropertyName) : nullptr;
+    if (!row || !root) {
         return ref;
     }
 
-    Property* root = Property::FindTypeProperty(node->GetClass(), track->PropertyName);
-    if (!root) {
-        return ref;
-    }
     ref.Target = node;
     ref.Root = root;
-
-    char* base = (char*)root->GetValuePtr(node);
+    ref.Leaf = root;
+    ref.Offset = root->Offset;
     if (row->Component < 0) {
-        if (Cast<FloatProperty>(root) || Cast<IntProperty>(root)) {
-            ref.Numeric = root;
-            ref.Address = base;
-        }
         return ref;
     }
 
-    const Array<Property*> components = ComponentsOf(root);
-    if (row->Component < components.Size()) {
-        ref.Numeric = components[row->Component];
-        ref.Address = base + components[row->Component]->Offset;
+    const Array<Property*> components = DetailsCustomization::GetInnerProperties(root);
+    if (row->Component >= components.Size()) {
+        return TimelineValueRef();
     }
+    ref.Leaf = components[row->Component];
+    ref.Offset = root->Offset + components[row->Component]->Offset;
     return ref;
 }
 
-double AnimationTimelineTab::ReadRowValue(const TimelineValueRef& InRef) const {
-    if (!InRef.Address) {
-        return 0.0;
+VectorImage* AnimationTimelineTab::GetRowIcon(int32_t InIndex) const {
+    const TimelineRow* row = GetRow(InIndex);
+    const AnimationTrack* track = GetRowTrack(InIndex);
+    Node* node = track ? GetTrackNode(*track) : nullptr;
+    if (!row || !node || row->Component >= 0) {
+        return nullptr;
     }
-    if (FloatProperty* number = Cast<FloatProperty>(InRef.Numeric)) {
-        return number->IsDouble ? *(double*)InRef.Address : (double)*(float*)InRef.Address;
-    }
-    if (IntProperty* number = Cast<IntProperty>(InRef.Numeric)) {
-        switch (number->NumBits) {
-            case 8:  return number->IsUnsigned ? (double)*(uint8_t*)InRef.Address : (double)*(int8_t*)InRef.Address;
-            case 16: return number->IsUnsigned ? (double)*(uint16_t*)InRef.Address : (double)*(int16_t*)InRef.Address;
-            case 32: return number->IsUnsigned ? (double)*(uint32_t*)InRef.Address : (double)*(int32_t*)InRef.Address;
-            default: return number->IsUnsigned ? (double)*(uint64_t*)InRef.Address : (double)*(int64_t*)InRef.Address;
+
+    for (Class current = node->GetClass(); current != Class::None; current = current.GetParentClass()) {
+        for (Property* property : Property::GetTypeProperties(current.Name)) {
+            if (property->Name == track->PropertyName) {
+                return EditorIcons::GetNodeIcon(current);
+            }
         }
     }
-    return 0.0;
+    return EditorIcons::GetNodeIcon(node->GetClass());
 }
 
-void AnimationTimelineTab::WriteRowValue(const TimelineValueRef& InRef, double InValue) {
-    if (!InRef.Address || !InRef.Target) {
+DetailsEditHandler AnimationTimelineTab::MakeRowEditHandler(const TimelineValueRef& InRef) {
+    const WeakObjectPtr<AnimationTimelineTab> self = this;
+    const WeakObjectPtr<Node> target = InRef.Target;
+    Property* root = InRef.Root;
+
+    DetailsEditHandler handler;
+    handler.BeginEdit = [self, target, root] {
+        AnimationTimelineTab* timeline = self.Get();
+        AnimationEditorTab* editor = timeline ? timeline->GetEditor() : nullptr;
+        if (!editor || !target.Get()) {
+            return;
+        }
+        editor->SetPreviewing(true);
+        timeline->RecordEdit("Edit " + DetailsCustomization::PrettyPropertyName(root->Name), target.Get());
+    };
+    handler.CommitEdit = [self, target, root] {
+        AnimationTimelineTab* timeline = self.Get();
+        AnimationEditorTab* editor = timeline ? timeline->GetEditor() : nullptr;
+        Node* node = target.Get();
+        if (!editor || !node) {
+            return;
+        }
+        root->NotifyChanged(node);
+        editor->KeyProperty(*node, root->Name);
+        DetailsCustomization::NotifyPropertyEdited(timeline->GetMajorTab(), node, root->Name);
+    };
+    return handler;
+}
+
+void AnimationTimelineTab::BuildRowEditor(UINode& InHost, int32_t InIndex) {
+    const TimelineValueRef ref = ResolveRow(InIndex);
+    const TimelineRow* row = GetRow(InIndex);
+    if (!ref.Leaf || !row) {
         return;
     }
-    if (FloatProperty* number = Cast<FloatProperty>(InRef.Numeric)) {
-        if (number->IsDouble) {
-            *(double*)InRef.Address = InValue;
-        } else {
-            *(float*)InRef.Address = (float)InValue;
-        }
-    } else if (IntProperty* number = Cast<IntProperty>(InRef.Numeric)) {
-        const int64_t rounded = (int64_t)std::llround(InValue);
-        std::memcpy(InRef.Address, &rounded, number->NumBits / 8);
-    } else {
+    if (DetailsCustomization::BuildValueEditor(InHost, ref.Target, ref.Offset, ref.Leaf,
+                                               MakeRowEditHandler(ref), row->Label)) {
+        return;
+    }
+    if (row->Expandable) {
         return;
     }
 
-    RecordEdit("Edit " + DetailsCustomization::PrettyPropertyName(InRef.Root->Name), InRef.Target);
-    InRef.Root->NotifyChanged(InRef.Target);
-    DetailsCustomization::NotifyPropertyEdited(GetMajorTab(), InRef.Target, InRef.Root->Name);
+    UILabel* text = InHost.Add<UILabel>();
+    text->Fill();
+    text->FontSize = EditorStyle::FontSize - 2.0f;
+    text->Color = EditorStyle::TextDim;
+    text->VAlign = UIVAlign::Middle;
+    text->Bind = [this, text, InIndex] { text->Text = RowValueText(InIndex); };
 }
 
 String AnimationTimelineTab::RowValueText(int32_t InIndex) const {
     const TimelineValueRef ref = ResolveRow(InIndex);
     const TimelineRow* row = GetRow(InIndex);
-    if (!ref.Root || ref.Numeric || !row || row->Expandable) {
-        return String();
-    }
-    if (Cast<StructProperty>(ref.Root) || Cast<ArrayProperty>(ref.Root)) {
+    if (!ref.Leaf || !row || row->Expandable) {
         return String();
     }
 
-    const String text = JsonSerializer::SerializeProperty(ref.Root, ref.Root->GetValuePtr(ref.Target)).dump();
-    return text.size() > 10 ? text.substr(0, 9) + "..." : text;
+    const String text = JsonSerializer::SerializeProperty(ref.Leaf, (char*)ref.Target + ref.Offset).dump();
+    return text.size() > 12 ? text.substr(0, 11) + "..." : text;
 }
 
 void AnimationTimelineTab::ScrubTo(const UIRectF& InStrip, float InX) {

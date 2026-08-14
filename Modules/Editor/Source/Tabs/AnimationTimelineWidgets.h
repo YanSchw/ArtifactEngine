@@ -1,11 +1,13 @@
 #pragma once
 #include "GameFramework/UINode.h"
+#include "Object/Pointer.h"
 #include "AnimationTimelineWidgets.gen.h"
 
 class AnimationTimelineTab;
+class Node;
 class UILabel;
 class UISvg;
-class UIDragNumber;
+struct Property;
 
 /** Shared by every part of the timeline that maps frames to pixels. */
 class AnimationTimelineStrip : public UINode {
@@ -73,12 +75,15 @@ public:
 private:
     virtual bool WheelZooms() const override { return false; }
     void Refresh();
+    void SetEditor(Node* InTarget, Property* InLeaf);
     int32_t KeyAt(const Vec2& InCursorPos) const;
 
     UISvg* m_Expander = nullptr;
+    UISvg* m_Icon = nullptr;
     UILabel* m_Label = nullptr;
-    UILabel* m_ValueLabel = nullptr;
-    UIDragNumber* m_ValueField = nullptr;
+    UINode* m_ValueHost = nullptr;
+    WeakObjectPtr<Node> m_EditorTarget;
+    Property* m_EditorLeaf = nullptr;
     int32_t m_DraggedKey = -1;
     bool m_PressedOnLabel = false;
 };
@@ -98,7 +103,6 @@ public:
 
 private:
     UIRectF ThumbRect() const;
-    void Domain(float& OutStart, float& OutSpan) const;
 
     float m_GrabOffset = 0.0f;
 };
