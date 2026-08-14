@@ -1496,6 +1496,19 @@ static int createNativeWindow(_GLFWwindow* window,
 
     SetPropW(window->win32.handle, L"GLFW", window);
 
+    // CreateWindowExW above dispatched WM_NCCREATE/WM_NCCALCSIZE/WM_CREATE before
+    // the property existed, so windowProc could not find the window and handed
+    // them all to DefWindowProcW. For a client-drawn title bar that means the
+    // frame was measured with a native WS_CAPTION, and nothing below changes the
+    // window size, so no further WM_NCCALCSIZE would arrive until the first user
+    // resize. Force the recalculation now, while the window is still hidden.
+    if (window->decorated && !window->titlebar)
+    {
+        SetWindowPos(window->win32.handle, NULL, 0, 0, 0, 0,
+                     SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE |
+                     SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE);
+    }
+
     if (IsWindows7OrGreater())
     {
         ChangeWindowMessageFilterEx(window->win32.handle,
