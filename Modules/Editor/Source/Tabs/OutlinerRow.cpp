@@ -286,12 +286,17 @@ static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<Outliner
 }
 
 bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
-    Node* node = m_Node.Get();
-    if (!node || !Owner) {
+    if (!Owner) {
         return false;
     }
-    if (!Owner->IsSelected(node)) {
+    Node* node = m_Node.Get();
+    if (!node) {
+        node = Owner->GetMajorTab() ? Owner->GetMajorTab()->GetAssetRootNode() : nullptr;
+    } else if (!Owner->IsSelected(node)) {
         Owner->HandleRowClick(node, false, false);
+    }
+    if (!node) {
+        return false;
     }
 
     const WeakObjectPtr<OutlinerTab> owner = Owner;
@@ -382,6 +387,9 @@ void OutlinerRow::OnPressed(const Vec2& InCursorPos) {
 
     Node* node = m_Node.Get();
     if (!node || !Owner) {
+        if (Owner && Owner->GetMajorTab()) {
+            Owner->GetMajorTab()->ClearSelection();
+        }
         return;
     }
 

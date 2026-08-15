@@ -86,6 +86,12 @@ OutlinerTab::OutlinerTab() {
     scroll->Size = { 1.0_rel, 1.0_rel };  // whatever the fixed-height bars leave over
     scroll->Padding = UIPadding(4.0f, 4.0f);
 
+    OutlinerRow* emptyArea = scroll->Add<OutlinerRow>();
+    emptyArea->Owner = this;
+    emptyArea->RowIndex = -1;
+    emptyArea->Fill();
+    emptyArea->Interactable = true;
+
     UIVStack* list = scroll->Add<UIVStack>();
     list->Anchor = list->Pivot = Vec2(0.0f);
     list->Position = Vec2(0.0f);
