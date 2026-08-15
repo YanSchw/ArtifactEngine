@@ -363,9 +363,7 @@ VectorImage* AnimationEditorTab::GetTabIcon() const {
 }
 
 void AnimationEditorTab::BuildToolBar(UINode& InToolBar) {
-    UIButton& save = UI::Button(InToolBar, "Save", [this] { Save(); });
-    save.Size = { 70.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(save);
+    EditorStyle::ToolButton(InToolBar, EditorIcons::Save(), "Save", [this] { Save(); });
 
     UILabel* caption = InToolBar.Add<UILabel>();
     caption->Size = { 76.0_px, 1.0_rel };

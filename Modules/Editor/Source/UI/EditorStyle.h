@@ -3,6 +3,7 @@
 #include "GameFramework/UIButton.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UISvg.h"
+#include "UITooltip.h"
 
 inline Vec4 HexColor(uint32_t InRGB, float InAlpha = 1.0f) {
     return Vec4(
@@ -63,6 +64,8 @@ public:
     inline static constexpr float BottomBarHeight = 34.0f;
     inline static constexpr float TabHeaderHeight = 26.0f;
     inline static constexpr float CaptionButtonWidth = 46.0f;
+    inline static constexpr float ToolButtonWidth = 30.0f;
+    inline static constexpr float ToolIconSize = 16.0f;
     inline static constexpr float SplitterThickness = 4.0f;
     inline static constexpr float MinPanelSize = 90.0f;
     inline static constexpr float FontSize = 13.0f;
@@ -77,6 +80,25 @@ public:
             label->FontSize = InFontSize;
             label->Color = Text;
         }
+    }
+
+    /** An icon-only button with a tooltip. */
+    static UIButton& ToolButton(UINode& InParent, VectorImage* InIcon, const String& InTooltip,
+                                std::function<void()> InAction, float InWidth = ToolButtonWidth) {
+        UIButton* button = InParent.Add<UIButton>();
+        button->Clicked = std::move(InAction);
+        button->Size = { UIValue(InWidth), 1.0_rel };
+        button->NormalColor = Button;
+        button->HoverColor = ButtonHover;
+        button->PressedColor = ButtonPressed;
+
+        UISvg* icon = button->Add<UISvg>();
+        icon->Center(Vec2(ToolIconSize));
+        icon->Tint = Text;
+        icon->Image = InIcon;
+
+        button->Add<UITooltip>()->Text = InTooltip;
+        return *button;
     }
 
     static UIButton& IconButton(UINode& InParent, VectorImage* InIcon, const Vec4& InIconTint,

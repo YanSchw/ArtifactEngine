@@ -76,7 +76,5 @@ VectorImage* MaterialEditorTab::GetTabIcon() const {
 }
 
 void MaterialEditorTab::BuildToolBar(UINode& InToolBar) {
-    UIButton& save = UI::Button(InToolBar, "Save", [this] { Save(); });
-    save.Size = { 70.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(save);
+    EditorStyle::ToolButton(InToolBar, EditorIcons::Save(), "Save", [this] { Save(); });
 }

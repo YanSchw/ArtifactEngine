@@ -50,6 +50,15 @@ public:
     static VectorImage* Character()     { return Get("37661651-475f-4abb-9aab-8d05e8da1fc0"); }
     static VectorImage* Animation()     { return Get("3f0e57a2-1c4b-4d90-9d0e-7a1b2c3d4e5f"); }
     static VectorImage* Record()        { return Get("5b2c8e14-9d33-4f61-8a72-6c0d51e9b3a4"); }
+    static VectorImage* Eye()           { return Get("b1c2d3e4-0004-4a00-9000-000000000004"); }
+    static VectorImage* Save()          { return Get("e173f6e2-fc21-4933-b11f-0e1bff34ece1"); }
+    static VectorImage* Select()        { return Get("fc8a90f0-1426-4ddb-837e-732882527a91"); }
+    static VectorImage* Move()          { return Get("fa00bfd5-a7a9-4e03-9da7-cac8c9276031"); }
+    static VectorImage* Rotate()        { return Get("8bcdae6a-a930-49f3-9bb4-77027d91bccc"); }
+    static VectorImage* Scale()         { return Get("6dbc20bf-42b5-41f0-b33c-f53eb22f0cdf"); }
+    static VectorImage* RectTool()      { return Get("029e2b33-c934-4392-928b-7e27d38f0bf9"); }
+    static VectorImage* WorldSpace()    { return Get("c25d2ba0-a8db-4a5f-a315-5f366fbc8ad0"); }
+    static VectorImage* LocalSpace()    { return Get("8cc2ddce-1fc9-4375-b4aa-b6eaed517caa"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
     static VectorImage* GetAssetIcon(const Class& InClass);

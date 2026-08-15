@@ -200,9 +200,7 @@ VectorImage* BlueprintEditorTab::GetTabIcon() const {
 }
 
 void BlueprintEditorTab::BuildToolBar(UINode& InToolBar) {
-    UIButton& save = UI::Button(InToolBar, "Save", [this] { Save(); });
-    save.Size = { 70.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(save);
+    EditorStyle::ToolButton(InToolBar, EditorIcons::Save(), "Save", [this] { Save(); });
 
     UILabel* caption = InToolBar.Add<UILabel>();
     caption->Size = { 78.0_px, 1.0_rel };

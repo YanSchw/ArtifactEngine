@@ -79,9 +79,7 @@ VectorImage* MeshEditorTab::GetTabIcon() const {
 }
 
 void MeshEditorTab::BuildToolBar(UINode& InToolBar) {
-    UIButton& save = UI::Button(InToolBar, "Save", [this] { Save(); });
-    save.Size = { 70.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(save);
+    EditorStyle::ToolButton(InToolBar, EditorIcons::Save(), "Save", [this] { Save(); });
 
     UIButton& reimport = UI::Button(InToolBar, "Reimport", [this] { m_ReimportPending = true; });
     reimport.Size = { 90.0_px, 1.0_rel };

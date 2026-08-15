@@ -97,49 +97,47 @@ ViewportTab::~ViewportTab() {
 void ViewportTab::BuildSceneTools(UINode& InParent) {
     static const char* toolNames[] = { "Select", "Move", "Rotate", "Scale" };
     static const GizmoMode toolModes[] = { GizmoMode::Select, GizmoMode::Translate, GizmoMode::Rotate, GizmoMode::Scale };
+    VectorImage* const toolIcons[] = { EditorIcons::Select(), EditorIcons::Move(),
+                                       EditorIcons::Rotate(), EditorIcons::Scale() };
     for (int i = 0; i < 4; i++) {
         const GizmoMode mode = toolModes[i];
-        UIButton& button = UI::Button(InParent, toolNames[i], [this, mode] { m_TransformGizmo->Mode = mode; });
-        button.Size = { 58.0_px, 1.0_rel };
-        EditorStyle::ApplyButtonStyle(button);
+        UIButton& button = EditorStyle::ToolButton(InParent, toolIcons[i], toolNames[i],
+                                                   [this, mode] { m_TransformGizmo->Mode = mode; });
         UIButton* buttonPtr = &button;
         button.Bind = [this, buttonPtr, mode] {
             buttonPtr->NormalColor = (m_TransformGizmo->Mode == mode) ? EditorStyle::Accent : EditorStyle::Button;
         };
     }
 
-    UIButton& space = UI::Button(InParent, "World", [this] {
+    UIButton& space = EditorStyle::ToolButton(InParent, EditorIcons::WorldSpace(), "World", [this] {
         m_TransformGizmo->Space = m_TransformGizmo->Space == GizmoSpace::World ? GizmoSpace::Local : GizmoSpace::World;
     });
-    space.Size = { 58.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(space);
-    if (Node* caption = space.GetChildByClass(UILabel::StaticClass())) {
-        UILabel* spaceLabel = caption->As<UILabel>();
-        space.Bind = [this, spaceLabel] {
-            const bool local = m_TransformGizmo->Space == GizmoSpace::Local || m_TransformGizmo->Mode == GizmoMode::Scale;
-            spaceLabel->Text = local ? "Local" : "World";
-            spaceLabel->Color = m_TransformGizmo->Mode == GizmoMode::Scale ? EditorStyle::TextDim : EditorStyle::Text;
-        };
-    }
+    UISvg* spaceIcon = space.GetChildByClass(UISvg::StaticClass())->As<UISvg>();
+    UITooltip* spaceTooltip = space.GetChildByClass(UITooltip::StaticClass())->As<UITooltip>();
+    space.Bind = [this, spaceIcon, spaceTooltip] {
+        const bool local = m_TransformGizmo->Space == GizmoSpace::Local || m_TransformGizmo->Mode == GizmoMode::Scale;
+        spaceIcon->Image = local ? EditorIcons::LocalSpace() : EditorIcons::WorldSpace();
+        spaceIcon->Tint = m_TransformGizmo->Mode == GizmoMode::Scale ? EditorStyle::TextDim : EditorStyle::Text;
+        spaceTooltip->Text = local ? "Local" : "World";
+    };
 }
 
 void ViewportTab::BuildDesignTools(UINode& InParent) {
     static const char* toolNames[] = { "Select", "Rect", "Rotate" };
     static const UILayoutTool tools[] = { UILayoutTool::Select, UILayoutTool::Rect, UILayoutTool::Rotate };
+    VectorImage* const toolIcons[] = { EditorIcons::Select(), EditorIcons::RectTool(), EditorIcons::Rotate() };
     for (int i = 0; i < 3; i++) {
         const UILayoutTool tool = tools[i];
-        UIButton& button = UI::Button(InParent, toolNames[i], [this, tool] { m_LayoutGizmo->Tool = tool; });
-        button.Size = { 58.0_px, 1.0_rel };
-        EditorStyle::ApplyButtonStyle(button);
+        UIButton& button = EditorStyle::ToolButton(InParent, toolIcons[i], toolNames[i],
+                                                   [this, tool] { m_LayoutGizmo->Tool = tool; });
         UIButton* buttonPtr = &button;
         button.Bind = [this, buttonPtr, tool] {
             buttonPtr->NormalColor = (m_LayoutGizmo->Tool == tool) ? EditorStyle::Accent : EditorStyle::Button;
         };
     }
 
-    UIButton& preview = UI::Button(InParent, "Preview", [this] { m_PreviewInput = !m_PreviewInput; });
-    preview.Size = { 64.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(preview);
+    UIButton& preview = EditorStyle::ToolButton(InParent, EditorIcons::Eye(), "Preview",
+                                                [this] { m_PreviewInput = !m_PreviewInput; });
     UIButton* previewPtr = &preview;
     preview.Bind = [this, previewPtr] {
         previewPtr->NormalColor = m_PreviewInput ? EditorStyle::Accent : EditorStyle::Button;

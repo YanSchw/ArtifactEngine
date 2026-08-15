@@ -253,7 +253,7 @@ void SceneEditorTab::BuildToolBar(UINode& InToolBar) {
         button.Size = { 70.0_px, 1.0_rel };
         EditorStyle::ApplyButtonStyle(button);
     };
-    addButton("Save", [this] { Save(); });
+    EditorStyle::ToolButton(InToolBar, EditorIcons::Save(), "Save", [this] { Save(); });
     addButton("Settings", [] { AE_INFO("SceneEditorTab: Settings"); });
 
     BuildPlayControls(InToolBar);
