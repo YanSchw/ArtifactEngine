@@ -138,15 +138,6 @@ void EditorWindow::BuildFileMenu(UIMenuModel& OutMenu) {
 
     OutMenu.Section("Editor");
     OutMenu.Item("New Scene Tab", [this] { OpenTab<SceneEditorTab>(); }).Icon(EditorIcons::Level());
-    OutMenu.Item("New Window", [this] {
-        WindowParams params;
-        params.Title = "Artifact Editor";
-        params.Width = 1100;
-        params.Height = 650;
-        SharedObjectPtr<EditorWindow> spawned = EditorWindow::Create(params);
-        spawned->SetPosition(GetPosition() + Vec2(40.0f, 40.0f));
-        spawned->OpenTab<SceneEditorTab>();
-    }).Icon(EditorIcons::Document());
     OutMenu.Separator();
     OutMenu.Item("Close Window", [this] { Close(); });
 }
