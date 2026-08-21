@@ -24,6 +24,7 @@
 #include "ThemedWindow.h"
 #include "Window.h"
 #include "Core/EngineConfig.h"
+#include "GameFramework/DebugDraw.h"
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/RenderTargetTexture.h"
 #include "GameFramework/UIVStack.h"
@@ -271,6 +272,12 @@ void ViewportTab::RenderScene(const UIFrameContext& InContext, const UIRectF& In
     params.CameraOverride = GetViewCamera();
     m_Pipeline->Render(InContext.DeltaTime, params);
 
+    Array<GizmoDraw> gizmos;
+    if (!IsPossessedByPlay()) {
+        m_GizmoLayer->Collect(GetEditedWorld(), m_Camera.Get(), GetMajorTab(), gizmos);
+    }
+    DebugDraw::Render(params.m_World, m_Pipeline->GetFrameBuffer().Get(), params.CameraOverride);
+
     if (IsPossessedByPlay()) {
         m_TransformGizmo->EndDrag();
         m_TransformGizmo->ClearHover();
@@ -279,8 +286,6 @@ void ViewportTab::RenderScene(const UIFrameContext& InContext, const UIRectF& In
         return;
     }
 
-    Array<GizmoDraw> gizmos;
-    m_GizmoLayer->Collect(GetEditedWorld(), m_Camera.Get(), GetMajorTab(), gizmos);
     m_GizmoRenderer->Render(m_Pipeline->GetFrameBuffer().Get(), m_Camera.Get(), gizmos);
 
     m_TransformGizmo->Update(GetMajorTab(), m_Camera.Get(), InRect.Size);

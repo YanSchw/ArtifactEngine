@@ -67,6 +67,9 @@ public:
     static Object* Create(const Class& type);
 
     template<typename T>
+    bool GetPropertyValue(const String& InName, T& OutValue);
+
+    template<typename T>
     static T* Create(const Class& type = T::StaticClass()) {
         Object* obj = Create(type);
         return obj->As<T>();

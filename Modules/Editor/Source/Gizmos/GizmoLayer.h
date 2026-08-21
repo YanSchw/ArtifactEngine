@@ -8,6 +8,8 @@ class World;
 class MajorTab;
 class Mesh;
 class CameraNode;
+class DirectionalLightNode;
+class Node3D;
 
 /** Decides what the editor overlays on a viewport. */
 class GizmoLayer : public Object {
@@ -21,6 +23,11 @@ public:
 private:
     /** Gizmos hold a constant on-screen size, so they stay usable at any distance. */
     float ScaleForDistance(const Vec3& InGizmoPos, CameraNode* InViewCamera) const;
+
+    void DrawShapeOutline(World* InWorld, Node3D* InNode) const;
+    void DrawCharacterOutline(World* InWorld, Node3D* InNode) const;
+    void DrawCameraFrustum(World* InWorld, CameraNode* InCamera, const Vec4& InColor) const;
+    void DrawSunDirection(World* InWorld, DirectionalLightNode* InLight) const;
 
     WeakObjectPtr<Mesh> m_CameraMesh;
 };

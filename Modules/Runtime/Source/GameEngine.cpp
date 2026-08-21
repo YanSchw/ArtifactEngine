@@ -19,6 +19,7 @@
 #include "Assets/AssetManager.h"
 #include "Assets/Scene.h"
 #include "Common/UUID.h"
+#include "GameFramework/DebugDraw.h"
 #include "GameFramework/GameInstance.h"
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
@@ -89,11 +90,15 @@ void GameEngine::RenderFrame(double InDeltaTime) {
         return;
     }
 
+    World* world = GetGameInstance()->GetCurrentWorld();
     m_RenderPipeline->Render(InDeltaTime, RenderParams {
         s_Surface->GetWidth(),
         s_Surface->GetHeight(),
-        GetGameInstance()->GetCurrentWorld()
+        world
     });
+
+    DebugDraw::Render(world, m_RenderPipeline->GetFrameBuffer().Get(),
+                      world ? world->GetMainCamera() : nullptr);
 
     auto[binding, imageView, sampler] = s_FullScreenPipeline->GetDesc().ImageBindings[0];
     if (imageView != m_RenderPipeline->GetFinalImageView()) {

@@ -3,6 +3,7 @@
 #include "Common/String.h"
 #include "Common/Map.h"
 #include "Common/Array.h"
+#include <type_traits>
 #include "Property.gen.h"
 
 #define PROPERTY(...)
@@ -126,3 +127,37 @@ struct ArrayProperty : public Property {
     ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty, GetSizeFn getSize, GetElementPtrFn getElementPtr, AddDefaultFn addDefault, ClearFn clear)
         : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize), GetElementPtr(getElementPtr), AddDefault(addDefault), Clear(clear) {}
 };
+
+namespace PropertyTypes {
+    template<typename T>
+    inline bool Matches(Property* InProperty) {
+        if constexpr (std::is_same_v<T, bool>) {
+            return Cast<BoolProperty>(InProperty) != nullptr;
+        } else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+            FloatProperty* property = Cast<FloatProperty>(InProperty);
+            return property && property->IsDouble == std::is_same_v<T, double>;
+        } else if constexpr (std::is_enum_v<T>) {
+            EnumProperty* property = Cast<EnumProperty>(InProperty);
+            return property && property->ByteSize == sizeof(T);
+        } else if constexpr (std::is_integral_v<T>) {
+            IntProperty* property = Cast<IntProperty>(InProperty);
+            return property && property->NumBits == sizeof(T) * 8 && property->IsUnsigned == std::is_unsigned_v<T>;
+        } else if constexpr (std::is_same_v<T, String>) {
+            return Cast<StringProperty>(InProperty) != nullptr;
+        } else if constexpr (std::is_same_v<T, UUID>) {
+            return Cast<UUIDProperty>(InProperty) != nullptr;
+        } else {
+            return Cast<StructProperty>(InProperty) != nullptr;
+        }
+    }
+}
+
+template<typename T>
+bool Object::GetPropertyValue(const String& InName, T& OutValue) {
+    Property* property = Property::FindTypeProperty(GetClass(), InName);
+    if (!property || !PropertyTypes::Matches<T>(property)) {
+        return false;
+    }
+    OutValue = *(const T*)property->GetValuePtr(this);
+    return true;
+}
