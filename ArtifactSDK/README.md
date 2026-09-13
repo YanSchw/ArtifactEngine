@@ -3,7 +3,7 @@
 ## Install
 
 Requirements:
-- Python 3.7+
+- Python 3.10+
 
 ### Windows
 ```powershell
