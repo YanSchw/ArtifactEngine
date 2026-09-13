@@ -213,7 +213,7 @@ def create_dev_bundle(project_path):
 
     create_plist(app_path)
 
-def package_for_macos(project_path):
+def package_for_macos(project_path, args):
     if APP_PATH.exists():
         shutil.rmtree(APP_PATH)
 

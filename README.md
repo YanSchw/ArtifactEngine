@@ -35,7 +35,7 @@ Artifact is a modular game engine written in C++.
 | --- | --- | --- | --- |
 | **Windows** (x64) | Vulkan | ✔︎ | ✔︎ |
 | **macOS** | Vulkan via MoltenVK |  ✔︎ | ✔︎ |
-| **Linux** (X11 + Wayland) | Vulkan | ✔︎ | - (not yet) |
+| **Linux** (X11 + Wayland) | Vulkan | ✔︎ | ✔︎ |
 | **Web** (WebAssembly) | WebGL 2 | - | ✔︎ (static hosting, no cross-origin isolation) |
 
 ## Repository layout

@@ -44,4 +44,4 @@ from both the engine and their own `Modules/` directory. See the
 
 `artifact cook` builds the engine, then relaunches the binary with
 `-EngineClass=AssetCookerEngine` to convert source assets into their cooked runtime format.
-`artifact package` cooks, builds `Dist` and bundles the result (macOS and Windows so far).
+`artifact package` cooks, builds `Dist` and bundles the result.

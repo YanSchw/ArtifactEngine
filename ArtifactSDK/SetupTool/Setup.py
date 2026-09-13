@@ -11,6 +11,7 @@ import sys
 from colorama import Fore, Style
 
 from SDK.Platforms import PlatformType, get_current_platform
+from SetupTool.AppImageTool import AppImageTool
 from SetupTool.Dependency import SetupError
 from SetupTool.Emscripten import EmscriptenSDK
 from SetupTool.PipTools import CMake, Ninja
@@ -25,7 +26,7 @@ def get_dependencies(platform: PlatformType) -> list:
         return [XcodeToolchain(), CMake(), Ninja(), MacOSVulkanSDK(), EmscriptenSDK()]
     if platform == PlatformType.Win64:
         return [MSVCToolchain(), CMake(), Ninja(), Win64VulkanSDK(), EmscriptenSDK()]
-    return [GccToolchain(), CMake(), Ninja(), WindowingLibraries(), LinuxVulkanSDK(), EmscriptenSDK()]
+    return [GccToolchain(), CMake(), Ninja(), WindowingLibraries(), LinuxVulkanSDK(), AppImageTool(), EmscriptenSDK()]
 
 
 def _resolve(dependencies: list, requested: list) -> list:

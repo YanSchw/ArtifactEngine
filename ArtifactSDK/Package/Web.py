@@ -49,7 +49,7 @@ PAGE = """<!DOCTYPE html>
 """
 
 
-def package_for_web(project_path: str):
+def package_for_web(project_path: str, args):
     output = Path(project_path) / OUTPUT_DIR
     if output.exists():
         shutil.rmtree(output)

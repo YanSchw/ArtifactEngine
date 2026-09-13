@@ -25,7 +25,7 @@ def copy_content(project_path):
     cooked_src = OUTPUT_DIR / "Cooked"
     shutil.copytree(cooked_src, content_dest, dirs_exist_ok=True)
 
-def package_for_win64(project_path):
+def package_for_win64(project_path, args):
     if PACKAGE_DIR.exists():
         shutil.rmtree(PACKAGE_DIR)
 

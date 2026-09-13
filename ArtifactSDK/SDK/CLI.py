@@ -133,6 +133,7 @@ def cmd_cook(args):
 PACKAGERS = {
     PlatformType.MacOS: ("Package.MacOS", "package_for_macos"),
     PlatformType.Win64: ("Package.Win64", "package_for_win64"),
+    PlatformType.Linux: ("Package.Linux", "package_for_linux"),
     PlatformType.Web: ("Package.Web", "package_for_web"),
 }
 
@@ -141,6 +142,9 @@ def cmd_package(args):
     target = get_platform(args.target)
     if target not in PACKAGERS:
         print(f"Packaging for {target.name} is not implemented yet")
+        sys.exit(1)
+    if target != PlatformType.Web and target != get_current_platform():
+        print(f"Packaging for {target.name} has to run on {target.name}; only the Web target cross-compiles.")
         sys.exit(1)
 
     try:
@@ -165,8 +169,12 @@ def cmd_package(args):
 
     module_name, function_name = PACKAGERS[target]
     package = getattr(__import__(module_name, fromlist=[function_name]), function_name)
-    with Job("Packaging"):
-        package(project_path)
+    try:
+        with Job("Packaging"):
+            package(project_path, args)
+    except JobError as e:
+        print(f"{Fore.RED}{e}{Style.RESET_ALL}")
+        sys.exit(e.returncode)
 
 def cmd_docs(args):
     from DocsGen.DocsGen import generate_docs_json
@@ -263,6 +271,8 @@ def main():
     cook_parser.set_defaults(func=cmd_cook)
 
     package_parser = subparsers.add_parser("package", parents=[generate_args_parser], help="Package project")
+    package_parser.add_argument("--sign", action="store_true", default=False, help="Sign the package (Linux: embeds a GPG signature in the AppImage)")
+    package_parser.add_argument("--sign-key", default=None, metavar="KEY", help="Key to sign with; implies --sign and defaults to the default GPG key")
     package_parser.set_defaults(func=cmd_package)
 
     docs_parser = subparsers.add_parser("docs", help="Dump reflection data (classes, structs, enums, modules) as JSON for the Docs frontend")
