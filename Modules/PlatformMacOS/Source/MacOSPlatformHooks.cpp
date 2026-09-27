@@ -25,6 +25,10 @@ static void* SendMessage(void* InReceiver, const char* InSelector, void* InArg) 
 }
 
 void MacOSPlatformHooks::SetApplicationIcon(const String& InImagePath) {
+    if (CFBundleGetValueForInfoDictionaryKey(CFBundleGetMainBundle(), CFSTR("CFBundleIconFile"))) {
+        return;
+    }
+
     void* path = ((void* (*)(void*, void*, const char*))objc_msgSend)(
         objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), InImagePath.c_str());
     void* image = SendMessage(SendMessage(objc_getClass("NSImage"), "alloc"), "initWithContentsOfFile:", path);
