@@ -2,6 +2,8 @@
 #include "Rendering/UIDrawList.h"
 #include <algorithm>
 
+static constexpr float s_OverflowTolerance = 0.5f;
+
 UIScrollArea::UIScrollArea() {
     ClipChildren = true;
     Interactable = true;  // so the router delivers wheel/press/drag here
@@ -15,8 +17,9 @@ bool UIScrollArea::OnScroll(const Vec2& InDelta) {
 
 void UIScrollArea::ClampScrollOffset() {
     const Vec2 contentSize = GetContentRect().Size;
-    const Vec2 maxOffset = Vec2(std::max(0.0f, m_ContentSize.x - contentSize.x),
-                                std::max(0.0f, m_ContentSize.y - contentSize.y));
+    const Vec2 overflow = m_ContentSize - contentSize;
+    const Vec2 maxOffset = Vec2(overflow.x > s_OverflowTolerance ? overflow.x : 0.0f,
+                                overflow.y > s_OverflowTolerance ? overflow.y : 0.0f);
     ScrollOffset = Vec2(std::clamp(ScrollOffset.x, 0.0f, maxOffset.x),
                         std::clamp(ScrollOffset.y, 0.0f, maxOffset.y));
 }
@@ -52,7 +55,7 @@ void UIScrollArea::LayoutChildren(const UIRectF& InContent) {
 }
 
 UIRectF UIScrollArea::ComputeVerticalThumbRect(const UIRectF& InContent) const {
-    if (m_ContentSize.y <= InContent.Size.y || InContent.Size.y <= 0.0f) {
+    if (m_ContentSize.y <= InContent.Size.y + s_OverflowTolerance || InContent.Size.y <= 0.0f) {
         return UIRectF();
     }
     const float thumbH = std::max(16.0f, InContent.Size.y * InContent.Size.y / m_ContentSize.y);
@@ -63,7 +66,7 @@ UIRectF UIScrollArea::ComputeVerticalThumbRect(const UIRectF& InContent) const {
 }
 
 UIRectF UIScrollArea::ComputeHorizontalThumbRect(const UIRectF& InContent) const {
-    if (m_ContentSize.x <= InContent.Size.x || InContent.Size.x <= 0.0f) {
+    if (m_ContentSize.x <= InContent.Size.x + s_OverflowTolerance || InContent.Size.x <= 0.0f) {
         return UIRectF();
     }
     const float thumbW = std::max(16.0f, InContent.Size.x * InContent.Size.x / m_ContentSize.x);
