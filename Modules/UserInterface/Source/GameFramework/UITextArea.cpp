@@ -3,12 +3,15 @@
 #include "Assets/Font.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/Clipboard.h"
+#include <cctype>
 #include <cmath>
 
 static constexpr float s_RepeatDelay = 0.45f;    // seconds a key is held before it repeats
 static constexpr float s_RepeatInterval = 0.03f; // seconds between repeats once repeating
 static constexpr float s_BlinkPeriod = 1.0f;
 static constexpr float s_CaretMargin = 2.0f;     // pixels kept between the caret and the right edge
+static constexpr float s_DoubleClickTime = 0.35f;
+static constexpr float s_DoubleClickSlop = 4.0f;
 
 UITextArea::UITextArea() {
     Interactable = true;
@@ -148,7 +151,7 @@ Vec2 UITextArea::ScreenToLocal(const Vec2& InScreenPoint) const {
                 (delta.y * basisX.x - delta.x * basisX.y) / det);
 }
 
-int32_t UITextArea::IndexFromPoint(const Vec2& InScreenPoint) const {
+int32_t UITextArea::IndexFromPoint(const Vec2& InScreenPoint, float InGlyphSplit) const {
     Font* font = ResolveFont();
     if (!font) {
         return (int32_t)Text.size();
@@ -170,13 +173,66 @@ int32_t UITextArea::IndexFromPoint(const Vec2& InScreenPoint) const {
         GlyphInfo glyph;
         const float advance = font->GetGlyph((uint32_t)(unsigned char)Text[(size_t)index], glyph)
             ? glyph.AdvancePx * scale : 0.0f;
-        if (local.x < penX + advance * 0.5f) {
+        if (local.x < penX + advance * InGlyphSplit) {
             break;
         }
         penX += advance;
         index++;
     }
     return index;
+}
+
+int32_t UITextArea::WordIndexFromPoint(const Vec2& InScreenPoint) const {
+    const int32_t index = IndexFromPoint(InScreenPoint, 1.0f);
+    int32_t lineStart = 0, lineEnd = 0;
+    GetLineBounds(index, lineStart, lineEnd);
+    return (index == lineEnd && index > lineStart) ? index - 1 : index;
+}
+
+static bool IsBlank(char InChar) {
+    return InChar == ' ' || InChar == '\t';
+}
+
+bool UITextArea::IsWordCharAt(int32_t InIndex) const {
+    const unsigned char c = (unsigned char)Text[(size_t)InIndex];
+    if (std::isalnum(c) || c == '_' || c >= 0x80) {
+        return true;
+    }
+    if (InIndex == 0 || InIndex + 1 >= (int32_t)Text.size()) {
+        return false;
+    }
+    const unsigned char previous = (unsigned char)Text[(size_t)InIndex - 1];
+    const unsigned char next = (unsigned char)Text[(size_t)InIndex + 1];
+    if (c == '\'') {
+        return std::isalpha(previous) && std::isalpha(next);
+    }
+    return (c == '.' || c == ',') && std::isdigit(previous) && std::isdigit(next);
+}
+
+void UITextArea::GetWordBounds(int32_t InIndex, int32_t& OutStart, int32_t& OutEnd) const {
+    OutStart = InIndex;
+    OutEnd = InIndex;
+    if (InIndex >= (int32_t)Text.size() || Text[(size_t)InIndex] == '\n') {
+        return;
+    }
+    const char hit = Text[(size_t)InIndex];
+    const bool word = IsWordCharAt(InIndex);
+    const auto sameRun = [&](int32_t InOther) {
+        if (word) {
+            return IsWordCharAt(InOther);
+        }
+        if (IsBlank(hit)) {
+            return IsBlank(Text[(size_t)InOther]);
+        }
+        return Text[(size_t)InOther] == hit;
+    };
+    while (OutStart > 0 && sameRun(OutStart - 1)) {
+        OutStart--;
+    }
+    OutEnd = InIndex + 1;
+    while (OutEnd < (int32_t)Text.size() && sameRun(OutEnd)) {
+        OutEnd++;
+    }
 }
 
 static bool IsAnyKeyHeld(KeyboardDevice* InKeyboard, KeyCode InLeft, KeyCode InRight) {
@@ -188,6 +244,16 @@ static bool IsShiftHeld() {
 }
 
 void UITextArea::OnPressed(const Vec2& InCursorPos) {
+    const bool doubleClick = m_DoubleClickTimer > 0.0f && glm::length(InCursorPos - m_LastPressPos) <= s_DoubleClickSlop;
+    m_DoubleClickTimer = s_DoubleClickTime;
+    m_LastPressPos = InCursorPos;
+    if (doubleClick) {
+        GetWordBounds(WordIndexFromPoint(InCursorPos), m_WordDragStart, m_WordDragEnd);
+        SetSelection(m_WordDragStart, m_WordDragEnd);
+        return;
+    }
+    m_WordDragStart = -1;
+
     // Shift+click extends the selection; a plain click collapses it and re-anchors for dragging.
     MoveCaret(IndexFromPoint(InCursorPos), IsShiftHeld());
     if (m_SelectionAnchor < 0) {
@@ -197,7 +263,17 @@ void UITextArea::OnPressed(const Vec2& InCursorPos) {
 
 void UITextArea::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
     (void)InDelta;
-    MoveCaret(IndexFromPoint(InCursorPos), true);
+    if (m_WordDragStart < 0) {
+        MoveCaret(IndexFromPoint(InCursorPos), true);
+        return;
+    }
+    int32_t start = 0, end = 0;
+    GetWordBounds(WordIndexFromPoint(InCursorPos), start, end);
+    if (start < m_WordDragStart) {
+        SetSelection(m_WordDragEnd, start);
+    } else {
+        SetSelection(m_WordDragStart, std::max(end, m_WordDragEnd));
+    }
 }
 
 void UITextArea::OnFocusChanged(bool InFocused) {
@@ -209,6 +285,7 @@ void UITextArea::OnFocusChanged(bool InFocused) {
 
 void UITextArea::OnUIUpdate(const UIFrameContext& InContext) {
     m_CaretBlink += InContext.DeltaTime;
+    m_DoubleClickTimer = std::max(0.0f, m_DoubleClickTimer - InContext.DeltaTime);
     if (!IsFocused()) {
         return;
     }

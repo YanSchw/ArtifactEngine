@@ -7,11 +7,11 @@
 class Font;
 class KeyboardDevice;
 
-/** An editable text box: caret with blink, click-to-place, drag/shift selection, clipboard
- *  shortcuts (Ctrl/Cmd + A/C/X/V), key-repeat editing, Enter/Escape handling and clipped
- *  rendering. Multiline by default; SingleLine turns it into a one-line text field where Enter
- *  fires Submitted (instead of inserting a line break) and the view scrolls horizontally to
- *  keep the caret visible. */
+/** An editable text box: caret with blink, click-to-place, drag/shift selection, double-click
+ *  word selection, clipboard shortcuts (Ctrl/Cmd + A/C/X/V), key-repeat editing, Enter/Escape
+ *  handling and clipped rendering. Multiline by default; SingleLine turns it into a one-line text
+ *  field where Enter fires Submitted (instead of inserting a line break) and the view scrolls
+ *  horizontally to keep the caret visible. */
 class UITextArea : public UINode {
 public:
     ARTIFACT_CLASS();
@@ -76,7 +76,10 @@ private:
     int32_t LineOfIndex(int32_t InIndex) const;
     /** Caret offset in content-local pixels: x from the line start, y = line * line height. */
     Vec2 CaretLocalPosition(Font* InFont) const;
-    int32_t IndexFromPoint(const Vec2& InScreenPoint) const;
+    int32_t IndexFromPoint(const Vec2& InScreenPoint, float InGlyphSplit = 0.5f) const;
+    int32_t WordIndexFromPoint(const Vec2& InScreenPoint) const;
+    bool IsWordCharAt(int32_t InIndex) const;
+    void GetWordBounds(int32_t InIndex, int32_t& OutStart, int32_t& OutEnd) const;
     Vec2 ScreenToLocal(const Vec2& InScreenPoint) const;
     float LineHeight(Font* InFont) const;
     /** Content-local y of line 0; a SingleLine field centers its line vertically. */
@@ -89,4 +92,8 @@ private:
     float m_ScrollX = 0.0f;
     KeyCode m_RepeatKey = KeyCode::Space;  // last edit key pressed; only repeats while held
     float m_RepeatHeld = 0.0f;
+    float m_DoubleClickTimer = 0.0f;
+    Vec2 m_LastPressPos = Vec2(0.0f);
+    int32_t m_WordDragStart = -1;
+    int32_t m_WordDragEnd = -1;
 };
