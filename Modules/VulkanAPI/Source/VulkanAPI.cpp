@@ -1228,6 +1228,10 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                     continue;
 
                 VulkanPipeline* pipeline = data.Pipeline->As<VulkanPipeline>();
+                if (!pipeline->m_Pipeline) {
+                    currentPipeline = nullptr;
+                    continue;
+                }
                 currentPipeline = pipeline;
 
                 vkCmdBindDescriptorSets(InCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_PipelineLayout, 0, 1, &pipeline->m_DescriptorSet, 0, nullptr);
@@ -1253,6 +1257,8 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
 
             case RenderCommandType::DrawIndexed: {
                 const auto& data = std::get<CmdDrawIndexed>(cmd.Data);
+                if (!currentPipeline)
+                    continue;
                 vkCmdDrawIndexed(InCmdBuffer, data.IndexCount, 1, data.FirstIndex, data.VertexOffset, 0);
                 break;
             }
@@ -1260,10 +1266,9 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
             case RenderCommandType::SetShaderData: {
                 const auto& data = std::get<CmdSetShaderData>(cmd.Data);
 
-                if (!data.Data)
+                if (!data.Data || !currentPipeline)
                     continue;
 
-                AE_ASSERT(currentPipeline, "A Pipeline has to be bound for ShaderData to be uploaded!");
                 AE_ASSERT(data.Data->Size() <= VulkanPipeline::MAX_SHADER_DATA_SIZE);
 
                 vkCmdPushConstants(

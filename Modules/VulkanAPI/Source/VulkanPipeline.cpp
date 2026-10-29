@@ -298,7 +298,8 @@ void VulkanPipeline::Invalidate() {
 
     if (vkCreateGraphicsPipelines(m_VulkanAPI->GetDevice(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_Pipeline) != VK_SUCCESS) {
         AE_ERROR("failed to create graphics pipeline");
-        exit(1);
+        m_Pipeline = VK_NULL_HANDLE;
+        return;
     } else {
         AE_INFO("created graphics pipeline");
     }
@@ -441,6 +442,7 @@ void VulkanPipeline::CreateDescriptorSet() {
         }
     }
     std::vector<VkDescriptorImageInfo> imageInfos;
+    imageInfos.reserve(m_Desc.ImageBindings.Size());
     for (const auto& [binding, imageView, sampler] : m_Desc.ImageBindings) {
         if (VulkanImageView* vkImageView = imageView->As<VulkanImageView>()) {
             VkDescriptorImageInfo imageInfo = {};
