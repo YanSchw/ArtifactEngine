@@ -298,6 +298,7 @@ bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
     if (!node) {
         return false;
     }
+    const bool isAssetRoot = Owner->GetMajorTab() && Owner->GetMajorTab()->IsAssetRootNode(node);
 
     const WeakObjectPtr<OutlinerTab> owner = Owner;
     const WeakObjectPtr<Node> target = node;
@@ -373,9 +374,10 @@ bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
             owner.Get()->RecordEdit("Delete", target.Get()->GetParent());
             target.Get()->Destroy();
         }
-    }).Enabled(!node->IsInherited())
-      .Tooltip(node->IsInherited() ? "Inherited nodes are owned by the class or Blueprint that creates them"
-                                   : "Destroys the node and everything under it");
+    }).Enabled(!node->IsInherited() && !isAssetRoot)
+      .Tooltip(isAssetRoot           ? "The root node cannot be deleted"
+               : node->IsInherited() ? "Inherited nodes are owned by the class or Blueprint that creates them"
+                                     : "Destroys the node and everything under it");
 
     UIContextMenu::OpenAt(*this, InCursorPos, menu);
     return true;
