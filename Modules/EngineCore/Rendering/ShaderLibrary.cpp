@@ -184,7 +184,7 @@ bool ShaderLibrary::Reload(const String& InKey, String& OutError) {
         renderingAPI->WaitIdle();
     }
 
-    if (!s_Shaders.ContainsKey(key)) {
+    if (!s_Shaders.ContainsKey(key) || s_RegisteredSources.ContainsKey(key)) {
         SharedObjectPtr<Shader> shader = Shader::Create(compiled);
         if (!shader) {
             OutError = std::format("failed to create shader '{0}'", key);
