@@ -10,6 +10,14 @@ UIScrollArea::UIScrollArea() {
 }
 
 bool UIScrollArea::OnScroll(const Vec2& InDelta) {
+    // Only consume the wheel along an axis that actually overflows; otherwise let it bubble so an
+    // enclosing scroll area still scrolls while the cursor is over a non-scrollable inner one.
+    const Vec2 overflow = m_ContentSize - GetContentRect().Size;
+    const bool scrollsX = InDelta.x != 0.0f && overflow.x > s_OverflowTolerance;
+    const bool scrollsY = InDelta.y != 0.0f && overflow.y > s_OverflowTolerance;
+    if (!scrollsX && !scrollsY) {
+        return false;
+    }
     ScrollOffset -= InDelta * ScrollSpeed;
     ClampScrollOffset();
     return true;
@@ -24,7 +32,7 @@ void UIScrollArea::ClampScrollOffset() {
                         std::clamp(ScrollOffset.y, 0.0f, maxOffset.y));
 }
 
-// Furthest bottom-right corner reached by any node in the subtree.
+// Furthest bottom-right corner reached by any visible node in the subtree.
 static void MaxSubtreeCorner(Node* InNode, Vec2& OutMax) {
     for (uint32_t i = 0; i < InNode->GetChildCount(); i++) {
         if (UINode* child = InNode->GetChild((int)i)->As<UINode>()) {
@@ -33,7 +41,9 @@ static void MaxSubtreeCorner(Node* InNode, Vec2& OutMax) {
             }
             const Vec2 corner = child->GetGeometry().Max();
             OutMax = Vec2(std::max(OutMax.x, corner.x), std::max(OutMax.y, corner.y));
-            MaxSubtreeCorner(child, OutMax);
+            if (!child->ClipChildren) {
+                MaxSubtreeCorner(child, OutMax);
+            }
         }
     }
 }

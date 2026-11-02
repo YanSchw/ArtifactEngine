@@ -16,13 +16,15 @@ public:
         BatchKind Kind;
         uint32_t FirstIndex;
         uint32_t IndexCount;
-        Texture* Tex;  // Image batches only; the painting node keeps it alive over the frame
+        Texture* Tex;  // Image: the image. Text: the font atlas (null = the default font's).
+                       // The painting node keeps it alive over the frame.
     };
 
     UIDrawList() = default;
 
     void AddRect(const UIRectF& InRectPx, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f));
-    void AddGlyphQuad(const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f));
+    /** InAtlas is the SDF atlas the UVs index into. */
+    void AddGlyphQuad(const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f), Texture* InAtlas = nullptr);
     void AddText(Font* InFont, const String& InText, const Vec2& InTopLeftPx, float InPixelHeight, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f));
     /** Null texture falls back to a solid rect. */
     void AddImageRect(const UIRectF& InRectPx, const Vec4& InColor, Texture* InTexture, const Mat4& InTransform = Mat4(1.0f), const Vec2& InUvMin = Vec2(0.0f), const Vec2& InUvMax = Vec2(1.0f));
@@ -37,6 +39,8 @@ public:
      *  same winding as AddRect's corners (TL, BL, BR, TR). */
     void AddConvexPolyFilled(const Vec2* InPoints, int32_t InCount, const Vec4& InColor, const Mat4& InTransform = Mat4(1.0f));
     void AddRoundedRect(const UIRectF& InRectPx, const Vec4& InColor, float InRadius, const Mat4& InTransform = Mat4(1.0f));
+    /** Border of a rounded rectangle: a band InThickness wide just inside InRectPx. */
+    void AddRoundedRectOutline(const UIRectF& InRectPx, const Vec4& InColor, float InRadius, float InThickness, const Mat4& InTransform = Mat4(1.0f));
     /** Rounded rectangle with per-corner radii and a vertical top->bottom color gradient (pass
      *  one color twice for a flat fill). Radii are clamped to the rect's half extent. */
     void AddRoundedRectEx(const UIRectF& InRectPx, const Vec4& InColorTop, const Vec4& InColorBottom,

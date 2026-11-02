@@ -67,6 +67,8 @@ private:
     Mat4 BuildProjection(const Vec2& InViewportSize) const;
 
     void RouteInput(const UIFrameContext& InContext);
+    /** Picks m_DesiredCursor from the final layout, after update handlers refreshed Cursor. */
+    void ResolveCursor(const UIFrameContext& InContext);
     void RouteCursor(const UIFrameContext& InContext);
     void RouteFocus(const UIFrameContext& InContext);
     void SetHovered(UINode* InNode);

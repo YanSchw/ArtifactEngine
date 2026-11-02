@@ -219,6 +219,7 @@ void EditorWindow::BuildEditorChrome() {
     UIQuad* drawerBg = m_DrawerHost->Add<UIQuad>();
     drawerBg->Fill();
     drawerBg->Color = EditorStyle::PanelDark;
+    drawerBg->Interactable = true;
 
     UIQuad* drawerTopLine = m_DrawerHost->Add<UIQuad>();
     drawerTopLine->Anchor = drawerTopLine->Pivot = Vec2(0.0f, 0.0f);

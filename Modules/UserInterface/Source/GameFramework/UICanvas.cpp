@@ -98,8 +98,24 @@ Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InCont
     // A click or update handler can add or remove children
     // re-layout so Paint below never renders a node that hasn't been laid out yet.
     Layout(canvasRect);
+    ResolveCursor(InContext);
     PaintTree(OutDrawList);
     return projection;
+}
+
+void UICanvas::ResolveCursor(const UIFrameContext& InContext) {
+    m_DesiredCursor = CursorIcon::Arrow;
+    if (InputMode != UIInputMode::Cursor) {
+        return;
+    }
+    // The captured node keeps its cursor for the whole drag, even off the node.
+    UINode* node = m_CapturedNode.Get();
+    if (!node) {
+        node = HitTestTopmost(this, InContext.CursorPosition, true);
+    }
+    if (node) {
+        m_DesiredCursor = node->Cursor;
+    }
 }
 
 void UICanvas::SetFocus(UINode* InNode) {
@@ -159,7 +175,6 @@ UINode* UICanvas::HitTestTopmost(UINode* InNode, const Vec2& InPoint, bool InInt
 }
 
 void UICanvas::RouteInput(const UIFrameContext& InContext) {
-    m_DesiredCursor = CursorIcon::Arrow;
     if (InputMode == UIInputMode::Cursor) {
         RouteCursor(InContext);
     } else {
@@ -175,6 +190,11 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
     SetHovered(m_CapturedNode.Get() ? m_CapturedNode.Get() : hit);
 
     if (InContext.CursorPressedThisFrame) {
+        if (UINode* stale = m_CapturedNode.Get()) {
+            stale->m_Pressed = false;
+            stale->OnReleased(false);
+            m_CapturedNode = nullptr;
+        }
         SetFocus(hit);  // a press on empty space clears focus, blurring any focused field
         if (hit) {
             m_CapturedNode = hit;
@@ -184,7 +204,7 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
     }
 
     if (UINode* captured = m_CapturedNode.Get()) {
-        if (cursor != m_LastCursor) {
+        if (!InContext.CursorPressedThisFrame && cursor != m_LastCursor) {
             captured->OnDrag(cursor, cursor - m_LastCursor);
         }
         if (InContext.CursorReleasedThisFrame) {
@@ -227,11 +247,6 @@ void UICanvas::RouteCursor(const UIFrameContext& InContext) {
         }
     }
 
-    // The captured node keeps its cursor for the whole drag, even off the node.
-    if (UINode* cursorNode = m_CapturedNode.Get() ? m_CapturedNode.Get() : hit) {
-        m_DesiredCursor = cursorNode->Cursor;
-    }
-
     m_LastCursor = cursor;
 }
 
@@ -250,7 +265,14 @@ static void CollectFocusable(UINode* InNode, const UIRectF* InClip, Array<UINode
     UIRectF clipStorage;
     const UIRectF* childClip = InClip;
     if (InNode->ClipChildren) {
-        clipStorage = InNode->GetContentRect();  // nested clips are not intersected here
+        // Intersect with the enclosing clip, so a node hidden by an outer clip stays unreachable
+        // even when it lies inside an inner one.
+        clipStorage = InNode->GetContentRect();
+        if (InClip) {
+            const Vec2 mn = glm::max(clipStorage.Min(), InClip->Min());
+            const Vec2 mx = glm::min(clipStorage.Max(), InClip->Max());
+            clipStorage = UIRectF(mn, glm::max(mx - mn, Vec2(0.0f)));
+        }
         childClip = &clipStorage;
     }
     for (uint32_t i = 0; i < InNode->GetChildCount(); i++) {
@@ -313,6 +335,10 @@ void UICanvas::RouteFocus(const UIFrameContext& InContext) {
         else if (InContext.NavLeft) direction = UINavDirection::Left;
         else if (InContext.NavRight) direction = UINavDirection::Right;
         if (UINode* target = FindNavTarget(focused, direction)) {
+            if (focused && focused->m_Pressed) {
+                focused->m_Pressed = false;
+                focused->OnReleased(false);
+            }
             SetFocus(target);
             focused = target;
         }

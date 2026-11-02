@@ -25,9 +25,12 @@ public:
     void Submit(Object* InTarget, const Vec2& InViewportSize, const UIDrawList& InDrawList, const Mat4& InProjection);
 
 private:
+    using PipelineCache = Map<Texture*, SharedObjectPtr<Pipeline>>;
+
     void CreateSharedResources();
     void CreatePipelines(Object* InTarget);
-    Pipeline* GetImagePipeline(Texture* InTexture);
+    /** Pipeline drawing with InShader and sampling InTexture, cached per texture in InCache. */
+    Pipeline* GetTexturedPipeline(PipelineCache& InCache, const SharedObjectPtr<Shader>& InShader, Texture* InTexture);
 
     SharedObjectPtr<Shader> m_SolidShader;
     SharedObjectPtr<Shader> m_TextShader;
@@ -36,13 +39,12 @@ private:
     SharedObjectPtr<Texture> m_WhiteTexture;
     SharedObjectPtr<UniformBuffer> m_ProjectionBuffer;
     SharedObjectPtr<Pipeline> m_SolidPipeline;
-    SharedObjectPtr<Pipeline> m_TextPipeline;
-    Map<Texture*, SharedObjectPtr<Pipeline>> m_ImagePipelines;
+    PipelineCache m_TextPipelines;   // keyed by font atlas
+    PipelineCache m_ImagePipelines;  // keyed by image
     SharedObjectPtr<VertexBuffer> m_DynamicVertexBuffer;
 
     bool m_ResourcesReady = false;
     Object* m_CachedTarget = nullptr;
     uint32_t m_CachedWidth = 0;
     uint32_t m_CachedHeight = 0;
-    bool m_TextPipelineReady = false;
 };

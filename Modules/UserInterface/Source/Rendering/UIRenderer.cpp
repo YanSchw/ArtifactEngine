@@ -38,7 +38,9 @@ void UIRenderer::CreateSharedResources() {
 }
 
 void UIRenderer::CreatePipelines(Object* InTarget) {
-    m_ImagePipelines = Map<Texture*, SharedObjectPtr<Pipeline>>();
+    // Text and image pipelines are built lazily per texture against the current target.
+    m_TextPipelines = PipelineCache();
+    m_ImagePipelines = PipelineCache();
 
     PipelineDesc solidDesc;
     solidDesc.Target = InTarget;
@@ -47,19 +49,6 @@ void UIRenderer::CreatePipelines(Object* InTarget) {
     solidDesc.Buffers.Add(m_ProjectionBuffer);
     solidDesc.ImageBindings.Add({ 16, m_WhiteTexture->GetDefaultView(), m_Sampler });
     m_SolidPipeline = Pipeline::Create(solidDesc);
-
-    m_TextPipelineReady = false;
-    Font* font = UINode::GetDefaultFont();
-    if (font && font->GetAtlasTexture()) {
-        PipelineDesc textDesc;
-        textDesc.Target = InTarget;
-        textDesc.Shader = m_TextShader;
-        textDesc.VertexLayout = UIVertex::GetLayout();
-        textDesc.Buffers.Add(m_ProjectionBuffer);
-        textDesc.ImageBindings.Add({ 16, font->GetAtlasTexture()->GetDefaultView(), m_Sampler });
-        m_TextPipeline = Pipeline::Create(textDesc);
-        m_TextPipelineReady = true;
-    }
 }
 
 void UIRenderer::Render(Object* InTarget, UICanvas* InCanvas, const Vec2& InViewportSize, const UIFrameContext& InContext) {
@@ -82,10 +71,8 @@ void UIRenderer::Submit(Object* InTarget, const Vec2& InViewportSize, const UIDr
     const uint32_t width = (uint32_t)InViewportSize.x;
     const uint32_t height = (uint32_t)InViewportSize.y;
 
-    // (Re)create pipelines on target/size change, or once the font atlas has finished loading.
-    Font* font = UINode::GetDefaultFont();
-    const bool needsFontPipeline = font && font->GetAtlasTexture() && !m_TextPipelineReady;
-    if (!m_SolidPipeline || m_CachedTarget != InTarget || m_CachedWidth != width || m_CachedHeight != height || needsFontPipeline) {
+    // (Re)create pipelines on target/size change.
+    if (!m_SolidPipeline || m_CachedTarget != InTarget || m_CachedWidth != width || m_CachedHeight != height) {
         CreatePipelines(InTarget);
         m_CachedTarget = InTarget;
         m_CachedWidth = width;
@@ -109,12 +96,18 @@ void UIRenderer::Submit(Object* InTarget, const Vec2& InViewportSize, const UIDr
     // Draw each batch in paint (tree) order so later nodes layer in front.
     for (const UIDrawList::Batch& batch : InDrawList.GetBatches()) {
         if (batch.Kind == UIDrawList::BatchKind::Text) {
-            if (!m_TextPipelineReady) {
+            Texture* atlas = batch.Tex;
+            if (!atlas) {
+                Font* defaultFont = UINode::GetDefaultFont();
+                atlas = defaultFont ? defaultFont->GetAtlasTexture() : nullptr;
+            }
+            Pipeline* pipeline = GetTexturedPipeline(m_TextPipelines, m_TextShader, atlas);
+            if (!pipeline) {
                 continue;
             }
-            m_TextPipeline->Bind();
+            pipeline->Bind();
         } else if (batch.Kind == UIDrawList::BatchKind::Image) {
-            Pipeline* pipeline = GetImagePipeline(batch.Tex);
+            Pipeline* pipeline = GetTexturedPipeline(m_ImagePipelines, m_ImageShader, batch.Tex);
             if (!pipeline) {
                 continue;
             }
@@ -126,7 +119,7 @@ void UIRenderer::Submit(Object* InTarget, const Vec2& InViewportSize, const UIDr
     }
 }
 
-Pipeline* UIRenderer::GetImagePipeline(Texture* InTexture) {
+Pipeline* UIRenderer::GetTexturedPipeline(PipelineCache& InCache, const SharedObjectPtr<Shader>& InShader, Texture* InTexture) {
     if (!InTexture || !m_CachedTarget) {
         return nullptr;
     }
@@ -134,19 +127,19 @@ Pipeline* UIRenderer::GetImagePipeline(Texture* InTexture) {
     if (!view.Get()) {
         return nullptr;
     }
-    if (m_ImagePipelines.ContainsKey(InTexture)) {
-        Pipeline* cached = m_ImagePipelines[InTexture].Get();
+    if (InCache.ContainsKey(InTexture)) {
+        Pipeline* cached = InCache[InTexture].Get();
         if (std::get<1>(cached->GetDesc().ImageBindings[0]).Get() == view.Get()) {
             return cached;
         }
     }
-    PipelineDesc imageDesc;
-    imageDesc.Target = (Object*)m_CachedTarget;
-    imageDesc.Shader = m_ImageShader;
-    imageDesc.VertexLayout = UIVertex::GetLayout();
-    imageDesc.Buffers.Add(m_ProjectionBuffer);
-    imageDesc.ImageBindings.Add({ 16, view, m_Sampler });
-    SharedObjectPtr<Pipeline> pipeline = Pipeline::Create(imageDesc);
-    m_ImagePipelines[InTexture] = pipeline;
+    PipelineDesc desc;
+    desc.Target = (Object*)m_CachedTarget;
+    desc.Shader = InShader;
+    desc.VertexLayout = UIVertex::GetLayout();
+    desc.Buffers.Add(m_ProjectionBuffer);
+    desc.ImageBindings.Add({ 16, view, m_Sampler });
+    SharedObjectPtr<Pipeline> pipeline = Pipeline::Create(desc);
+    InCache[InTexture] = pipeline;
     return pipeline.Get();
 }

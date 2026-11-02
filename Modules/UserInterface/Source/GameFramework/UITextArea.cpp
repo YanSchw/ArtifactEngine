@@ -278,8 +278,13 @@ void UITextArea::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
 
 void UITextArea::OnFocusChanged(bool InFocused) {
     m_CaretBlink = 0.0f;
-    if (!InFocused && FocusLost) {
-        FocusLost();
+    if (!InFocused) {
+        // The view only tracks the caret while focused; show the start of the text otherwise, so
+        // a later external change to Text can't leave the field scrolled past its new end.
+        m_ScrollX = 0.0f;
+        if (FocusLost) {
+            FocusLost();
+        }
     }
 }
 
@@ -293,7 +298,10 @@ void UITextArea::OnUIUpdate(const UIFrameContext& InContext) {
     m_SelectionAnchor = std::min(m_SelectionAnchor, (int32_t)Text.size());
 
     if (!InContext.TextInput.empty()) {
-        InsertAtCaret(SanitizeInput(InContext.TextInput));
+        const String typed = SanitizeInput(InContext.TextInput);
+        if (!typed.empty()) {
+            InsertAtCaret(typed);
+        }
     }
     if (KeyboardDevice* keyboard = KeyboardDevice::Instance()) {
         HandleEditKeys(keyboard, InContext.DeltaTime);
@@ -438,16 +446,19 @@ void UITextArea::ScrollCaretIntoView() {
     const float caretX = CaretLocalPosition(font).x;
     const float width = std::max(GetContentRect().Size.x, s_CaretMargin);
     m_ScrollX = std::clamp(m_ScrollX, caretX - width + s_CaretMargin, caretX);
-    m_ScrollX = std::max(0.0f, m_ScrollX);
+    const float maxScroll = std::max(0.0f, font->MeasureText(Text, FontSize).x - width + s_CaretMargin);
+    m_ScrollX = std::clamp(m_ScrollX, 0.0f, maxScroll);
 }
 
 void UITextArea::Paint(UIDrawList& OutDrawList) {
-    if (IsFocused() && FocusedBorderColor.a > 0.0f) {
-        const UIRectF border(m_Geometry.Position - Vec2(1.0f), m_Geometry.Size + Vec2(2.0f));
-        OutDrawList.AddRoundedRect(border, FocusedBorderColor, CornerRadius + 1.0f, m_WorldMatrix);
-    }
     if (BackgroundColor.a > 0.0f) {
         OutDrawList.AddRoundedRect(m_Geometry, BackgroundColor, CornerRadius, m_WorldMatrix);
+    }
+    if (IsFocused() && FocusedBorderColor.a > 0.0f) {
+        // A 1px band just outside the field. Drawn as an outline, not a filled rect under the
+        // background, which would tint the whole field whenever BackgroundColor is translucent.
+        const UIRectF border(m_Geometry.Position - Vec2(1.0f), m_Geometry.Size + Vec2(2.0f));
+        OutDrawList.AddRoundedRectOutline(border, FocusedBorderColor, CornerRadius + 1.0f, 1.0f, m_WorldMatrix);
     }
 
     Font* font = ResolveFont();

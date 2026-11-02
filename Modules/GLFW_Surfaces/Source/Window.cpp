@@ -90,6 +90,7 @@ void Window::Setup(const WindowParams& InParams) {
     }
     s_AllWindows.Add(this);
 
+    glfwInitVulkanLoader(vkGetInstanceProcAddr);
     if (!glfwInit()) {
         AE_ERROR("Failed to initialize GLFW");
         return;

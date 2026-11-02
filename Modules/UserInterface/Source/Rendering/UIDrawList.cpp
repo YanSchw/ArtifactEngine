@@ -66,8 +66,8 @@ void UIDrawList::AddRect(const UIRectF& InRectPx, const Vec4& InColor, const Mat
     AppendQuad(BatchKind::Solid, InRectPx, Vec2(0.0f), Vec2(0.0f), InColor, InTransform, nullptr);
 }
 
-void UIDrawList::AddGlyphQuad(const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform) {
-    AppendQuad(BatchKind::Text, InRectPx, InUvMin, InUvMax, InColor, InTransform, nullptr);
+void UIDrawList::AddGlyphQuad(const UIRectF& InRectPx, const Vec2& InUvMin, const Vec2& InUvMax, const Vec4& InColor, const Mat4& InTransform, Texture* InAtlas) {
+    AppendQuad(BatchKind::Text, InRectPx, InUvMin, InUvMax, InColor, InTransform, InAtlas);
 }
 
 void UIDrawList::AddImageRect(const UIRectF& InRectPx, const Vec4& InColor, Texture* InTexture, const Mat4& InTransform, const Vec2& InUvMin, const Vec2& InUvMax) {
@@ -325,6 +325,50 @@ void UIDrawList::AddRoundedRectEx(const UIRectF& InRectPx, const Vec4& InColorTo
     AppendConvexPoly(points, count, InColorTop, InColorBottom, InTransform);
 }
 
+void UIDrawList::AddRoundedRectOutline(const UIRectF& InRectPx, const Vec4& InColor, float InRadius, float InThickness, const Mat4& InTransform) {
+    const Vec2 mn = InRectPx.Min();
+    const Vec2 mx = InRectPx.Max();
+    if (mx.x <= mn.x || mx.y <= mn.y || InThickness <= 0.0f) {
+        return;
+    }
+
+    const float halfExtent = std::min(InRectPx.Size.x, InRectPx.Size.y) * 0.5f;
+    const float thickness = std::min(InThickness, halfExtent);
+    const float clampedRadius = std::clamp(InRadius, 0.0f, halfExtent);
+    const float outerRadius = clampedRadius > 0.5f ? clampedRadius : 0.0f;  // same cutoff as AddRoundedRectEx
+    const float innerRadius = std::max(0.0f, outerRadius - thickness);
+    const int32_t segments = outerRadius > 0.0f ? std::clamp((int32_t)outerRadius, 3, 12) : 0;
+    const float halfPi = std::numbers::pi_v<float> * 0.5f;
+
+    // Same corner order (TL, BL, BR, TR) and -90 degree sweeps as AddRoundedRectEx, so the band's
+    // quads keep AddRect's winding. The inner edge is the rect deflated by the thickness; while the
+    // radius exceeds the thickness both arcs share a centre, otherwise the inner corner is sharp.
+    const Vec2 outerCorners[4] = { mn, Vec2(mn.x, mx.y), mx, Vec2(mx.x, mn.y) };
+    const Vec2 inward[4] = { Vec2(1.0f, 1.0f), Vec2(1.0f, -1.0f), Vec2(-1.0f, -1.0f), Vec2(-1.0f, 1.0f) };
+    const float startAngles[4] = { -halfPi, std::numbers::pi_v<float>, halfPi, 0.0f };
+
+    Vec2 outer[4 * (12 + 1)];
+    Vec2 inner[4 * (12 + 1)];
+    int32_t count = 0;
+    for (int32_t corner = 0; corner < 4; corner++) {
+        const Vec2 outerCenter = outerCorners[corner] + inward[corner] * outerRadius;
+        const Vec2 innerCenter = outerCorners[corner] + inward[corner] * (thickness + innerRadius);
+        for (int32_t i = 0; i <= segments; i++) {
+            const float angle = startAngles[corner] - (segments > 0 ? halfPi * (float)i / (float)segments : 0.0f);
+            const Vec2 unit = Vec2(std::cos(angle), std::sin(angle));
+            outer[count] = outerCenter + unit * outerRadius;
+            inner[count] = innerCenter + unit * innerRadius;
+            count++;
+        }
+    }
+
+    for (int32_t i = 0; i < count; i++) {
+        const int32_t next = (i + 1) % count;
+        const Vec2 quad[4] = { outer[i], outer[next], inner[next], inner[i] };
+        AppendConvexPoly(quad, 4, InColor, InColor, InTransform);
+    }
+}
+
 void UIDrawList::AddLine(const Vec2& InA, const Vec2& InB, float InThickness, const Vec4& InColor, const Mat4& InTransform) {
     const Vec2 delta = InB - InA;
     const float length = glm::length(delta);
@@ -422,6 +466,7 @@ void UIDrawList::AddText(Font* InFont, const String& InText, const Vec2& InTopLe
     const float scale = InFont->GetScaleForPixelHeight(InPixelHeight);
     float penX = InTopLeftPx.x;
     const float baselineY = InTopLeftPx.y + InFont->GetAscentBasePx() * scale;
+    Texture* atlas = InFont->GetAtlasTexture();
 
     for (char c : InText) {
         GlyphInfo glyph;
@@ -430,7 +475,7 @@ void UIDrawList::AddText(Font* InFont, const String& InText, const Vec2& InTopLe
         }
         if (glyph.SizePx.x > 0.0f && glyph.SizePx.y > 0.0f) {
             const Vec2 topLeft = Vec2(penX + glyph.OffsetPx.x * scale, baselineY + glyph.OffsetPx.y * scale);
-            AddGlyphQuad(UIRectF(topLeft, glyph.SizePx * scale), glyph.UvMin, glyph.UvMax, InColor, InTransform);
+            AddGlyphQuad(UIRectF(topLeft, glyph.SizePx * scale), glyph.UvMin, glyph.UvMax, InColor, InTransform, atlas);
         }
         penX += glyph.AdvancePx * scale;
     }
