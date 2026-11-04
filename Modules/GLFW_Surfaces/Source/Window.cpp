@@ -35,12 +35,6 @@ static Array<Window*> s_AllWindows;
 static Vec2 s_GlobalScrollAccum = Vec2(0.0f);
 static std::function<void()> s_RefreshCallback;
 
-static void OnWindowResized(GLFWwindow* InWindow, int InWidth, int InHeight) {
-    if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
-        self->SetResizedFlag(true);
-    }
-}
-
 static void OnWindowScroll(GLFWwindow* InWindow, double InOffsetX, double InOffsetY);
 static void OnWindowChar(GLFWwindow* InWindow, unsigned int InCodepoint);
 static void OnWindowKey(GLFWwindow* InWindow, int InKey, int InScancode, int InAction, int InMods);
@@ -112,7 +106,17 @@ void Window::Setup(const WindowParams& InParams) {
     }
     glfwSetWindowUserPointer(m_Window, this);
     ApplyIcon(m_Window);
-    glfwSetWindowSizeCallback(m_Window, OnWindowResized);
+    glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* InWindow, int, int) {
+        if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
+            self->SetResizedFlag(true);
+            self->CaptureRestoredRect();
+        }
+    });
+    glfwSetWindowPosCallback(m_Window, [](GLFWwindow* InWindow, int, int) {
+        if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
+            self->CaptureRestoredRect();
+        }
+    });
     glfwSetScrollCallback(m_Window, OnWindowScroll);
     glfwSetCharCallback(m_Window, OnWindowChar);
     glfwSetKeyCallback(m_Window, OnWindowKey);
@@ -130,6 +134,7 @@ void Window::Setup(const WindowParams& InParams) {
     }
 
     SetFullscreen(m_Params.Fullscreen);
+    CaptureRestoredRect();
 
     // Spin up the global input devices the first time a window is created.
     static bool s_InputDevicesCreated = false;
@@ -254,6 +259,10 @@ void Window::Minimize() {
     glfwIconifyWindow(m_Window);
 }
 
+void Window::Maximize() {
+    glfwMaximizeWindow(m_Window);
+}
+
 void Window::ToggleMaximize() {
     if (IsMaximized()) {
         glfwRestoreWindow(m_Window);
@@ -332,6 +341,38 @@ Vec2 Window::GetPosition() const {
 
 void Window::SetPosition(const Vec2& InScreenPos) {
     glfwSetWindowPos(m_Window, (int)InScreenPos.x, (int)InScreenPos.y);
+}
+
+void Window::SetSize(const Vec2& InSize) {
+    glfwSetWindowSize(m_Window, (int)InSize.x, (int)InSize.y);
+}
+
+void Window::CaptureRestoredRect() {
+    if (!m_Window || m_Fullscreen || IsMaximized() || IsMinimized()) {
+        return;
+    }
+    m_RestoredPosition = GetPosition();
+    m_RestoredSize = Vec2((float)GetWidth(), (float)GetHeight());
+}
+
+Array<MonitorInfo> Window::GetMonitors() {
+    Array<MonitorInfo> monitors;
+    int count = 0;
+    GLFWmonitor** handles = glfwGetMonitors(&count);
+    for (int i = 0; i < count; i++) {
+        MonitorInfo monitor;
+        const char* name = glfwGetMonitorName(handles[i]);
+        monitor.Name = name ? name : "";
+
+        int x = 0, y = 0, width = 0, height = 0;
+        glfwGetMonitorPos(handles[i], &x, &y);
+        monitor.Position = Vec2((float)x, (float)y);
+        glfwGetMonitorWorkarea(handles[i], &x, &y, &width, &height);
+        monitor.WorkAreaPosition = Vec2((float)x, (float)y);
+        monitor.WorkAreaSize = Vec2((float)width, (float)height);
+        monitors.Add(monitor);
+    }
+    return monitors;
 }
 
 Vec2 Window::GetCursorPosition() const {

@@ -1,4 +1,5 @@
 #include "ThemedWindow.h"
+#include "Settings/EditorSettings.h"
 #include "UI/EditorStyle.h"
 #include "UI/UICaptionButton.h"
 #include "GameFramework/UIBuilder.h"
@@ -9,11 +10,18 @@
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/KeyCodes.h"
 #include "InputSystem/MouseCodes.h"
+#include <cmath>
 
 static Array<SharedObjectPtr<ThemedWindow>> s_WindowRegistry;
 
+static WindowParams ScaleToPixels(WindowParams InParams) {
+    InParams.Width = (uint32_t)std::lround(InParams.Width * ThemedWindow::GetUIScale());
+    InParams.Height = (uint32_t)std::lround(InParams.Height * ThemedWindow::GetUIScale());
+    return InParams;
+}
+
 ThemedWindow::ThemedWindow(const WindowParams& InParams)
-    : Window(InParams) {
+    : Window(ScaleToPixels(InParams)) {
     BuildChrome(InParams.Title);
 }
 
@@ -41,6 +49,14 @@ SharedObjectPtr<ThemedWindow> ThemedWindow::Create(WindowParams InParams) {
     SharedObjectPtr<ThemedWindow> window(new ThemedWindow(InParams));
     RegisterWindow(window);
     return window;
+}
+
+float ThemedWindow::GetUIScale() {
+    return EditorSettings::Get().Appearance.InterfaceScale;
+}
+
+Vec2 ThemedWindow::CanvasToScreen(const Vec2& InCanvasPoint) const {
+    return GetPosition() + InCanvasPoint * GetUIScale();
 }
 
 void ThemedWindow::BuildChrome(const String& InTitle) {
@@ -96,7 +112,7 @@ void ThemedWindow::SetTitleText(const String& InText) {
 
 void ThemedWindow::BuildFrameContext(UIFrameContext& OutContext, double InDeltaTime) {
     OutContext.DeltaTime = (float)InDeltaTime;
-    OutContext.CursorPosition = GetCursorPosition();
+    OutContext.CursorPosition = GetCursorPosition() / GetUIScale();
     OutContext.CursorDown = IsMouseButtonDown((int32_t)MouseCode::Left);
     OutContext.CursorPressedThisFrame = OutContext.CursorDown && !m_WasCursorDown;
     OutContext.CursorReleasedThisFrame = !OutContext.CursorDown && m_WasCursorDown;
@@ -134,13 +150,14 @@ void ThemedWindow::RenderWindow(double InDeltaTime) {
 
     UIFrameContext context;
     BuildFrameContext(context, InDeltaTime);
-    const Vec2 surfaceSize = Vec2((float)GetWidth(), (float)GetHeight());
+    const Vec2 surfaceSize = Vec2((float)GetWidth(), (float)GetHeight()) / GetUIScale();
     m_UIRenderer->Render(this, m_Canvas, surfaceSize, context);
     SetCursorIcon(m_Canvas->GetDesiredCursor());
 }
 
 bool ThemedWindow::HitTestTitleBar(const Vec2& InPoint) const {
-    if (!m_TitleBar || !m_TitleBar->GetGeometry().Contains(InPoint)) {
+    const Vec2 point = InPoint / GetUIScale();
+    if (!m_TitleBar || !m_TitleBar->GetGeometry().Contains(point)) {
         return false;
     }
 #if defined(AE_PLATFORM_MACOS)
@@ -152,7 +169,7 @@ bool ThemedWindow::HitTestTitleBar(const Vec2& InPoint) const {
     }
 #endif
     for (UINode* button : m_TitleBarButtons) {
-        if (button->GetGeometry().Contains(InPoint)) {
+        if (button->GetGeometry().Contains(point)) {
             return false;
         }
     }

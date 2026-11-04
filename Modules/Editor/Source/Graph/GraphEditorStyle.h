@@ -17,12 +17,12 @@ public:
     inline static const Vec4 NodeBody = HexColor(0x1E1E1E, 0.94f);
     inline static const Vec4 NodeShadow = HexColor(0x000000, 0.35f);
     inline static const Vec4 NodeBorder = HexColor(0x0C0C0C);
-    inline static const Vec4 NodeBorderSelected = EditorStyle::AccentBright;
+    inline static const Vec4& NodeBorderSelected = EditorStyle::AccentBright;
     inline static const Vec4 SelectionGlow = HexColor(0x26BBFF, 0.22f);
     inline static const Vec4 HeaderSeparator = HexColor(0x000000, 0.45f);
-    inline static const Vec4 TitleColor = EditorStyle::TextBright;
+    inline static const Vec4& TitleColor = EditorStyle::TextBright;
     inline static const Vec4 TitleShadow = HexColor(0x000000, 0.55f);
-    inline static const Vec4 PinLabelColor = EditorStyle::Text;
+    inline static const Vec4& PinLabelColor = EditorStyle::Text;
 
     // Wires
     inline static const Vec4 WireUnderlay = HexColor(0x000000, 0.32f);

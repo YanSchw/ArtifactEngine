@@ -164,6 +164,7 @@ Dist/
 Build/
 Binaries/
 Intermediate/
+Saved/
 *.log
 
 # Artifact SDK venv activation

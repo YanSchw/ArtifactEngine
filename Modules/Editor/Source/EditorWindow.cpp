@@ -6,6 +6,8 @@
 #include "Tabs/MaterialEditorTab.h"
 #include "Tabs/MeshEditorTab.h"
 #include "Tabs/AnimationEditorTab.h"
+#include "Tabs/EditorSettingsTab.h"
+#include "Settings/EditorSettings.h"
 #include "Assets/Scene.h"
 #include "Assets/Blueprint.h"
 #include "Assets/ShaderGraph.h"
@@ -138,6 +140,8 @@ void EditorWindow::BuildFileMenu(UIMenuModel& OutMenu) {
 
     OutMenu.Section("Editor");
     OutMenu.Item("New Scene Tab", [this] { OpenTab<SceneEditorTab>(); }).Icon(EditorIcons::Level());
+    OutMenu.Item("Editor Settings", [this] { OpenEditorSettings(); })
+           .Icon(EditorIcons::Settings()).Shortcut(EditorStyle::CommandKey + "+,");
     OutMenu.Separator();
     OutMenu.Item("Close Window", [this] { Close(); });
 }
@@ -309,6 +313,23 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     return nullptr;
 }
 
+void EditorWindow::OpenEditorSettings() {
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        EditorWindow* editorWindow = window.Get() ? window->As<EditorWindow>() : nullptr;
+        if (!editorWindow) {
+            continue;
+        }
+        for (MajorTab* tab : editorWindow->m_OpenTabs) {
+            if (tab->IsA<EditorSettingsTab>()) {
+                editorWindow->ActivateTab(tab);
+                editorWindow->Focus();
+                return;
+            }
+        }
+    }
+    OpenTab<EditorSettingsTab>();
+}
+
 void EditorWindow::CloseTab(MajorTab* InTab) {
     if (!InTab || !m_OpenTabs.Contains(InTab)) {
         return;
@@ -370,6 +391,10 @@ void EditorWindow::RebuildBottomBar() {
     stats->VAlign = UIVAlign::Middle;
     stats->Padding = UIPadding(0.0f, 0.0f, 8.0f, 0.0f);
     stats->Bind = [this, stats] {
+        if (!EditorSettings::Get().General.ShowFrameStats) {
+            stats->Text = "";
+            return;
+        }
         const double ms = m_FrameSeconds * 1000.0;
         String text = "FPS: " + std::to_string(m_FrameSeconds > 0.0 ? (int)std::lround(1.0 / m_FrameSeconds) : 0);
         String msText = std::to_string(ms);
@@ -500,6 +525,8 @@ void EditorWindow::HandleShortcuts() {
         ToggleHeroTool(m_ContentDrawerTool);
     } else if (ctrl && keyboard->IsDown(KeyCode::Period)) {
         ToggleHeroTool(m_ConsoleTool);
+    } else if (ctrl && keyboard->IsDown(KeyCode::Comma)) {
+        OpenEditorSettings();
     } else if (keyboard->IsDown(KeyCode::Escape) && m_ActiveHeroTool) {
         CloseHeroTool();
     } else {
@@ -540,7 +567,7 @@ void EditorWindow::EndTabHandleDrag(MajorTab* InTab) {
     }
     m_DraggingTabHandle = false;
 
-    const Vec2 screenPos = GetPosition() + m_TabHandleDragCursor;
+    const Vec2 screenPos = CanvasToScreen(m_TabHandleDragCursor);
     if (ContainsScreenPoint(screenPos)) {
         return;
     }
@@ -563,7 +590,7 @@ void EditorWindow::EndTabHandleDrag(MajorTab* InTab) {
     params.Width = 1100;
     params.Height = 650;
     SharedObjectPtr<EditorWindow> spawned = EditorWindow::Create(params);
-    spawned->SetPosition(screenPos - Vec2(120.0f, 12.0f));
+    spawned->SetPosition(CanvasToScreen(m_TabHandleDragCursor - Vec2(120.0f, 12.0f)));
     MoveTab(InTab, this, spawned.Get());
 }
 

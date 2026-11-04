@@ -26,6 +26,10 @@ String Platform::GetContentDirectory() {
     return (std::filesystem::path(GetResourceDirectory()) / "Content").string();
 }
 
+String Platform::GetUserConfigDirectory() {
+    return "/home/web_user/.config";
+}
+
 Platform::TemporaryDirectory::TemporaryDirectory() {
     static uint32_t counter = 0;
     const std::filesystem::path candidate = std::filesystem::temp_directory_path() / ("tmp_" + std::to_string(counter++));

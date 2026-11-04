@@ -34,6 +34,8 @@ public:
     static VectorImage* GraphEditor()   { return Get("b1c2d3e4-0018-4a00-9000-000000000018"); }
     static VectorImage* Message()       { return Get("b1c2d3e4-0019-4a00-9000-000000000019"); }
     static VectorImage* Close()         { return Get("b1c2d3e4-001a-4a00-9000-00000000001a"); }
+    static VectorImage* Reset()         { return Get("b1c2d3e4-0006-4a00-9000-000000000006"); }
+    static VectorImage* Settings()      { return Get("bad42a9c-6ed5-4480-87b5-80327decc45d"); }
     static VectorImage* UseSelected()   { return Get("c605a931-fe32-4afc-b054-ff46bc5d9ecf"); }
     static VectorImage* Search()        { return Get("fcc09193-44bc-4f87-9e1e-f77546713c07"); }
     static VectorImage* Play()          { return Get("f24d1510-5091-462e-be7d-0a9cc35a711b"); }

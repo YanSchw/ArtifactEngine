@@ -4,6 +4,8 @@
 #include "Platform/PlatformHooks.h"
 
 #include "EditorWindow.h"
+#include "Settings/EditorSettings.h"
+#include "Settings/EditorCache.h"
 #include "Tabs/SceneEditorTab.h"
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/ShaderLibrary.h"
@@ -16,7 +18,6 @@
 
 #include "GameFramework/GameInstance.h"
 #include "GameFramework/UICanvas.h"
-#include "Assets/Font.h"
 
 static bool AnyCursorLocked() {
     for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
@@ -39,6 +40,29 @@ static void UnlockAllCursors() {
             primary->SetCursorLocked(false);
         }
     }
+}
+
+static bool HasEditorWindows() {
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        if (window.Get() && window->IsA<EditorWindow>()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool AreAllEditorWindowsClosing() {
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        if (window.Get() && window->IsA<EditorWindow>() && !window->ShouldClose()) {
+            return false;
+        }
+    }
+    return HasEditorWindows();
+}
+
+static void SaveSession() {
+    EditorCache::Get().Capture();
+    EditorCache::Get().Save();
 }
 
 static bool EditorIsDraggingCursor() {
@@ -100,7 +124,13 @@ bool EditorEngine::IsGameInputActive() const {
 }
 
 void EditorEngine::Initialize() {
-    SharedObjectPtr<EditorWindow> window = EditorWindow::Create(WindowParams{ "Artifact Editor", 1280, 720 });
+    EditorSettings& settings = EditorSettings::Get();
+    settings.Load();
+    settings.ApplyStartupSettings();
+
+    EditorCache& cache = EditorCache::Get();
+    cache.Load();
+    SharedObjectPtr<EditorWindow> window = cache.CreateMainWindow();
     AE_ASSERT(window);
 
     Object::Create(Platform::GetDefaultRenderingAPIClass());
@@ -109,16 +139,16 @@ void EditorEngine::Initialize() {
     ShaderLibrary::Initialize();
 
     (new AssetManager())->Initialize();
+    settings.ApplyInterfaceFont();
 
-    // Set the default UI font once (see Content/Fonts/Default.asset)
-    UINode::SetDefaultFont(AssetManager::Get().GetAsset<Font>(UUID::FromString("3e50e8a9-df79-4e81-89be-189a15ca838b")));
-
-    Scene* scene = AssetManager::Get().GetAsset<Scene>(EngineConfig::GetConfigVar<UUID>("DefaultScene"));
-    if (!scene) {
-        Array<Asset*> scenes = AssetManager::Get().GetAssetsOfClass(Scene::StaticClass());
-        scene = scenes.IsEmpty() ? nullptr : Cast<Scene>(scenes[0]);
+    if (!settings.General.ReopenTabs || !cache.ReopenTabs(*window)) {
+        Scene* scene = AssetManager::Get().GetAsset<Scene>(EngineConfig::GetConfigVar<UUID>("DefaultScene"));
+        if (!scene) {
+            Array<Asset*> scenes = AssetManager::Get().GetAssetsOfClass(Scene::StaticClass());
+            scene = scenes.IsEmpty() ? nullptr : Cast<Scene>(scenes[0]);
+        }
+        window->OpenTab<SceneEditorTab>()->OpenScene(scene);
     }
-    window->OpenTab<SceneEditorTab>()->OpenScene(scene);
 
     // Keep rendering while a modal resize/move blocks the main loop's event pump.
     Window::SetRefreshCallback([this]() { RenderFrame(m_DeltaTime); });
@@ -151,6 +181,10 @@ bool EditorEngine::MainTick(double InDeltaTime) {
 
     RenderFrame(InDeltaTime);
 
+    if (AreAllEditorWindowsClosing()) {
+        SaveSession();
+    }
+
     // Destroying a window can cascade, so restart the sweep whenever one goes away.
     bool sweptWindow = true;
     while (sweptWindow) {
@@ -165,17 +199,15 @@ bool EditorEngine::MainTick(double InDeltaTime) {
         }
     }
 
-    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
-        if (window->IsA<EditorWindow>()) {
-            return true;
-        }
-    }
-    return false;
+    return HasEditorWindows();
 }
 
 void EditorEngine::Shutdown() {
     PlatformHooks::Get().SetSystemShortcutsSuppressed(false);
     DisposePlayInstance();
+    if (HasEditorWindows()) {
+        SaveSession();
+    }
     // Tear the windows (and their UI renderers) down before the assets they sample and the RHI.
     ThemedWindow::DestroyAllWindows();
     AssetManager::Get().Shutdown();

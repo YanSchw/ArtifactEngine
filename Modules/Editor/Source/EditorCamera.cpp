@@ -1,12 +1,11 @@
 #include "EditorCamera.h"
+#include "Settings/EditorSettings.h"
 #include "Window.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/MouseDevice.h"
 #include "InputSystem/MouseCodes.h"
 #include <cmath>
 
-static constexpr float s_MinFlySpeed = 0.25f;
-static constexpr float s_MaxFlySpeed = 100.0f;
 static constexpr float s_SpeedStepFactor = 1.25f;
 static constexpr float s_DollyStepFactor = 0.25f;
 static constexpr float s_PanUnitsPerPixel = 0.002f;
@@ -16,6 +15,7 @@ EditorCamera::EditorCamera() {
     SetName("EditorCamera");
     SetPosition(Vec3(0.0f, 2.0f, -6.0f));
     m_Pitch = 15.0f;
+    m_FlySpeed = EditorSettings::Get().Viewport.DefaultFlySpeed;
     ApplyYawPitch();
 }
 
@@ -74,15 +74,16 @@ void EditorCamera::CancelNavigation() {
 }
 
 void EditorCamera::UpdateFly(float InDeltaTime, const Vec2& InCursorDelta) {
-    m_Yaw += InCursorDelta.x * m_LookSensitivity;
-    m_Pitch += InCursorDelta.y * m_LookSensitivity;
+    const float sensitivity = EditorSettings::Get().Viewport.LookSensitivity;
+    m_Yaw += InCursorDelta.x * sensitivity;
+    m_Pitch += InCursorDelta.y * sensitivity;
     m_Pitch = glm::clamp(m_Pitch, -89.0f, 89.0f);
     ApplyYawPitch();
 
     if (MouseDevice* mouse = MouseDevice::Instance()) {
         const float steps = mouse->GetScrollDelta().y;
         if (steps != 0.0f) {
-            m_FlySpeed = glm::clamp(m_FlySpeed * std::pow(s_SpeedStepFactor, steps), s_MinFlySpeed, s_MaxFlySpeed);
+            m_FlySpeed = glm::clamp(m_FlySpeed * std::pow(s_SpeedStepFactor, steps), MinFlySpeed, MaxFlySpeed);
         }
     }
 

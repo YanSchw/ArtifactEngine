@@ -17,6 +17,13 @@ struct WindowParams {
     bool EditorStyle = false;
 };
 
+struct MonitorInfo {
+    String Name;
+    Vec2 Position = Vec2(0.0f);
+    Vec2 WorkAreaPosition = Vec2(0.0f);
+    Vec2 WorkAreaSize = Vec2(0.0f);
+};
+
 class Window : public Surface {
 public:
     ARTIFACT_CLASS();
@@ -44,6 +51,7 @@ public:
     static void SetRefreshCallback(const std::function<void()>& InCallback);
 
     void Minimize();
+    void Maximize();
     void ToggleMaximize();
     bool IsMaximized() const;
     virtual bool IsMinimized() const override;
@@ -60,6 +68,14 @@ public:
 
     Vec2 GetPosition() const;
     void SetPosition(const Vec2& InScreenPos);
+    void SetSize(const Vec2& InSize);
+
+    /** The rect the window returns to when it leaves the maximized or minimized state. */
+    Vec2 GetRestoredPosition() const { return m_RestoredPosition; }
+    Vec2 GetRestoredSize() const { return m_RestoredSize; }
+
+    /** Every connected monitor, the primary one first. */
+    static Array<MonitorInfo> GetMonitors();
 
     Vec2 GetCursorPosition() const;
     bool IsMouseButtonDown(int32_t InButton) const;
@@ -91,12 +107,15 @@ public:
     struct GLFWwindow* GetNativeWindow() const { return m_Window; }
 private:
     void Setup(const WindowParams& InParams);
+    void CaptureRestoredRect();
 
     WindowParams m_Params;
     struct GLFWwindow* m_Window = nullptr;
     bool m_CursorLocked = false;
     bool m_Fullscreen = false;
     int32_t m_WindowedRect[4] = {}; // x, y, width, height to restore when leaving fullscreen
+    Vec2 m_RestoredPosition = Vec2(0.0f);
+    Vec2 m_RestoredSize = Vec2(0.0f);
     bool m_Resized = false;
     Vec2 m_ScrollAccum = Vec2(0.0f);
     String m_TextInputAccum;

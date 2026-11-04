@@ -27,6 +27,10 @@ public:
     static String GetResourceDirectory();
     static String GetContentDirectory();
 
+    /** The per-user directory applications keep their settings in: the roaming AppData on Windows,
+     *  Application Support on macOS and the XDG config home on Linux. */
+    static String GetUserConfigDirectory();
+
     struct TemporaryDirectory {
         String Path;
         TemporaryDirectory();

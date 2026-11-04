@@ -7,6 +7,9 @@ class JsonSerializer {
 public:
     static String SerializeObject(const Object* InObject);
     static void DeserializeObject(Object* OutObject, const String& InJsonString);
+    /** DeserializeObject for untrusted input: false instead of asserting on malformed JSON,
+     *  a mismatching $type or values of the wrong type. */
+    static bool TryDeserializeObject(Object* OutObject, const String& InJsonString);
     /** Instantiates the concrete class recorded in $type and deserializes into it.
      *  Returns null on malformed JSON or an unknown class. */
     static Object* DeserializeNewObject(const String& InJsonString);

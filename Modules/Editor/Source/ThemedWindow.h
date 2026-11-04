@@ -19,6 +19,10 @@ public:
 
     static SharedObjectPtr<ThemedWindow> Create(WindowParams InParams);
 
+    /** Window coordinates per canvas unit; the sizes in WindowParams are given in canvas units. */
+    static float GetUIScale();
+    Vec2 CanvasToScreen(const Vec2& InCanvasPoint) const;
+
     UICanvas* GetCanvas() const { return m_Canvas; }
     UINode* GetContentRoot() const { return m_ContentRoot; }
     void SetTitleText(const String& InText);

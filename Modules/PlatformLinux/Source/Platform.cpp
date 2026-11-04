@@ -1,6 +1,8 @@
 #include "Platform/Platform.h"
 #include <unistd.h>
 #include <limits.h>
+#include <pwd.h>
+#include <cstdlib>
 
 static std::filesystem::path GetExecutablePath() {
     char result[PATH_MAX];
@@ -29,4 +31,19 @@ String Platform::GetResourceDirectory() {
 
 String Platform::GetContentDirectory() {
     return (std::filesystem::path(GetResourceDirectory()) / "Content").string();
+}
+
+static std::filesystem::path GetHomeDirectory() {
+    if (const char* home = std::getenv("HOME"); home && *home) {
+        return home;
+    }
+    const passwd* entry = getpwuid(getuid());
+    return entry ? entry->pw_dir : "";
+}
+
+String Platform::GetUserConfigDirectory() {
+    if (const char* configHome = std::getenv("XDG_CONFIG_HOME"); configHome && *configHome) {
+        return configHome;
+    }
+    return (GetHomeDirectory() / ".config").string();
 }

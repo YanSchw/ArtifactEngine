@@ -1,5 +1,6 @@
 #include "Platform/Platform.h"
 #include <windows.h>
+#include <shlobj.h>
 #include <filesystem>
 
 static std::filesystem::path GetExecutablePath() {
@@ -26,4 +27,14 @@ String Platform::GetResourceDirectory() {
 
 String Platform::GetContentDirectory() {
     return (std::filesystem::path(GetResourceDirectory()) / "Content").string();
+}
+
+String Platform::GetUserConfigDirectory() {
+    PWSTR path = nullptr;
+    std::filesystem::path directory;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path))) {
+        directory = path;
+    }
+    CoTaskMemFree(path);
+    return directory.string();
 }

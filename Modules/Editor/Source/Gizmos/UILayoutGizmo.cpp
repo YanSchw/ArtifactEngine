@@ -22,7 +22,7 @@ static constexpr float s_RotateSnapDegrees = 15.0f;
 static constexpr float s_MinExtent = 1.0f;
 static constexpr float s_ReadoutSize = 12.0f;
 
-static const Vec4 s_OutlineColor = EditorStyle::AccentBright;
+static const Vec4& s_OutlineColor = EditorStyle::AccentBright;
 static const Vec4 s_HandleColor = HexColor(0xFFFFFF);
 static const Vec4 s_HandleHoverColor = HexColor(0xFFC02E);
 static const Vec4 s_StackHandleColor = HexColor(0x8F8F8F);

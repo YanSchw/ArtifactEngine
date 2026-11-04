@@ -1,6 +1,9 @@
 #include "Platform/Platform.h"
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <unistd.h>
+#include <pwd.h>
+#include <cstdlib>
 
 static std::filesystem::path GetMacOSResourcesPath() {
     CFBundleRef bundle = CFBundleGetMainBundle();
@@ -46,4 +49,16 @@ String Platform::GetResourceDirectory() {
 
 String Platform::GetContentDirectory() {
     return (std::filesystem::path(GetResourceDirectory()) / "Content").string();
+}
+
+static std::filesystem::path GetHomeDirectory() {
+    if (const char* home = std::getenv("HOME"); home && *home) {
+        return home;
+    }
+    const passwd* entry = getpwuid(getuid());
+    return entry ? entry->pw_dir : "";
+}
+
+String Platform::GetUserConfigDirectory() {
+    return (GetHomeDirectory() / "Library" / "Application Support").string();
 }

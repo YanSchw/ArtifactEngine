@@ -18,7 +18,7 @@ SharedObjectPtr<MinorTabStandaloneWindow> MinorTabStandaloneWindow::Create(Minor
     SharedObjectPtr<MinorTabStandaloneWindow> window(new MinorTabStandaloneWindow(params));
     window->m_Tab = InTab;
     window->m_Owner = InOwner;
-    window->SetPosition(InScreenPos - Vec2(80.0f, 14.0f));
+    window->SetPosition(InScreenPos - Vec2(80.0f, 14.0f) * GetUIScale());
 
     UIQuad* background = window->GetContentRoot()->Add<UIQuad>();
     background->Fill();

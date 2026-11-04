@@ -29,6 +29,20 @@ void JsonSerializer::DeserializeObject(Object* OutObject, const String& InJsonSt
     DeserializeType(OutObject, OutObject->GetClass().Name, j);
 }
 
+bool JsonSerializer::TryDeserializeObject(Object* OutObject, const String& InJsonString) {
+    const json j = json::parse(InJsonString, nullptr, false);
+    if (j.is_discarded() || !j.is_object() || !j.contains("$type") || !j["$type"].is_string()
+        || j["$type"].get<String>() != OutObject->GetClass().Name) {
+        return false;
+    }
+    try {
+        DeserializeType(OutObject, OutObject->GetClass().Name, j);
+    } catch (const json::exception&) {
+        return false;
+    }
+    return true;
+}
+
 Object* JsonSerializer::DeserializeNewObject(const String& InJsonString) {
     json j = json::parse(InJsonString, nullptr, false);
     if (j.is_discarded() || !j.contains("$type") || !j["$type"].is_string()) {

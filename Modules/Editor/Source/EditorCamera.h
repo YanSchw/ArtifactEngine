@@ -9,6 +9,9 @@ class EditorCamera : public CameraNode {
 public:
     ARTIFACT_CLASS();
 
+    inline static constexpr float MinFlySpeed = 0.25f;
+    inline static constexpr float MaxFlySpeed = 100.0f;
+
     EditorCamera();
 
     void UpdateNavigation(float InDeltaTime, Window& InWindow, bool InViewportHovered);
@@ -35,5 +38,4 @@ private:
     float m_Yaw = 0.0f;
     float m_Pitch = 0.0f;
     float m_FlySpeed = 5.0f;
-    float m_LookSensitivity = 0.35f;
 };

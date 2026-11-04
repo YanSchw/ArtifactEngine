@@ -23,6 +23,8 @@ public:
     static void MountContent(const String& InKey, const String& InDir, bool InPackaged = true);
     static String GetEngineContentDir();
     static String GetProjectContentDir();
+    /** The root of the project, holding its Content and Modules; empty in packaged builds. */
+    static String GetProjectDir();
     static String GetContentDir(const String& InKey);
     static String ResolveContentPath(const String& InRelativePath);
     static Array<String> GetContentMountDirs();

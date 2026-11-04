@@ -110,7 +110,7 @@ void UIDockArea::FloatDraggedTab(MinorTab* InTab, UIDockNode* InSource) {
 
     UIDockNode* unusedTarget = nullptr;
     DetachTab(InTab, InSource, unusedTarget);
-    const Vec2 screenPos = majorTab->GetOwnerWindow()->GetPosition() + m_DragCursor;
+    const Vec2 screenPos = majorTab->GetOwnerWindow()->CanvasToScreen(m_DragCursor);
     majorTab->FloatTab(InTab, screenPos);
 }
 

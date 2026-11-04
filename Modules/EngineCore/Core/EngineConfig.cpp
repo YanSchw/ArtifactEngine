@@ -94,6 +94,13 @@ String EngineConfig::GetProjectContentDir() {
     return GetContentDir("ProjectContent");
 }
 
+String EngineConfig::GetProjectDir() {
+    if (IsPackagedBuild()) {
+        return "";
+    }
+    return std::filesystem::path(GetProjectContentDir()).parent_path().string();
+}
+
 String EngineConfig::GetContentDir(const String& InKey) {
     if (IsPackagedBuild()) {
         return Platform::GetContentDirectory();
