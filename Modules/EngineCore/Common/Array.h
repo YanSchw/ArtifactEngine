@@ -162,8 +162,15 @@ public:
 
     // Ascending: a < b
     // Descending: a > b
-    void Sort(const std::function<bool(const T&, const T&)>& lambda) {
+    Array<T>& Sort(const std::function<bool(const T&, const T&)>& lambda) {
         std::ranges::sort(m_Data, lambda);
+        return *this;
+    }
+
+    // Keeps the items the predicate returns true for
+    Array<T>& Filter(const std::function<bool(const T&)>& predicate) {
+        std::erase_if(m_Data, [&](const T& item) { return !predicate(item); });
+        return *this;
     }
 
     // Iterators

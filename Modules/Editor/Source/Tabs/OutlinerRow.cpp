@@ -267,7 +267,8 @@ static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<Outliner
     }
 
     Array<Class> classes = Class::GetSubclassesOf(Node::StaticClass());
-    classes.Sort([](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
+    const String editorModule = OutlinerRow::StaticClass().GetModuleName();
+    classes.Sort([](const Class& InA, const Class& InB) { return InA.Name < InB.Name; }).Filter([&](const Class& InClass) { return InClass.GetModuleName() != editorModule; });
 
     OutMenu.Section("Classes");
     for (const Class& nodeClass : classes) {
