@@ -43,21 +43,24 @@ static constexpr bool ShouldLogToConsole() {
 }
 
 static std::filesystem::path GetPackagedBuildLogFileDirectory() {
-    std::filesystem::path logFilePath;
-#if defined(AE_PLATFORM_WINDOWS)
-    logFilePath = std::filesystem::path(std::getenv("LOCALAPPDATA")) / "ArtifactEngine" / "Logs";
+    // std::getenv returns null for an unset variable, and a path cannot be built from null.
+    // An unset or empty variable falls back to the working directory, like platforms without a log location.
+#if defined(AE_PLATFORM_WIN64)
+    if (const char* localAppData = std::getenv("LOCALAPPDATA"); localAppData != nullptr && localAppData[0] != '\0') {
+        return std::filesystem::path(localAppData) / "ArtifactEngine" / "Logs";
+    }
 #elif defined(AE_PLATFORM_MACOS)
-    logFilePath = std::filesystem::path(std::getenv("HOME")) / "Library" / "Logs" / "ArtifactEngine";
+    if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
+        return std::filesystem::path(home) / "Library" / "Logs" / "ArtifactEngine";
+    }
 #elif defined(AE_PLATFORM_LINUX)
-    logFilePath = std::filesystem::path(std::getenv("HOME")) / ".local" / "share" / "ArtifactEngine" / "Logs";
-#else
-    std::error_code cwdError;
-    logFilePath = std::filesystem::current_path(cwdError);
-    if (cwdError) {
-        logFilePath = ".";
+    if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
+        return std::filesystem::path(home) / ".local" / "share" / "ArtifactEngine" / "Logs";
     }
 #endif
-    return logFilePath;
+    std::error_code cwdError;
+    std::filesystem::path workingDirectory = std::filesystem::current_path(cwdError);
+    return cwdError ? std::filesystem::path(".") : workingDirectory;
 }
 
 static std::vector<std::string> split(const std::string &s, char delim) {
