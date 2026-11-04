@@ -1,6 +1,6 @@
 #include "Platform/Platform.h"
+#include "Win64KnownFolders.h"
 #include <windows.h>
-#include <shlobj.h>
 #include <filesystem>
 
 static std::filesystem::path GetExecutablePath() {
@@ -30,11 +30,5 @@ String Platform::GetContentDirectory() {
 }
 
 String Platform::GetUserConfigDirectory() {
-    PWSTR path = nullptr;
-    std::filesystem::path directory;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path))) {
-        directory = path;
-    }
-    CoTaskMemFree(path);
-    return directory.string();
+    return Win64GetRoamingAppDataDirectory().string();
 }
