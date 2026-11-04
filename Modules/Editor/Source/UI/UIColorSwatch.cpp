@@ -2,11 +2,23 @@
 
 #include "ColorPickerWindow.h"
 #include "EditorStyle.h"
+#include "ThemedWindow.h"
 #include "Rendering/UIDrawList.h"
 
 static constexpr float s_CheckerSize = 6.0f;
 static const Vec4 s_CheckerLight = HexColor(0x9A9A9A);
 static const Vec4 s_CheckerDark = HexColor(0x6E6E6E);
+
+/** Converts a point in a node's canvas (window-local) space to OS screen coordinates. */
+static Vec2 CanvasPointToScreen(const UINode& InNode, const Vec2& InCanvasPoint) {
+    const UICanvas* canvas = InNode.GetCanvas();
+    for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
+        if (window.Get() && window->GetCanvas() == canvas) {
+            return window->GetPosition() + InCanvasPoint;
+        }
+    }
+    return InCanvasPoint;
+}
 
 UIColorSwatch::UIColorSwatch() {
     Interactable = true;
@@ -46,5 +58,6 @@ void UIColorSwatch::OnClick() {
     if (!Get || !Set) {
         return;
     }
-    ColorPickerWindow::Open(Get(), UseAlpha, Title, LocalToScreen(m_Geometry.Max()), Set);
+    const Vec2 screenPos = CanvasPointToScreen(*this, LocalToScreen(m_Geometry.Max()));
+    ColorPickerWindow::Open(Get(), UseAlpha, Title, screenPos, Set);
 }
