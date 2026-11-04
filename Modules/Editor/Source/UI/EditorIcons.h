@@ -51,6 +51,7 @@ public:
     static VectorImage* RigidBody()     { return Get("d06d74b9-dfa5-4126-981a-4b9872ab540a"); }
     static VectorImage* Character()     { return Get("37661651-475f-4abb-9aab-8d05e8da1fc0"); }
     static VectorImage* Animation()     { return Get("3f0e57a2-1c4b-4d90-9d0e-7a1b2c3d4e5f"); }
+    static VectorImage* InputMapping()  { return Get("3c00f557-6c65-4ca3-b35d-6bfa9c50fd2f"); }
     static VectorImage* Record()        { return Get("5b2c8e14-9d33-4f61-8a72-6c0d51e9b3a4"); }
     static VectorImage* Eye()           { return Get("b1c2d3e4-0004-4a00-9000-000000000004"); }
     static VectorImage* Save()          { return Get("e173f6e2-fc21-4933-b11f-0e1bff34ece1"); }

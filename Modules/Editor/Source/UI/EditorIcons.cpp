@@ -62,6 +62,7 @@ VectorImage* EditorIcons::GetAssetIcon(const Class& InClass) {
         s_AssetIcons["Material"] = Material();
         s_AssetIcons["ShaderGraph"] = GraphEditor();
         s_AssetIcons["Animation"] = Animation();
+        s_AssetIcons["InputActionMapping"] = InputMapping();
     }
 
     VectorImage* icon = nullptr;
@@ -81,6 +82,7 @@ Vec4 EditorIcons::GetAssetColor(const Class& InClass) {
         s_AssetColors["Material"] = HexColor(0xC98BE0);
         s_AssetColors["ShaderGraph"] = HexColor(0xD86BA9);
         s_AssetColors["Animation"] = HexColor(0x6FD84A);
+        s_AssetColors["InputActionMapping"] = HexColor(0xE05A6E);
     }
 
     Vec4 color(0.0f);

@@ -23,6 +23,7 @@
 #include "Assets/Scene.h"
 #include "Assets/ShaderGraph.h"
 #include "Assets/Material.h"
+#include "InputSystem/InputActionMapping.h"
 #include "EditorWindow.h"
 #include "NewAnimationWindow.h"
 #include "NewBlueprintWindow.h"
@@ -466,6 +467,11 @@ void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu) {
             return (Asset*)Material::CreateEmpty(InDir, InName);
         });
     }).Icon(EditorIcons::Material());
+    OutMenu.Item("Input Mapping", [this] {
+        BeginCreateAsset(InputActionMapping::StaticClass(), "NewInputMapping", [](const String& InDir, const String& InName) {
+            return (Asset*)InputActionMapping::CreateEmpty(InDir, InName);
+        });
+    }).Icon(EditorIcons::InputMapping());
 }
 
 void ContentDrawer::BuildItemMenu(UIMenuModel& OutMenu, const Item& InItem) {

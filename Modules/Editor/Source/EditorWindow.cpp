@@ -6,6 +6,7 @@
 #include "Tabs/MaterialEditorTab.h"
 #include "Tabs/MeshEditorTab.h"
 #include "Tabs/AnimationEditorTab.h"
+#include "Tabs/InputMappingEditorTab.h"
 #include "Tabs/EditorSettingsTab.h"
 #include "Settings/EditorSettings.h"
 #include "Assets/Scene.h"
@@ -14,6 +15,7 @@
 #include "Assets/Material.h"
 #include "Assets/Mesh.h"
 #include "Assets/Animation.h"
+#include "InputSystem/InputActionMapping.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIContextMenu.h"
@@ -306,6 +308,11 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     if (Animation* animation = Cast<Animation>(InAsset)) {
         AnimationEditorTab* tab = OpenTab<AnimationEditorTab>();
         tab->OpenAnimation(animation);
+        return tab;
+    }
+    if (InputActionMapping* mapping = Cast<InputActionMapping>(InAsset)) {
+        InputMappingEditorTab* tab = OpenTab<InputMappingEditorTab>();
+        tab->OpenMapping(mapping);
         return tab;
     }
 

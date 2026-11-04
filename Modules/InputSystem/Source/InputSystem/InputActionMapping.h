@@ -18,11 +18,15 @@ public:
     PROPERTY()
     Array<SharedObjectPtr<InputAction>> Actions;
 
+    static InputActionMapping* CreateEmpty(const String& InDirectory, const String& InName);
+
     // Find an action by name, or nullptr if absent.
     InputAction* Find(const String& InName) const;
 
     // Evaluate every action (no-op while disabled).
     void Evaluate();
+
+    virtual String GetDisplayName() const override;
 
 protected:
     virtual void Load() override;
