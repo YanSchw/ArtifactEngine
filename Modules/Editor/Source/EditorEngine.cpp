@@ -75,6 +75,17 @@ EditorEngine* EditorEngine::Get() {
     return Cast<EditorEngine>(&Engine::Get());
 }
 
+Array<Class> EditorEngine::GetNonEditorClasses() {
+    const String editorModule = StaticClass().GetModuleName();
+    Array<Class> classes;
+    for (const Class& candidate : Class::GetAllClasses()) {
+        if (candidate.GetModuleName() != editorModule) {
+            classes.Add(candidate);
+        }
+    }
+    return classes;
+}
+
 GameInstance* EditorEngine::CreatePlayInstance(SceneEditorTab* InTab) {
     if (SceneEditorTab* previous = m_PlayingTab.Get()) {
         if (previous != InTab) {

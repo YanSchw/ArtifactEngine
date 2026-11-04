@@ -25,6 +25,16 @@ static Map<String, String>* GetChildToParentClassnames() {
     return s_ChildToParentClassnames;
 }
 
+static Map<String, String>* GetClassnameToModuleNames() {
+    static Map<String, String>* s_ClassnameToModuleNames = nullptr;
+    if (!s_ClassnameToModuleNames) {
+        s_ClassnameToModuleNames = new Map<String, String>();
+        s_ClassnameToModuleNames->Reserve(256);
+        (*s_ClassnameToModuleNames)["Object"] = "EngineCore";
+    }
+    return s_ClassnameToModuleNames;
+}
+
 const Class Class::None = Class("");
 
 static Blueprint* FindBlueprint(const Class& InClass) {
@@ -60,6 +70,13 @@ String Class::GetDisplayName() const {
     return Name;
 }
 
+String Class::GetModuleName() const {
+    if (!GetClassnameToModuleNames()->ContainsKey(Name)) {
+        return "";
+    }
+    return GetClassnameToModuleNames()->At(Name);
+}
+
 bool Class::IsSubclassOf(const Class& InBaseClass) const {
     if ((*this) == InBaseClass) return true;
     return (Name == "Object")
@@ -89,8 +106,9 @@ Array<Class> Class::GetAllClasses() {
     return *GetListOfAllClasses();
 }
 
-Class::RegisterParentChildClassRelationship::RegisterParentChildClassRelationship(const String& InChild, const String& InParent) {
+Class::RegisterParentChildClassRelationship::RegisterParentChildClassRelationship(const String& InChild, const String& InParent, const String& InModule) {
     (*GetChildToParentClassnames())[InChild] = InParent;
+    (*GetClassnameToModuleNames())[InChild] = InModule;
     (*GetListOfAllClasses()).Add(Class(InChild));
 }
 

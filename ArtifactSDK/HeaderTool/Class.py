@@ -14,7 +14,7 @@ static Class StaticClass() {{
 struct InternalAlloc {{
 private:
     InternalAlloc() = default;
-    inline static Class::RegisterParentChildClassRelationship _ClassParentChildRelationship_{CLASS_NAME} = {{ "{CLASS_NAME}", "{PARENT_CLASS_NAME}" }};
+    inline static Class::RegisterParentChildClassRelationship _ClassParentChildRelationship_{CLASS_NAME} = {{ "{CLASS_NAME}", "{PARENT_CLASS_NAME}", "{MODULE_NAME}" }};
     inline static Object::RegisterArtifactClass<{CLASS_NAME}> _ClassAllocator_{CLASS_NAME};
     {PROPERTIES_REGISTRATION_CODE}
 }}/* No ; is appended after this struct, since the macro itself is supposed to have a ; */
@@ -23,12 +23,13 @@ private:
 class Class:
     ALL_CLASSES = []
 
-    def __init__(self, name: str, line: int, body: str, parent_class_name: str):
+    def __init__(self, name: str, line: int, body: str, parent_class_name: str, module_name: str):
         Class.ALL_CLASSES.append(self)
         self.Name = name
         self.Line = line
         self.Body = body
         self.ParentClassName = parent_class_name
+        self.ModuleName = module_name
 
 
     def is_a(self, other_class_name: str) -> bool:
@@ -52,6 +53,7 @@ class Class:
         class_code = CLASS_CODE.format(
             CLASS_NAME=self.Name,
             PARENT_CLASS_NAME=self.ParentClassName,
+            MODULE_NAME=self.ModuleName,
             PROPERTIES_REGISTRATION_CODE=properties_code,
         )
 

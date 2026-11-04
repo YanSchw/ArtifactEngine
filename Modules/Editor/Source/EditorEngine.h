@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Engine.h"
+#include "Common/Array.h"
 #include "Object/Pointer.h"
 #include "EditorEngine.gen.h"
 
@@ -10,6 +11,9 @@ public:
     ARTIFACT_CLASS();
 
     static EditorEngine* Get();
+
+    /** Every reflected class declared outside the Editor module, i.e. the classes a game can use. */
+    static Array<Class> GetNonEditorClasses();
 
     GameInstance* CreatePlayInstance(SceneEditorTab* InTab);
     void DisposePlayInstance();

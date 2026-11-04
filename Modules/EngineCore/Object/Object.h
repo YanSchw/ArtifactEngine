@@ -26,12 +26,14 @@ struct Class {
     UUID GetBlueprintId() const;
     static Class FromBlueprint(const UUID& InBlueprintId);
     String GetDisplayName() const;
+    /** The module that declares this class. Empty for Blueprints. */
+    String GetModuleName() const;
 
     inline bool operator==(const Class& InOther) const { return Name == InOther.Name; }
     inline bool operator!=(const Class& InOther) const { return !operator==(InOther); }
 
     struct RegisterParentChildClassRelationship {
-        RegisterParentChildClassRelationship(const String& InChild, const String& InParent);
+        RegisterParentChildClassRelationship(const String& InChild, const String& InParent, const String& InModule);
     };
 
     const static Class None;

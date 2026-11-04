@@ -58,9 +58,10 @@ class HeaderTool:
                         continue
                     self.visited_header.add(header_path)
 
-                    results = HeaderTool.collect_classes_from_header(header_path)
+                    module_name = get_module_name_from_path(dirpath)
+                    results = HeaderTool.collect_classes_from_header(header_path, module_name)
                     if len(results) > 0:
-                        self.headers_per_module[get_module_name_from_path(dirpath)].append(header_path)
+                        self.headers_per_module[module_name].append(header_path)
                         header_name = filename.rstrip('hpp').rstrip('.')
                         if header_name in self.types_per_header:
                             print(f"Error: Duplicate header name {filename} found at {header_path}. This will cause issues with generated code. Consider renaming one of the headers to have a unique name.")
@@ -76,7 +77,7 @@ class HeaderTool:
         self.generate_module_registration_code()
 
     @staticmethod
-    def collect_classes_from_header(h_file_path: str) -> list[Enum | Struct | Class]:
+    def collect_classes_from_header(h_file_path: str, module_name: str) -> list[Enum | Struct | Class]:
         with open(h_file_path, 'r', encoding='utf-8', errors='ignore') as h_file:
             code = h_file.read()
             code_lines = code.splitlines()
@@ -100,7 +101,7 @@ class HeaderTool:
                 for offset, line in enumerate(class_lines):
                     if re.search(r'\bARTIFACT_CLASS\(\);', line):
                         ARTIFACT_class_line = start_line_num + offset
-                        results.append(Class(class_name, ARTIFACT_class_line, class_body, parent_class))
+                        results.append(Class(class_name, ARTIFACT_class_line, class_body, parent_class, module_name))
                         break
 
             
