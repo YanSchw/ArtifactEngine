@@ -5,7 +5,7 @@
 #include "Rendering/VertexBuffer.h"
 #include "Core/EngineConfig.h"
 #include "Serialization/ChunkedBinary.h"
-#include "Serialization/Assets/MeshLoader.h"
+#include "Serialization/Assets/MeshImporter.h"
 
 #include <cmath>
 #include <unordered_map>
@@ -95,11 +95,9 @@ Mesh::Mesh() {
 bool Mesh::ImportSource(Array<Vertex>& OutVertices, Array<uint32_t>& OutIndices) const {
     const String path = EngineConfig::ResolveContentPath(m_MeshPath);
 
-    Array<Class> meshLoaderClasses = Class::GetSubclassesOf(MeshLoader::StaticClass());
-    AE_ASSERT(meshLoaderClasses.Size() > 1, "No MeshLoader classes found!");
-    SharedObjectPtr<MeshLoader> meshLoader = Object::Create<MeshLoader>(meshLoaderClasses[1]);
-    if (!meshLoader->LoadMeshFromFile(path, OutVertices, OutIndices)) {
-        AE_WARN("Loading mesh from file {} was unsuccessful!", path);
+    MeshImporter* importer = AssetImporter::Find<MeshImporter>(path);
+    if (!importer || !importer->Import(path, OutVertices, OutIndices)) {
+        AE_WARN("Importing mesh from file {} was unsuccessful!", path);
         return false;
     }
 

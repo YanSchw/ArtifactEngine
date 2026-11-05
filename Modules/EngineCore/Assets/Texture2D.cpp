@@ -2,12 +2,21 @@
 #include "Rendering/Texture.h"
 #include "Core/EngineConfig.h"
 #include "Serialization/ChunkedBinary.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "Serialization/ThirdParty/stb_image/stb_image.h"
+#include "Serialization/Assets/Texture2DImporter.h"
 
 Texture2D::Texture2D() {
     m_StreamType = AssetStreamType::AlwaysLoaded;
+}
+
+bool Texture2D::ImportSource(Array<byte>& OutPixels, uint32_t& OutWidth, uint32_t& OutHeight) const {
+    const String path = EngineConfig::ResolveContentPath(m_TexturePath);
+
+    Texture2DImporter* importer = AssetImporter::Find<Texture2DImporter>(path);
+    if (!importer || !importer->Import(path, OutPixels, OutWidth, OutHeight)) {
+        AE_WARN("Importing texture from file {} was unsuccessful!", path);
+        return false;
+    }
+    return true;
 }
 
 void Texture2D::Load() {
@@ -22,12 +31,12 @@ void Texture2D::Load() {
     m_Texture = Texture::Create(pixels, width, height, channels);
     delete[] pixels;
 #else
-    int width, height, channels;
-    String path = EngineConfig::ResolveContentPath(m_TexturePath);
-    stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-    channels = 4;
-    m_Texture = Texture::Create(pixels, width, height, channels);
-    stbi_image_free(pixels);
+    Array<byte> pixels;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    m_Texture = ImportSource(pixels, width, height)
+        ? Texture::Create(pixels.Data(), width, height, 4)
+        : Texture::Create(nullptr, 1, 1, 4);
 #endif
 }
 
@@ -38,19 +47,19 @@ void Texture2D::Unload() {
 void Texture2D::Cook(ChunkedBinary& OutChunkedBinary) {
     Super::Cook(OutChunkedBinary);
 
-    int width, height, channels;
-    String path = EngineConfig::ResolveContentPath(m_TexturePath);
-    stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-    channels = 4;
+    Array<byte> pixels;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    if (!ImportSource(pixels, width, height)) {
+        return;
+    }
 
     ChunkWriter chunkWriter;
-    chunkWriter << width;
-    chunkWriter << height;
-    chunkWriter << channels;
-    chunkWriter.WriteBytes(pixels, width * height * channels);
+    chunkWriter << (int)width;
+    chunkWriter << (int)height;
+    chunkWriter << 4;
+    chunkWriter.WriteBytes(pixels.Data(), pixels.Size());
     OutChunkedBinary.AddChunk(1, chunkWriter);
-
-    stbi_image_free(pixels);
 }
 
 bool Texture2D::IsLoaded() const {

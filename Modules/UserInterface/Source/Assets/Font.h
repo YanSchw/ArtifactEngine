@@ -19,7 +19,7 @@ struct GlyphInfo {
 };
 
 /** A font asset. On load it rasterizes a signed-distance-field atlas for the printable ASCII range
- *  (glyph outlines from stb_truetype, filled with msdfgen's scanline rasterizer, then converted to
+ *  (glyph outlines from a FontImporter, filled with msdfgen's scanline rasterizer, then converted to
  *  a distance field via a Euclidean distance transform) and uploads it as a single RGBA8 Texture
  *  with the same SDF value in every channel. */
 class Font : public Asset {
@@ -53,8 +53,8 @@ public:
     virtual String GetDisplayName() const override { return DisplayNameFromPath(m_FontPath); }
 
 private:
-    /** Rasterizes the SDF atlas into OutAtlasPixels and fills the glyph table and font metrics. */
-    bool BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels);
+    /** Imports the font file, rasterizes the SDF atlas into OutAtlasPixels and fills the glyph table and font metrics. */
+    bool BuildAtlasData(Array<byte>& OutAtlasPixels);
     void CreateAtlasTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight);
 
     PROPERTY()

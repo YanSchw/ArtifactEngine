@@ -29,6 +29,5 @@ public:
     virtual SharedObjectPtr<Image> GetImage() const = 0;
     virtual SharedObjectPtr<ImageView> GetDefaultView() const = 0;
 
-    static SharedObjectPtr<Texture> Create(const String& InFilePath, const TextureDesc& InTextureDesc = TextureDesc());
     static SharedObjectPtr<Texture> Create(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const TextureDesc& InTextureDesc = TextureDesc());
 };

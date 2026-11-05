@@ -4,7 +4,7 @@
 #include "Platform/Platform.h"
 #include "Platform/PlatformHooks.h"
 #include "Rendering/RenderingAPI.h"
-#include "Serialization/ThirdParty/stb_image/stb_image.h"
+#include "Serialization/Assets/Texture2DImporter.h"
 
 #include "GLFWKeyboardDevice.h"
 #include "GLFWMouseDevice.h"
@@ -56,13 +56,13 @@ static void ApplyIcon(GLFWwindow* InWindow) {
     // GLFW windows have no icon of their own on macOS; the application icon covers the Dock.
     (void)InWindow;
 #else
-    int width = 0;
-    int height = 0;
-    int channels = 0;
-    if (stbi_uc* pixels = stbi_load(iconPath.c_str(), &width, &height, &channels, STBI_rgb_alpha)) {
-        GLFWimage icon{ width, height, pixels };
+    Array<byte> pixels;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    Texture2DImporter* importer = AssetImporter::Find<Texture2DImporter>(iconPath);
+    if (importer && importer->Import(iconPath, pixels, width, height)) {
+        GLFWimage icon{ (int)width, (int)height, pixels.Data() };
         glfwSetWindowIcon(InWindow, 1, &icon);
-        stbi_image_free(pixels);
     } else {
         AE_WARN("Failed to load window icon '{0}'", iconPath);
     }

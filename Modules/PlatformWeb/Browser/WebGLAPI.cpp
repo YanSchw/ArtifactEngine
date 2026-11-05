@@ -212,10 +212,6 @@ SharedObjectPtr<ImageView> WebGLAPI::CreateImageView(const ImageViewDesc& InImag
     return new WebGLImageView(InImageViewDesc);
 }
 
-SharedObjectPtr<Texture> WebGLAPI::CreateTexture(const String& InFilePath, const TextureDesc& InTextureDesc) {
-    return new WebGLTexture(InFilePath, InTextureDesc);
-}
-
 SharedObjectPtr<Texture> WebGLAPI::CreateTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const TextureDesc& InTextureDesc) {
     return new WebGLTexture(InPixels, InWidth, InHeight, InChannels, InTextureDesc);
 }

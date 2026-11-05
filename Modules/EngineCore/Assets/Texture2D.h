@@ -1,5 +1,6 @@
 #pragma once
 #include "Asset.h"
+#include "Common/Types.h"
 #include "Object/Pointer.h"
 #include "Texture2D.gen.h"
 
@@ -22,6 +23,8 @@ public:
     Texture* GetTexture() const;
 
 private:
+    bool ImportSource(Array<byte>& OutPixels, uint32_t& OutWidth, uint32_t& OutHeight) const;
+
     SharedObjectPtr<Texture> m_Texture = nullptr;
 
     PROPERTY()

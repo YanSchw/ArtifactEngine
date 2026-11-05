@@ -1354,10 +1354,6 @@ SharedObjectPtr<ImageView> VulkanAPI::CreateImageView(const ImageViewDesc& InIma
     return new VulkanImageView(InImageViewDesc, *this);
 }
 
-SharedObjectPtr<Texture> VulkanAPI::CreateTexture(const String& InFilePath, const TextureDesc& InTextureDesc) {
-    return new VulkanTexture(InFilePath, InTextureDesc, *this);
-}
-
 SharedObjectPtr<Texture> VulkanAPI::CreateTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const TextureDesc& InTextureDesc) {
     return new VulkanTexture(InPixels, InWidth, InHeight, InChannels, InTextureDesc, *this);
 }

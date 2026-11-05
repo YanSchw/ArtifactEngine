@@ -2,12 +2,8 @@
 #include "Rendering/Texture.h"
 #include "Core/EngineConfig.h"
 #include "Core/Log.h"
-#include "Platform/FileIO.h"
-#include "Common/ByteString.h"
 #include "Serialization/ChunkedBinary.h"
-
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
+#include "Serialization/Assets/FontImporter.h"
 
 #include "msdfgen/msdfgen.h"
 
@@ -68,72 +64,46 @@ void Font::Load() {
         CreateAtlasTexture(atlas.Data(), atlasWidth, atlasHeight);
     }
 #else
-    const String path = EngineConfig::ResolveContentPath(m_FontPath);
-    SharedObjectPtr<ByteString> bytes = FileIO::ReadFileToBytes(path);
-    if (!bytes || bytes->GetSizeInBytes() == 0) {
-        AE_ERROR("Font::Load failed to read font file '{0}'", path);
-        return;
-    }
-
     Array<byte> atlas;
-    if (BuildAtlasData(bytes->GetData(), atlas)) {
+    if (BuildAtlasData(atlas)) {
         CreateAtlasTexture(atlas.Data(), s_AtlasWidth, s_AtlasHeight);
     }
 #endif
 }
 
-// Translates one glyph's stb_truetype outline (font units, Y-up) into an msdfgen::Shape.
-// stb emits each contour as a move followed by line/quadratic/cubic segments; contours are
-// closed with an explicit edge back to the start when the outline does not already return there.
-static void BuildGlyphShape(const stbtt_fontinfo& InFont, int InCodepoint, msdfgen::Shape& OutShape) {
-    stbtt_vertex* vertices = nullptr;
-    const int vertexCount = stbtt_GetCodepointShape(&InFont, InCodepoint, &vertices);
-    if (vertexCount <= 0 || !vertices) {
-        if (vertices) {
-            stbtt_FreeShape(&InFont, vertices);
+static msdfgen::Point2 ToPoint(const Vec2& InPoint) {
+    return msdfgen::Point2((double)InPoint.x, (double)InPoint.y);
+}
+
+static void BuildGlyphShape(const ImportedGlyph& InGlyph, msdfgen::Shape& OutShape) {
+    for (const GlyphContour& glyphContour : InGlyph.Contours) {
+        msdfgen::Contour& contour = OutShape.addContour();
+        const msdfgen::Point2 start = ToPoint(glyphContour.Start);
+        msdfgen::Point2 pen = start;
+
+        for (const GlyphSegment& segment : glyphContour.Segments) {
+            const Array<Vec2>& points = segment.Points;
+            const msdfgen::Point2 to = ToPoint(points[points.Last()]);
+            switch (points.Size()) {
+                case 1:
+                    if (to != pen) {
+                        contour.addEdge(msdfgen::EdgeHolder(pen, to));
+                    }
+                    break;
+                case 2:
+                    contour.addEdge(msdfgen::EdgeHolder(pen, ToPoint(points[0]), to));
+                    break;
+                case 3:
+                    contour.addEdge(msdfgen::EdgeHolder(pen, ToPoint(points[0]), ToPoint(points[1]), to));
+                    break;
+            }
+            pen = to;
         }
-        return;
-    }
 
-    msdfgen::Contour* contour = nullptr;
-    msdfgen::Point2 contourStart(0.0, 0.0);
-    msdfgen::Point2 pen(0.0, 0.0);
-
-    for (int i = 0; i < vertexCount; i++) {
-        const stbtt_vertex& v = vertices[i];
-        const msdfgen::Point2 to((double)v.x, (double)v.y);
-        switch (v.type) {
-            case STBTT_vmove:
-                if (contour && pen != contourStart) {
-                    contour->addEdge(msdfgen::EdgeHolder(pen, contourStart));
-                }
-                contour = &OutShape.addContour();
-                contourStart = to;
-                break;
-            case STBTT_vline:
-                if (contour && to != pen) {
-                    contour->addEdge(msdfgen::EdgeHolder(pen, to));
-                }
-                break;
-            case STBTT_vcurve:
-                if (contour) {
-                    contour->addEdge(msdfgen::EdgeHolder(pen, msdfgen::Point2((double)v.cx, (double)v.cy), to));
-                }
-                break;
-            case STBTT_vcubic:
-                if (contour) {
-                    contour->addEdge(msdfgen::EdgeHolder(pen, msdfgen::Point2((double)v.cx, (double)v.cy), msdfgen::Point2((double)v.cx1, (double)v.cy1), to));
-                }
-                break;
+        if (pen != start) {
+            contour.addEdge(msdfgen::EdgeHolder(pen, start));
         }
-        pen = to;
     }
-
-    if (contour && pen != contourStart) {
-        contour->addEdge(msdfgen::EdgeHolder(pen, contourStart));
-    }
-
-    stbtt_FreeShape(&InFont, vertices);
 }
 
 // Felzenszwalb & Huttenlocher exact Euclidean distance transform (returns squared distance to the
@@ -196,21 +166,25 @@ static void SdfEdt2D(float* InoutGrid, int InW, int InH) {
     }
 }
 
-bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
-    stbtt_fontinfo font;
-    const int offset = stbtt_GetFontOffsetForIndex(InTtfData, 0);
-    if (!stbtt_InitFont(&font, InTtfData, offset)) {
-        AE_ERROR("Font::BuildAtlasData failed to initialize stb_truetype font");
+bool Font::BuildAtlasData(Array<byte>& OutAtlasPixels) {
+    const String path = EngineConfig::ResolveContentPath(m_FontPath);
+
+    Array<uint32_t> codepoints;
+    for (uint32_t cp = s_FirstCodepoint; cp <= s_LastCodepoint; cp++) {
+        codepoints.Add(cp);
+    }
+
+    ImportedFont font;
+    FontImporter* importer = AssetImporter::Find<FontImporter>(path);
+    if (!importer || !importer->Import(path, codepoints, font)) {
+        AE_ERROR("Font::BuildAtlasData failed to import font file '{0}'", path);
         return false;
     }
 
-    const float scale = stbtt_ScaleForPixelHeight(&font, m_BasePixelHeight);
-
-    int ascent = 0, descent = 0, lineGap = 0;
-    stbtt_GetFontVMetrics(&font, &ascent, &descent, &lineGap);
-    m_AscentPx = (float)ascent * scale;
-    m_DescentPx = (float)descent * scale; // negative
-    m_LineGapPx = (float)lineGap * scale;
+    const float scale = m_BasePixelHeight / (font.Ascent - font.Descent);
+    m_AscentPx = font.Ascent * scale;
+    m_DescentPx = font.Descent * scale; // negative
+    m_LineGapPx = font.LineGap * scale;
 
     Array<byte>& atlas = OutAtlasPixels;
     atlas.Resize((size_t)s_AtlasWidth * s_AtlasHeight * 4);
@@ -219,14 +193,16 @@ bool Font::BuildAtlasData(const byte* InTtfData, Array<byte>& OutAtlasPixels) {
     uint32_t penX = 0, penY = 0, rowHeight = 0;
 
     for (uint32_t cp = s_FirstCodepoint; cp <= s_LastCodepoint; cp++) {
-        int advance = 0, lsb = 0;
-        stbtt_GetCodepointHMetrics(&font, (int)cp, &advance, &lsb);
+        if (!font.Glyphs.ContainsKey(cp)) {
+            continue;
+        }
+        const ImportedGlyph& importedGlyph = font.Glyphs.At(cp);
 
         GlyphInfo glyph;
-        glyph.AdvancePx = (float)advance * scale;
+        glyph.AdvancePx = importedGlyph.Advance * scale;
 
         msdfgen::Shape shape;
-        BuildGlyphShape(font, (int)cp, shape);
+        BuildGlyphShape(importedGlyph, shape);
         if (shape.contours.empty()) {
             m_Glyphs[cp] = glyph; // whitespace and other outline-less glyphs
             continue;
@@ -381,15 +357,8 @@ void Font::Unload() {
 void Font::Cook(ChunkedBinary& OutChunkedBinary) {
     Super::Cook(OutChunkedBinary);
 
-    const String path = EngineConfig::ResolveContentPath(m_FontPath);
-    SharedObjectPtr<ByteString> bytes = FileIO::ReadFileToBytes(path);
-    if (!bytes || bytes->GetSizeInBytes() == 0) {
-        AE_ERROR("Font::Cook failed to read font file '{0}'", path);
-        return;
-    }
-
     Array<byte> atlas;
-    if (!BuildAtlasData(bytes->GetData(), atlas)) {
+    if (!BuildAtlasData(atlas)) {
         return;
     }
 

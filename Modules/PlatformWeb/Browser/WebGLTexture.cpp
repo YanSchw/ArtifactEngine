@@ -1,29 +1,11 @@
 #include "WebGLTexture.h"
 
 #include "WebGLImage.h"
-#include "Serialization/ThirdParty/stb_image/stb_image.h"
 
 #include <cmath>
 
 static uint32_t GetMipCount(uint32_t InWidth, uint32_t InHeight) {
     return 1 + (uint32_t)std::floor(std::log2((float)glm::max(InWidth, InHeight)));
-}
-
-WebGLTexture::WebGLTexture(const String& InFilePath, const TextureDesc& InTextureDesc) {
-    int width = 0;
-    int height = 0;
-    int channels = 0;
-    stbi_uc* pixels = stbi_load(InFilePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-
-    if (!pixels) {
-        AE_WARN("Failed to load texture '{0}'", InFilePath);
-        const byte magenta[4] = { 255, 0, 255, 255 };
-        Create(magenta, 1, 1, false);
-        return;
-    }
-
-    Create(pixels, (uint32_t)width, (uint32_t)height, InTextureDesc.GenerateMips);
-    stbi_image_free(pixels);
 }
 
 WebGLTexture::WebGLTexture(const byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels,

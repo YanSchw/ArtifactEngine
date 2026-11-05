@@ -27,7 +27,6 @@ public:
     virtual SharedObjectPtr<class StorageBuffer> CreateStorageBuffer(uint32_t InBinding, size_t InSize) override;
     virtual SharedObjectPtr<class Image> CreateImage(const struct ImageDesc& InImageDesc) override;
     virtual SharedObjectPtr<class ImageView> CreateImageView(const struct ImageViewDesc& InImageViewDesc) override;
-    virtual SharedObjectPtr<class Texture> CreateTexture(const String& InFilePath, const struct TextureDesc& InTextureDesc) override;
     virtual SharedObjectPtr<class Texture> CreateTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight, uint32_t InChannels, const struct TextureDesc& InTextureDesc) override;
     virtual SharedObjectPtr<class Sampler> CreateSampler(const struct SamplerDesc& InSamplerDesc) override;
     virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) override;

@@ -1,0 +1,24 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "IncludePaths": [
+        "Source",
+        "ThirdParty"
+    ],
+    "ImportModules": [
+        "EngineCore"
+    ],
+    "AddAdditionalCMakeProjects": [
+        "ThirdParty/assimp-build"
+    ],
+    "LinkLibraries": [
+        "assimp"
+    ],
+    "IsNonPackageOnly": true,
+    "TargetPlatforms": [
+        "Win64",
+        "Linux",
+        "MacOS"
+    ]
+}
