@@ -237,8 +237,33 @@ static void AttachChildFromMenu(const WeakObjectPtr<OutlinerTab>& InOwner, const
     owner->HandleRowClick(child, false, false);
 }
 
-static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent) {
-    OutMenu.Searchable("Search classes");
+static bool CanSpawn(const Class& InClass) {
+    // Reflected classes without a default constructor cannot be spawned; probing is the only
+    // way to tell, and CreateChild would assert on them.
+    Object* probe = Object::Create(InClass);
+    delete probe;
+    return probe != nullptr;
+}
+
+static void AddClassItem(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent,
+                         const Class& InClass) {
+    OutMenu.Item(InClass.Name, [InOwner, InParent, InClass] {
+        AttachChildFromMenu(InOwner, InParent, InClass, InClass.Name);
+    }).Icon(EditorIcons::GetNodeIcon(InClass));
+}
+
+static void BuildQuickAccessMenu(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent,
+                                 std::initializer_list<const char*> InClassNames) {
+    for (const char* name : InClassNames) {
+        const Class nodeClass(name);
+        if (CanSpawn(nodeClass)) {
+            AddClassItem(OutMenu, InOwner, InParent, nodeClass);
+        }
+    }
+}
+
+static void BuildAllClassesMenu(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent) {
+    OutMenu.Searchable("Search all classes");
 
     MajorTab* document = InOwner.Get() ? InOwner.Get()->GetMajorTab() : nullptr;
     Blueprint* edited = document ? Cast<Blueprint>(document->GetEditedAsset()) : nullptr;
@@ -272,18 +297,28 @@ static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<Outliner
 
     OutMenu.Section("Classes");
     for (const Class& nodeClass : classes) {
-        // Reflected classes without a default constructor cannot be spawned; probing is the only
-        // way to tell, and CreateChild would assert on them.
-        Object* probe = Object::Create(nodeClass);
-        if (!probe) {
-            continue;
+        if (CanSpawn(nodeClass)) {
+            AddClassItem(OutMenu, InOwner, InParent, nodeClass);
         }
-        delete probe;
-
-        OutMenu.Item(nodeClass.Name, [InOwner, InParent, nodeClass] {
-            AttachChildFromMenu(InOwner, InParent, nodeClass, nodeClass.Name);
-        }).Icon(EditorIcons::GetNodeIcon(nodeClass));
     }
+}
+
+static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent) {
+    OutMenu.Submenu("3D", [InOwner, InParent](UIMenuModel& OutSub) {
+        BuildQuickAccessMenu(OutSub, InOwner, InParent,
+                             {"Node3D", "StaticMeshNode", "CameraNode", "CameraController", "DirectionalLightNode", "PointLightNode"});
+    });
+    OutMenu.Submenu("Physics", [InOwner, InParent](UIMenuModel& OutSub) {
+        BuildQuickAccessMenu(OutSub, InOwner, InParent,
+                             {"RigidBodyNode", "CharacterNode", "BoxShapeNode", "SphereShapeNode", "CapsuleShapeNode", "CylinderShapeNode"});
+    });
+    OutMenu.Submenu("UI", [InOwner, InParent](UIMenuModel& OutSub) {
+        BuildQuickAccessMenu(OutSub, InOwner, InParent,
+                             {"UICanvas", "UIVStack", "UIHStack", "UIGrid", "UILabel", "UIButton", "UIImage", "UIRoundedQuad",
+                              "UIScrollArea", "UICheckbox", "UITextArea"});
+    });
+    OutMenu.Separator();
+    OutMenu.Submenu("All Classes", [InOwner, InParent](UIMenuModel& OutSub) { BuildAllClassesMenu(OutSub, InOwner, InParent); });
 }
 
 bool OutlinerRow::OnSecondaryClick(const Vec2& InCursorPos) {
