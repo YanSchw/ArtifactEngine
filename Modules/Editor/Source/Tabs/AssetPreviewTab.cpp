@@ -259,8 +259,8 @@ Mat4 AssetPreviewTab::GetMeshRotation() const {
 
 void AssetPreviewTab::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
     (void)InCursorPos;
-    m_Yaw += InDelta.x * s_DragSpeed;
-    m_Pitch = glm::clamp(m_Pitch + InDelta.y * s_DragSpeed, -s_PitchLimit, s_PitchLimit);
+    m_Yaw -= InDelta.x * s_DragSpeed;
+    m_Pitch = glm::clamp(m_Pitch - InDelta.y * s_DragSpeed, -s_PitchLimit, s_PitchLimit);
 }
 
 bool AssetPreviewTab::OnSecondaryClick(const Vec2& InCursorPos) {
