@@ -31,6 +31,9 @@ public:
 
     void MarkDirty() { m_Inspected = nullptr; }
 
+    /** Inspects this object instead of the MajorTab's selection, for panels outside of one. */
+    void Inspect(Object* InObject) { m_Pinned = InObject; }
+
 private:
     void Refresh();
     void RebuildInspector(Object* InObject, DetailsCustomization* InCustomization);
@@ -43,6 +46,7 @@ private:
     UILabel* m_MessageLabel = nullptr;
 
     WeakObjectPtr<Object> m_Inspected;
+    WeakObjectPtr<Object> m_Pinned;
     SharedObjectPtr<class ThumbnailRenderer> m_Thumbnails;
     float m_HeaderHeight = 0.0f;
     float m_LabelSplit = 0.32f;

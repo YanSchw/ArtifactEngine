@@ -66,6 +66,14 @@ public:
     UUID GetId() const { return m_Id; }
     virtual String GetDisplayName() const;
 
+    /** The asset this one lives inside of, saved and deleted together with it. */
+    Asset* GetOwner() const { return m_Owner.Get(); }
+    bool IsSubAsset() const { return m_Owner.Get() != nullptr; }
+
+    /** The content path of the file an imported asset is built from. */
+    virtual String GetSourcePath() const { return String(); }
+    virtual void SetSourcePath(const String& InPath) { (void)InPath; }
+
     virtual String SerializeToJson() const;
     virtual void DeserializeFromJson(const String& InJson);
 
@@ -77,6 +85,7 @@ protected:
     AssetStreamType m_StreamType = AssetStreamType::Referenced;
 
     AssetFlags m_Flags = AssetFlags::None;
+    WeakObjectPtr<Asset> m_Owner;
 
     uint32_t m_ActiveStreamHandleCount = 0;
 

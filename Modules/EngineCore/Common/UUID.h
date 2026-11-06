@@ -22,6 +22,9 @@ struct UUID {
     // Generate a random RFC 4122 version 4 UUID
     static UUID Generate();
 
+    /** The same deterministic UUID for the same base and name. */
+    static UUID Derive(const UUID& InBase, const String& InName);
+
     // Parse UUID from:
     // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     //

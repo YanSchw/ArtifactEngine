@@ -51,6 +51,8 @@ protected:
 public:
     virtual bool IsLoaded() const override;
     virtual String GetDisplayName() const override { return DisplayNameFromPath(m_FontPath); }
+    virtual String GetSourcePath() const override { return m_FontPath; }
+    virtual void SetSourcePath(const String& InPath) override { m_FontPath = InPath; }
 
 private:
     /** Imports the font file, rasterizes the SDF atlas into OutAtlasPixels and fills the glyph table and font metrics. */

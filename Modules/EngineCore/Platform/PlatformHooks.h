@@ -1,5 +1,6 @@
 #pragma once
 #include "Object/Object.h"
+#include "Common/Array.h"
 #include "Common/String.h"
 #include <functional>
 #include "PlatformHooks.gen.h"
@@ -29,5 +30,11 @@ public:
         (void)InNativeWindow;
         (void)InFullscreen;
         return false;
+    }
+
+    /** Lets the user pick files to open: empty when cancelled, or where there is no such dialog. */
+    virtual Array<String> OpenFilesDialog(const String& InTitle) {
+        (void)InTitle;
+        return Array<String>();
     }
 };

@@ -27,6 +27,8 @@ public:
     static String GetProjectDir();
     static String GetContentDir(const String& InKey);
     static String ResolveContentPath(const String& InRelativePath);
+    /** The content path ResolveContentPath turns back into this file, empty outside every mount. */
+    static String ToContentPath(const String& InFilePath);
     static Array<String> GetContentMountDirs();
     static Array<String> GetPackagedContentMountDirs();
     static Array<String> GetContentMountKeys();

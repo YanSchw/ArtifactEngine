@@ -22,6 +22,8 @@ public:
     const String& GetTemplatePath() const { return m_TemplatePath; }
     const ShaderTemplate& GetTemplate() const { return m_Template; }
     void SetTemplatePath(const String& InPath);
+    /** Starts over on a template, with nothing but the output node. */
+    void Reset(const String& InTemplatePath);
 
     virtual ShaderGraph* GetBaseGraph() const override { return const_cast<ShaderGraph*>(this); }
 

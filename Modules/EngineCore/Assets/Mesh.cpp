@@ -1,5 +1,6 @@
 #include "Mesh.h"
 #include "Assets/AssetManager.h"
+#include "Assets/CollectionAsset.h"
 #include "Assets/Material.h"
 #include "Rendering/Vertex.h"
 #include "Rendering/VertexBuffer.h"
@@ -92,22 +93,33 @@ Mesh::Mesh() {
     m_StreamType = AssetStreamType::AlwaysLoaded;
 }
 
-bool Mesh::ImportSource(Array<Vertex>& OutVertices, Array<uint32_t>& OutIndices) const {
-    const String path = EngineConfig::ResolveContentPath(m_MeshPath);
-
-    MeshImporter* importer = AssetImporter::Find<MeshImporter>(path);
-    if (!importer || !importer->Import(path, OutVertices, OutIndices)) {
-        AE_WARN("Importing mesh from file {} was unsuccessful!", path);
-        return false;
+bool Mesh::ImportSource(ImportedMesh& OutMesh) const {
+    if (CollectionAsset* collection = Cast<CollectionAsset>(GetOwner())) {
+        if (!collection->ImportMesh(m_SourceMesh, OutMesh)) {
+            AE_WARN("'{0}' has no mesh '{1}'", collection->GetSourcePath(), m_SourceMesh);
+            return false;
+        }
+    } else {
+        const String path = EngineConfig::ResolveContentPath(m_MeshPath);
+        MeshImporter* importer = AssetImporter::Find<MeshImporter>(path);
+        if (!importer || !importer->Import(path, OutMesh)) {
+            AE_WARN("Importing mesh from file {} was unsuccessful!", path);
+            return false;
+        }
     }
 
-    if (m_NormalMode == MeshNormalMode::Smooth || !HasNormals(OutVertices)) {
-        GenerateSmoothNormals(OutVertices, OutIndices);
+    if (OutMesh.SubMeshes.IsEmpty()) {
+        OutMesh.SubMeshes.Add({ String(), 0, (uint32_t)OutMesh.Indices.Size() });
+    }
+
+    Array<Vertex>& vertices = OutMesh.Vertices;
+    if (m_NormalMode == MeshNormalMode::Smooth || !HasNormals(vertices)) {
+        GenerateSmoothNormals(vertices, OutMesh.Indices);
     }
 
     // A non-uniform import scale skews the surface, so normals follow the inverse scale.
     const Vec3 normalScale = 1.0f / glm::max(glm::abs(m_ImportScale), Vec3(1e-4f));
-    for (Vertex& vertex : OutVertices) {
+    for (Vertex& vertex : vertices) {
         vertex.Position = vertex.Position * m_ImportScale + m_ImportOffset;
         const Vec3 normal = vertex.Normal * normalScale;
         vertex.Normal = glm::dot(normal, normal) > 0.0f ? glm::normalize(normal) : VecUtils::Up;
@@ -115,49 +127,55 @@ bool Mesh::ImportSource(Array<Vertex>& OutVertices, Array<uint32_t>& OutIndices)
     return true;
 }
 
-void Mesh::BuildVertexBuffer(const Array<Vertex>& InVertices, const Array<uint32_t>& InIndices) {
+void Mesh::BuildVertexBuffer(const ImportedMesh& InMesh) {
     Vec3 boundsMin = Vec3(0.0f);
     Vec3 boundsMax = Vec3(0.0f);
-    for (int32_t i = 0; i < InVertices.Size(); i++) {
-        boundsMin = i == 0 ? InVertices[i].Position : glm::min(boundsMin, InVertices[i].Position);
-        boundsMax = i == 0 ? InVertices[i].Position : glm::max(boundsMax, InVertices[i].Position);
+    for (int32_t i = 0; i < InMesh.Vertices.Size(); i++) {
+        boundsMin = i == 0 ? InMesh.Vertices[i].Position : glm::min(boundsMin, InMesh.Vertices[i].Position);
+        boundsMax = i == 0 ? InMesh.Vertices[i].Position : glm::max(boundsMax, InMesh.Vertices[i].Position);
     }
     m_BoundsCenter = (boundsMin + boundsMax) * 0.5f;
     m_BoundsExtents = (boundsMax - boundsMin) * 0.5f;
     m_BoundsRadius = glm::max(glm::length(boundsMax - m_BoundsCenter), 0.001f);
 
-    m_VertexBuffer = VertexBuffer::Create(InVertices, InIndices);
+    m_SubMeshes = InMesh.SubMeshes;
+    m_VertexBuffer = VertexBuffer::Create(InMesh.Vertices, InMesh.Indices);
 }
 
 void Mesh::Load() {
+    ImportedMesh imported;
 #if defined(AE_PACKAGED)
-    int32_t vertexSize, indexSize;
+    int32_t vertexSize, indexSize, subMeshCount;
     {
         ChunkReader chunkReader = GetChunkedBinary()->GetChunk(1);
         chunkReader >> vertexSize;
         chunkReader >> indexSize;
+        chunkReader >> subMeshCount;
+        for (int32_t i = 0; i < subMeshCount; i++) {
+            SubMesh subMesh;
+            chunkReader >> subMesh.FirstIndex;
+            chunkReader >> subMesh.IndexCount;
+            imported.SubMeshes.Add(subMesh);
+        }
     }
-    Array<Vertex> vertices(vertexSize);
-    Array<uint32_t> indices(indexSize);
+    imported.Vertices.Resize(vertexSize);
+    imported.Indices.Resize(indexSize);
     {
         ChunkReader chunkReader = GetChunkedBinary()->GetChunk(2);
-        chunkReader.ReadBytes(&vertices[0], sizeof(Vertex) * vertexSize);
+        chunkReader.ReadBytes(&imported.Vertices[0], sizeof(Vertex) * vertexSize);
     }
     {
         ChunkReader chunkReader = GetChunkedBinary()->GetChunk(3);
-        chunkReader.ReadBytes(&indices[0], sizeof(uint32_t) * indexSize);
+        chunkReader.ReadBytes(&imported.Indices[0], sizeof(uint32_t) * indexSize);
     }
-
-    BuildVertexBuffer(vertices, indices);
 #else
-    Array<Vertex> vertices;
-    Array<uint32_t> indices;
-    ImportSource(vertices, indices);
-
-    BuildVertexBuffer(vertices, indices);
+    ImportSource(imported);
 #endif
 
-    AssetManager::Get().LoadAsset(m_Material.Get());
+    BuildVertexBuffer(imported);
+    for (int32_t slot = 0; slot < m_SubMeshes.Size(); slot++) {
+        AssetManager::Get().LoadAsset(GetMaterial(slot));
+    }
 }
 
 void Mesh::Unload() {
@@ -165,35 +183,38 @@ void Mesh::Unload() {
 }
 
 void Mesh::Reimport() {
-    Array<Vertex> vertices;
-    Array<uint32_t> indices;
-    if (!ImportSource(vertices, indices)) {
+    ImportedMesh imported;
+    if (!ImportSource(imported)) {
         return;
     }
-    BuildVertexBuffer(vertices, indices);
+    BuildVertexBuffer(imported);
 }
 
 void Mesh::Cook(ChunkedBinary& OutChunkedBinary) {
     Super::Cook(OutChunkedBinary);
 
-    Array<Vertex> vertices;
-    Array<uint32_t> indices;
-    ImportSource(vertices, indices);
+    ImportedMesh imported;
+    ImportSource(imported);
 
     {
         ChunkWriter chunkWriter;
-        chunkWriter << (int32_t)vertices.Size();
-        chunkWriter << (int32_t)indices.Size();
+        chunkWriter << (int32_t)imported.Vertices.Size();
+        chunkWriter << (int32_t)imported.Indices.Size();
+        chunkWriter << (int32_t)imported.SubMeshes.Size();
+        for (const SubMesh& subMesh : imported.SubMeshes) {
+            chunkWriter << subMesh.FirstIndex;
+            chunkWriter << subMesh.IndexCount;
+        }
         OutChunkedBinary.AddChunk(1, chunkWriter);
     }
     {
         ChunkWriter chunkWriter;
-        chunkWriter.WriteBytes(&vertices[0], sizeof(Vertex) * vertices.Size());
+        chunkWriter.WriteBytes(&imported.Vertices[0], sizeof(Vertex) * imported.Vertices.Size());
         OutChunkedBinary.AddChunk(2, chunkWriter);
     }
     {
         ChunkWriter chunkWriter;
-        chunkWriter.WriteBytes(&indices[0], sizeof(uint32_t) * indices.Size());
+        chunkWriter.WriteBytes(&imported.Indices[0], sizeof(uint32_t) * imported.Indices.Size());
         OutChunkedBinary.AddChunk(3, chunkWriter);
     }
 }
@@ -206,11 +227,28 @@ VertexBuffer* Mesh::GetVertexBuffer() const {
     return m_VertexBuffer;
 }
 
-Material* Mesh::GetMaterial() const {
-    return m_Material.Get();
+Material* Mesh::GetMaterial(int32_t InSlot) const {
+    Material* material = GetAssignedMaterial(InSlot);
+    return material ? material : Material::GetDefault();
 }
 
-void Mesh::SetMaterial(Material* InMaterial) {
-    m_Material = InMaterial;
+Material* Mesh::GetAssignedMaterial(int32_t InSlot) const {
+    return InSlot >= 0 && InSlot < m_Materials.Size() ? m_Materials[InSlot].Get() : nullptr;
+}
+
+void Mesh::SetMaterial(int32_t InSlot, Material* InMaterial) {
+    if (InSlot < 0) {
+        return;
+    }
+    while (m_Materials.Size() <= InSlot) {
+        m_Materials.Add(WeakObjectPtr<Material>());
+    }
+    m_Materials[InSlot] = InMaterial;
     AssetManager::Get().LoadAsset(InMaterial);
+}
+
+void Mesh::SetImportSettings(const Vec3& InScale, const Vec3& InOffset, MeshNormalMode InNormalMode) {
+    m_ImportScale = InScale;
+    m_ImportOffset = InOffset;
+    m_NormalMode = InNormalMode;
 }

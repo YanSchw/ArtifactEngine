@@ -26,7 +26,6 @@ public:
     // Evaluate every action (no-op while disabled).
     void Evaluate();
 
-    virtual String GetDisplayName() const override;
 
 protected:
     virtual void Load() override;

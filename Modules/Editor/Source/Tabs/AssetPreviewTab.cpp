@@ -22,8 +22,9 @@
 #include "UI/EditorStyle.h"
 #include "UI/UIContextMenu.h"
 
+#include <algorithm>
+
 static const UUID s_DefaultMesh = UUID::FromString("c6308770-3a5b-4b2b-9cec-14ba803ff817");
-static const UUID s_DefaultShaderGraph = UUID::FromString("d351ca39-9ab6-43cf-9921-4965ec126be8");
 static const Vec4 s_ClearColor = HexColor(0x141417);
 
 static const Vec3 s_KeyLightDirection = glm::normalize(Vec3(0.45f, -0.8f, 0.4f));
@@ -88,13 +89,12 @@ void AssetPreviewTab::InvalidatePipeline() {
     m_PipelineDirty = true;
 }
 
-Material* AssetPreviewTab::ResolveMaterial() const {
+Material* AssetPreviewTab::ResolveMaterial(int32_t InSlot) const {
     if (Material* material = m_Material.Get()) {
         return material;
     }
     Mesh* mesh = ResolveMesh();
-    Material* material = mesh ? mesh->GetMaterial() : nullptr;
-    return material ? material : AssetManager::Get().GetAsset<Material>(s_DefaultShaderGraph);
+    return mesh ? mesh->GetMaterial(InSlot) : Material::GetDefault();
 }
 
 Mesh* AssetPreviewTab::ResolveMesh() const {
@@ -153,47 +153,47 @@ void AssetPreviewTab::EnsureTarget(uint32_t InWidth, uint32_t InHeight) {
     m_PipelineDirty = true;
 }
 
-void AssetPreviewTab::EnsurePipeline() {
-    Material* material = ResolveMaterial();
-    Shader* shader = material ? material->GetShader() : nullptr;
+Pipeline* AssetPreviewTab::EnsurePipeline(PreviewSlotPipeline& InOutSlot, Material* InMaterial) {
+    Shader* shader = InMaterial ? InMaterial->GetShader() : nullptr;
     if (!m_Target || !shader) {
-        m_Pipeline = nullptr;
-        return;
+        InOutSlot = PreviewSlotPipeline();
+        return nullptr;
     }
 
     // A pipeline missing a binding the shader declares is a descriptor-set mismatch, so keep the
     // previous one until every texture has streamed in.
-    Array<void*> resources = { shader, material->GetPropertyBuffer() };
+    Array<void*> resources = { shader, InMaterial->GetPropertyBuffer() };
     PipelineDesc desc;
     desc.ImageBindings.Add({ ShaderTemplate::ShadowMapBinding, m_ShadowMap.GetView(), m_ShadowMap.GetSampler() });
-    for (const MaterialTextureBinding& binding : material->GetTextureBindings()) {
+    for (const MaterialTextureBinding& binding : InMaterial->GetTextureBindings()) {
         AssetManager::Get().LoadAsset(binding.Texture);
         Texture* texture = binding.Texture ? binding.Texture->GetTexture() : nullptr;
         if (!texture) {
-            return;
+            return InOutSlot.Instance.Get();
         }
         resources.Add(texture);
         desc.ImageBindings.Add({ binding.Binding, texture->GetDefaultView(), m_Sampler });
     }
 
-    if (!m_PipelineDirty && m_Pipeline && m_PipelineResources == resources) {
-        return;
+    if (!InOutSlot.Dirty && InOutSlot.Instance && InOutSlot.Resources == resources) {
+        return InOutSlot.Instance.Get();
     }
 
-    if (m_Pipeline) {
+    if (InOutSlot.Instance) {
         RenderingAPI::GetInstance()->WaitIdle();
     }
 
     desc.Target = m_Target;
     desc.Shader = shader;
     desc.Buffers.Add(m_SceneBuffer);
-    if (UniformBuffer* properties = material->GetPropertyBuffer()) {
+    if (UniformBuffer* properties = InMaterial->GetPropertyBuffer()) {
         desc.Buffers.Add(properties);
     }
 
-    m_Pipeline = Pipeline::Create(desc);
-    m_PipelineResources = resources;
-    m_PipelineDirty = false;
+    InOutSlot.Instance = Pipeline::Create(desc);
+    InOutSlot.Resources = resources;
+    InOutSlot.Dirty = false;
+    return InOutSlot.Instance.Get();
 }
 
 void AssetPreviewTab::BuildMeshMenu(UIMenuModel& OutMenu) {
@@ -323,8 +323,19 @@ void AssetPreviewTab::OnUIUpdate(const UIFrameContext& InContext) {
     VertexBuffer* vertexBuffer = mesh ? mesh->GetVertexBuffer() : nullptr;
 
     EnsureTarget(width, height);
-    EnsurePipeline();
-    if (!m_Pipeline || !vertexBuffer) {
+    if (!vertexBuffer) {
+        return;
+    }
+
+    const Array<SubMesh>& subMeshes = mesh->GetSubMeshes();
+    m_Pipelines.Resize(subMeshes.Size());
+    Array<Pipeline*> pipelines;
+    for (int32_t slot = 0; slot < subMeshes.Size(); slot++) {
+        m_Pipelines[slot].Dirty = m_Pipelines[slot].Dirty || m_PipelineDirty;
+        pipelines.Add(EnsurePipeline(m_Pipelines[slot], ResolveMaterial(slot)));
+    }
+    m_PipelineDirty = false;
+    if (std::all_of(pipelines.begin(), pipelines.end(), [](Pipeline* InPipeline) { return InPipeline == nullptr; })) {
         return;
     }
 
@@ -341,10 +352,15 @@ void AssetPreviewTab::OnUIUpdate(const UIFrameContext& InContext) {
     }
     m_ShaderData->Set(push);
 
-    m_Pipeline->Bind();
-    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData,
-                                                       CmdSetShaderData{ m_ShaderData.Get() });
-    vertexBuffer->Draw();
+    for (int32_t slot = 0; slot < subMeshes.Size(); slot++) {
+        if (!pipelines[slot]) {
+            continue;
+        }
+        pipelines[slot]->Bind();
+        RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::SetShaderData,
+                                                           CmdSetShaderData{ m_ShaderData.Get() });
+        vertexBuffer->Draw(subMeshes[slot].IndexCount, subMeshes[slot].FirstIndex);
+    }
 
     m_Texture->SetView(m_Target->GetDesc().ColorAttachments[0]);
 }

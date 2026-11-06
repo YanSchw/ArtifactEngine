@@ -55,6 +55,28 @@ UUID UUID::Generate() {
     return UUID(s);
 }
 
+UUID UUID::Derive(const UUID& InBase, const String& InName) {
+    uint64_t halves[2] = { 0xcbf29ce484222325ull, 0x84222325cbf29ce4ull };
+    const auto mix = [&](uint8_t InByte) {
+        for (uint64_t& half : halves) {
+            half = (half ^ InByte) * 0x100000001b3ull;
+        }
+        halves[1] = (halves[1] << 7) | (halves[1] >> 57);
+    };
+    for (uint8_t byte : InBase.Data) {
+        mix(byte);
+    }
+    for (char c : InName) {
+        mix((uint8_t)c);
+    }
+
+    Storage s{};
+    std::memcpy(s.data(), halves, s.size());
+    s[6] = (s[6] & 0x0F) | 0x50;
+    s[8] = (s[8] & 0x3F) | 0x80;
+    return UUID(s);
+}
+
 bool UUID::TryParse(const String& str, UUID& out) {
     String filtered;
     filtered.reserve(32);

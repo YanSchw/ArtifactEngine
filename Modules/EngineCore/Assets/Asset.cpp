@@ -103,7 +103,8 @@ AssetStreamHandle Asset::GetStreamHandle() const {
 }
 
 String Asset::GetDisplayName() const {
-    return m_Id.ToString();
+    const String path = AssetManager::IsAvailable() ? AssetManager::Get().GetAssetPath(m_Id) : String();
+    return path.empty() ? m_Id.ToString() : DisplayNameFromPath(path);
 }
 
 String Asset::SerializeToJson() const {

@@ -101,7 +101,7 @@ void ThumbnailRenderer::RenderEntry(const UUID& InId, Entry& InEntry) {
         World* scene = new World();
         StaticMeshNode* meshNode = scene->Spawn<StaticMeshNode>();
         meshNode->SetMesh(mesh);
-        meshNode->SetMaterialOverride(material);
+        meshNode->SetMaterialOverride(0, material);
 
         const float distance = FitDistance(mesh->GetBoundsExtents(), s_ViewDirection);
 
@@ -120,8 +120,12 @@ void ThumbnailRenderer::RenderEntry(const UUID& InId, Entry& InEntry) {
 
     // Assets stream in behind the scenes and nothing is drawn until they are all there, so an
     // unready material waits its turn again instead of baking an empty thumbnail.
-    Material* drawnWith = material ? material : mesh->GetMaterial();
-    if ((!drawnWith || !drawnWith->IsReadyToRender()) && ++InEntry.Attempts < s_MaxAttempts) {
+    bool ready = mesh->IsLoaded() && (!material || material->IsReadyToRender());
+    for (int32_t slot = 0; !material && slot < mesh->GetSubMeshes().Size(); slot++) {
+        Material* slotMaterial = mesh->GetMaterial(slot);
+        ready = ready && slotMaterial && slotMaterial->IsReadyToRender();
+    }
+    if (!ready && ++InEntry.Attempts < s_MaxAttempts) {
         m_Pending.Add(InId);
         return;
     }

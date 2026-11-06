@@ -149,6 +149,20 @@ void AssetManager::HotLoadAssets() {
             jsonStrings[asset] = jsonString;
             m_Assets[asset->GetId()] = asset;
             m_AssetPaths[asset->GetId()] = filePath;
+
+            // Registered before anything is deserialized, so references into them resolve.
+            for (const nlohmann::json& subJson : j.value("SubAssets", nlohmann::json::array())) {
+                Asset* subAsset = Cast<Asset>(Object::Create(Class(subJson["AssetClass"].get<String>())));
+                if (!subAsset) {
+                    AE_ERROR("'{0}' holds a sub-asset of unknown class '{1}'", filePath, subJson["AssetClass"].get<String>());
+                    continue;
+                }
+                subAsset->m_Id = UUID::FromString(subJson["m_Id"].get<String>());
+                subAsset->m_Owner = asset;
+                jsonStrings[subAsset] = subJson.dump();
+                m_Assets[subAsset->GetId()] = subAsset;
+                m_AssetPaths[subAsset->GetId()] = filePath + "/" + subJson["SubAssetName"].get<String>() + ".asset";
+            }
         }
     }
 
@@ -177,22 +191,67 @@ String AssetManager::GetAssetPath(const UUID& InId) {
     return m_AssetPaths.ContainsKey(InId) ? m_AssetPaths.At(InId) : String();
 }
 
+Asset* AssetManager::GetAssetAtPath(const String& InPath) const {
+    for (const auto& [id, path] : m_AssetPaths) {
+        if (path == InPath) {
+            return m_Assets.ContainsKey(id) ? m_Assets.At(id).Get() : nullptr;
+        }
+    }
+    return nullptr;
+}
+
 Asset* AssetManager::CreateAsset(const Class& InClass, const String& InDirectory, const String& InName) {
     Asset* asset = Cast<Asset>(Object::Create(InClass));
     if (!asset) {
         AE_ERROR("Cannot create an asset of class '{0}'", InClass.Name);
         return nullptr;
     }
+    return AddAsset(asset, InDirectory, InName);
+}
 
-    asset->m_Id = UUID::Generate();
-    m_Assets[asset->GetId()] = asset;
-    m_AssetPaths[asset->GetId()] = InDirectory + "/" + InName + ".asset";
-    return asset;
+Asset* AssetManager::AddAsset(Asset* InAsset, const String& InDirectory, const String& InName) {
+    InAsset->m_Id = UUID::Generate();
+    m_Assets[InAsset->GetId()] = InAsset;
+    m_AssetPaths[InAsset->GetId()] = InDirectory + "/" + InName + ".asset";
+    return InAsset;
+}
+
+Asset* AssetManager::AddSubAsset(Asset* InAsset, Asset* InOwner, const UUID& InId, const String& InName) {
+    const String ownerPath = GetAssetPath(InOwner->GetId());
+    const auto taken = [&](const String& InCandidate) {
+        return GetAssetAtPath(ownerPath + "/" + InCandidate + ".asset") != nullptr;
+    };
+    const String base = InName.empty() ? String("Unnamed") : InName;
+    String name = base;
+    for (int32_t suffix = 2; taken(name); suffix++) {
+        name = base + std::to_string(suffix);
+    }
+
+    InAsset->m_Id = InId;
+    InAsset->m_Owner = InOwner;
+    m_Assets[InId] = InAsset;
+    m_AssetPaths[InId] = ownerPath + "/" + name + ".asset";
+    return InAsset;
+}
+
+Array<Asset*> AssetManager::GetSubAssets(const Asset* InOwner) const {
+    Array<Asset*> subAssets;
+    for (const auto& [id, asset] : m_Assets) {
+        if (asset.Get() && asset->GetOwner() == InOwner) {
+            subAssets.Add(asset.Get());
+        }
+    }
+    return subAssets.Sort([this](Asset* InA, Asset* InB) {
+        return m_AssetPaths.At(InA->GetId()) < m_AssetPaths.At(InB->GetId());
+    });
 }
 
 bool AssetManager::SaveAsset(Asset* InAsset) {
     if (!InAsset) {
         return false;
+    }
+    if (Asset* owner = InAsset->GetOwner()) {
+        return SaveAsset(owner);
     }
 
     const String path = GetAssetPath(InAsset->GetId());
@@ -204,7 +263,14 @@ bool AssetManager::SaveAsset(Asset* InAsset) {
     std::error_code error;
     std::filesystem::create_directories(std::filesystem::path(path).parent_path(), error);
 
-    if (!FileIO::WriteStringToFile(path, InAsset->SerializeToJson())) {
+    nlohmann::json json = nlohmann::json::parse(InAsset->SerializeToJson());
+    for (Asset* subAsset : GetSubAssets(InAsset)) {
+        nlohmann::json subJson = nlohmann::json::parse(subAsset->SerializeToJson());
+        subJson["SubAssetName"] = std::filesystem::path(GetAssetPath(subAsset->GetId())).stem().string();
+        json["SubAssets"].push_back(subJson);
+    }
+
+    if (!FileIO::WriteStringToFile(path, json.dump(4))) {
         AE_ERROR("Failed to write asset to {0}", path);
         return false;
     }
@@ -215,6 +281,10 @@ bool AssetManager::SaveAsset(Asset* InAsset) {
 
 bool AssetManager::MoveAsset(const UUID& InId, const String& InNewPath) {
     const String oldPath = GetAssetPath(InId);
+    if (Asset* asset = GetAsset(InId); asset && asset->IsSubAsset()) {
+        AE_ERROR("'{0}' lives inside '{1}' and moves with it", oldPath, GetAssetPath(asset->GetOwner()->GetId()));
+        return false;
+    }
     if (oldPath.empty()) {
         AE_ERROR("Asset {0} has no file to move", InId.ToString());
         return false;
@@ -236,6 +306,7 @@ bool AssetManager::MoveAsset(const UUID& InId, const String& InNewPath) {
     }
 
     m_AssetPaths[InId] = InNewPath;
+    RebindAssetPaths(oldPath, InNewPath);
     return true;
 }
 
@@ -246,13 +317,14 @@ bool AssetManager::DeleteAsset(Asset* InAsset) {
 
     const UUID id = InAsset->GetId();
     const String path = GetAssetPath(id);
-    if (!path.empty()) {
+    if (!path.empty() && !InAsset->IsSubAsset()) {
         std::error_code error;
         std::filesystem::remove(path, error);
         if (error) {
             AE_ERROR("Failed to delete '{0}': {1}", path, error.message());
             return false;
         }
+        UnregisterAssetsUnder(path);
     }
 
     if (InAsset->IsLoaded()) {

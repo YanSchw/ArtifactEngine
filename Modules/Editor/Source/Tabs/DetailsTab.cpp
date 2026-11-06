@@ -87,7 +87,8 @@ void DetailsTab::Refresh() {
     }
 
     MajorTab* major = GetMajorTab();
-    const Array<Object*> selection = major ? major->GetSelection() : Array<Object*>();
+    const Array<Object*> selection = m_Pinned.Get() ? Array<Object*>({ m_Pinned.Get() })
+                                   : major ? major->GetSelection() : Array<Object*>();
     Object* sole = selection.Size() == 1 ? selection[0] : nullptr;
     DetailsCustomization* customization = sole ? DetailsCustomization::FindFor(sole->GetClass()) : nullptr;
     Object* inspected = customization ? sole : nullptr;

@@ -18,13 +18,19 @@ ShaderGraph* ShaderGraph::CreateEmpty(const String& InDirectory, const String& I
         return nullptr;
     }
 
-    asset->m_Graph = Object::Create<ShaderNodeGraph>();
-    asset->m_Graph->GraphName = InName;
-    asset->EnsureTemplateLoaded();
-    asset->SyncGraph();
-
+    asset->Reset(DefaultTemplate);
     AssetManager::Get().SaveAsset(asset);
     return asset;
+}
+
+void ShaderGraph::Reset(const String& InTemplatePath) {
+    m_TemplatePath = InTemplatePath;
+    m_TemplateLoaded = false;
+    m_Template = ShaderTemplate();
+    m_Graph = Object::Create<ShaderNodeGraph>();
+    m_Graph->GraphName = GetDisplayName();
+    EnsureTemplateLoaded();
+    SyncGraph();
 }
 
 bool ShaderGraph::IsLoaded() const {

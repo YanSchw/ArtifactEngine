@@ -73,9 +73,9 @@ bool ObjMeshImporter::CanImport(const String& InExtension) const {
     return InExtension == ".obj";
 }
 
-bool ObjMeshImporter::Import(const String& InFilePath, Array<Vertex>& OutVertices, Array<uint32_t>& OutIndices) {
-    OutVertices.Clear();
-    OutIndices.Clear();
+bool ObjMeshImporter::Import(const String& InFilePath, ImportedMesh& OutMesh) {
+    OutMesh = ImportedMesh();
+    Array<Vertex>& OutVertices = OutMesh.Vertices;
 
     std::ifstream File(InFilePath);
 
@@ -88,6 +88,10 @@ bool ObjMeshImporter::Import(const String& InFilePath, Array<Vertex>& OutVertice
     Array<Vec3> Normals;
 
     std::unordered_map<ObjVertexKey, uint32_t, ObjVertexKeyHasher> VertexMap;
+
+    Array<String> SlotNames = { String() };
+    Array<Array<uint32_t>> SlotIndices = { Array<uint32_t>() };
+    int32_t CurrentSlot = 0;
 
     String Line;
 
@@ -122,6 +126,15 @@ bool ObjMeshImporter::Import(const String& InFilePath, Array<Vertex>& OutVertice
             Stream >> Normal.x >> Normal.y >> Normal.z;
 
             Normals.Add(Normal);
+        } else if (Prefix == "usemtl") {
+            String MaterialName;
+            Stream >> MaterialName;
+            CurrentSlot = SlotNames.IndexOf(MaterialName);
+            if (CurrentSlot < 0) {
+                CurrentSlot = SlotNames.Size();
+                SlotNames.Add(MaterialName);
+                SlotIndices.Add(Array<uint32_t>());
+            }
         } else if (Prefix == "f") {
             Array<String> FaceVertices;
 
@@ -189,12 +202,19 @@ bool ObjMeshImporter::Import(const String& InFilePath, Array<Vertex>& OutVertice
             // 0 1 2 3 -> (0,1,2) (0,2,3)
             // Works for triangles, quads and n-gons.
             for (size_t i = 1; i + 1 < FaceIndices.Size(); ++i) {
-                OutIndices.Add(FaceIndices[0]);
-                OutIndices.Add(FaceIndices[i]);
-                OutIndices.Add(FaceIndices[i + 1]);
+                SlotIndices[CurrentSlot].Add(FaceIndices[0]);
+                SlotIndices[CurrentSlot].Add(FaceIndices[i]);
+                SlotIndices[CurrentSlot].Add(FaceIndices[i + 1]);
             }
         }
     }
 
-    return !OutVertices.IsEmpty() && !OutIndices.IsEmpty();
+    for (int32_t Slot = 0; Slot < SlotNames.Size(); Slot++) {
+        if (!SlotIndices[Slot].IsEmpty()) {
+            OutMesh.SubMeshes.Add({ SlotNames[Slot], (uint32_t)OutMesh.Indices.Size(), (uint32_t)SlotIndices[Slot].Size() });
+            OutMesh.Indices += SlotIndices[Slot];
+        }
+    }
+
+    return !OutVertices.IsEmpty() && !OutMesh.Indices.IsEmpty();
 }

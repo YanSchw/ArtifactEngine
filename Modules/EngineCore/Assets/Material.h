@@ -22,6 +22,8 @@ public:
     virtual ~Material() = default;
 
     static Material* CreateEmpty(const String& InDirectory, const String& InName);
+    /** The engine's default shader graph, drawn wherever no material is assigned. */
+    static Material* GetDefault();
 
     virtual ShaderGraph* GetBaseGraph() const;
     void SetBaseGraph(ShaderGraph* InShaderGraph);
@@ -48,7 +50,6 @@ public:
 
     void RefreshPropertyBuffer();
 
-    virtual String GetDisplayName() const override;
     virtual bool IsLoaded() const override;
 
 protected:

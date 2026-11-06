@@ -31,14 +31,24 @@ void StaticMeshNode::SetMesh(Mesh* InMesh) {
     m_Mesh = InMesh;
 }
 
-Material* StaticMeshNode::GetMaterial() const {
-    if (Material* material = m_MaterialOverride.Get()) {
+Material* StaticMeshNode::GetMaterial(int32_t InSlot) const {
+    if (Material* material = GetMaterialOverride(InSlot)) {
         return material;
     }
-    return m_Mesh ? m_Mesh->GetMaterial() : nullptr;
+    return m_Mesh ? m_Mesh->GetMaterial(InSlot) : nullptr;
 }
 
-void StaticMeshNode::SetMaterialOverride(Material* InMaterial) {
-    m_MaterialOverride = InMaterial;
+Material* StaticMeshNode::GetMaterialOverride(int32_t InSlot) const {
+    return InSlot >= 0 && InSlot < m_MaterialOverrides.Size() ? m_MaterialOverrides[InSlot].Get() : nullptr;
+}
+
+void StaticMeshNode::SetMaterialOverride(int32_t InSlot, Material* InMaterial) {
+    if (InSlot < 0) {
+        return;
+    }
+    while (m_MaterialOverrides.Size() <= InSlot) {
+        m_MaterialOverrides.Add(WeakObjectPtr<Material>());
+    }
+    m_MaterialOverrides[InSlot] = InMaterial;
     AssetManager::Get().LoadAsset(InMaterial);
 }

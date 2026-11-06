@@ -9,4 +9,5 @@ public:
     virtual void SetApplicationIcon(const String& InImagePath) override;
     virtual void SetSystemShortcutsSuppressed(bool InSuppressed) override;
     virtual bool SetWindowFullscreen(void* InNativeWindow, bool InFullscreen) override;
+    virtual Array<String> OpenFilesDialog(const String& InTitle) override;
 };

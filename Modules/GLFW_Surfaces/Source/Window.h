@@ -93,6 +93,9 @@ public:
      *  then handles dragging, snapping and double-click itself. */
     virtual bool HitTestTitleBar(const Vec2& InPoint) const { (void)InPoint; return false; }
 
+    /** Files the user dragged in from the OS and released over this window. */
+    virtual void OnFilesDropped(const Array<String>& InPaths) { (void)InPaths; }
+
     virtual void SetCursorLocked(bool InLocked) override;
     virtual bool IsCursorLocked() const override;
 

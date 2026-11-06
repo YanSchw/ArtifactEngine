@@ -53,6 +53,10 @@ public:
     void OpenHeroTool(HeroTool* InTool);
     void CloseHeroTool();
     ContentDrawer* GetContentDrawer() const;
+    /** Opens the Content Drawer and queues the files for import into the folder it shows. */
+    void ImportFiles(const Array<String>& InFiles);
+
+    virtual void OnFilesDropped(const Array<String>& InPaths) override { ImportFiles(InPaths); }
     bool IsHeroToolOpen(const HeroTool* InTool) const { return m_ActiveHeroTool == InTool; }
 
 private:

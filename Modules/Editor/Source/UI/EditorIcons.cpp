@@ -54,6 +54,7 @@ VectorImage* EditorIcons::GetAssetIcon(const Class& InClass) {
     if (s_AssetIcons.Size() == 0) {
         s_AssetIcons["Asset"] = Asset();
         s_AssetIcons["Mesh"] = Mesh();
+        s_AssetIcons["CollectionAsset"] = Collection();
         s_AssetIcons["Texture2D"] = Texture();
         s_AssetIcons["Font"] = Font();
         s_AssetIcons["VectorImage"] = Node();
@@ -74,6 +75,7 @@ Vec4 EditorIcons::GetAssetColor(const Class& InClass) {
     if (s_AssetColors.Size() == 0) {
         s_AssetColors["Asset"] = HexColor(0x9A9A9A);
         s_AssetColors["Mesh"] = HexColor(0x1FB8C4);
+        s_AssetColors["CollectionAsset"] = HexColor(0xD8C34A);
         s_AssetColors["Texture2D"] = HexColor(0xE0704A);
         s_AssetColors["Font"] = HexColor(0xA96BD8);
         s_AssetColors["VectorImage"] = HexColor(0x4ACF8B);

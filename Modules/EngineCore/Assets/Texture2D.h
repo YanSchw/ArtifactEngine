@@ -19,8 +19,13 @@ protected:
 
 public:
     virtual bool IsLoaded() const override;
-    virtual String GetDisplayName() const override { return DisplayNameFromPath(m_TexturePath); }
+    virtual String GetDisplayName() const override { return IsSubAsset() ? Asset::GetDisplayName() : DisplayNameFromPath(m_TexturePath); }
+    virtual String GetSourcePath() const override { return m_TexturePath; }
+    virtual void SetSourcePath(const String& InPath) override { m_TexturePath = InPath; }
     Texture* GetTexture() const;
+
+    void SetGenerateMips(bool InGenerateMips) { m_GenerateMips = InGenerateMips; }
+    void Reimport();
 
 private:
     bool ImportSource(Array<byte>& OutPixels, uint32_t& OutWidth, uint32_t& OutHeight) const;
@@ -29,4 +34,10 @@ private:
 
     PROPERTY()
     String m_TexturePath;
+
+    PROPERTY()
+    bool m_GenerateMips = true;
+
+    PROPERTY()
+    bool m_FlipVertically = false;
 };

@@ -25,9 +25,11 @@ public:
     Mesh* GetMesh() const;
     void SetMesh(Mesh* InMesh);
 
-    /** The override, or the mesh's own material when there is none. */
-    Material* GetMaterial() const;
-    void SetMaterialOverride(Material* InMaterial);
+    /** The slot's override, or the mesh's own material for that slot when there is none. */
+    Material* GetMaterial(int32_t InSlot = 0) const;
+    Material* GetMaterialOverride(int32_t InSlot) const;
+    /** Null clears the override. */
+    void SetMaterialOverride(int32_t InSlot, Material* InMaterial);
 
     bool GetCastShadow() const { return m_CastShadow; }
     void SetCastShadow(bool InCastShadow) { m_CastShadow = InCastShadow; }
@@ -39,7 +41,7 @@ private:
     WeakObjectPtr<Mesh> m_Mesh;
 
     PROPERTY()
-    WeakObjectPtr<Material> m_MaterialOverride;
+    Array<WeakObjectPtr<Material>> m_MaterialOverrides;
 
     PROPERTY()
     bool m_CastShadow = true;

@@ -32,7 +32,15 @@ public:
     }
 
     String GetAssetPath(const UUID& InId);
+    Asset* GetAssetAtPath(const String& InPath) const;
     Asset* CreateAsset(const Class& InClass, const String& InDirectory, const String& InName);
+    /** Registers an asset made outside the manager under a fresh id. */
+    Asset* AddAsset(Asset* InAsset, const String& InDirectory, const String& InName);
+    /** Sub-assets have no file of their own: they are written into their owner's file and their
+     *  path is a virtual one inside it, which is what keeps their names unique. */
+    Asset* AddSubAsset(Asset* InAsset, Asset* InOwner, const UUID& InId, const String& InName);
+    Array<Asset*> GetSubAssets(const Asset* InOwner) const;
+    /** Saving a sub-asset saves its owner. */
     bool SaveAsset(Asset* InAsset);
 
     bool MoveAsset(const UUID& InId, const String& InNewPath);

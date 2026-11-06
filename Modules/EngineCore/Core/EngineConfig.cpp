@@ -167,6 +167,17 @@ String EngineConfig::ResolveContentPath(const String& InRelativePath) {
     return InRelativePath;
 }
 
+String EngineConfig::ToContentPath(const String& InFilePath) {
+    const String path = std::filesystem::path(InFilePath).lexically_normal().generic_string();
+    for (const String& dir : GetContentMountDirs()) {
+        const String prefix = std::filesystem::path(dir).lexically_normal().generic_string() + "/";
+        if (path.compare(0, prefix.size(), prefix) == 0) {
+            return path.substr(prefix.size() - 1);
+        }
+    }
+    return String();
+}
+
 bool EngineConfig::IsPackagedBuild() {
 #if defined(AE_PACKAGED)
     return true;

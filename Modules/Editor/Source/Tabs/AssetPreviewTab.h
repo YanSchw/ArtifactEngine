@@ -21,8 +21,14 @@ enum class PreviewPanMode : uint8_t {
     None
 };
 
-/** Renders one mesh with one material, framed by the mesh's bounds. Shared by every editor that
- *  shows what an asset looks like: shader graphs, materials and meshes. */
+struct PreviewSlotPipeline {
+    SharedObjectPtr<Pipeline> Instance;
+    Array<void*> Resources;
+    bool Dirty = true;
+};
+
+/** Renders one mesh, with one material or the mesh's own per slot, framed by the mesh's bounds.
+ *  Shared by every editor that shows what an asset looks like: shader graphs, materials and meshes. */
 class AssetPreviewTab : public MinorTab {
 public:
     ARTIFACT_CLASS();
@@ -43,11 +49,11 @@ public:
     void InvalidatePipeline();
 
 private:
-    Material* ResolveMaterial() const;
+    Material* ResolveMaterial(int32_t InSlot) const;
     Mesh* ResolveMesh() const;
 
     void EnsureTarget(uint32_t InWidth, uint32_t InHeight);
-    void EnsurePipeline();
+    Pipeline* EnsurePipeline(PreviewSlotPipeline& InOutSlot, Material* InMaterial);
     void UpdateSceneBuffer(float InDeltaTime, const Mesh& InMesh);
 
     void BuildMeshMenu(UIMenuModel& OutMenu);
@@ -59,13 +65,12 @@ private:
     WeakObjectPtr<Mesh> m_Mesh;
 
     SharedObjectPtr<FrameBuffer> m_Target;
-    SharedObjectPtr<Pipeline> m_Pipeline;
+    Array<PreviewSlotPipeline> m_Pipelines;
     SharedObjectPtr<UniformBuffer> m_SceneBuffer;
     SharedObjectPtr<RenderTargetTexture> m_Texture;
     SharedObjectPtr<Sampler> m_Sampler;
     SharedObjectPtr<class ShaderData> m_ShaderData;
     ShadowMapPlaceholder m_ShadowMap;
-    Array<void*> m_PipelineResources;
     UIImage* m_Image = nullptr;
 
     uint32_t m_Width = 0;

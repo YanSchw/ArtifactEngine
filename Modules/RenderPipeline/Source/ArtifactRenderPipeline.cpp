@@ -234,16 +234,19 @@ void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InPa
             continue;
         }
 
-        Pipeline* pipeline = ResolvePipeline(staticMesh->GetMaterial());
-        if (!pipeline) {
-            continue;
-        }
-        renderQueue.Push(RenderCommandType::BindPipeline, CmdBindPipeline{ pipeline });
-        renderQueue.Push(RenderCommandType::SetShaderData, CmdSetShaderData{ staticMesh->GetPerMeshShaderData() });
-
         VertexBuffer* vertexBuffer = mesh->GetVertexBuffer();
         AE_ASSERT(vertexBuffer);
-        vertexBuffer->Draw();
+        ShaderData* shaderData = staticMesh->GetPerMeshShaderData();
+        const Array<SubMesh>& subMeshes = mesh->GetSubMeshes();
+        for (int32_t slot = 0; slot < subMeshes.Size(); slot++) {
+            Pipeline* pipeline = ResolvePipeline(staticMesh->GetMaterial(slot));
+            if (!pipeline) {
+                continue;
+            }
+            renderQueue.Push(RenderCommandType::BindPipeline, CmdBindPipeline{ pipeline });
+            renderQueue.Push(RenderCommandType::SetShaderData, CmdSetShaderData{ shaderData });
+            vertexBuffer->Draw(subMeshes[slot].IndexCount, subMeshes[slot].FirstIndex);
+        }
     }
 }
 

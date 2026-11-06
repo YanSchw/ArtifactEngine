@@ -7,12 +7,16 @@
 #include "UI/EditorStyle.h"
 #include "UI/UIDragNumber.h"
 #include "UI/UICheckbox.h"
+#include "MeshDetailsCustomization.h"
 #include "GameFramework/Node3D.h"
+#include "GameFramework/StaticMeshNode.h"
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UISvg.h"
 #include "GameFramework/UITextArea.h"
 #include "GameFramework/UIHStack.h"
 #include "Assets/AssetManager.h"
+#include "Assets/Material.h"
+#include "Assets/Mesh.h"
 #include "Assets/VectorImage.h"
 #include "Common/UUID.h"
 #include <cmath>
@@ -106,7 +110,54 @@ void NodeDetailsCustomization::BuildClassCategory(DetailsCategory& InCategory, c
         }
         return;
     }
+    if (InClass == StaticMeshNode::StaticClass()) {
+        BuildStaticMeshCategory(InCategory, Cast<StaticMeshNode>(InObject), InTab);
+        return;
+    }
     DetailsCustomization::BuildClassCategory(InCategory, InClass, InObject, InTab);
+}
+
+void NodeDetailsCustomization::BuildStaticMeshCategory(DetailsCategory& InCategory, StaticMeshNode* InNode, DetailsTab& InTab) {
+    const WeakObjectPtr<Object> weak(InNode);
+    for (Property* property : Property::GetTypeProperties(StaticMeshNode::StaticClass().Name)) {
+        if (property->Name != "m_MaterialOverrides") {
+            AddPropertyRow(*InCategory.GetBody(), InTab, weak, 0, property, 0);
+        }
+    }
+
+    Mesh* mesh = InNode ? InNode->GetMesh() : nullptr;
+    if (!mesh || mesh->GetSubMeshes().IsEmpty()) {
+        return;
+    }
+
+    // Each row shows what the slot draws with; picking another material overrides just that slot.
+    const WeakObjectPtr<StaticMeshNode> node(InNode);
+    DetailsCategory& slots = AddCategory(*InCategory.GetBody(), InTab, "Materials", 1);
+    for (int32_t slot = 0; slot < mesh->GetSubMeshes().Size(); slot++) {
+        const auto setOverride = [node, slot, tab = &InTab](Material* InMaterial) {
+            if (StaticMeshNode* current = node.Get()) {
+                tab->RecordEdit("Edit Material Override", current);
+                current->SetMaterialOverride(slot, InMaterial);
+                NotifyPropertyEdited(tab, current, "m_MaterialOverrides");
+            }
+        };
+        DetailsRow& row = MeshDetailsCustomization::AddMaterialSlotRow(*slots.GetBody(), InTab, MeshDetailsCustomization::GetSlotLabel(*mesh, slot),
+            [node, slot]() -> Asset* {
+                StaticMeshNode* current = node.Get();
+                return current ? current->GetMaterial(slot) : nullptr;
+            },
+            [node, slot, setOverride](Asset* InAsset) {
+                StaticMeshNode* current = node.Get();
+                Mesh* currentMesh = current ? current->GetMesh() : nullptr;
+                Material* material = Cast<Material>(InAsset);
+                setOverride(currentMesh && material == currentMesh->GetMaterial(slot) ? nullptr : material);
+            });
+        row.IsOverridden = [node, slot] {
+            StaticMeshNode* current = node.Get();
+            return current && current->GetMaterialOverride(slot) != nullptr;
+        };
+        row.ResetAction = [setOverride] { setOverride(nullptr); };
+    }
 }
 
 static void AddVectorRow(UINode& InBody, DetailsTab& InTab, const String& InLabel,

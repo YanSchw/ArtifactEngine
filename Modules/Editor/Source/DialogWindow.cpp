@@ -95,6 +95,13 @@ UITextArea* DialogWindow::AddTextField(const String& InPlaceholder) {
 }
 
 UITextArea* DialogWindow::AddNamedTextField(const String& InCaption) {
+    UITextArea* field = AddNamedRow(InCaption)->Add<UITextArea>();
+    field->Fill();
+    StyleField(*field);
+    return field;
+}
+
+UINode* DialogWindow::AddNamedRow(const String& InCaption) {
     UIHStack* row = m_Body->Add<UIHStack>();
     row->Size = { 1.0_rel, UIValue(FieldHeight) };
     row->Gap = s_Gap;
@@ -106,10 +113,9 @@ UITextArea* DialogWindow::AddNamedTextField(const String& InCaption) {
     caption->VAlign = UIVAlign::Middle;
     caption->Color = EditorStyle::TextDim;
 
-    UITextArea* field = row->Add<UITextArea>();
-    field->Size = { 1.0_rel, 1.0_rel };
-    StyleField(*field);
-    return field;
+    UINode* host = row->Add<UINode>();
+    host->Size = { 1.0_rel, 1.0_rel };
+    return host;
 }
 
 UINode* DialogWindow::AddFillPanel() {

@@ -120,6 +120,15 @@ void Window::Setup(const WindowParams& InParams) {
     glfwSetScrollCallback(m_Window, OnWindowScroll);
     glfwSetCharCallback(m_Window, OnWindowChar);
     glfwSetKeyCallback(m_Window, OnWindowKey);
+    glfwSetDropCallback(m_Window, [](GLFWwindow* InWindow, int InCount, const char** InPaths) {
+        if (Window* self = static_cast<Window*>(glfwGetWindowUserPointer(InWindow))) {
+            Array<String> paths;
+            for (int i = 0; i < InCount; i++) {
+                paths.Add(InPaths[i]);
+            }
+            self->OnFilesDropped(paths);
+        }
+    });
     glfwSetWindowRefreshCallback(m_Window, [](GLFWwindow*) {
         if (s_RefreshCallback) {
             s_RefreshCallback();

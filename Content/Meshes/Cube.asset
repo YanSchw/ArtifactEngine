@@ -12,7 +12,9 @@
         "Y": 1.0,
         "Z": 1.0
     },
-    "m_Material": "d351ca39-9ab6-43cf-9921-4965ec126be8",
+    "m_Materials": [
+        "d351ca39-9ab6-43cf-9921-4965ec126be8"
+    ],
     "m_MeshPath": "/Meshes/Cube.obj",
     "m_StreamType": "AlwaysLoaded"
 }

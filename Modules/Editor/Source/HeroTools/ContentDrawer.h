@@ -12,6 +12,7 @@ class UIStack;
 class UITextArea;
 class ThumbnailRenderer;
 class Asset;
+class CollectionAsset;
 class UIMenuModel;
 
 class ContentDrawer : public HeroTool {
@@ -25,6 +26,8 @@ public:
     Asset* GetSelectedAsset();
     /** Navigates to the asset's folder and selects it there. */
     void RevealAsset(Asset* InAsset);
+    /** Queues the files for the import dialog, into the folder on screen. */
+    void ImportFiles(const Array<String>& InFiles);
 
 private:
     struct Location {
@@ -56,6 +59,7 @@ private:
         String Rel;
     };
 
+    void EnsureLocation();
     void NavigateTo(const String& InMount, const String& InRel, bool InPushHistory = true);
     void GoBack();
     void GoForward();
@@ -74,6 +78,7 @@ private:
     void BuildAddMenu(UIMenuModel& OutMenu);
     void BuildItemMenu(UIMenuModel& OutMenu, const Item& InItem);
     void BuildFolderMenu(UIMenuModel& OutMenu, const String& InMount, const String& InRel);
+    void BuildCollectionMenu(UIMenuModel& OutMenu, CollectionAsset* InCollection);
 
     void BeginCreateFolder();
     void BeginCreateAsset(const Class& InAssetClass, const String& InBaseName,
@@ -105,6 +110,13 @@ private:
     String DirFor(const String& InMount, const String& InRel) const;
     bool IsCurrent(const String& InMount, const String& InRel) const;
     bool IsMountRoot(const String& InRel) const { return InRel.empty(); }
+
+    /** A collection is entered like a folder: the location's last segment is its .asset file. */
+    bool IsInsideCollection() const { return m_RelPath.ends_with(".asset"); }
+    CollectionAsset* GetOpenCollection() const;
+    String GetFolderOnScreen() const;
+    static bool IsSubAsset(const Item& InItem);
+    static bool IsCollection(const Item& InItem);
 
     String m_Mount;
     String m_RelPath;

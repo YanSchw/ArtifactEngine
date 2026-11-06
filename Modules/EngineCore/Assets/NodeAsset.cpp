@@ -28,11 +28,6 @@ Class NodeAsset::GetRootClass() const {
     return m_Root.Get() ? Class(m_Root->ClassName) : Class::None;
 }
 
-String NodeAsset::GetDisplayName() const {
-    const String path = AssetManager::Get().GetAssetPath(GetId());
-    return path.empty() ? GetId().ToString() : DisplayNameFromPath(path);
-}
-
 String NodeAsset::SerializeToJson() const {
     nlohmann::json json = nlohmann::json::parse(JsonSerializer::SerializeObject(this));
     json["AssetClass"] = GetClass().Name;

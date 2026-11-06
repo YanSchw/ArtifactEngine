@@ -23,6 +23,10 @@
 #include "Assets/Scene.h"
 #include "Assets/ShaderGraph.h"
 #include "Assets/Material.h"
+#include "Assets/CollectionAsset.h"
+#include "Import/CollectionSettingsWindow.h"
+#include "Import/ImportWindow.h"
+#include "Platform/PlatformHooks.h"
 #include "InputSystem/InputActionMapping.h"
 #include "EditorWindow.h"
 #include "NewAnimationWindow.h"
@@ -144,6 +148,37 @@ bool ContentDrawer::IsCurrent(const String& InMount, const String& InRel) const 
     return m_Mount == InMount && m_RelPath == InRel;
 }
 
+CollectionAsset* ContentDrawer::GetOpenCollection() const {
+    return IsInsideCollection() ? Cast<CollectionAsset>(AssetManager::Get().GetAssetAtPath(DirFor(m_Mount, m_RelPath))) : nullptr;
+}
+
+String ContentDrawer::GetFolderOnScreen() const {
+    const String dir = DirFor(m_Mount, m_RelPath);
+    return IsInsideCollection() ? fs::path(dir).parent_path().string() : dir;
+}
+
+bool ContentDrawer::IsSubAsset(const Item& InItem) {
+    return InItem.AssetPtr && InItem.AssetPtr->IsSubAsset();
+}
+
+bool ContentDrawer::IsCollection(const Item& InItem) {
+    return !InItem.IsFolder && InItem.AssetClass.IsSubclassOf(CollectionAsset::StaticClass());
+}
+
+void ContentDrawer::ImportFiles(const Array<String>& InFiles) {
+    if (InFiles.IsEmpty()) {
+        return;
+    }
+    EnsureLocation();
+    WeakObjectPtr<ContentDrawer> self = this;
+    ImportWindow::Enqueue(InFiles, GetFolderOnScreen(), [self](Asset* InAsset) {
+        if (ContentDrawer* drawer = self.Get(); drawer && InAsset) {
+            drawer->m_SelectedPath = AssetManager::Get().GetAssetPath(InAsset->GetId());
+            drawer->m_NavDirty = true;
+        }
+    });
+}
+
 bool ContentDrawer::IsExpanded(const String& InKey) const {
     return m_Expanded.Contains(InKey);
 }
@@ -197,6 +232,18 @@ void ContentDrawer::GoForward() {
     }
 }
 
+void ContentDrawer::EnsureLocation() {
+    if (!m_Mount.empty()) {
+        return;
+    }
+    Array<String> keys = EngineConfig::GetContentMountKeys();
+    if (keys.Contains("ProjectContent")) {
+        NavigateTo("ProjectContent", "");
+    } else if (!keys.IsEmpty()) {
+        NavigateTo(keys[0], "");
+    }
+}
+
 void ContentDrawer::BuildDrawer(UINode& InBody) {
     m_Breadcrumb = nullptr;
     m_Tree = nullptr;
@@ -204,15 +251,7 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
     m_DropTargets.Clear();
     m_Dragging = false;
     CancelEdit();
-
-    if (m_Mount.empty()) {
-        Array<String> keys = EngineConfig::GetContentMountKeys();
-        if (keys.Contains("ProjectContent")) {
-            NavigateTo("ProjectContent", "");
-        } else if (!keys.IsEmpty()) {
-            NavigateTo(keys[0], "");
-        }
-    }
+    EnsureLocation();
 
     UIVStack* root = InBody.Add<UIVStack>();
     root->Fill();
@@ -257,7 +296,13 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
         BuildAddMenu(menu);
         UIContextMenu::OpenUnder(*addButton, menu);
     };
-    labelButton(*toolbarRow, "Import", 62.0f, EditorStyle::Button, [] {});
+    addButton->Bind = [this, addButton] {
+        addButton->SetCaption(IsInsideCollection() ? "Settings" : "+ Add");
+        addButton->NormalColor = IsInsideCollection() ? EditorStyle::Button : s_AddGreen;
+    };
+    labelButton(*toolbarRow, "Import", 62.0f, EditorStyle::Button, [this] {
+        ImportFiles(PlatformHooks::Get().OpenFilesDialog("Import Assets"));
+    });
     labelButton(*toolbarRow, "Save All", 74.0f, EditorStyle::Button, [this] {
         EditorWindow* window = GetOwnerWindow();
         for (MajorTab* tab : window ? window->GetOpenTabs() : Array<MajorTab*>()) {
@@ -364,15 +409,20 @@ void ContentDrawer::BuildBreadcrumb() {
             targetRel += (j == 1 ? "" : "/") + segments[j];
         }
 
+        const bool isCollection = segments[i].ends_with(".asset");
+        const String caption = isCollection ? fs::path(segments[i]).stem().string() : segments[i];
+
         UIButton* crumb = m_Breadcrumb->Add<UIButton>();
-        crumb->Size = { 12.0_px + UINode::GetDefaultFont()->GetTextWidth(segments[i], EditorStyle::FontSize), 1.0_rel };
+        crumb->Size = { 12.0_px + UINode::GetDefaultFont()->GetTextWidth(caption, EditorStyle::FontSize), 1.0_rel };
         crumb->NormalColor = Vec4(0.0f);
         crumb->HoverColor = EditorStyle::TabHover;
         crumb->PressedColor = EditorStyle::ButtonPressed;
         const String mount = m_Mount;
         crumb->Clicked = [this, mount, targetRel] { NavigateTo(mount, targetRel); };
         crumb->Bind = [this, crumb] { crumb->NormalColor = IsDropHighlight(*crumb) ? s_DropColor : Vec4(0.0f); };
-        RegisterDropTarget(*crumb, mount, targetRel);
+        if (!isCollection) {
+            RegisterDropTarget(*crumb, mount, targetRel);
+        }
 
         UILabel* label = crumb->Add<UILabel>();
         label->Fill();
@@ -380,7 +430,7 @@ void ContentDrawer::BuildBreadcrumb() {
         label->FontSize = EditorStyle::FontSize;
         label->VAlign = UIVAlign::Middle;
         label->Color = (i == segments.Size() - 1) ? EditorStyle::TextBright : EditorStyle::TextDim;
-        label->Text = segments[i];
+        label->Text = caption;
     }
 }
 
@@ -400,8 +450,8 @@ Asset* ContentDrawer::GetSelectedAsset() {
     if (m_ResolvedSelection != m_SelectedPath) {
         m_ResolvedSelection = m_SelectedPath;
         Class assetClass;
-        Asset* asset = nullptr;
-        if (fs::path(m_SelectedPath).extension().string() == ".asset") {
+        Asset* asset = AssetManager::Get().GetAssetAtPath(m_SelectedPath);
+        if (!asset && fs::path(m_SelectedPath).extension().string() == ".asset") {
             ReadAssetHeader(m_SelectedPath, assetClass, asset);
         }
         m_SelectedAsset = asset;
@@ -441,6 +491,10 @@ void ContentDrawer::OpenAsset(Asset* InAsset) {
 /* -------------------------------- Menus -------------------------------- */
 
 void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu) {
+    if (IsInsideCollection()) {
+        BuildCollectionMenu(OutMenu, GetOpenCollection());
+        return;
+    }
     OutMenu.Section("Create");
     OutMenu.Item("New Folder", [this] { BeginCreateFolder(); }).Icon(EditorIcons::Folder());
 
@@ -479,13 +533,20 @@ void ContentDrawer::BuildItemMenu(UIMenuModel& OutMenu, const Item& InItem) {
 
     OutMenu.Section(item.Name);
     OutMenu.Item("Open", [this, item] {
-        if (item.IsFolder) {
+        if (item.IsFolder || IsCollection(item)) {
             NavigateTo(m_Mount, item.Rel);
         } else if (item.AssetPtr) {
             OpenAsset(item.AssetPtr);
         }
     }).Enabled(item.IsFolder || item.AssetPtr != nullptr)
       .Icon(item.IsFolder ? EditorIcons::Folder() : EditorIcons::GetAssetIcon(item.AssetClass));
+    if (IsSubAsset(item)) {
+        BuildCollectionMenu(OutMenu, Cast<CollectionAsset>(item.AssetPtr->GetOwner()));
+        return;
+    }
+    if (IsCollection(item)) {
+        BuildCollectionMenu(OutMenu, Cast<CollectionAsset>(item.AssetPtr));
+    }
     OutMenu.Item("Rename", [this, item] { BeginRename(item); }).Shortcut("F2");
     OutMenu.Separator();
     OutMenu.Submenu("Move To", [this, item](UIMenuModel& OutSub) {
@@ -539,6 +600,27 @@ void ContentDrawer::BuildFolderMenu(UIMenuModel& OutMenu, const String& InMount,
     }).Shortcut("F2");
     OutMenu.Item("Delete", [this, item] { DeleteItem(item); })
            .Tooltip("Deletes the folder and everything in it");
+}
+
+void ContentDrawer::BuildCollectionMenu(UIMenuModel& OutMenu, CollectionAsset* InCollection) {
+    WeakObjectPtr<CollectionAsset> collection = InCollection;
+    WeakObjectPtr<ContentDrawer> self = this;
+    const auto refresh = [self] {
+        if (ContentDrawer* drawer = self.Get()) {
+            drawer->m_NavDirty = true;
+        }
+    };
+
+    OutMenu.Section("Collection");
+    OutMenu.Item("Import Settings...", [collection, refresh] { CollectionSettingsWindow::Open(collection.Get(), refresh); })
+           .Icon(EditorIcons::Settings()).Enabled(InCollection != nullptr)
+           .Tooltip("Change how the source is imported, then reimport it");
+    OutMenu.Item("Reimport", [collection, refresh] {
+        if (CollectionAsset* current = collection.Get(); current && CollectionSettingsWindow::Reimport(*current)) {
+            refresh();
+        }
+    }).Icon(EditorIcons::Reset()).Enabled(InCollection != nullptr)
+      .Tooltip("Reads the source again; sub-assets keep their ids and edits");
 }
 
 /* -------------------------------- Tree -------------------------------- */
@@ -619,6 +701,22 @@ void ContentDrawer::BuildTreeNode(const String& InMount, const String& InRel, co
 Array<ContentDrawer::Item> ContentDrawer::CollectItems() const {
     Array<Item> items;
 
+    if (IsInsideCollection()) {
+        CollectionAsset* collection = GetOpenCollection();
+        for (Asset* subAsset : collection ? AssetManager::Get().GetSubAssets(collection) : Array<Asset*>()) {
+            Item item;
+            item.Path = AssetManager::Get().GetAssetPath(subAsset->GetId());
+            item.Name = fs::path(item.Path).stem().string();
+            item.AssetClass = subAsset->GetClass();
+            item.AssetPtr = subAsset;
+            items.Add(item);
+        }
+        std::sort(items.begin(), items.end(), [](const Item& InA, const Item& InB) {
+            return InA.AssetClass.Name != InB.AssetClass.Name ? InA.AssetClass.Name < InB.AssetClass.Name : InA.Name < InB.Name;
+        });
+        return items;
+    }
+
     const String dir = DirFor(m_Mount, m_RelPath);
     for (const String& sub : ListSubfolders(dir)) {
         Item folder;
@@ -638,6 +736,7 @@ Array<ContentDrawer::Item> ContentDrawer::CollectItems() const {
             Item asset;
             asset.Path = entry.path().string();
             asset.Name = entry.path().stem().string();
+            asset.Rel = m_RelPath.empty() ? entry.path().filename().string() : m_RelPath + "/" + entry.path().filename().string();
             ReadAssetHeader(asset.Path, asset.AssetClass, asset.AssetPtr);
             items.Add(asset);
         }
@@ -775,7 +874,9 @@ void ContentDrawer::BuildAssetTile(const Item& InItem) {
     if (!placeholder) {
         card->Clicked = [this, item] { m_SelectedPath = item.Path; };
         card->DoubleClicked = [this, item] {
-            if (item.AssetPtr) {
+            if (IsCollection(item)) {
+                NavigateTo(m_Mount, item.Rel);
+            } else if (item.AssetPtr) {
                 OpenAsset(item.AssetPtr);
             } else {
                 AE_WARN("Asset {0} ({1}) is not registered", item.Name, item.Path);
@@ -828,7 +929,8 @@ void ContentDrawer::BuildAssetTile(const Item& InItem) {
             UIImage* preview = thumb->Add<UIImage>();
             preview->Center({ 1.0_rel - 8.0_px, 1.0_rel - 8.0_px });
             preview->Image = thumbnail;
-            preview->Bind = [preview, icon, thumbnail] {
+            // On the parent, because a node that disables itself is never bound again.
+            thumb->Bind = [preview, icon, thumbnail] {
                 const bool ready = thumbnail->GetDefaultView().Get() != nullptr;
                 preview->SetEnabled(ready);
                 icon->SetEnabled(!ready);
@@ -1092,7 +1194,7 @@ void ContentDrawer::PruneLocations() {
     }
 
     std::error_code ec;
-    if (!fs::is_directory(DirFor(m_Mount, m_RelPath), ec)) {
+    if (!fs::exists(DirFor(m_Mount, m_RelPath), ec)) {
         NavigateTo(m_Mount, "");
     }
 }
@@ -1126,6 +1228,9 @@ void ContentDrawer::DragOver(const Vec2& InCursorPos) {
     }
     EditorDragDrop::Update(InCursorPos);
     m_DropNode = nullptr;
+    if (IsSubAsset(m_DragItem)) {
+        return;
+    }
     for (const DropTarget& target : m_DropTargets) {
         UINode* node = target.Node.Get();
         if (!node || !node->IsEnabled() || !node->HitTest(InCursorPos)) {

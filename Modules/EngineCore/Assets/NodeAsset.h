@@ -18,7 +18,6 @@ public:
     Class GetRootClass() const;
     Array<AssetStreamHandle> GetReferencedAssetHandles() const { return m_ReferencedAssets; }
 
-    virtual String GetDisplayName() const override;
     virtual String SerializeToJson() const override;
     virtual void DeserializeFromJson(const String& InJson) override;
     virtual bool IsLoaded() const override;

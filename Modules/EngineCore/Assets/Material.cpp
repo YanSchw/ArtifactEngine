@@ -17,6 +17,11 @@ Material* Material::CreateEmpty(const String& InDirectory, const String& InName)
     return asset;
 }
 
+Material* Material::GetDefault() {
+    static const UUID s_DefaultId = UUID::FromString("d351ca39-9ab6-43cf-9921-4965ec126be8");
+    return AssetManager::Get().GetAsset<Material>(s_DefaultId);
+}
+
 ShaderGraph* Material::GetBaseGraph() const {
     return m_BaseGraph.Get();
 }
@@ -185,10 +190,6 @@ void Material::RefreshPropertyBuffer() {
     void* mapped = m_PropertyBuffer->MapData(block.Size(), 0);
     memcpy(mapped, block.Data(), block.Size());
     m_PropertyBuffer->UnmapData();
-}
-
-String Material::GetDisplayName() const {
-    return DisplayNameFromPath(AssetManager::Get().GetAssetPath(GetId()));
 }
 
 bool Material::IsLoaded() const {

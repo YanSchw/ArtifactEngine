@@ -30,11 +30,6 @@ void InputActionMapping::Evaluate() {
     }
 }
 
-String InputActionMapping::GetDisplayName() const {
-    const String path = AssetManager::Get().GetAssetPath(GetId());
-    return path.empty() ? Asset::GetDisplayName() : DisplayNameFromPath(path);
-}
-
 void InputActionMapping::Load() {
     // Actions and bindings are populated from the asset's PROPERTY fields on
     // deserialization, so there is nothing extra to stream in here.

@@ -32,6 +32,7 @@
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/KeyCodes.h"
 #include "Assets/Font.h"
+#include "Platform/PlatformHooks.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -76,6 +77,17 @@ EditorWindow* EditorWindow::FindFor(const UINode& InNode) {
 
 ContentDrawer* EditorWindow::GetContentDrawer() const {
     return Cast<ContentDrawer>(m_ContentDrawerTool);
+}
+
+void EditorWindow::ImportFiles(const Array<String>& InFiles) {
+    ContentDrawer* drawer = GetContentDrawer();
+    if (!drawer || InFiles.IsEmpty()) {
+        return;
+    }
+    if (!IsHeroToolOpen(drawer)) {
+        OpenHeroTool(drawer);
+    }
+    drawer->ImportFiles(InFiles);
 }
 
 void EditorWindow::RegisterHeroTools() {
@@ -139,6 +151,11 @@ void EditorWindow::BuildFileMenu(UIMenuModel& OutMenu) {
            .Shortcut(EditorStyle::CommandKey + "+Z").Enabled(tab && tab->CanUndo());
     OutMenu.Item("Redo " + (tab ? tab->GetRedoTitle() : String()), [tab] { tab->Redo(); })
            .Shortcut(EditorStyle::CommandKey + "+Y").Enabled(tab && tab->CanRedo());
+
+    OutMenu.Section("Content");
+    OutMenu.Item("Import...", [this] { ImportFiles(PlatformHooks::Get().OpenFilesDialog("Import Assets")); })
+           .Icon(EditorIcons::ContentDrawer())
+           .Tooltip("Dropping files onto the editor imports them too");
 
     OutMenu.Section("Editor");
     OutMenu.Item("New Scene Tab", [this] { OpenTab<SceneEditorTab>(); }).Icon(EditorIcons::Level());

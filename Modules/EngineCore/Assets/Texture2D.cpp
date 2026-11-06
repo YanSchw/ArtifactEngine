@@ -4,6 +4,8 @@
 #include "Serialization/ChunkedBinary.h"
 #include "Serialization/Assets/Texture2DImporter.h"
 
+#include <algorithm>
+
 Texture2D::Texture2D() {
     m_StreamType = AssetStreamType::AlwaysLoaded;
 }
@@ -16,6 +18,14 @@ bool Texture2D::ImportSource(Array<byte>& OutPixels, uint32_t& OutWidth, uint32_
         AE_WARN("Importing texture from file {} was unsuccessful!", path);
         return false;
     }
+
+    if (m_FlipVertically) {
+        const size_t rowSize = (size_t)OutWidth * 4;
+        for (uint32_t y = 0; y < OutHeight / 2; y++) {
+            std::swap_ranges(OutPixels.Data() + y * rowSize, OutPixels.Data() + (y + 1) * rowSize,
+                             OutPixels.Data() + (OutHeight - 1 - y) * rowSize);
+        }
+    }
     return true;
 }
 
@@ -26,18 +36,28 @@ void Texture2D::Load() {
     chunkReader >> width;
     chunkReader >> height;
     chunkReader >> channels;
+    TextureDesc desc;
+    desc.GenerateMips = m_GenerateMips;
     byte* pixels = new byte[width * height * channels];
     chunkReader.ReadBytes(pixels, width * height * channels);
-    m_Texture = Texture::Create(pixels, width, height, channels);
+    m_Texture = Texture::Create(pixels, width, height, channels, desc);
     delete[] pixels;
 #else
+    TextureDesc desc;
+    desc.GenerateMips = m_GenerateMips;
     Array<byte> pixels;
     uint32_t width = 0;
     uint32_t height = 0;
     m_Texture = ImportSource(pixels, width, height)
-        ? Texture::Create(pixels.Data(), width, height, 4)
-        : Texture::Create(nullptr, 1, 1, 4);
+        ? Texture::Create(pixels.Data(), width, height, 4, desc)
+        : Texture::Create(nullptr, 1, 1, 4, desc);
 #endif
+}
+
+void Texture2D::Reimport() {
+    if (IsLoaded()) {
+        Load();
+    }
 }
 
 void Texture2D::Unload() {

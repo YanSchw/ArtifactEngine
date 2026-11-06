@@ -31,6 +31,8 @@ protected:
     UITextArea* AddTextField(const String& InPlaceholder);
     /** A [caption][field] row. */
     UITextArea* AddNamedTextField(const String& InCaption);
+    /** A [caption][host] row, the host taking the rest of the width. */
+    UINode* AddNamedRow(const String& InCaption);
     /** A sunken panel taking whatever height the body has left over. */
     UINode* AddFillPanel();
     UIButton* AddFooterButton(const String& InCaption, bool InPrimary, std::function<void()> InClicked);

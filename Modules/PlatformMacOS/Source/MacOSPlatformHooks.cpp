@@ -135,3 +135,29 @@ static void SuppressSystemShortcuts(bool InSuppressed) {
 void MacOSPlatformHooks::SetSystemShortcutsSuppressed(bool InSuppressed) {
     SuppressSystemShortcuts(InSuppressed);
 }
+
+Array<String> MacOSPlatformHooks::OpenFilesDialog(const String& InTitle) {
+    static constexpr long modalResponseOK = 1;
+
+    void* panel = SendMessage(objc_getClass("NSOpenPanel"), "openPanel");
+    ((void (*)(void*, void*, bool))objc_msgSend)(panel, sel_registerName("setCanChooseFiles:"), true);
+    ((void (*)(void*, void*, bool))objc_msgSend)(panel, sel_registerName("setCanChooseDirectories:"), false);
+    ((void (*)(void*, void*, bool))objc_msgSend)(panel, sel_registerName("setAllowsMultipleSelection:"), true);
+    SendMessage(panel, "setMessage:", MakeString(InTitle.c_str()));
+
+    Array<String> files;
+    if (((long (*)(void*, void*))objc_msgSend)(panel, sel_registerName("runModal")) != modalResponseOK) {
+        return files;
+    }
+
+    void* urls = SendMessage(panel, "URLs");
+    const unsigned long count = ((unsigned long (*)(void*, void*))objc_msgSend)(urls, sel_registerName("count"));
+    for (unsigned long i = 0; i < count; i++) {
+        void* url = ((void* (*)(void*, void*, unsigned long))objc_msgSend)(urls, sel_registerName("objectAtIndex:"), i);
+        const char* path = ((const char* (*)(void*, void*))objc_msgSend)(SendMessage(url, "path"), sel_registerName("UTF8String"));
+        if (path) {
+            files.Add(path);
+        }
+    }
+    return files;
+}
