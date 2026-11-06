@@ -10,5 +10,6 @@ public:
 
     virtual ShaderAPI GetAPI() const override { return ShaderAPI::WebGL; }
     virtual bool SupportsPlatform(PlatformType InPlatform) const override { return InPlatform == PlatformType::Web; }
+    virtual bool SupportsStage(ShaderStage InStage) const override { return InStage != ShaderStage::Compute; }
     virtual bool Compile(const ShaderSource& InSource, CompiledShader& OutCompiled, String& OutError) override;
 };

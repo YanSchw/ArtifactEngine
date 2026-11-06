@@ -148,14 +148,18 @@ void VulkanFrameBuffer::TransitionToAttachmentLayout(VkCommandBuffer InCmdBuffer
     }
 }
 
+static VkImageLayout GetShaderReadLayout(const SharedObjectPtr<ImageView>& InAttachment) {
+    return InAttachment->GetDesc().ImagePtr->As<VulkanImage>()->GetShaderReadLayout();
+}
+
 void VulkanFrameBuffer::TransitionToShaderReadLayout(VkCommandBuffer InCmdBuffer) const {
     for (const SharedObjectPtr<ImageView>& colorAttachment : m_Desc.ColorAttachments) {
         TransitionAttachment(InCmdBuffer, colorAttachment,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, GetShaderReadLayout(colorAttachment), VK_IMAGE_ASPECT_COLOR_BIT);
     }
     if (IsDepthSampled(m_Desc.DepthAttachment)) {
         TransitionAttachment(InCmdBuffer, m_Desc.DepthAttachment,
-            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, GetShaderReadLayout(m_Desc.DepthAttachment), VK_IMAGE_ASPECT_DEPTH_BIT);
     }
 }
 

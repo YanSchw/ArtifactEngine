@@ -14,5 +14,10 @@ SharedObjectPtr<Shader> Shader::Create(const CompiledShader& InCompiledShader) {
         return nullptr;
     }
 
+    if (InCompiledShader.HasStage(ShaderStage::Compute) && !RenderingAPI::GetInstance()->GetCapabilities().ComputeShaders) {
+        AE_ERROR("The active rendering API does not support compute shaders");
+        return nullptr;
+    }
+
     return RenderingAPI::GetInstance()->CreateShader(InCompiledShader);
 }

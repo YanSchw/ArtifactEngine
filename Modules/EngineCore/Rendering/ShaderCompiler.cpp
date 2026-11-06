@@ -41,3 +41,12 @@ Array<ShaderAPI> ShaderCompiler::GetAPIsForPlatform(PlatformType InPlatform) {
     }
     return apis;
 }
+
+bool ShaderCompiler::SupportsAllStages(const ShaderSource& InSource) const {
+    for (const ShaderStageSource& stage : InSource.GetStages()) {
+        if (!SupportsStage(stage.Stage)) {
+            return false;
+        }
+    }
+    return true;
+}

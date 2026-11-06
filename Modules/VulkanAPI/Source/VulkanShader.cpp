@@ -65,6 +65,15 @@ void VulkanShader::Reload(const CompiledShader& InCompiledShader) {
     CreateModules(InCompiledShader);
 }
 
+VkShaderModule VulkanShader::GetModule(ShaderStage InStage) const {
+    switch (InStage) {
+        case ShaderStage::Vertex:   return m_VertexShaderModule;
+        case ShaderStage::Fragment: return m_FragmentShaderModule;
+        case ShaderStage::Compute:  return m_ComputeShaderModule;
+    }
+    return VK_NULL_HANDLE;
+}
+
 ShaderType VulkanShader::GetShaderType() const {
     if (m_VertexShaderModule && m_FragmentShaderModule) {
         return ShaderType::VertexFragment;
@@ -73,7 +82,7 @@ ShaderType VulkanShader::GetShaderType() const {
         return ShaderType::Compute;
     }
     else {
-        return ShaderType::Unkown;
+        return ShaderType::Unknown;
     }
 }
 

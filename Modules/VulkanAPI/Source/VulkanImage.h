@@ -15,6 +15,10 @@ public:
     VkImage GetVkImage() const { return m_Image; }
     VkDeviceMemory GetVkDeviceMemory() const { return m_DeviceMemory; }
 
+    /** The layout this image rests in whenever no pass is writing it as an attachment. Storage images
+     *  stay in GENERAL so compute can write them without a transition. */
+    VkImageLayout GetShaderReadLayout() const;
+
     static void DestroyAll();
 
 private:
@@ -32,6 +36,7 @@ public:
     virtual ~VulkanImageView();
 
     VkImageView GetVkImageView() const { return m_ImageView; }
+    VulkanImage* GetImage() const;
 
     static void DestroyAll();
 

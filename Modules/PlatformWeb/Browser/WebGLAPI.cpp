@@ -10,6 +10,7 @@
 #include "WebGLTexture.h"
 #include "WebGLVertexBuffer.h"
 
+#include "Rendering/ComputePipeline.h"
 #include "Rendering/ShaderData.h"
 #include "Rendering/Surface.h"
 
@@ -93,6 +94,13 @@ void WebGLAPI::Execute() {
                 glBindBuffer(GL_UNIFORM_BUFFER, 0);
                 break;
             }
+
+            case RenderCommandType::BindComputePipeline:
+                AE_ERROR("WebGL 2 has no compute shaders. Unsupported command: BindComputePipeline");
+                break;
+            case RenderCommandType::Dispatch:
+                AE_ERROR("WebGL 2 has no compute shaders. Unsupported command: Dispatch");
+                break;
         }
     }
 
@@ -191,6 +199,12 @@ SharedObjectPtr<Shader> WebGLAPI::CreateShader(const CompiledShader& InCompiledS
 
 SharedObjectPtr<Pipeline> WebGLAPI::CreatePipeline(const PipelineDesc& InPipelineDesc) {
     return new WebGLPipeline(InPipelineDesc);
+}
+
+SharedObjectPtr<ComputePipeline> WebGLAPI::CreateComputePipeline(const ComputePipelineDesc& InComputePipelineDesc) {
+    (void)InComputePipelineDesc;
+    AE_ERROR("WebGL 2 has no compute shaders");
+    return nullptr;
 }
 
 SharedObjectPtr<UniformBuffer> WebGLAPI::CreateUniformBuffer(uint32_t InBinding, size_t InSize) {

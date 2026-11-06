@@ -27,6 +27,8 @@
 #include "VulkanShader.h"
 #include "VulkanBuffer.h"
 #include "VulkanPipeline.h"
+#include "VulkanComputePipeline.h"
+#include "VulkanPipelineLayout.h"
 #include "VulkanImage.h"
 #include "VulkanTexture.h"
 #include "VulkanSampler.h"
@@ -496,6 +498,7 @@ void VulkanAPI::Initialize() {
     VulkanAPI::CheckSwapChainSupport();
     VulkanAPI::FindQueueFamilies();
     VulkanAPI::CreateLogicalDevice();
+    QueryCapabilities();
     VulkanAPI::CreateCommandPool();
     VulkanAPI::CreateDescriptorPool();
     CreateSwapchainResources(*swapchains[0]);
@@ -511,6 +514,8 @@ void VulkanAPI::CleanUp(bool fullClean) {
         vkDestroyCommandPool(device, commandPool, nullptr);
 
         VulkanPipeline::DestroyAll();
+        VulkanComputePipeline::DestroyAll();
+        VulkanPipelineLayout::FlushRetired();
         VulkanShader::DestroyAll();
 
         VulkanImageView::DestroyAll();
@@ -757,7 +762,9 @@ void VulkanAPI::FindQueueFamilies() {
         VkBool32 presentSupport = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, swapchains[0]->WindowSurface, &presentSupport);
 
-        if (queueFamilies[i].queueCount > 0 && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+        // Dispatches are recorded into the graphics command buffer; Vulkan guarantees such a family exists.
+        const VkQueueFlags universalFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
+        if (queueFamilies[i].queueCount > 0 && (queueFamilies[i].queueFlags & universalFlags) == universalFlags) {
             graphicsQueueFamily = i;
             foundGraphicsQueueFamily = true;
 
@@ -896,19 +903,20 @@ void VulkanAPI::CreateCommandPool() {
 }
 
 void VulkanAPI::CreateDescriptorPool() {
-    // This describes how many descriptor sets we'll create from this pool for each type
-    VkDescriptorPoolSize typeCounts[2] = {};
-    typeCounts[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    typeCounts[0].descriptorCount = 1000; // total UBO bindings across all sets
-    typeCounts[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    typeCounts[1].descriptorCount = 1000; // total sampler bindings across all sets
+    // Total bindings of each type across every descriptor set allocated from the pool
+    VkDescriptorPoolSize typeCounts[] = {
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+    };
 
     VkDescriptorPoolCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    // A rebuilt pipeline's old set is retired (freed a frame later, see VulkanPipeline::Destroy),
+    // A rebuilt pipeline's old set is retired (freed a frame later, see VulkanPipelineLayout::Retire),
     // so it coexists with the replacement set
     createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    createInfo.poolSizeCount = 2;
+    createInfo.poolSizeCount = (uint32_t)std::size(typeCounts);
     createInfo.pPoolSizes = typeCounts;
     createInfo.maxSets = 1000; // number of descriptor sets
 
@@ -986,8 +994,7 @@ void VulkanAPI::Draw() {
         }
     }
 
-    if (targets.empty()) {
-        m_RenderQueue.Clear();
+    if (m_RenderQueue.commands.empty()) {
         return;
     }
 
@@ -995,7 +1002,7 @@ void VulkanAPI::Draw() {
     // The fence is only reset once past the point where this frame can still bail out.
     vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
 
-    VulkanPipeline::FlushRetired();
+    VulkanPipelineLayout::FlushRetired();
 
     for (VulkanSwapchainData* swapchain : targets) {
         swapchain->Acquired = false;
@@ -1106,6 +1113,10 @@ void VulkanAPI::Draw() {
         exit(1);
     }
 
+    if (targets.empty()) {
+        return;
+    }
+
     std::vector<VkSwapchainKHR> presentSwapchains;
     std::vector<uint32_t> presentImageIndices;
     std::vector<VkResult> presentResults(targets.size(), VK_SUCCESS);
@@ -1136,23 +1147,46 @@ void VulkanAPI::Draw() {
     }
 }
 
+static void BarrierAfterDispatch(VkCommandBuffer InCmdBuffer) {
+    VulkanHelpers::GlobalBarrier(InCmdBuffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_HOST_BIT,
+        VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_HOST_READ_BIT);
+}
+
+static void BarrierBeforeDispatch(VkCommandBuffer InCmdBuffer) {
+    VulkanHelpers::GlobalBarrier(InCmdBuffer,
+        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+}
+
 void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer) {
     bool hasRenderPassBegun = false;
+    bool hasDrawnSinceDispatch = false;
     VulkanFrameBuffer* openFrameBuffer = nullptr;
     VulkanPipeline* currentPipeline = nullptr;
+    VulkanComputePipeline* currentComputePipeline = nullptr;
+    const VulkanPipelineLayout* currentLayout = nullptr;
+
+    auto endRenderPass = [&]() {
+        if (!hasRenderPassBegun) {
+            return;
+        }
+        vkCmdEndRendering(InCmdBuffer);
+        if (openFrameBuffer) {
+            openFrameBuffer->TransitionToShaderReadLayout(InCmdBuffer);
+            openFrameBuffer = nullptr;
+        }
+        hasRenderPassBegun = false;
+    };
 
     for (const RenderCommand& cmd : InQueue.commands) {
         switch (cmd.Type) {
             case RenderCommandType::BeginRenderPass: {
                 const auto& data = std::get<CmdBeginRenderPass>(cmd.Data);
-                if (hasRenderPassBegun) {
-                    vkCmdEndRendering(InCmdBuffer);
-
-                    if (openFrameBuffer) {
-                        openFrameBuffer->TransitionToShaderReadLayout(InCmdBuffer);
-                        openFrameBuffer = nullptr;
-                    }
-                }
+                endRenderPass();
 
                 if (VulkanFrameBuffer* framebuffer = data.Target ? data.Target->As<VulkanFrameBuffer>() : nullptr) {
                     auto colorAttachmentInfo = framebuffer->GetColorAttachmentInfo();
@@ -1222,20 +1256,16 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
             }
 
             case RenderCommandType::BindPipeline: {
-                const auto& data = std::get<CmdBindPipeline>(cmd.Data);
-
-                if (!data.Pipeline)
-                    continue;
-
-                VulkanPipeline* pipeline = data.Pipeline->As<VulkanPipeline>();
-                if (!pipeline->m_Pipeline) {
-                    currentPipeline = nullptr;
+                Pipeline* pipeline = std::get<CmdBindPipeline>(cmd.Data).Pipeline.Get();
+                VulkanPipeline* vkPipeline = pipeline ? pipeline->As<VulkanPipeline>() : nullptr;
+                currentPipeline = vkPipeline && vkPipeline->IsValid() ? vkPipeline : nullptr;
+                currentLayout = currentPipeline ? &currentPipeline->GetLayout() : nullptr;
+                if (!currentPipeline) {
                     continue;
                 }
-                currentPipeline = pipeline;
 
-                vkCmdBindDescriptorSets(InCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_PipelineLayout, 0, 1, &pipeline->m_DescriptorSet, 0, nullptr);
-                vkCmdBindPipeline(InCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_Pipeline);
+                vkCmdBindPipeline(InCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline->GetHandle());
+                currentLayout->BindDescriptorSet(InCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
                 break;
             }
 
@@ -1257,37 +1287,55 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
 
             case RenderCommandType::DrawIndexed: {
                 const auto& data = std::get<CmdDrawIndexed>(cmd.Data);
-                if (!currentPipeline)
+                if (!currentPipeline || !hasRenderPassBegun)
                     continue;
                 vkCmdDrawIndexed(InCmdBuffer, data.IndexCount, 1, data.FirstIndex, data.VertexOffset, 0);
+                hasDrawnSinceDispatch = true;
                 break;
             }
 
             case RenderCommandType::SetShaderData: {
                 const auto& data = std::get<CmdSetShaderData>(cmd.Data);
-
-                if (!data.Data || !currentPipeline)
+                if (!data.Data || !currentLayout)
                     continue;
+                currentLayout->PushShaderData(InCmdBuffer, *data.Data);
+                break;
+            }
 
-                AE_ASSERT(data.Data->Size() <= VulkanPipeline::MAX_SHADER_DATA_SIZE);
+            case RenderCommandType::BindComputePipeline: {
+                endRenderPass();
+                currentPipeline = nullptr;
 
-                vkCmdPushConstants(
-                    InCmdBuffer,
-                    currentPipeline->m_PipelineLayout,
-                    VK_SHADER_STAGE_VERTEX_BIT |
-                    VK_SHADER_STAGE_FRAGMENT_BIT,
-                    0,
-                    static_cast<uint32_t>(data.Data->Size()),
-                    data.Data->Data());
+                if (hasDrawnSinceDispatch) {
+                    BarrierBeforeDispatch(InCmdBuffer);
+                    hasDrawnSinceDispatch = false;
+                }
 
+                ComputePipeline* pipeline = std::get<CmdBindComputePipeline>(cmd.Data).Pipeline.Get();
+                VulkanComputePipeline* vkPipeline = pipeline ? pipeline->As<VulkanComputePipeline>() : nullptr;
+                currentComputePipeline = vkPipeline && vkPipeline->IsValid() ? vkPipeline : nullptr;
+                currentLayout = currentComputePipeline ? &currentComputePipeline->GetLayout() : nullptr;
+                if (!currentComputePipeline) {
+                    continue;
+                }
+
+                vkCmdBindPipeline(InCmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, currentComputePipeline->GetHandle());
+                currentLayout->BindDescriptorSet(InCmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE);
+                break;
+            }
+
+            case RenderCommandType::Dispatch: {
+                const auto& data = std::get<CmdDispatch>(cmd.Data);
+                if (!currentComputePipeline || hasRenderPassBegun)
+                    continue;
+                vkCmdDispatch(InCmdBuffer, data.GroupCountX, data.GroupCountY, data.GroupCountZ);
+                BarrierAfterDispatch(InCmdBuffer);
                 break;
             }
         }
     }
 
-    if (hasRenderPassBegun) {
-        vkCmdEndRendering(InCmdBuffer);
-    }
+    endRenderPass();
 }
 
 VkDevice VulkanAPI::GetDevice() const {
@@ -1314,6 +1362,51 @@ VkQueue VulkanAPI::GetGraphicsQueue() const {
     return graphicsQueue;
 }
 
+void VulkanAPI::ExecuteImmediate(const std::function<void(VkCommandBuffer)>& InRecord) {
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+    if (vkAllocateCommandBuffers(device, &allocInfo, &cmdBuffer) != VK_SUCCESS) {
+        AE_ERROR("failed to allocate an immediate command buffer");
+        return;
+    }
+
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+    InRecord(cmdBuffer);
+    vkEndCommandBuffer(cmdBuffer);
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmdBuffer;
+    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphicsQueue);
+
+    vkFreeCommandBuffers(device, commandPool, 1, &cmdBuffer);
+}
+
+void VulkanAPI::QueryCapabilities() {
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+    const VkPhysicalDeviceLimits& limits = properties.limits;
+
+    m_Capabilities.ComputeShaders = true;
+    m_Capabilities.StorageBuffers = true;
+    m_Capabilities.StorageImages = true;
+    for (int32_t i = 0; i < 3; i++) {
+        m_Capabilities.MaxComputeWorkGroupCount[i] = limits.maxComputeWorkGroupCount[i];
+        m_Capabilities.MaxComputeWorkGroupSize[i] = limits.maxComputeWorkGroupSize[i];
+    }
+    m_Capabilities.MaxComputeWorkGroupInvocations = limits.maxComputeWorkGroupInvocations;
+}
+
 RenderCommandQueue& VulkanAPI::GetRenderQueue() {
     return m_RenderQueue;
 }
@@ -1334,8 +1427,13 @@ SharedObjectPtr<Pipeline> VulkanAPI::CreatePipeline(const PipelineDesc& InPipeli
     return new VulkanPipeline(InPipelineDesc, *this);
 }
 
+SharedObjectPtr<ComputePipeline> VulkanAPI::CreateComputePipeline(const ComputePipelineDesc& InComputePipelineDesc) {
+    return new VulkanComputePipeline(InComputePipelineDesc, *this);
+}
+
 void VulkanAPI::InvalidateAllPipelines() {
     VulkanPipeline::InvalidateAll();
+    VulkanComputePipeline::InvalidateAll();
 }
 
 SharedObjectPtr<UniformBuffer> VulkanAPI::CreateUniformBuffer(uint32_t InBinding, size_t InSize) {

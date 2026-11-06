@@ -16,7 +16,10 @@ public:
 
     virtual ShaderAPI GetAPI() const = 0;
     virtual bool SupportsPlatform(PlatformType InPlatform) const = 0;
+    virtual bool SupportsStage(ShaderStage InStage) const { (void)InStage; return true; }
     virtual bool Compile(const ShaderSource& InSource, CompiledShader& OutCompiled, String& OutError) = 0;
+
+    bool SupportsAllStages(const ShaderSource& InSource) const;
 
     static ShaderCompiler* Get(ShaderAPI InAPI);
     static Array<ShaderAPI> GetAPIsForPlatform(PlatformType InPlatform);

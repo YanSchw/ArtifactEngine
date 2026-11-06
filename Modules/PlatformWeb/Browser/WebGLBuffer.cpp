@@ -1,7 +1,8 @@
 #include "WebGLBuffer.h"
 
-WebGLUniformBuffer::WebGLUniformBuffer(uint32_t InBinding, size_t InSize)
-    : m_Binding(InBinding) {
+WebGLUniformBuffer::WebGLUniformBuffer(uint32_t InBinding, size_t InSize) {
+    m_Binding = InBinding;
+    m_Size = InSize;
     m_Staging.Resize(InSize);
 
     glGenBuffers(1, &m_Buffer);

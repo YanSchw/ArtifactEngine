@@ -4,7 +4,20 @@
 #include "Rendering/RenderingCommand.h"
 #include "Rendering/Image.h"
 #include "Rendering/CompiledShader.h"
+
+#include <array>
 #include "RenderingAPI.gen.h"
+
+/** What the active backend can do. */
+struct RenderingCapabilities {
+    bool ComputeShaders = false;
+    bool StorageBuffers = false;
+    bool StorageImages = false;
+
+    std::array<uint32_t, 3> MaxComputeWorkGroupCount = { 0, 0, 0 };
+    std::array<uint32_t, 3> MaxComputeWorkGroupSize = { 0, 0, 0 };
+    uint32_t MaxComputeWorkGroupInvocations = 0;
+};
 
 class RenderingAPI : public Object {
 public:
@@ -14,6 +27,9 @@ public:
     static RenderingAPI* GetInstance() { return s_Instance; }
 
     void DrawIndexed(uint32_t InIndexCount, uint32_t InFirstIndex, int32_t InVertexOffset);
+    void SetShaderData(class ShaderData* InShaderData);
+
+    const RenderingCapabilities& GetCapabilities() const { return m_Capabilities; }
 
     virtual void Initialize() = 0;
     virtual void Draw() = 0;
@@ -33,6 +49,7 @@ public:
     virtual ShaderAPI GetShaderAPI() const = 0;
     virtual SharedObjectPtr<class Shader> CreateShader(const CompiledShader& InCompiledShader) = 0;
     virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) = 0;
+    virtual SharedObjectPtr<class ComputePipeline> CreateComputePipeline(const struct ComputePipelineDesc& InComputePipelineDesc) = 0;
     virtual void InvalidateAllPipelines() = 0;
     virtual SharedObjectPtr<class UniformBuffer> CreateUniformBuffer(uint32_t InBinding, size_t InSize) = 0;
     virtual SharedObjectPtr<class StorageBuffer> CreateStorageBuffer(uint32_t InBinding, size_t InSize) = 0;
@@ -43,6 +60,9 @@ public:
     virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) = 0;
 
     virtual SampleCount GetMaxSupportedSampleCount() const = 0;
+
+protected:
+    RenderingCapabilities m_Capabilities;
 
 private:
     inline static RenderingAPI* s_Instance = nullptr;

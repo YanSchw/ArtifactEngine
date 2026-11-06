@@ -15,17 +15,15 @@ public:
     virtual void* MapData(size_t InSize, size_t InOffset = 0) override;
     virtual void UnmapData() override;
 
+    const VkDescriptorBufferInfo& GetDescriptorInfo() const { return m_BufferInfo; }
+
     static void DestroyAll();
 
 private:
     VkBuffer m_Buffer = VK_NULL_HANDLE;
     VkDeviceMemory m_DeviceMemory = VK_NULL_HANDLE;
     VkDescriptorBufferInfo m_BufferInfo = {};
-    uint32_t m_Binding = 0;
     VulkanAPI* m_VulkanAPI = nullptr;
-
-    friend class VulkanAPI;
-    friend class VulkanPipeline;
 };
 
 class VulkanStorageBuffer : public StorageBuffer {
@@ -37,15 +35,13 @@ public:
     virtual void* MapData(size_t InSize, size_t InOffset = 0) override;
     virtual void UnmapData() override;
 
+    const VkDescriptorBufferInfo& GetDescriptorInfo() const { return m_BufferInfo; }
+
     static void DestroyAll();
 
 private:
     VkBuffer m_Buffer = VK_NULL_HANDLE;
     VkDeviceMemory m_DeviceMemory = VK_NULL_HANDLE;
     VkDescriptorBufferInfo m_BufferInfo = {};
-    uint32_t m_Binding = 0;
     VulkanAPI* m_VulkanAPI = nullptr;
-
-    friend class VulkanAPI;
-    friend class VulkanPipeline;
 };

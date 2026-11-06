@@ -4,7 +4,7 @@
 #include "Shader.gen.h"
 
 enum class ShaderType {
-    Unkown = 0,
+    Unknown = 0,
     VertexFragment,
     Compute
 };

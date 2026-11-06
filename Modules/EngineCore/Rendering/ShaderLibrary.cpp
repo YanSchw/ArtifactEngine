@@ -41,6 +41,12 @@ static void TrackKey(const String& InKey) {
     }
 }
 
+static bool PreprocessKey(const String& InKey, ShaderSource& OutSource, String& OutError) {
+    return s_RegisteredSources.ContainsKey(InKey)
+        ? ShaderSource::PreprocessSource(InKey, s_RegisteredSources[InKey], OutSource, OutError)
+        : ShaderSource::Preprocess(InKey, OutSource, OutError);
+}
+
 void ShaderLibrary::Initialize() {
     if (s_Initialized) {
         return;
@@ -214,11 +220,7 @@ bool ShaderLibrary::CompileForKey(const String& InKey, ShaderAPI InAPI, Compiled
     }
 
     ShaderSource source;
-    const bool preprocessed = s_RegisteredSources.ContainsKey(InKey)
-        ? ShaderSource::PreprocessSource(InKey, s_RegisteredSources[InKey], source, OutError)
-        : ShaderSource::Preprocess(InKey, source, OutError);
-
-    if (!preprocessed) {
+    if (!PreprocessKey(InKey, source, OutError)) {
         return false;
     }
 
@@ -281,6 +283,7 @@ bool ShaderLibrary::Cook(const String& InOutputDirectory, PlatformType InTargetP
 
     for (int32_t apiIndex = 0; apiIndex < apis.Size(); apiIndex++) {
         const ShaderAPI api = apis[apiIndex];
+        ShaderCompiler* compiler = ShaderCompiler::Get(api);
         ChunkWriter entryChunk;
         uint32_t entryCount = 0;
 
@@ -288,9 +291,21 @@ bool ShaderLibrary::Cook(const String& InOutputDirectory, PlatformType InTargetP
             const String& key = keys[i];
             AE_INFO("[{0}/{1}] Cooking shader: {2}", apiIndex * keys.Size() + i + 1, apis.Size() * keys.Size(), key);
 
+            ShaderSource source;
             CompiledShader compiled;
             String error;
-            if (!CompileForKey(key, api, compiled, error)) {
+            if (!PreprocessKey(key, source, error)) {
+                AE_ERROR("Failed to cook shader '{0}':\n{1}", key, error);
+                succeeded = false;
+                continue;
+            }
+
+            if (!compiler->SupportsAllStages(source)) {
+                AE_INFO("Skipping shader '{0}': {1} does not support all of its stages", key, EShaderAPI::ConvertEnumToString(api));
+                continue;
+            }
+
+            if (!compiler->Compile(source, compiled, error)) {
                 AE_ERROR("Failed to cook shader '{0}':\n{1}", key, error);
                 succeeded = false;
                 continue;

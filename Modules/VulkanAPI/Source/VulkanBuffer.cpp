@@ -43,8 +43,8 @@ VulkanUniformBuffer::VulkanUniformBuffer(uint32_t InBinding, VkDeviceSize InSize
     s_UniformBuffers.Add(this);
     m_VulkanAPI = &InVulkanAPI;
 
-    // Create buffer and allocate memory (omitted for brevity)
     m_Binding = InBinding;
+    m_Size = (size_t)InSize;
 
     CreateBuffer(InSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_Buffer, m_DeviceMemory, InVulkanAPI);
 
@@ -90,8 +90,8 @@ VulkanStorageBuffer::VulkanStorageBuffer(uint32_t InBinding, VkDeviceSize InSize
     s_StorageBuffers.Add(this);
     m_VulkanAPI = &InVulkanAPI;
 
-    // Create buffer and allocate memory (omitted for brevity)
     m_Binding = InBinding;
+    m_Size = (size_t)InSize;
 
     CreateBuffer(InSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_Buffer, m_DeviceMemory, InVulkanAPI);
 

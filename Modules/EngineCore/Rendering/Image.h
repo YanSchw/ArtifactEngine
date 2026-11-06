@@ -81,6 +81,7 @@ public:
     virtual ~Image() = default;
 
     const ImageDesc& GetDesc() const { return m_Desc; }
+    bool HasUsage(ImageUsage InUsage) const { return (m_Desc.Usage & InUsage) != ImageUsage::None; }
 
     static SharedObjectPtr<Image> Create(const ImageDesc& InImageDesc);
 protected:

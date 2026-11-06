@@ -50,6 +50,17 @@ VulkanImage::VulkanImage(const ImageDesc& InImageDesc, VulkanAPI& InVulkanAPI) {
     }
 
     vkBindImageMemory(m_VulkanAPI->GetDevice(), m_Image, m_DeviceMemory, 0);
+
+    if (HasUsage(ImageUsage::Storage)) {
+        m_VulkanAPI->ExecuteImmediate([this](VkCommandBuffer InCmdBuffer) {
+            VulkanHelpers::TransitionImage(InCmdBuffer, m_Image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT,
+                0, VK_REMAINING_ARRAY_LAYERS, 0, VK_REMAINING_MIP_LEVELS);
+        });
+    }
+}
+
+VkImageLayout VulkanImage::GetShaderReadLayout() const {
+    return HasUsage(ImageUsage::Storage) ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
 VulkanImage::~VulkanImage() {
@@ -103,6 +114,10 @@ VulkanImageView::VulkanImageView(const ImageViewDesc& InImageViewDesc, VulkanAPI
     if (vkCreateImageView(m_VulkanAPI->GetDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS) {
         throw std::runtime_error("failed to create image view!");
     }
+}
+
+VulkanImage* VulkanImageView::GetImage() const {
+    return m_Desc.ImagePtr ? m_Desc.ImagePtr->As<VulkanImage>() : nullptr;
 }
 
 VulkanImageView::~VulkanImageView() {

@@ -10,25 +10,11 @@ SharedObjectPtr<Pipeline> Pipeline::Create(const PipelineDesc& InPipelineDesc) {
 }
 
 void Pipeline::Bind() {
-    bool isLastBoundTargetSame = false;
-
-    auto& renderQueue = RenderingAPI::GetInstance()->GetRenderQueue();
-    for (int32_t i = (int32_t)renderQueue.commands.size() - 1; i >= 0; i--) {
-        const auto& cmd = renderQueue.commands[i];
-        if (cmd.Type == RenderCommandType::BindPipeline) {
-            const auto& data = std::get<CmdBindPipeline>(cmd.Data);
-            if (data.Pipeline->GetDesc().Target.Get() == GetDesc().Target.Get()) {
-                isLastBoundTargetSame = true;
-            }
-            break;
-        }
+    RenderCommandQueue& queue = RenderingAPI::GetInstance()->GetRenderQueue();
+    if (queue.GetOpenRenderTarget() != m_Desc.Target.Get()) {
+        queue.Push(RenderCommandType::BeginRenderPass, CmdBeginRenderPass{ m_Desc.Target });
     }
-
-    if (!isLastBoundTargetSame) {
-        RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BeginRenderPass, CmdBeginRenderPass{ GetDesc().Target });
-    }
-
-    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BindPipeline, CmdBindPipeline{ this });
+    queue.Push(RenderCommandType::BindPipeline, CmdBindPipeline{ this });
 }
 
 void Pipeline::InvalidateAll() {

@@ -1,4 +1,5 @@
 #include "RenderingAPI.h"
+#include "ShaderData.h"
 
 RenderingAPI::RenderingAPI() {
     s_Instance = this;
@@ -6,4 +7,8 @@ RenderingAPI::RenderingAPI() {
 
 void RenderingAPI::DrawIndexed(uint32_t InIndexCount, uint32_t InFirstIndex, int32_t InVertexOffset) {
     GetRenderQueue().Push(RenderCommandType::DrawIndexed, CmdDrawIndexed{ InIndexCount, InFirstIndex, InVertexOffset });
+}
+
+void RenderingAPI::SetShaderData(ShaderData* InShaderData) {
+    GetRenderQueue().Push(RenderCommandType::SetShaderData, CmdSetShaderData{ InShaderData });
 }

@@ -1,26 +1,9 @@
 #include "VulkanPipeline.h"
 #include "VulkanShader.h"
-#include "VulkanBuffer.h"
-#include "VulkanTexture.h"
-#include "VulkanSampler.h"
-#include "VulkanImage.h"
 #include "VulkanFrameBuffer.h"
 #include "Helpers.h"
 
 static Array<VulkanPipeline*> s_Pipelines;
-
-// GPU handles whose owning pipeline has been destroyed or invalidated, but which the frame
-// still in flight may be reading from. Only one frame is buffered and its fence is waited at
-// the top of the next Draw, so these are safe to destroy the moment that fence is crossed.
-struct RetiredPipeline {
-    VkDevice Device;
-    VkDescriptorPool DescriptorPool;
-    VkPipeline Pipeline;
-    VkPipelineLayout PipelineLayout;
-    VkDescriptorSet DescriptorSet;
-    VkDescriptorSetLayout DescriptorSetLayout;
-};
-static Array<RetiredPipeline> s_RetiredPipelines;
 
 extern VkExtent2D swapChainExtent;
 extern VkFormat swapChainFormat;
@@ -125,7 +108,10 @@ void VulkanPipeline::Invalidate() {
 
     AE_ASSERT(m_Desc.Shader && m_Desc.Shader->IsA<VulkanShader>(), "Pipeline must have a shader of type VulkanShader!");
     VulkanShader& vulkanShader = *m_Desc.Shader->As<VulkanShader>();
-    AE_ASSERT(vulkanShader.IsVertexFragmentShader(), "shader must have vertex and fragment shader modules to be used in graphics pipeline");
+    if (!vulkanShader.IsVertexFragmentShader()) {
+        AE_ERROR("a graphics pipeline needs a shader with vertex and fragment stages");
+        return;
+    }
 
     const ShaderRenderState& renderState = vulkanShader.GetRenderState();
 
@@ -133,13 +119,13 @@ void VulkanPipeline::Invalidate() {
     VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
     vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertexShaderCreateInfo.module = vulkanShader.m_VertexShaderModule;
+    vertexShaderCreateInfo.module = vulkanShader.GetModule(ShaderStage::Vertex);
     vertexShaderCreateInfo.pName = "main";
 
     VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
     fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragmentShaderCreateInfo.module = vulkanShader.m_FragmentShaderModule;
+    fragmentShaderCreateInfo.module = vulkanShader.GetModule(ShaderStage::Fragment);
     fragmentShaderCreateInfo.pName = "main";
 
     VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderCreateInfo, fragmentShaderCreateInfo };
@@ -250,25 +236,8 @@ void VulkanPipeline::Invalidate() {
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
-    CreateDescriptorSetLayout();
-
-    VkPushConstantRange pushConstantRange = {};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = MAX_SHADER_DATA_SIZE;
-
-    VkPipelineLayoutCreateInfo layoutCreateInfo = {};
-    layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutCreateInfo.setLayoutCount = 1;
-    layoutCreateInfo.pSetLayouts = &m_DescriptorSetLayout;
-    layoutCreateInfo.pushConstantRangeCount = 1;
-    layoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-
-    if (vkCreatePipelineLayout(m_VulkanAPI->GetDevice(), &layoutCreateInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS) {
-        AE_ERROR("failed to create pipeline layout");
-        exit(1);
-    } else {
-        AE_INFO("created pipeline layout");
+    if (!m_Layout.Create(*m_VulkanAPI, m_Desc, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)) {
+        return;
     }
 
     VkPipelineRenderingCreateInfo renderingCreateInfo = {};
@@ -290,7 +259,7 @@ void VulkanPipeline::Invalidate() {
     pipelineCreateInfo.pColorBlendState = &colorBlendCreateInfo;
     pipelineCreateInfo.pDepthStencilState = &depthStencil;
     pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
-    pipelineCreateInfo.layout = m_PipelineLayout;
+    pipelineCreateInfo.layout = m_Layout.GetHandle();
     pipelineCreateInfo.renderPass = VK_NULL_HANDLE;
     pipelineCreateInfo.subpass = 0;
     pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -303,8 +272,6 @@ void VulkanPipeline::Invalidate() {
     } else {
         AE_INFO("created graphics pipeline");
     }
-
-    CreateDescriptorSet();
 }
 
 void VulkanPipeline::CreateVertexDescriptions() {
@@ -349,167 +316,9 @@ void VulkanPipeline::CreateVertexDescriptions() {
     m_VertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 }
 
-
-void VulkanPipeline::CreateDescriptorSetLayout() {
-    // Describe pipeline layout
-    // Note: this describes the mapping between memory and shader resources (descriptor sets)
-    // This is for uniform buffers and samplers
-    std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
-    for (const SharedObjectPtr<ShaderBuffer>& buffer : m_Desc.Buffers) {
-        if (VulkanUniformBuffer* vkUniformBuffer = buffer->As<VulkanUniformBuffer>()) {
-            VkDescriptorSetLayoutBinding layoutBinding = {};
-            layoutBinding.binding = vkUniformBuffer->m_Binding;
-            layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            layoutBinding.descriptorCount = 1;
-            layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-            layoutBindings.push_back(layoutBinding);
-        } else if (VulkanStorageBuffer* vkStorageBuffer = buffer->As<VulkanStorageBuffer>()) {
-            VkDescriptorSetLayoutBinding layoutBinding = {};
-            layoutBinding.binding = vkStorageBuffer->m_Binding;
-            layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            layoutBinding.descriptorCount = 1;
-            layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-            layoutBindings.push_back(layoutBinding);
-        } else {
-            AE_ERROR("unsupported buffer type in pipeline descriptor set");
-            exit(1);
-        }
-    }
-    for (const auto& [binding, imageView, sampler] : m_Desc.ImageBindings) {
-        if (VulkanImageView* vkImageView = imageView->As<VulkanImageView>()) {
-            VkDescriptorSetLayoutBinding layoutBinding = {};
-            layoutBinding.binding = binding;
-            layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            layoutBinding.descriptorCount = 1;
-            layoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-            layoutBindings.push_back(layoutBinding);
-        } else {
-            AE_ERROR("unsupported texture type in pipeline descriptor set");
-            exit(1);
-        }
-    }
-
-    VkDescriptorSetLayoutCreateInfo descriptorLayoutCreateInfo = {};
-    descriptorLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorLayoutCreateInfo.bindingCount = layoutBindings.size();
-    descriptorLayoutCreateInfo.pBindings = layoutBindings.data();
-
-    if (vkCreateDescriptorSetLayout(m_VulkanAPI->GetDevice(), &descriptorLayoutCreateInfo, nullptr, &m_DescriptorSetLayout) != VK_SUCCESS) {
-        AE_ERROR("failed to create descriptor layout");
-        exit(1);
-    } else {
-        AE_INFO("created descriptor layout");
-    }
-}
-
-void VulkanPipeline::CreateDescriptorSet() {
-    // There needs to be one descriptor set per binding point in the shader
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = m_VulkanAPI->GetDescriptorPool();
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &m_DescriptorSetLayout;
-
-    if (vkAllocateDescriptorSets(m_VulkanAPI->GetDevice(), &allocInfo, &m_DescriptorSet) != VK_SUCCESS) {
-        AE_ERROR("failed to create descriptor set");
-        exit(1);
-    } else {
-        AE_INFO("created descriptor set");
-    }
-
-    // Update descriptor set with uniform binding
-    std::vector<VkWriteDescriptorSet> writes = { };
-    for (const SharedObjectPtr<ShaderBuffer>& buffer : m_Desc.Buffers) {
-        if (VulkanUniformBuffer* vkUniformBuffer = buffer->As<VulkanUniformBuffer>()) {
-            VkWriteDescriptorSet bw = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-            bw.dstSet = m_DescriptorSet;
-            bw.dstBinding = vkUniformBuffer->m_Binding;
-            bw.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            bw.descriptorCount = 1;
-            bw.pBufferInfo = &vkUniformBuffer->m_BufferInfo;
-            writes.push_back(bw);
-        } else if (VulkanStorageBuffer* vkStorageBuffer = buffer->As<VulkanStorageBuffer>()) {
-            VkWriteDescriptorSet bw = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-            bw.dstSet = m_DescriptorSet;
-            bw.dstBinding = vkStorageBuffer->m_Binding;
-            bw.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            bw.descriptorCount = 1;
-            bw.pBufferInfo = &vkStorageBuffer->m_BufferInfo;
-            writes.push_back(bw);
-        } else {
-            AE_ERROR("unsupported buffer type in pipeline descriptor set");
-            exit(1);
-        }
-    }
-    std::vector<VkDescriptorImageInfo> imageInfos;
-    imageInfos.reserve(m_Desc.ImageBindings.Size());
-    for (const auto& [binding, imageView, sampler] : m_Desc.ImageBindings) {
-        if (VulkanImageView* vkImageView = imageView->As<VulkanImageView>()) {
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = vkImageView->GetVkImageView();
-            imageInfo.sampler = sampler->As<VulkanSampler>()->GetVkSampler();
-            imageInfos.push_back(imageInfo);
-
-            VkWriteDescriptorSet bw = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-            bw.dstSet = m_DescriptorSet;
-            bw.dstBinding = binding;
-            bw.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            bw.descriptorCount = 1;
-            bw.pImageInfo = &imageInfos.back();
-            writes.push_back(bw);
-        } else {
-            AE_ERROR("unsupported texture type in pipeline descriptor set");
-            exit(1);
-        }
-    }
-    vkUpdateDescriptorSets(m_VulkanAPI->GetDevice(), (uint32_t)writes.size(), writes.data(), 0, nullptr);
-}
-
-PipelineDesc VulkanPipeline::GetDesc() const {
-    return m_Desc;
-}
-
 void VulkanPipeline::Destroy() {
-    if (!m_Pipeline && !m_PipelineLayout && !m_DescriptorSet && !m_DescriptorSetLayout) {
-        return;
-    }
-
-    // Don't free the GPU handles here: the previous frame's command buffer may still be reading
-    // them (its fence is only waited at the top of the next Draw). Retire them for FlushRetired
-    // to destroy once that fence has been crossed.
-    s_RetiredPipelines.Add({
-        m_VulkanAPI->GetDevice(),
-        m_VulkanAPI->GetDescriptorPool(),
-        m_Pipeline,
-        m_PipelineLayout,
-        m_DescriptorSet,
-        m_DescriptorSetLayout,
-    });
-
+    m_Layout.Retire(m_Pipeline);
     m_Pipeline = VK_NULL_HANDLE;
-    m_PipelineLayout = VK_NULL_HANDLE;
-    m_DescriptorSet = VK_NULL_HANDLE;
-    m_DescriptorSetLayout = VK_NULL_HANDLE;
-}
-
-void VulkanPipeline::FlushRetired() {
-    for (const RetiredPipeline& retired : s_RetiredPipelines) {
-        if (retired.Pipeline) {
-            vkDestroyPipeline(retired.Device, retired.Pipeline, nullptr);
-        }
-        if (retired.PipelineLayout) {
-            vkDestroyPipelineLayout(retired.Device, retired.PipelineLayout, nullptr);
-        }
-        if (retired.DescriptorSet) {
-            VkDescriptorSet set = retired.DescriptorSet;
-            vkFreeDescriptorSets(retired.Device, retired.DescriptorPool, 1, &set);
-        }
-        if (retired.DescriptorSetLayout) {
-            vkDestroyDescriptorSetLayout(retired.Device, retired.DescriptorSetLayout, nullptr);
-        }
-    }
-    s_RetiredPipelines.Clear();
 }
 
 void VulkanPipeline::InvalidateAll() {
@@ -525,6 +334,4 @@ void VulkanPipeline::DestroyAll() {
         delete pipeline;
     }
     s_Pipelines.Clear();
-
-    FlushRetired();
 }

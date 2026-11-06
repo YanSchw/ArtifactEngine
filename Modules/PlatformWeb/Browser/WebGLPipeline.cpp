@@ -6,8 +6,11 @@
 #include "WebGLSampler.h"
 #include "WebGLShader.h"
 
-WebGLPipeline::WebGLPipeline(const PipelineDesc& InPipelineDesc)
-    : m_Desc(InPipelineDesc) {
+WebGLPipeline::WebGLPipeline(const PipelineDesc& InPipelineDesc) {
+    m_Desc = InPipelineDesc;
+    if (!m_Desc.StorageImages.IsEmpty()) {
+        AE_ERROR("WebGL 2 has no storage images; the pipeline's storage image bindings are ignored");
+    }
 }
 
 void WebGLPipeline::Apply(GLuint InShaderDataBuffer) {

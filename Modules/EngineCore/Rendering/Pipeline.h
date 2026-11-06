@@ -1,15 +1,12 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Vertex.h"
+#include "PipelineResources.h"
 
-#include <variant>
 #include "Pipeline.gen.h"
 
-struct PipelineDesc {
-    SharedObjectPtr<class Shader> Shader;
+struct PipelineDesc : public PipelineResources {
     Array<ShaderDataType> VertexLayout = Vertex::GetLayout();
-    Array<SharedObjectPtr<class ShaderBuffer>> Buffers;
-    Array<std::tuple<uint32_t, SharedObjectPtr<class ImageView>, SharedObjectPtr<class Sampler>>> ImageBindings;
 
     /* Target has to be of class Surface or FrameBuffer */
     SharedObjectPtr<Object> Target = nullptr;
@@ -24,9 +21,15 @@ public:
 
     virtual ~Pipeline() { }
     virtual void Invalidate() = 0;
-    virtual PipelineDesc GetDesc() const = 0;
+
+    const PipelineDesc& GetDesc() const { return m_Desc; }
 
     void Bind();
+
+    /** Rebuilds every graphics and compute pipeline. */
     static void InvalidateAll();
     static SharedObjectPtr<Pipeline> Create(const PipelineDesc& InPipelineDesc);
+
+protected:
+    PipelineDesc m_Desc;
 };

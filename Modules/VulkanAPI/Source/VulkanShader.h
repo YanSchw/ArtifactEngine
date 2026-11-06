@@ -15,6 +15,8 @@ public:
     virtual ShaderType GetShaderType() const override;
     virtual void Reload(const CompiledShader& InCompiledShader) override;
 
+    VkShaderModule GetModule(ShaderStage InStage) const;
+
     static void DestroyAll();
 
 private:
@@ -29,5 +31,4 @@ private:
     VulkanAPI* m_VulkanAPI = nullptr;
 
     friend class VulkanAPI;
-    friend class VulkanPipeline;
 };

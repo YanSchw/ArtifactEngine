@@ -22,6 +22,7 @@ public:
     virtual ShaderAPI GetShaderAPI() const override { return ShaderAPI::WebGL; }
     virtual SharedObjectPtr<class Shader> CreateShader(const CompiledShader& InCompiledShader) override;
     virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) override;
+    virtual SharedObjectPtr<class ComputePipeline> CreateComputePipeline(const struct ComputePipelineDesc& InComputePipelineDesc) override;
     virtual void InvalidateAllPipelines() override { }
     virtual SharedObjectPtr<class UniformBuffer> CreateUniformBuffer(uint32_t InBinding, size_t InSize) override;
     virtual SharedObjectPtr<class StorageBuffer> CreateStorageBuffer(uint32_t InBinding, size_t InSize) override;

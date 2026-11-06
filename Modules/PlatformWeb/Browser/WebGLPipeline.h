@@ -11,10 +11,6 @@ public:
 
     // GL resolves its state at draw time, so there is nothing cached to rebuild.
     virtual void Invalidate() override { }
-    virtual PipelineDesc GetDesc() const override { return m_Desc; }
 
     void Apply(GLuint InShaderDataBuffer);
-
-private:
-    PipelineDesc m_Desc;
 };

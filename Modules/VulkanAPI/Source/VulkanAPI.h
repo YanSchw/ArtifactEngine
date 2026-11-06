@@ -2,6 +2,7 @@
 #include "Rendering/RenderingAPI.h"
 
 #include <vulkan/vulkan.h>
+#include <functional>
 #include "VulkanAPI.gen.h"
 
 class VulkanAPI : public RenderingAPI {
@@ -22,6 +23,7 @@ public:
     static void CreateCommandPool();
     static void CreateDescriptorPool();
     static void CreateCommandBuffers();
+    void QueryCapabilities();
 
     void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer);
 
@@ -37,6 +39,9 @@ public:
     VkDescriptorPool GetDescriptorPool() const;
     VkQueue GetGraphicsQueue() const;
 
+    /** Records InRecord into a one-off command buffer, submits it and waits for it to finish. */
+    void ExecuteImmediate(const std::function<void(VkCommandBuffer)>& InRecord);
+
     uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     bool TryFindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t& OutMemoryTypeIndex) const;
 
@@ -46,6 +51,7 @@ public:
     virtual ShaderAPI GetShaderAPI() const override { return ShaderAPI::Vulkan; }
     virtual SharedObjectPtr<class Shader> CreateShader(const CompiledShader& InCompiledShader) override;
     virtual SharedObjectPtr<class Pipeline> CreatePipeline(const struct PipelineDesc& InPipelineDesc) override;
+    virtual SharedObjectPtr<class ComputePipeline> CreateComputePipeline(const struct ComputePipelineDesc& InComputePipelineDesc) override;
     virtual void InvalidateAllPipelines() override;
     virtual SharedObjectPtr<class UniformBuffer> CreateUniformBuffer(uint32_t InBinding, size_t InSize) override;
     virtual SharedObjectPtr<class StorageBuffer> CreateStorageBuffer(uint32_t InBinding, size_t InSize) override;
