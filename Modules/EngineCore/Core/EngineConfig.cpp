@@ -23,6 +23,9 @@ void EngineConfig::LoadConfigVars(const Array<String>& InArgs) {
     SetConfigVar("RenderPipeline", "ArtifactRenderPipeline");
     SetConfigVar("Fullscreen", IsPackagedBuild() ? "true" : "false");
     SetConfigVar("CapFPS", "60");
+    SetConfigVar("AudioSampleRate", "48000");
+    SetConfigVar("AudioBufferFrames", "512");
+    SetConfigVar("AudioMaxVoices", "128");
     SetConfigVar("DefaultScene", "a1b2c3d4-0001-4a00-9000-000000000001");
 
     // 2. Load frozen ConfigVars from packaged build

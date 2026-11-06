@@ -17,6 +17,7 @@
 #include "Rendering/FrameBuffer.h"
 #include "Rendering/Image.h"
 #include "Assets/AssetManager.h"
+#include "Audio/AudioEngine.h"
 #include "Assets/Scene.h"
 #include "Common/UUID.h"
 #include "GameFramework/DebugDraw.h"
@@ -45,6 +46,7 @@ void GameEngine::Initialize() {
     ShaderLibrary::Initialize();
 
     (new AssetManager())->Initialize();
+    (new AudioEngine())->Initialize();
 
     m_RenderPipeline = Object::Create(EngineConfig::RenderPipelineClass())->As<RenderPipeline>();
     AE_ASSERT(m_RenderPipeline, "Failed to create RenderPipeline instance!");
@@ -121,6 +123,7 @@ bool GameEngine::MainTick(double InDeltaTime) {
 
 void GameEngine::Shutdown() {
     m_GameInstance = nullptr;
+    AudioEngine::Get().Shutdown();
     AssetManager::Get().Shutdown();
     ShaderLibrary::Shutdown();
     s_Surface = nullptr;

@@ -28,6 +28,8 @@ VectorImage* EditorIcons::GetNodeIcon(const Class& InClass) {
         s_NodeIcons["CylinderShapeNode"] = CylinderShape();
         s_NodeIcons["RigidBodyNode"] = RigidBody();
         s_NodeIcons["CharacterNode"] = Character();
+        s_NodeIcons["AudioSourceNode"] = Audio();
+        s_NodeIcons["AudioListenerNode"] = AudioListener();
         s_NodeIcons["UINode"] = Get("d5ff8074-f233-41a8-b202-f6ced99f2d8f");
         s_NodeIcons["UICanvas"] = Get("26818e74-f484-4f52-8f97-b06dcb64c58b");
         s_NodeIcons["UIQuad"] = Get("62670d8d-e97b-4c2e-afdd-3f69ebbddb83");
@@ -64,6 +66,7 @@ VectorImage* EditorIcons::GetAssetIcon(const Class& InClass) {
         s_AssetIcons["ShaderGraph"] = GraphEditor();
         s_AssetIcons["Animation"] = Animation();
         s_AssetIcons["InputActionMapping"] = InputMapping();
+        s_AssetIcons["AudioClip"] = Audio();
     }
 
     VectorImage* icon = nullptr;
@@ -85,6 +88,7 @@ Vec4 EditorIcons::GetAssetColor(const Class& InClass) {
         s_AssetColors["ShaderGraph"] = HexColor(0xD86BA9);
         s_AssetColors["Animation"] = HexColor(0x6FD84A);
         s_AssetColors["InputActionMapping"] = HexColor(0xE05A6E);
+        s_AssetColors["AudioClip"] = HexColor(0x7A7CE0);
     }
 
     Vec4 color(0.0f);

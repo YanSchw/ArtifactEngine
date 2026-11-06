@@ -33,6 +33,10 @@ Class Platform::GetDefaultRenderingAPIClass() {
     return Class("VulkanAPI");
 }
 
+Class Platform::GetDefaultAudioDeviceClass() {
+    return Class("CoreAudioDevice");
+}
+
 Class Platform::GetMainSurfaceClass() {
     return Class("Window");
 }

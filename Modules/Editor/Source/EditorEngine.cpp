@@ -10,6 +10,7 @@
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/ShaderLibrary.h"
 #include "Assets/AssetManager.h"
+#include "Audio/AudioEngine.h"
 #include "Assets/Scene.h"
 #include "Core/EngineConfig.h"
 #include "InputSystem/InputSystem.h"
@@ -150,6 +151,7 @@ void EditorEngine::Initialize() {
     ShaderLibrary::Initialize();
 
     (new AssetManager())->Initialize();
+    (new AudioEngine())->Initialize();
     settings.ApplyInterfaceFont();
 
     if (!settings.General.ReopenTabs || !cache.ReopenTabs(*window)) {
@@ -221,6 +223,7 @@ void EditorEngine::Shutdown() {
     }
     // Tear the windows (and their UI renderers) down before the assets they sample and the RHI.
     ThemedWindow::DestroyAllWindows();
+    AudioEngine::Get().Shutdown();
     AssetManager::Get().Shutdown();
     ShaderLibrary::Shutdown();
     RenderingAPI::GetInstance()->CleanUp(true);

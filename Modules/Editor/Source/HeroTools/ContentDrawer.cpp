@@ -24,6 +24,9 @@
 #include "Assets/ShaderGraph.h"
 #include "Assets/Material.h"
 #include "Assets/CollectionAsset.h"
+#include "Assets/AudioClip.h"
+#include "Audio/AudioPreview.h"
+#include "UI/UIAudioWaveform.h"
 #include "Import/CollectionSettingsWindow.h"
 #include "Import/ImportWindow.h"
 #include "Platform/PlatformHooks.h"
@@ -860,6 +863,49 @@ void ContentDrawer::BuildFolderTile(const Item& InItem) {
     name->Text = Ellipsize(item.Name, name->FontSize, s_CardWidth - 8.0f);
 }
 
+static UIButton* AddAudioPreview(ContentTile& InCard, UINode& InThumb, UISvg& InIcon, AudioClip* InClip, const Vec4& InTypeColor) {
+    UIAudioWaveform* waveform = InThumb.Add<UIAudioWaveform>();
+    waveform->Fill();
+    waveform->Padding = UIPadding(8.0f, 16.0f);
+    waveform->SplitChannels = false;
+    waveform->WaveColor = Vec4(Vec3(InTypeColor), 0.55f);
+    waveform->PlayedColor = HexColor(0xC4C5FF);
+    waveform->PlayheadColor = Vec4(0.0f);
+
+    UIButton* play = InThumb.Add<UIButton>();
+    play->Center(Vec2(30.0f));
+    play->NormalColor = play->HoverColor = play->PressedColor = Vec4(0.0f);
+    play->SecondaryClicked = InCard.SecondaryClicked;
+    play->Add<UITooltip>()->Text = "Play / Pause";
+
+    UIRoundedQuad* disc = play->Add<UIRoundedQuad>();
+    disc->Fill();
+    disc->CornerRadius = Vec4(15.0f);
+
+    UISvg* glyph = play->Add<UISvg>();
+    glyph->Center(Vec2(14.0f));
+    glyph->Tint = EditorStyle::TextBright;
+
+    const WeakObjectPtr<AudioClip> weakClip = InClip;
+    UISvg* icon = &InIcon;
+    ContentTile* card = &InCard;
+    const Vec4 hoverColor = InTypeColor;
+    InThumb.Bind = [weakClip, card, waveform, play, disc, glyph, icon, hoverColor] {
+        AudioClip* clip = weakClip.Get();
+        waveform->Samples = clip ? clip->GetSamples() : nullptr;
+        const bool hasSamples = waveform->Samples != nullptr;
+        icon->SetEnabled(!hasSamples);
+        waveform->SetEnabled(hasSamples);
+
+        const bool active = AudioPreview::IsActive(clip);
+        waveform->PlayheadTime = active ? AudioPreview::GetTime(clip) : -1.0;
+        play->SetEnabled(hasSamples && (active || card->IsHovered() || play->IsHovered()));
+        disc->Color = play->IsHovered() ? hoverColor : HexColor(0x000000, 0.65f);
+        glyph->Image = AudioPreview::IsPlaying(clip) ? EditorIcons::Pause() : EditorIcons::Play();
+    };
+    return play;
+}
+
 void ContentDrawer::BuildAssetTile(const Item& InItem) {
     const Item item = InItem;
     const bool placeholder = item.Path.empty();
@@ -900,12 +946,6 @@ void ContentDrawer::BuildAssetTile(const Item& InItem) {
     frame->CornerRadius = Vec4(4.0f);
     frame->ClipChildren = true;
     frame->Color = s_CardBase;
-    if (!placeholder) {
-        frame->Bind = [this, card, frame, item] {
-            const bool selected = (m_SelectedPath == item.Path);
-            frame->Color = selected ? s_SelectedColor : (card->IsHovered() ? s_CardHover : s_CardBase);
-        };
-    }
 
     UIVStack* column = frame->Add<UIVStack>();
     column->Fill();
@@ -936,6 +976,23 @@ void ContentDrawer::BuildAssetTile(const Item& InItem) {
                 icon->SetEnabled(!ready);
             };
         }
+    }
+
+    UIButton* playButton = nullptr;
+    if (AudioClip* clip = Cast<AudioClip>(item.AssetPtr)) {
+        playButton = AddAudioPreview(*card, *thumb, *icon, clip, typeColor);
+        playButton->Clicked = [this, clip, item] {
+            m_SelectedPath = item.Path;
+            AudioPreview::Toggle(clip);
+        };
+    }
+
+    if (!placeholder) {
+        frame->Bind = [this, card, frame, playButton, item] {
+            const bool selected = (m_SelectedPath == item.Path);
+            const bool hovered = card->IsHovered() || (playButton && playButton->IsHovered());
+            frame->Color = selected ? s_SelectedColor : (hovered ? s_CardHover : s_CardBase);
+        };
     }
 
     UIQuad* typeBar = column->Add<UIQuad>();

@@ -1,6 +1,7 @@
 #include "Engine.h"
 
 #include "EngineConfig.h"
+#include "Audio/AudioEngine.h"
 #include "GameFramework/DebugDraw.h"
 #include "Platform/PlatformHooks.h"
 
@@ -33,7 +34,11 @@ bool Engine::Tick() {
 
     // Refresh input before gameplay reads it this frame.
     TickInput(m_DeltaTime);
-    return MainTick(m_DeltaTime) && s_IsRunning;
+    const bool keepRunning = MainTick(m_DeltaTime);
+    if (AudioEngine::IsAvailable()) {
+        AudioEngine::Get().Update();
+    }
+    return keepRunning && s_IsRunning;
 }
 
 void Engine::MainLoop() {

@@ -18,6 +18,8 @@ public:
 
     static Class GetDefaultRenderingAPIClass();
 
+    static Class GetDefaultAudioDeviceClass();
+
     /** Class of the Surface the application presents into. */
     static Class GetMainSurfaceClass();
 

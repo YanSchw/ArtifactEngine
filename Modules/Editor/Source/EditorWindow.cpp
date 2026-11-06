@@ -5,6 +5,7 @@
 #include "Tabs/ShaderGraphEditorTab.h"
 #include "Tabs/MaterialEditorTab.h"
 #include "Tabs/MeshEditorTab.h"
+#include "Tabs/AudioClipEditorTab.h"
 #include "Tabs/AnimationEditorTab.h"
 #include "Tabs/InputMappingEditorTab.h"
 #include "Tabs/EditorSettingsTab.h"
@@ -15,6 +16,7 @@
 #include "Assets/Material.h"
 #include "Assets/Mesh.h"
 #include "Assets/Animation.h"
+#include "Assets/AudioClip.h"
 #include "InputSystem/InputActionMapping.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
@@ -320,6 +322,11 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     if (Mesh* mesh = Cast<Mesh>(InAsset)) {
         MeshEditorTab* tab = OpenTab<MeshEditorTab>();
         tab->OpenMesh(mesh);
+        return tab;
+    }
+    if (AudioClip* clip = Cast<AudioClip>(InAsset)) {
+        AudioClipEditorTab* tab = OpenTab<AudioClipEditorTab>();
+        tab->OpenClip(clip);
         return tab;
     }
     if (Animation* animation = Cast<Animation>(InAsset)) {

@@ -72,3 +72,12 @@ public:
     virtual Class GetAssetClass() const override;
     virtual bool CanImport(const String& InFilePath) const override;
 };
+
+class AudioClipImportMenu : public AssetImportMenu {
+public:
+    ARTIFACT_CLASS();
+
+    virtual String GetName() const override { return "Audio Clip"; }
+    virtual Class GetAssetClass() const override;
+    virtual bool CanImport(const String& InFilePath) const override;
+};

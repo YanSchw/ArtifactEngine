@@ -16,7 +16,7 @@ from SetupTool.Dependency import SetupError
 from SetupTool.Emscripten import EmscriptenSDK
 from SetupTool.PipTools import CMake, Ninja
 from SetupTool.Process import step
-from SetupTool.Toolchain import GccToolchain, MSVCToolchain, WindowingLibraries, XcodeToolchain
+from SetupTool.Toolchain import AudioLibraries, GccToolchain, MSVCToolchain, WindowingLibraries, XcodeToolchain
 from SetupTool.VulkanSDK import LinuxVulkanSDK, MacOSVulkanSDK, Win64VulkanSDK
 
 
@@ -26,7 +26,7 @@ def get_dependencies(platform: PlatformType) -> list:
         return [XcodeToolchain(), CMake(), Ninja(), MacOSVulkanSDK(), EmscriptenSDK()]
     if platform == PlatformType.Win64:
         return [MSVCToolchain(), CMake(), Ninja(), Win64VulkanSDK(), EmscriptenSDK()]
-    return [GccToolchain(), CMake(), Ninja(), WindowingLibraries(), LinuxVulkanSDK(), AppImageTool(), EmscriptenSDK()]
+    return [GccToolchain(), CMake(), Ninja(), WindowingLibraries(), AudioLibraries(), LinuxVulkanSDK(), AppImageTool(), EmscriptenSDK()]
 
 
 def _resolve(dependencies: list, requested: list) -> list:

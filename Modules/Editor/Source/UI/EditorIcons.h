@@ -42,6 +42,8 @@ public:
     static VectorImage* Play()          { return Get("f24d1510-5091-462e-be7d-0a9cc35a711b"); }
     static VectorImage* Simulate()      { return Get("1ec662cf-ef29-440d-94b2-7980f6b2ba7d"); }
     static VectorImage* Stop()          { return Get("0457f0fb-4131-4edf-814f-13986bb58f97"); }
+    static VectorImage* Pause()         { return Get("1e8c9564-65a0-427b-88b9-005157ff03dc"); }
+    static VectorImage* Loop()          { return Get("64ce3236-65ee-4ee9-89d4-27bcb4e46089"); }
     static VectorImage* Eject()         { return Get("b96bbcd6-154c-4705-a371-db1c7d229b3d"); }
     static VectorImage* Possess()       { return Get("d273a65f-36fb-4737-b30e-85549591eec9"); }
     static VectorImage* Material()      { return Get("64a96b51-290f-4883-a5fd-b1e7707b4fd8"); }
@@ -53,6 +55,8 @@ public:
     static VectorImage* Character()     { return Get("37661651-475f-4abb-9aab-8d05e8da1fc0"); }
     static VectorImage* Animation()     { return Get("3f0e57a2-1c4b-4d90-9d0e-7a1b2c3d4e5f"); }
     static VectorImage* InputMapping()  { return Get("3c00f557-6c65-4ca3-b35d-6bfa9c50fd2f"); }
+    static VectorImage* Audio()         { return Get("87b011c9-7a52-4b36-880b-f817fdaaa9ca"); }
+    static VectorImage* AudioListener() { return Get("a012916e-b923-43e3-bb3d-e85d3d191de2"); }
     static VectorImage* Record()        { return Get("5b2c8e14-9d33-4f61-8a72-6c0d51e9b3a4"); }
     static VectorImage* Eye()           { return Get("b1c2d3e4-0004-4a00-9000-000000000004"); }
     static VectorImage* Save()          { return Get("e173f6e2-fc21-4933-b11f-0e1bff34ece1"); }

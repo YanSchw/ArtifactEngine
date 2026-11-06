@@ -1,10 +1,12 @@
 #include "AssetImportMenus.h"
+#include "Assets/AudioClip.h"
 #include "Assets/CollectionAsset.h"
 #include "Assets/Font.h"
 #include "Assets/Mesh.h"
 #include "Assets/Texture2D.h"
 #include "Assets/VectorImage.h"
 #include "Object/Pointer.h"
+#include "Serialization/Assets/AudioClipImporter.h"
 #include "Serialization/Assets/CollectionImporter.h"
 #include "Serialization/Assets/FontImporter.h"
 #include "Serialization/Assets/Texture2DImporter.h"
@@ -99,4 +101,12 @@ Class FontImportMenu::GetAssetClass() const {
 
 bool FontImportMenu::CanImport(const String& InFilePath) const {
     return AssetImporter::Find<FontImporter>(InFilePath) != nullptr;
+}
+
+Class AudioClipImportMenu::GetAssetClass() const {
+    return AudioClip::StaticClass();
+}
+
+bool AudioClipImportMenu::CanImport(const String& InFilePath) const {
+    return AssetImporter::Find<AudioClipImporter>(InFilePath) != nullptr;
 }

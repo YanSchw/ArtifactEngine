@@ -206,3 +206,27 @@ class WindowingLibraries(Dependency):
 
     def install(self):
         install_packages(WINDOWING_PACKAGES, "the X11/Wayland development libraries")
+
+
+AUDIO_PACKAGES = {
+    "apt": ["libasound2-dev"],
+    "dnf": ["alsa-lib-devel"],
+    "pacman": ["alsa-lib"],
+    "zypper": ["alsa-devel"],
+}
+
+
+class AudioLibraries(Dependency):
+    key = "audio"
+    name = "ALSA dev libraries"
+    aliases = ("alsa", "asound", "libasound")
+
+    def check(self) -> CheckResult:
+        if not shutil.which("pkg-config") and not shutil.which("pkgconf"):
+            return CheckResult.missing("pkg-config not found")
+        if not command_succeeds(["pkg-config", "--exists", "alsa"]):
+            return CheckResult.missing("missing: alsa")
+        return CheckResult.found("ALSA development package present")
+
+    def install(self):
+        install_packages(AUDIO_PACKAGES, "the ALSA development library")

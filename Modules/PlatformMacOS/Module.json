@@ -10,6 +10,8 @@
         "-framework Security",
         "-framework CoreFoundation",
         "-framework AppKit",
+        "-framework AudioToolbox",
+        "-framework CoreAudio",
         "-lobjc"
     ],
     "TargetPlatforms": [

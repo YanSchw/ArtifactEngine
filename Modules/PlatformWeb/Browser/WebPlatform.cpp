@@ -14,6 +14,10 @@ Class Platform::GetDefaultRenderingAPIClass() {
     return Class("WebGLAPI");
 }
 
+Class Platform::GetDefaultAudioDeviceClass() {
+    return Class("WebAudioDevice");
+}
+
 Class Platform::GetMainSurfaceClass() {
     return Class("BrowserSurface");
 }
