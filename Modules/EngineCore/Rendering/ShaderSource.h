@@ -40,6 +40,12 @@ enum class WindingOrder : uint32_t {
     Clockwise
 };
 
+ARTIFACT_ENUM();
+enum class RenderPath : uint32_t {
+    Forward,
+    Deferred
+};
+
 struct ShaderRenderState {
     ARTIFACT_STRUCT();
 
@@ -47,6 +53,7 @@ struct ShaderRenderState {
     CullMode Cull = CullMode::Back;
     DepthMode Depth = DepthMode::TestWrite;
     WindingOrder FrontFace = WindingOrder::CounterClockwise;
+    RenderPath Path = RenderPath::Forward;
 };
 
 struct ShaderSourceLocation {

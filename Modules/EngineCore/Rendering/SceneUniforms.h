@@ -1,13 +1,14 @@
 #pragma once
 #include "Common/Types.h"
 
-/** Mirrors the std140 SceneBlock that ShaderTemplate emits at every #gen_buffers site.
+/** Mirrors the std140 SceneBlock of /Shaders/Common/Scene.glsl.
  *  Whoever renders a scene fills one of these and uploads it to binding 0. */
 struct SceneUniformData {
     static constexpr int32_t ShadowCascadeCount = 4;
     static constexpr int32_t MaxPointLights = 16;
 
     Mat4 ViewProjection = Mat4(1.0f);
+    Mat4 InverseViewProjection = Mat4(1.0f);
     Mat4 ShadowMatrices[ShadowCascadeCount] = { Mat4(1.0f), Mat4(1.0f), Mat4(1.0f), Mat4(1.0f) };
 
     /** xyz: the world position the scene is viewed from. */

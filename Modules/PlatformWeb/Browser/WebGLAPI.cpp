@@ -101,6 +101,8 @@ void WebGLAPI::Execute() {
             case RenderCommandType::Dispatch:
                 AE_ERROR("WebGL 2 has no compute shaders. Unsupported command: Dispatch");
                 break;
+            case RenderCommandType::WriteTimestamp:
+                break;
         }
     }
 

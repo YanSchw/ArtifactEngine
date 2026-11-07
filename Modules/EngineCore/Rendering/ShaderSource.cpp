@@ -333,8 +333,8 @@ bool ShaderSource::PreprocessSource(const String& InPath, const String& InSource
                 continue;
             }
 
-            if (directive.Name == "blend" || directive.Name == "cull" ||
-                directive.Name == "depth" || directive.Name == "frontface") {
+            if (directive.Name == "blend" || directive.Name == "cull" || directive.Name == "depth" ||
+                directive.Name == "frontface" || directive.Name == "renderpath") {
                 if (hasStage) {
                     OutError = std::format("{0}:{1}: #{2} must appear before the first #type",
                                            line.File, line.Line, directive.Name);
@@ -359,9 +359,12 @@ bool ShaderSource::PreprocessSource(const String& InPath, const String& InSource
                 } else if (directive.Name == "depth") {
                     enumName = "DepthMode";
                     parsed = ParseEnumArgument(enumName, argument, OutSource.m_RenderState.Depth);
-                } else {
+                } else if (directive.Name == "frontface") {
                     enumName = "WindingOrder";
                     parsed = ParseEnumArgument(enumName, argument, OutSource.m_RenderState.FrontFace);
+                } else {
+                    enumName = "RenderPath";
+                    parsed = ParseEnumArgument(enumName, argument, OutSource.m_RenderState.Path);
                 }
 
                 if (!parsed) {

@@ -8,15 +8,27 @@
 #include <array>
 #include "RenderingAPI.gen.h"
 
+ARTIFACT_ENUM();
+enum class RenderCapability : uint32_t {
+    None           = 0,
+    Compute        = 1 << 0,
+    StorageBuffers = 1 << 1,
+    StorageImages  = 1 << 2,
+    Timestamps     = 1 << 3
+};
+
 /** What the active backend can do. */
 struct RenderingCapabilities {
     bool ComputeShaders = false;
     bool StorageBuffers = false;
     bool StorageImages = false;
+    bool Timestamps = false;
 
     std::array<uint32_t, 3> MaxComputeWorkGroupCount = { 0, 0, 0 };
     std::array<uint32_t, 3> MaxComputeWorkGroupSize = { 0, 0, 0 };
     uint32_t MaxComputeWorkGroupInvocations = 0;
+
+    bool Supports(RenderCapability InCapabilities) const;
 };
 
 class RenderingAPI : public Object {
@@ -26,10 +38,19 @@ public:
     RenderingAPI();
     static RenderingAPI* GetInstance() { return s_Instance; }
 
+    static constexpr uint32_t InvalidTimestampQuery = ~0u;
+
     void DrawIndexed(uint32_t InIndexCount, uint32_t InFirstIndex, int32_t InVertexOffset);
     void SetShaderData(class ShaderData* InShaderData);
+    void WriteTimestamp(uint32_t InQuery);
 
     const RenderingCapabilities& GetCapabilities() const { return m_Capabilities; }
+
+    /** Reserves the queries InQuery and InQuery + 1 for timing one span of GPU work. */
+    virtual uint32_t AllocateTimestampQueryPair() { return InvalidTimestampQuery; }
+    virtual void ReleaseTimestampQueryPair(uint32_t InQuery) { (void)InQuery; }
+    /** The span between the pair's timestamps in the latest frame the GPU has finished, 0 before one has. */
+    virtual double GetTimestampQueryMilliseconds(uint32_t InQuery) const { (void)InQuery; return 0.0; }
 
     virtual void Initialize() = 0;
     virtual void Draw() = 0;

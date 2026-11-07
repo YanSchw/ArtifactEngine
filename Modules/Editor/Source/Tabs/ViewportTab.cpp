@@ -23,8 +23,6 @@
 #include "InputSystem/KeyboardDevice.h"
 #include "ThemedWindow.h"
 #include "Window.h"
-#include "Core/EngineConfig.h"
-#include "GameFramework/DebugDraw.h"
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/RenderTargetTexture.h"
 #include "GameFramework/UIVStack.h"
@@ -33,6 +31,8 @@
 #include "GameFramework/UIImage.h"
 #include "GameFramework/UIBuilder.h"
 #include "Core/Log.h"
+
+#include <format>
 
 static constexpr float s_ToolBarHeight = 30.0f;
 static constexpr float s_DefaultDropDistance = 8.0f;
@@ -60,8 +60,7 @@ CameraNode* ViewportTab::GetViewCamera() const {
 
 ViewportTab::ViewportTab() {
     m_Camera = Object::Create<EditorCamera>();
-    m_Pipeline = Object::Create(EngineConfig::RenderPipelineClass())->As<RenderPipeline>();
-    AE_ASSERT(m_Pipeline, "Failed to create RenderPipeline instance!");
+    m_Pipeline = RenderPipeline::Create();
     m_SceneTexture = Object::Create<RenderTargetTexture>();
     m_GizmoLayer = Object::Create<GizmoLayer>();
     m_GizmoRenderer = Object::Create<GizmoRenderer>();
@@ -88,6 +87,8 @@ ViewportTab::ViewportTab() {
     EditorDragDrop::AddDropZone(*m_ViewportArea,
         [this](Asset* InAsset) { return AcceptsDroppedAsset(InAsset); },
         [this](Asset* InAsset, const Vec2& InCursorPos) { SpawnDroppedAsset(InAsset, InCursorPos); });
+
+    BuildRenderStats(*m_ViewportArea);
 }
 
 ViewportTab::~ViewportTab() {
@@ -145,11 +146,84 @@ void ViewportTab::BuildDesignTools(UINode& InParent) {
     };
 }
 
+static String FormatTiming(const RenderTiming& InTiming) {
+    return std::format("{:.2f} / {:.2f} ms", InTiming.CpuMilliseconds, InTiming.GpuMilliseconds);
+}
+
+void ViewportTab::BuildRenderStats(UINode& InParent) {
+    constexpr float rowHeight = 18.0f;
+    constexpr float toggleWidth = 30.0f;
+    constexpr float timingWidth = 110.0f;
+
+    RenderPipeline* pipeline = m_Pipeline.Get();
+    int32_t rowCount = 1;
+    for (RenderStage* stage = pipeline->GetFirstStage(); stage; stage = stage->GetNext()) {
+        rowCount += 1 + stage->GetPasses().Size();
+    }
+
+    UIQuad* panel = InParent.Add<UIQuad>();
+    panel->Anchor = panel->Pivot = Vec2(0.0f);
+    panel->Position = Vec2(8.0f);
+    panel->Size = { 340.0_px, UIValue(rowCount * rowHeight + 12.0f) };
+    panel->Padding = UIPadding(8.0f, 6.0f);
+    panel->Color = HexColor(0x161616, 0.85f);
+    // BindTree skips disabled nodes, so the always-enabled parent has to do the toggling.
+    InParent.Bind = [this, panel] { panel->SetEnabled(m_ShowRenderStats && !m_DesignMode); };
+
+    UIVStack* rows = panel->Add<UIVStack>();
+    rows->Fill();
+
+    auto addRow = [&](const String& InName, float InIndent, std::function<const RenderTiming&()> InTiming, RenderPass* InPass) {
+        UIHStack* row = rows->Add<UIHStack>();
+        row->Size = { 1.0_rel, UIValue(rowHeight) };
+        row->Padding = UIPadding(UIValue(InIndent), 0.0f, 0.0f, 0.0f);
+        row->Gap = 4.0f;
+
+        UIButton* toggle = InPass ? row->Add<UIButton>() : nullptr;
+        UILabel* name = row->Add<UILabel>();
+        UILabel* timing = row->Add<UILabel>();
+
+        name->Text = InName;
+        name->Size = { 1.0_rel - UIValue(timingWidth + (toggle ? toggleWidth + 8.0f : 4.0f)), 1.0_rel };
+        timing->Size = { UIValue(timingWidth), 1.0_rel };
+        timing->HAlign = UIHAlign::Right;
+        timing->Bind = [timing, InTiming] { timing->Text = FormatTiming(InTiming()); };
+        for (UILabel* label : { name, timing }) {
+            label->FontSize = EditorStyle::FontSize;
+            label->VAlign = UIVAlign::Middle;
+            label->Color = EditorStyle::Text;
+        }
+
+        if (!toggle) {
+            return;
+        }
+        toggle->Size = { UIValue(toggleWidth), 1.0_rel };
+        toggle->SetCaption("On");
+        EditorStyle::ApplyButtonStyle(*toggle, EditorStyle::FontSize - 2.0f);
+        toggle->Clicked = [InPass] { InPass->SetEnabled(!InPass->IsEnabled()); };
+        UILabel* caption = toggle->GetChildByClass(UILabel::StaticClass())->As<UILabel>();
+        toggle->Bind = [InPass, toggle, caption, name] {
+            toggle->NormalColor = InPass->IsEnabled() ? EditorStyle::Accent : EditorStyle::Button;
+            caption->Text = !InPass->IsSupported() ? "N/A" : InPass->IsEnabled() ? "On" : "Off";
+            name->Color = InPass->IsEnabled() ? EditorStyle::Text : EditorStyle::TextDim;
+        };
+    };
+
+    addRow("Frame  (CPU / GPU)", 0.0f, [pipeline]() -> const RenderTiming& { return pipeline->GetTiming(); }, nullptr);
+    for (RenderStage* stage = pipeline->GetFirstStage(); stage; stage = stage->GetNext()) {
+        addRow(stage->GetDisplayName(), 8.0f, [stage]() -> const RenderTiming& { return stage->GetTiming(); }, nullptr);
+        for (const SharedObjectPtr<RenderPass>& pass : stage->GetPasses()) {
+            RenderPass* raw = pass.Get();
+            addRow(raw->GetName(), 16.0f, [raw]() -> const RenderTiming& { return raw->GetTiming(); }, raw);
+        }
+    }
+}
+
 void ViewportTab::BuildToolBar(UINode& InToolBar) {
     UIHStack* sceneTools = InToolBar.Add<UIHStack>();
     sceneTools->Anchor = sceneTools->Pivot = Vec2(0.0f);
     sceneTools->Position = Vec2(0.0f);
-    sceneTools->Size = { 1.0_rel - 220.0_px, 1.0_rel };
+    sceneTools->Size = { 1.0_rel - 270.0_px, 1.0_rel };
     sceneTools->Padding = UIPadding(4.0f, 3.0f);
     sceneTools->Gap = 2.0f;
     BuildSceneTools(*sceneTools);
@@ -157,7 +231,7 @@ void ViewportTab::BuildToolBar(UINode& InToolBar) {
     UIHStack* designTools = InToolBar.Add<UIHStack>();
     designTools->Anchor = designTools->Pivot = Vec2(0.0f);
     designTools->Position = Vec2(0.0f);
-    designTools->Size = { 1.0_rel - 220.0_px, 1.0_rel };
+    designTools->Size = { 1.0_rel - 270.0_px, 1.0_rel };
     designTools->Padding = UIPadding(4.0f, 3.0f);
     designTools->Gap = 2.0f;
     BuildDesignTools(*designTools);
@@ -170,7 +244,7 @@ void ViewportTab::BuildToolBar(UINode& InToolBar) {
     UIHStack* viewGroup = InToolBar.Add<UIHStack>();
     viewGroup->Anchor = viewGroup->Pivot = Vec2(1.0f, 0.0f);
     viewGroup->Position = Vec2(0.0f);
-    viewGroup->Size = { 220.0_px, 1.0_rel };
+    viewGroup->Size = { 270.0_px, 1.0_rel };
     viewGroup->Padding = UIPadding(4.0f, 3.0f);
     viewGroup->Gap = 2.0f;
 
@@ -193,6 +267,14 @@ void ViewportTab::BuildToolBar(UINode& InToolBar) {
     UIButton& lit = UI::Button(*viewGroup, "Lit", [] { AE_INFO("ViewportTab: Lit"); });
     lit.Size = { 54.0_px, 1.0_rel };
     EditorStyle::ApplyButtonStyle(lit);
+
+    UIButton& stats = UI::Button(*viewGroup, "Stats", [this] { m_ShowRenderStats = !m_ShowRenderStats; });
+    stats.Size = { 48.0_px, 1.0_rel };
+    EditorStyle::ApplyButtonStyle(stats);
+    UIButton* statsPtr = &stats;
+    stats.Bind = [this, statsPtr] {
+        statsPtr->NormalColor = m_ShowRenderStats ? EditorStyle::Accent : EditorStyle::Button;
+    };
 }
 
 UICanvas* ViewportTab::FindWorldCanvas() const {
@@ -276,7 +358,6 @@ void ViewportTab::RenderScene(const UIFrameContext& InContext, const UIRectF& In
     if (!IsPossessedByPlay()) {
         m_GizmoLayer->Collect(GetEditedWorld(), m_Camera.Get(), GetMajorTab(), gizmos);
     }
-    DebugDraw::Render(params.m_World, m_Pipeline->GetFrameBuffer().Get(), params.CameraOverride);
 
     if (IsPossessedByPlay()) {
         m_TransformGizmo->EndDrag();

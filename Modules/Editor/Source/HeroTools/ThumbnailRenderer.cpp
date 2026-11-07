@@ -4,7 +4,6 @@
 #include "Assets/Mesh.h"
 #include "Assets/Material.h"
 #include "Assets/Texture2D.h"
-#include "Core/EngineConfig.h"
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/RenderTargetTexture.h"
 #include "GameFramework/World.h"
@@ -96,7 +95,7 @@ void ThumbnailRenderer::RenderEntry(const UUID& InId, Entry& InEntry) {
     }
 
     if (!InEntry.Pipeline.Get()) {
-        InEntry.Pipeline = Object::Create(EngineConfig::RenderPipelineClass())->As<RenderPipeline>();
+        InEntry.Pipeline = RenderPipeline::Create();
 
         World* scene = new World();
         StaticMeshNode* meshNode = scene->Spawn<StaticMeshNode>();

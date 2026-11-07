@@ -3,6 +3,7 @@
 
 #include <vulkan/vulkan.h>
 #include <functional>
+#include <vector>
 #include "VulkanAPI.gen.h"
 
 class VulkanAPI : public RenderingAPI {
@@ -24,6 +25,8 @@ public:
     static void CreateDescriptorPool();
     static void CreateCommandBuffers();
     void QueryCapabilities();
+    void CreateTimestampQueries();
+    void ResolveTimestampQueries();
 
     void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer);
 
@@ -62,5 +65,21 @@ public:
     virtual SharedObjectPtr<class FrameBuffer> CreateFrameBuffer(const struct FrameBufferDesc& InFrameBufferDesc) override;
     virtual SampleCount GetMaxSupportedSampleCount() const override;
 
+    virtual uint32_t AllocateTimestampQueryPair() override;
+    virtual void ReleaseTimestampQueryPair(uint32_t InQuery) override;
+    virtual double GetTimestampQueryMilliseconds(uint32_t InQuery) const override;
+
     RenderCommandQueue m_RenderQueue;
+
+private:
+    static constexpr uint32_t MaxTimestampQueries = 4096;
+
+    VkQueryPool m_TimestampPool = VK_NULL_HANDLE;
+    double m_TimestampNanoseconds = 0.0;
+    uint64_t m_TimestampMask = 0;
+    bool m_TimestampsSubmitted = false;
+    std::vector<bool> m_TimestampPairsInUse;
+    std::vector<bool> m_TimestampsWritten;
+    std::vector<double> m_TimestampPairMilliseconds;
+    std::vector<uint64_t> m_TimestampResults;
 };

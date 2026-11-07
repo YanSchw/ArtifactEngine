@@ -7,20 +7,11 @@
 #include "Core/EngineConfig.h"
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/RenderingAPI.h"
-#include "Rendering/VertexBuffer.h"
-#include "Rendering/Shader.h"
 #include "Rendering/ShaderLibrary.h"
-#include "Rendering/Texture.h"
-#include "Rendering/Sampler.h"
-#include "Rendering/Buffer.h"
-#include "Rendering/Pipeline.h"
-#include "Rendering/FrameBuffer.h"
-#include "Rendering/Image.h"
 #include "Assets/AssetManager.h"
 #include "Audio/AudioEngine.h"
 #include "Assets/Scene.h"
 #include "Common/UUID.h"
-#include "GameFramework/DebugDraw.h"
 #include "GameFramework/GameInstance.h"
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
@@ -28,8 +19,6 @@
 #include "GameFramework/StaticMeshNode.h"
 
 static SharedObjectPtr<Surface> s_Surface;
-static SharedObjectPtr<Pipeline> s_FullScreenPipeline;
-static SharedObjectPtr<VertexBuffer> s_FullScreenQuadVertexBuffer;
 
 static bool IsSurfaceDrawable() {
     return s_Surface && !s_Surface->IsMinimized() && s_Surface->GetWidth() > 0 && s_Surface->GetHeight() > 0;
@@ -48,24 +37,7 @@ void GameEngine::Initialize() {
     (new AssetManager())->Initialize();
     (new AudioEngine())->Initialize();
 
-    m_RenderPipeline = Object::Create(EngineConfig::RenderPipelineClass())->As<RenderPipeline>();
-    AE_ASSERT(m_RenderPipeline, "Failed to create RenderPipeline instance!");
-
-    Array<Vertex> fullScreenQuadVertices = {
-        { { -1.0f, -1.0f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
-        { { -1.0f,  1.0f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
-        { {  1.0f,  1.0f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
-        { {  1.0f, -1.0f,  0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }
-    };
-    s_FullScreenQuadVertexBuffer = VertexBuffer::Create(fullScreenQuadVertices, { 0, 1, 2, 0, 2, 3 });
-
-    auto sampler = Sampler::Create({ FilterMode::Nearest, FilterMode::Nearest, AddressMode::Repeat, AddressMode::Repeat, AddressMode::Repeat });
-
-    PipelineDesc fullscreenDesc;
-    fullscreenDesc.Target = s_Surface;
-    fullscreenDesc.Shader = ShaderLibrary::CreateShader("/Shaders/Passthrough.glsl");
-    fullscreenDesc.ImageBindings.Add({ 16, m_RenderPipeline->GetFinalImageView(), sampler });
-    s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
+    m_RenderPipeline = RenderPipeline::Create();
 
     // create GameInstance and World
     m_GameInstance = new GameInstance();
@@ -92,25 +64,12 @@ void GameEngine::RenderFrame(double InDeltaTime) {
         return;
     }
 
-    World* world = GetGameInstance()->GetCurrentWorld();
-    m_RenderPipeline->Render(InDeltaTime, RenderParams {
-        s_Surface->GetWidth(),
-        s_Surface->GetHeight(),
-        world
-    });
-
-    DebugDraw::Render(world, m_RenderPipeline->GetFrameBuffer().Get(),
-                      world ? world->GetMainCamera() : nullptr);
-
-    auto[binding, imageView, sampler] = s_FullScreenPipeline->GetDesc().ImageBindings[0];
-    if (imageView != m_RenderPipeline->GetFinalImageView()) {
-        PipelineDesc fullscreenDesc = s_FullScreenPipeline->GetDesc();
-        fullscreenDesc.ImageBindings[0] = { 16, m_RenderPipeline->GetFinalImageView(), sampler };
-        s_FullScreenPipeline = Pipeline::Create(fullscreenDesc);
-    }
-
-    s_FullScreenPipeline->Bind();
-    s_FullScreenQuadVertexBuffer->Draw();
+    RenderParams params;
+    params.Width = s_Surface->GetWidth();
+    params.Height = s_Surface->GetHeight();
+    params.m_World = GetGameInstance()->GetCurrentWorld();
+    params.PresentTarget = s_Surface;
+    m_RenderPipeline->Render(InDeltaTime, params);
 
     RenderingAPI::GetInstance()->Draw();
 }

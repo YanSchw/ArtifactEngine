@@ -1,6 +1,6 @@
 #pragma once
 
-// Expects the SceneBlock and u_ShadowMap declared by #gen_buffers(frag).
+// Expects the SceneBlock of Scene.glsl and u_ShadowMap.
 
 float SampleCascade(int InCascade, vec2 InUV, float InDepth) {
     float tapStep = u_ShadowParams.w;
@@ -52,12 +52,13 @@ vec3 PointLighting(vec3 InWorldPosition, vec3 InNormal) {
     return result;
 }
 
+vec3 SunLighting(vec3 InWorldPosition, vec3 InNormal) {
+    float lambert = max(dot(InNormal, -u_SunDirection.xyz), 0.0);
+    return u_SunColor.rgb * lambert * SunShadow(InWorldPosition, InNormal);
+}
+
 vec3 ShadeSurface(vec3 InBaseColor, vec3 InNormal, vec3 InWorldPosition) {
     vec3 normal = normalize(InNormal);
-
-    float sunLambert = max(dot(normal, -u_SunDirection.xyz), 0.0);
-    vec3 light = u_SunColor.rgb * sunLambert * SunShadow(InWorldPosition, normal);
-    light += PointLighting(InWorldPosition, normal);
-
+    vec3 light = SunLighting(InWorldPosition, normal) + PointLighting(InWorldPosition, normal);
     return InBaseColor * (light + u_AmbientColor.rgb);
 }

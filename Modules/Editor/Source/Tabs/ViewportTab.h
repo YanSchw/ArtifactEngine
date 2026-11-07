@@ -41,6 +41,7 @@ private:
     CameraNode* GetViewCamera() const;
 
     void BuildToolBar(UINode& InToolBar);
+    void BuildRenderStats(UINode& InParent);
     void BuildSceneTools(UINode& InParent);
     void BuildDesignTools(UINode& InParent);
     void UpdateToolShortcuts();
@@ -78,5 +79,6 @@ private:
     Mat4 m_DesignProjection = Mat4(1.0f);
     Vec2 m_DesignViewport = Vec2(1.0f);
     bool m_DesignMode = false;
+    bool m_ShowRenderStats = false;
     bool m_PreviewInput = false;
 };

@@ -499,6 +499,7 @@ void VulkanAPI::Initialize() {
     VulkanAPI::FindQueueFamilies();
     VulkanAPI::CreateLogicalDevice();
     QueryCapabilities();
+    CreateTimestampQueries();
     VulkanAPI::CreateCommandPool();
     VulkanAPI::CreateDescriptorPool();
     CreateSwapchainResources(*swapchains[0]);
@@ -530,6 +531,11 @@ void VulkanAPI::CleanUp(bool fullClean) {
 
         // Buffers must be destroyed after no command buffers are referring to them anymore
         VulkanVertexBuffer::DestroyAll();
+
+        if (m_TimestampPool != VK_NULL_HANDLE) {
+            vkDestroyQueryPool(device, m_TimestampPool, nullptr);
+            m_TimestampPool = VK_NULL_HANDLE;
+        }
 
         for (VulkanSwapchainData* data : swapchains) {
             DestroySwapchainData(*data);
@@ -1003,6 +1009,7 @@ void VulkanAPI::Draw() {
     vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
 
     VulkanPipelineLayout::FlushRetired();
+    ResolveTimestampQueries();
 
     for (VulkanSwapchainData* swapchain : targets) {
         swapchain->Acquired = false;
@@ -1035,6 +1042,11 @@ void VulkanAPI::Draw() {
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     vkBeginCommandBuffer(graphicsCommandBuffer, &beginInfo);
+
+    if (m_TimestampPool != VK_NULL_HANDLE) {
+        vkCmdResetQueryPool(graphicsCommandBuffer, m_TimestampPool, 0, MaxTimestampQueries);
+        m_TimestampsWritten.assign(MaxTimestampQueries, false);
+    }
 
     VkImageSubresourceRange subResourceRange = {};
     subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1112,6 +1124,7 @@ void VulkanAPI::Draw() {
         AE_ERROR("failed to submit draw command buffer");
         exit(1);
     }
+    m_TimestampsSubmitted = m_TimestampPool != VK_NULL_HANDLE;
 
     if (targets.empty()) {
         return;
@@ -1332,6 +1345,17 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                 BarrierAfterDispatch(InCmdBuffer);
                 break;
             }
+
+            case RenderCommandType::WriteTimestamp: {
+                const uint32_t query = std::get<CmdWriteTimestamp>(cmd.Data).Query;
+                // A query can only be written once between resets.
+                // Repeats keep the first span.
+                if (m_TimestampPool == VK_NULL_HANDLE || query >= MaxTimestampQueries || m_TimestampsWritten[query])
+                    continue;
+                vkCmdWriteTimestamp(InCmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_TimestampPool, query);
+                m_TimestampsWritten[query] = true;
+                break;
+            }
         }
     }
 
@@ -1405,6 +1429,78 @@ void VulkanAPI::QueryCapabilities() {
         m_Capabilities.MaxComputeWorkGroupSize[i] = limits.maxComputeWorkGroupSize[i];
     }
     m_Capabilities.MaxComputeWorkGroupInvocations = limits.maxComputeWorkGroupInvocations;
+}
+
+void VulkanAPI::CreateTimestampQueries() {
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+    const uint32_t validBits = graphicsQueueFamily < queueFamilyCount ? queueFamilies[graphicsQueueFamily].timestampValidBits : 0;
+    if (validBits == 0) {
+        return;
+    }
+
+    VkQueryPoolCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    createInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+    createInfo.queryCount = MaxTimestampQueries;
+    if (vkCreateQueryPool(device, &createInfo, nullptr, &m_TimestampPool) != VK_SUCCESS) {
+        AE_WARN("failed to create the timestamp query pool, GPU timings are unavailable");
+        m_TimestampPool = VK_NULL_HANDLE;
+        return;
+    }
+
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+    m_TimestampNanoseconds = properties.limits.timestampPeriod;
+    m_TimestampMask = validBits >= 64 ? ~0ull : (1ull << validBits) - 1;
+    m_TimestampPairsInUse.assign(MaxTimestampQueries / 2, false);
+    m_TimestampsWritten.assign(MaxTimestampQueries, false);
+    m_TimestampPairMilliseconds.assign(MaxTimestampQueries / 2, 0.0);
+    m_Capabilities.Timestamps = true;
+}
+
+void VulkanAPI::ResolveTimestampQueries() {
+    if (!m_TimestampsSubmitted) {
+        return;
+    }
+    m_TimestampsSubmitted = false;
+
+    // Each query yields its value followed by its availability.
+    m_TimestampResults.assign(MaxTimestampQueries * 2, 0);
+    vkGetQueryPoolResults(device, m_TimestampPool, 0, MaxTimestampQueries, m_TimestampResults.size() * sizeof(uint64_t),
+                          m_TimestampResults.data(), 2 * sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+
+    for (uint32_t pair = 0; pair < MaxTimestampQueries / 2; pair++) {
+        const uint64_t* begin = &m_TimestampResults[pair * 4];
+        const uint64_t* end = &m_TimestampResults[pair * 4 + 2];
+        if (m_TimestampPairsInUse[pair] && begin[1] != 0 && end[1] != 0) {
+            const uint64_t ticks = (end[0] - begin[0]) & m_TimestampMask;
+            m_TimestampPairMilliseconds[pair] = (double)ticks * m_TimestampNanoseconds / 1.0e6;
+        }
+    }
+}
+
+uint32_t VulkanAPI::AllocateTimestampQueryPair() {
+    for (uint32_t pair = 0; pair < (uint32_t)m_TimestampPairsInUse.size(); pair++) {
+        if (!m_TimestampPairsInUse[pair]) {
+            m_TimestampPairsInUse[pair] = true;
+            m_TimestampPairMilliseconds[pair] = 0.0;
+            return pair * 2;
+        }
+    }
+    return InvalidTimestampQuery;
+}
+
+void VulkanAPI::ReleaseTimestampQueryPair(uint32_t InQuery) {
+    if (InQuery / 2 < m_TimestampPairsInUse.size()) {
+        m_TimestampPairsInUse[InQuery / 2] = false;
+    }
+}
+
+double VulkanAPI::GetTimestampQueryMilliseconds(uint32_t InQuery) const {
+    return InQuery / 2 < m_TimestampPairMilliseconds.size() ? m_TimestampPairMilliseconds[InQuery / 2] : 0.0;
 }
 
 RenderCommandQueue& VulkanAPI::GetRenderQueue() {

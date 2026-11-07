@@ -48,15 +48,20 @@ public:
     String Expand(const Map<String, ShaderPropertyCode>& InCode, const Map<String, String>& InStates,
                   const String& InDeclarations) const;
 
-    static String GetStageDeclarations(ShaderStage InStage);
+    static String GetStageDeclarations(ShaderStage InStage, RenderPath InPath = RenderPath::Forward);
     static String GetStageAliases(ShaderStage InStage);
 
 private:
+    String ResolveState(const String& InState, const Map<String, String>& InStates) const;
+    /** Deferred only when the template offers it and the material is opaque. */
+    RenderPath ResolveRenderPath(const Map<String, String>& InStates) const;
+
     String m_Path;
     String m_DisplayName;
     Array<String> m_Lines;
     Array<ShaderGraphProperty> m_Properties;
     Array<ShaderPropertySite> m_Sites;
     Map<String, Array<String>> m_StateOptions;
+    Map<String, String> m_FixedStates;
     Array<String> m_StateOrder;
 };

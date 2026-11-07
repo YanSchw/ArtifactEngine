@@ -10,7 +10,8 @@ enum class RenderCommandType {
     DrawIndexed,
     SetShaderData,
     BindComputePipeline,
-    Dispatch
+    Dispatch,
+    WriteTimestamp
 };
 
 struct CmdBeginRenderPass {
@@ -45,6 +46,10 @@ struct CmdDispatch {
     uint32_t GroupCountZ;
 };
 
+struct CmdWriteTimestamp {
+    uint32_t Query;
+};
+
 using RenderCommandData = std::variant<
     CmdBeginRenderPass,
     CmdBindPipeline,
@@ -52,7 +57,8 @@ using RenderCommandData = std::variant<
     CmdDrawIndexed,
     CmdSetShaderData,
     CmdBindComputePipeline,
-    CmdDispatch
+    CmdDispatch,
+    CmdWriteTimestamp
 >;
 
 struct RenderCommand {

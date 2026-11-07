@@ -1,6 +1,6 @@
 #pragma once
 
-// Expects the SceneBlock and u_ShadowMap declared by #gen_buffers(frag).
+// Expects the SceneBlock of Scene.glsl and u_ShadowMap.
 
 #include "/Shaders/Common/Lighting.glsl"
 

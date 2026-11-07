@@ -1,39 +1,140 @@
-#include "CoreMinimal.h"
-#include "Platform/Platform.h"
-
 #include "ArtifactRenderPipeline.h"
-#include "Assets/Material.h"
-#include "Assets/Texture2D.h"
-#include "Assets/Mesh.h"
+#include "Passes/DebugDrawPass.h"
+#include "Passes/DeferredLightPass.h"
+#include "Passes/StaticMeshPass.h"
 #include "Rendering/RenderingAPI.h"
-#include "Rendering/VertexBuffer.h"
-#include "Rendering/Shader.h"
-#include "Rendering/Texture.h"
 #include "Rendering/Sampler.h"
 #include "Rendering/Buffer.h"
-#include "Rendering/Pipeline.h"
 #include "Rendering/FrameBuffer.h"
+#include "Rendering/GBuffer.h"
 #include "Rendering/Image.h"
 #include "Rendering/SceneUniforms.h"
-#include "Rendering/ShaderData.h"
-#include "Rendering/ShaderTemplate.h"
+#include "Rendering/Shader.h"
+#include "Rendering/ShaderLibrary.h"
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
 #include "GameFramework/PointLightNode.h"
-#include "GameFramework/StaticMeshNode.h"
 
-CameraNode* ArtifactRenderPipeline::ResolveCamera(const RenderParams& InParams) const {
-    if (InParams.CameraOverride) {
-        return InParams.CameraOverride;
-    }
-    return InParams.m_World ? InParams.m_World->GetMainCamera() : nullptr;
+static const Vec4 s_BackgroundColor = Vec4(0.08f, 0.09f, 0.11f, 1.0f);
+
+static SharedObjectPtr<ImageView> CreateAttachment(uint32_t InWidth, uint32_t InHeight, ImageFormat InFormat, ImageUsage InUsage) {
+    ImageDesc imageDesc;
+    imageDesc.Width = InWidth;
+    imageDesc.Height = InHeight;
+    imageDesc.Format = InFormat;
+    imageDesc.Usage = InUsage;
+
+    ImageViewDesc viewDesc;
+    viewDesc.ImagePtr = Image::Create(imageDesc);
+    viewDesc.Format = InFormat;
+    viewDesc.Aspect = (InUsage & ImageUsage::DepthStencil) != ImageUsage::None ? ImageAspect::Depth : ImageAspect::Color;
+    return ImageView::Create(viewDesc);
 }
 
-DirectionalLightNode* ArtifactRenderPipeline::FindSunLight(const RenderParams& InParams) const {
-    if (!InParams.m_World) {
+void ArtifactRenderPipeline::Initialize() {
+    m_GeometryStage = SetFirstStage(RenderStageName::DeferredGeometry);
+    m_LightingStage = m_GeometryStage->Then(RenderStageName::DeferredLighting);
+    m_ForwardStage = m_LightingStage->Then(RenderStageName::Forward);
+
+    m_GeometryStage->AddPass<StaticMeshDeferredPass>();
+    m_LightingStage->AddPass<DeferredDirectionalLightPass>();
+    m_LightingStage->AddPass<DeferredPointLightPass>();
+    m_ForwardStage->AddPass<StaticMeshForwardPass>();
+    m_ForwardStage->AddPass<DebugDrawPass>();
+
+    m_SceneUniforms = UniformBuffer::Create(0, sizeof(SceneUniformData));
+    m_ResolveShader = ShaderLibrary::CreateShader("/Shaders/Deferred/Resolve.glsl");
+    m_GBufferSampler = Sampler::Create({ FilterMode::Nearest, FilterMode::Nearest,
+                                         AddressMode::Clamp, AddressMode::Clamp, AddressMode::Clamp });
+    m_ShadowPlaceholder.Create();
+    CreateTargets(100, 100);
+}
+
+void ArtifactRenderPipeline::CreateTargets(uint32_t InWidth, uint32_t InHeight) {
+    if (m_GeometryStage->GetTarget()) {
+        RenderingAPI::GetInstance()->WaitIdle();
+    }
+    m_Width = InWidth;
+    m_Height = InHeight;
+
+    FrameBufferDesc gbufferDesc;
+    gbufferDesc.Width = InWidth;
+    gbufferDesc.Height = InHeight;
+    for (int32_t attachment = 0; attachment < GBufferLayout::AttachmentCount; attachment++) {
+        gbufferDesc.ColorAttachments.Add(CreateAttachment(InWidth, InHeight, GBufferLayout::Format,
+                                                          ImageUsage::ColorAttachment | ImageUsage::Sampled));
+    }
+    gbufferDesc.DepthAttachment = CreateAttachment(InWidth, InHeight, GBufferLayout::DepthFormat,
+                                                   ImageUsage::DepthStencil | ImageUsage::Sampled);
+    gbufferDesc.ClearColor = Vec4(0.0f);
+    m_GeometryStage->SetTarget(FrameBuffer::Create(gbufferDesc));
+
+    FrameBufferDesc sceneDesc;
+    sceneDesc.Width = InWidth;
+    sceneDesc.Height = InHeight;
+    sceneDesc.Samples = SceneSampleCount;
+    sceneDesc.ColorAttachments.Add(CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
+                                                    ImageUsage::ColorAttachment | ImageUsage::Sampled));
+    // The id is packed into RGBA8
+    sceneDesc.ColorAttachments.Add(CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
+                                                    ImageUsage::ColorAttachment | ImageUsage::TransferSrc | ImageUsage::Sampled));
+    sceneDesc.DepthAttachment = CreateAttachment(InWidth, InHeight, ImageFormat::Depth32F, ImageUsage::DepthStencil);
+    sceneDesc.ClearColor = s_BackgroundColor;
+    sceneDesc.ClearColors.Add(s_BackgroundColor);
+    sceneDesc.ClearColors.Add(Vec4(0.0f));
+    SharedObjectPtr<FrameBuffer> scene = FrameBuffer::Create(sceneDesc);
+    m_LightingStage->SetTarget(scene);
+    m_ForwardStage->SetTarget(scene);
+}
+
+void ArtifactRenderPipeline::PrepareFrame(RenderContext& InOutContext) {
+    if (m_Width != InOutContext.Width || m_Height != InOutContext.Height) {
+        CreateTargets(InOutContext.Width, InOutContext.Height);
+    }
+
+    CameraNode* camera = InOutContext.Camera;
+    if (camera) {
+        camera->SetAspectRatio(InOutContext.Width / (float)InOutContext.Height);
+    }
+
+    DirectionalLightNode* sun = FindSunLight(InOutContext.World);
+    const bool shadowsRendered = sun && camera && sun->RenderShadowMaps(*InOutContext.World, *camera);
+    if (!shadowsRendered) {
+        m_ShadowPlaceholder.Clear();
+    }
+    m_ShadowSource = shadowsRendered ? sun : nullptr;
+
+    InOutContext.SceneUniforms = m_SceneUniforms.Get();
+    InOutContext.ShadowMap = shadowsRendered ? sun->GetShadowMapView() : m_ShadowPlaceholder.GetView();
+    InOutContext.ShadowSampler = shadowsRendered ? sun->GetShadowSampler() : m_ShadowPlaceholder.GetSampler();
+    UploadSceneUniforms(InOutContext, sun);
+}
+
+void ArtifactRenderPipeline::TransitionRenderStage(RenderStage* InFrom, RenderStage& InTo, const RenderContext& InContext) {
+    if (InFrom && InFrom->GetTarget() == InTo.GetTarget()) {
+        return;
+    }
+    InTo.BeginTarget();
+    if (InFrom == m_GeometryStage && &InTo == m_LightingStage) {
+        ResolveGBuffer(*InFrom, InTo, InContext);
+    }
+}
+
+/** Carries depth, node ids and emissive over, so lighting only adds onto it and forward geometry
+ *  is occluded by deferred geometry. */
+void ArtifactRenderPipeline::ResolveGBuffer(RenderStage& InGeometry, RenderStage& InLighting, const RenderContext& InContext) {
+    if (!m_ResolveShader) {
+        return;
+    }
+    m_ResolveQuad.Draw(DeferredLightPass::DescribeGBufferRead(*InLighting.GetTarget(), *InGeometry.GetTarget(),
+                                                              *m_ResolveShader, *m_GBufferSampler, InContext));
+}
+
+DirectionalLightNode* ArtifactRenderPipeline::FindSunLight(World* InWorld) const {
+    if (!InWorld) {
         return nullptr;
     }
-    for (Node* node : InParams.m_World->GetAllNodes()) {
+    for (Node* node : InWorld->GetAllNodes()) {
         DirectionalLightNode* light = node->As<DirectionalLightNode>();
         if (light && light->IsEnabled()) {
             return light;
@@ -42,15 +143,15 @@ DirectionalLightNode* ArtifactRenderPipeline::FindSunLight(const RenderParams& I
     return nullptr;
 }
 
-void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, CameraNode* InCamera,
-                                               DirectionalLightNode* InSun, const RenderParams& InParams) {
-    m_Time += (float)InDeltaTime;
+void ArtifactRenderPipeline::UploadSceneUniforms(const RenderContext& InContext, DirectionalLightNode* InSun) {
+    m_Time += (float)InContext.DeltaTime;
 
     SceneUniformData data;
     data.Time = m_Time;
-    if (InCamera) {
-        data.ViewProjection = InCamera->GetViewProjectionMatrix();
-        data.CameraPosition = Vec4(InCamera->GetPosition(), 1.0f);
+    if (InContext.Camera) {
+        data.ViewProjection = InContext.Camera->GetViewProjectionMatrix();
+        data.InverseViewProjection = glm::inverse(data.ViewProjection);
+        data.CameraPosition = Vec4(InContext.Camera->GetPosition(), 1.0f);
     }
 
     if (InSun) {
@@ -64,8 +165,8 @@ void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, CameraNode* I
         }
     }
 
-    if (InParams.m_World) {
-        for (Node* node : InParams.m_World->GetAllNodes()) {
+    if (InContext.World) {
+        for (Node* node : InContext.World->GetAllNodes()) {
             PointLightNode* light = node->As<PointLightNode>();
             if (!light || !light->IsEnabled() || data.PointLightCount >= SceneUniformData::MaxPointLights) {
                 continue;
@@ -77,194 +178,12 @@ void ArtifactRenderPipeline::UpdateUniformData(double InDeltaTime, CameraNode* I
         }
     }
 
-    void* mapped = m_UniformBuffer->MapData(sizeof(data), 0);
+    void* mapped = m_SceneUniforms->MapData(sizeof(data), 0);
     memcpy(mapped, &data, sizeof(data));
-    m_UniformBuffer->UnmapData();
-}
-
-Pipeline* ArtifactRenderPipeline::ResolvePipeline(Material* InMaterial) {
-    if (!InMaterial || !InMaterial->IsReadyToRender()) {
-        return nullptr;
-    }
-
-    DirectionalLightNode* sun = m_ShadowSource.Get();
-    ImageView* shadowMap = sun ? sun->GetShadowMapView() : m_ShadowPlaceholder.GetView();
-    Sampler* shadowSampler = sun ? sun->GetShadowSampler() : m_ShadowPlaceholder.GetSampler();
-
-    Shader* shader = InMaterial->GetShader();
-    Array<void*> resources = { shader, InMaterial->GetPropertyBuffer(), shadowMap };
-    Array<std::tuple<uint32_t, SharedObjectPtr<ImageView>, SharedObjectPtr<Sampler>>> imageBindings;
-    imageBindings.Add({ ShaderTemplate::ShadowMapBinding, shadowMap, shadowSampler });
-    for (const MaterialTextureBinding& binding : InMaterial->GetTextureBindings()) {
-        Texture* texture = binding.Texture ? binding.Texture->GetTexture() : nullptr;
-        if (!texture) {
-            return nullptr;
-        }
-        resources.Add(texture);
-        imageBindings.Add({ binding.Binding, texture->GetDefaultView(), m_Sampler });
-    }
-
-    MaterialPipeline& cached = m_MaterialPipelines[InMaterial->GetId()];
-    if (cached.Instance.Get() && cached.Resources == resources) {
-        return cached.Instance.Get();
-    }
-
-    PipelineDesc desc;
-    desc.Target = m_FrameBuffer;
-    desc.Shader = shader;
-    desc.Buffers.Add(m_UniformBuffer);
-    if (UniformBuffer* properties = InMaterial->GetPropertyBuffer()) {
-        desc.Buffers.Add(properties);
-    }
-    desc.ImageBindings = imageBindings;
-
-    cached.Instance = Pipeline::Create(desc);
-    cached.Resources = resources;
-    return cached.Instance.Get();
-}
-
-void ArtifactRenderPipeline::Invalidate(uint32_t InWidth, uint32_t InHeight) {
-    if (m_FrameBuffer.Get()) {
-        RenderingAPI::GetInstance()->WaitIdle();
-    }
-
-    m_Width = InWidth;
-    m_Height = InHeight;
-
-    ImageDesc imageDesc;
-    imageDesc.Width = InWidth;
-    imageDesc.Height = InHeight;
-    imageDesc.Format = ImageFormat::RGBA8;
-    imageDesc.Usage = ImageUsage::ColorAttachment | ImageUsage::Sampled;
-    auto image = Image::Create(imageDesc);
-    ImageViewDesc imageViewDesc;
-    imageViewDesc.ImagePtr = image;
-    imageViewDesc.Format = ImageFormat::RGBA8;
-    auto imageView = ImageView::Create(imageViewDesc);
-
-    ImageDesc depthImageDesc;
-    depthImageDesc.Width = InWidth;
-    depthImageDesc.Height = InHeight;
-    depthImageDesc.Format = ImageFormat::Depth32F;
-    depthImageDesc.Usage = ImageUsage::DepthStencil;
-    auto depthImage = Image::Create(depthImageDesc);
-
-    ImageViewDesc depthImageViewDesc;
-    depthImageViewDesc.ImagePtr = depthImage;
-    depthImageViewDesc.Format = ImageFormat::Depth32F;
-    depthImageViewDesc.Aspect = ImageAspect::Depth;
-    auto depthImageView = ImageView::Create(depthImageViewDesc);
-
-    ImageDesc idImageDesc;
-    idImageDesc.Width = InWidth;
-    idImageDesc.Height = InHeight;
-    // The id is packed into RGBA8
-    idImageDesc.Format = ImageFormat::RGBA8;
-    idImageDesc.Usage = ImageUsage::ColorAttachment | ImageUsage::TransferSrc | ImageUsage::Sampled;
-    auto idImage = Image::Create(idImageDesc);
-
-    ImageViewDesc idImageViewDesc;
-    idImageViewDesc.ImagePtr = idImage;
-    idImageViewDesc.Format = ImageFormat::RGBA8;
-    auto idImageView = ImageView::Create(idImageViewDesc);
-
-    FrameBufferDesc frameBufferDesc;
-    frameBufferDesc.Width = InWidth;
-    frameBufferDesc.Height = InHeight;
-    frameBufferDesc.Samples = SceneSampleCount;
-    frameBufferDesc.ColorAttachments.Add(imageView);
-    frameBufferDesc.ColorAttachments.Add(idImageView);
-    frameBufferDesc.DepthAttachment = depthImageView;
-    frameBufferDesc.ClearColor = Vec4(0.08f, 0.09f, 0.11f, 1.0f);
-    frameBufferDesc.ClearColors.Add(Vec4(0.08f, 0.09f, 0.11f, 1.0f));
-    frameBufferDesc.ClearColors.Add(Vec4(0.0f));
-    m_FrameBuffer = FrameBuffer::Create(frameBufferDesc);
-
-    if (!m_Sampler.Get()) {
-        SamplerDesc samplerDesc;
-        samplerDesc.MagFilter = FilterMode::Linear;
-        samplerDesc.MinFilter = FilterMode::Linear;
-        m_Sampler = Sampler::Create(samplerDesc);
-    }
-    if (!m_UniformBuffer.Get()) {
-        m_UniformBuffer = UniformBuffer::Create(0, sizeof(SceneUniformData));
-    }
-    if (!m_ShadowPlaceholder.GetView()) {
-        m_ShadowPlaceholder.Create();
-    }
-    m_MaterialPipelines.Clear();
-}
-
-void ArtifactRenderPipeline::Render(double InDeltaTime, const RenderParams& InParams) {
-    if (m_Width != InParams.Width || m_Height != InParams.Height) {
-        Invalidate(InParams.Width, InParams.Height);
-    }
-
-    CameraNode* camera = ResolveCamera(InParams);
-    if (camera) {
-        // A zero height (minimized window) would make this NaN
-        camera->SetAspectRatio(InParams.Width / (float) glm::max(InParams.Height, 1u));
-    }
-
-    DirectionalLightNode* sun = FindSunLight(InParams);
-    const bool shadowsRendered = sun && camera && sun->RenderShadowMaps(*InParams.m_World, *camera);
-    if (!shadowsRendered) {
-        m_ShadowPlaceholder.Clear();
-    }
-
-    DirectionalLightNode* previousShadowSource = m_ShadowSource.Get();
-    m_ShadowSource = shadowsRendered ? sun : nullptr;
-    if (m_ShadowSource.Get() != previousShadowSource) {
-        m_MaterialPipelines.Clear();
-    }
-
-    UpdateUniformData(InDeltaTime, camera, sun, InParams);
-
-    // Opening the pass here is what clears the target; a material-less world simply draws nothing into it.
-    RenderCommandQueue& renderQueue = RenderingAPI::GetInstance()->GetRenderQueue();
-    renderQueue.Push(RenderCommandType::BeginRenderPass, CmdBeginRenderPass{ m_FrameBuffer });
-    if (InParams.m_World == nullptr) {
-        return;
-    }
-
-    for (Node* node : InParams.m_World->GetAllNodes()) {
-        StaticMeshNode* staticMesh = node->As<StaticMeshNode>();
-        Mesh* mesh = staticMesh ? staticMesh->GetMesh() : nullptr;
-        if (!mesh || !staticMesh->IsEnabled()) {
-            continue;
-        }
-
-        VertexBuffer* vertexBuffer = mesh->GetVertexBuffer();
-        AE_ASSERT(vertexBuffer);
-        ShaderData* shaderData = staticMesh->GetPerMeshShaderData();
-        const Array<SubMesh>& subMeshes = mesh->GetSubMeshes();
-        for (int32_t slot = 0; slot < subMeshes.Size(); slot++) {
-            Pipeline* pipeline = ResolvePipeline(staticMesh->GetMaterial(slot));
-            if (!pipeline) {
-                continue;
-            }
-            renderQueue.Push(RenderCommandType::BindPipeline, CmdBindPipeline{ pipeline });
-            renderQueue.Push(RenderCommandType::SetShaderData, CmdSetShaderData{ shaderData });
-            vertexBuffer->Draw(subMeshes[slot].IndexCount, subMeshes[slot].FirstIndex);
-        }
-    }
+    m_SceneUniforms->UnmapData();
 }
 
 uint32_t ArtifactRenderPipeline::PickNodeId(uint32_t InX, uint32_t InY) const {
-    return m_FrameBuffer.Get() ? m_FrameBuffer->ReadPixelUint(NodeIdAttachment, InX, InY) : 0;
-}
-
-SharedObjectPtr<class ImageView> ArtifactRenderPipeline::GetFinalImageView() const {
-    if (!m_FrameBuffer.Get()) {
-        return nullptr;
-    }
-    return m_FrameBuffer->GetDesc().ColorAttachments[0];
-}
-
-ArtifactRenderPipeline::ArtifactRenderPipeline() {
-    Invalidate(100, 100);
-}
-
-ArtifactRenderPipeline::~ArtifactRenderPipeline() {
-
+    FrameBuffer* scene = GetFrameBuffer().Get();
+    return scene ? scene->ReadPixelUint(NodeIdAttachment, InX, InY) : 0;
 }

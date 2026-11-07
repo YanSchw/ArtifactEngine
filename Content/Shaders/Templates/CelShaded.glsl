@@ -3,6 +3,7 @@
 #blend (Opaque, Alpha, Additive, Multiply)
 #cull (Back, Front, None)
 #depth (TestWrite, Test, Write, None)
+#renderpath Forward
 #frontface Clockwise
 
 #type vert
@@ -21,6 +22,7 @@ void main() {
 #type frag
 #gen_buffers(frag)
 #include "/Shaders/Common/CelLighting.glsl"
+#include "/Shaders/Common/Encoding.glsl"
 
 void main() {
     #property(BaseColor_, "BaseColor", Color, vec4(0.8, 0.8, 0.8, 1.0))
@@ -52,9 +54,5 @@ void main() {
 
     outColor = vec4(ShadeCel(surface) + Emissive_.rgb, BaseColor_.a * Opacity_);
 
-    uint id = u_ShaderData.NodeId;
-    outNodeId = vec4(float(id & 0xFFu),
-                     float((id >> 8) & 0xFFu),
-                     float((id >> 16) & 0xFFu),
-                     float((id >> 24) & 0xFFu)) / 255.0;
+    outNodeId = PackNodeId(u_ShaderData.NodeId);
 }

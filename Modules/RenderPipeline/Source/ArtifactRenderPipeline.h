@@ -1,18 +1,15 @@
 #pragma once
 #include "Rendering/RenderPipeline.h"
+#include "Rendering/FullscreenQuad.h"
 #include "Rendering/Image.h"
 #include "Object/Pointer.h"
-#include "Common/Map.h"
-#include "Common/UUID.h"
 #include "GameFramework/DirectionalLightNode.h"
 #include "ArtifactRenderPipeline.gen.h"
 
-class Material;
-class Sampler;
-class UniformBuffer;
-class Pipeline;
 class FrameBuffer;
-class CameraNode;
+class Sampler;
+class Shader;
+class UniformBuffer;
 
 class ArtifactRenderPipeline : public RenderPipeline {
 public:
@@ -21,33 +18,27 @@ public:
     static constexpr int32_t NodeIdAttachment = 1;
     static constexpr SampleCount SceneSampleCount = SampleCount::X8;
 
-    ArtifactRenderPipeline();
-    ~ArtifactRenderPipeline();
-
-    void Invalidate(uint32_t InWidth, uint32_t InHeight);
-
-    virtual void Render(double InDeltaTime, const RenderParams& InParams) override;
-    virtual SharedObjectPtr<class ImageView> GetFinalImageView() const override;
-    virtual SharedObjectPtr<class FrameBuffer> GetFrameBuffer() const override { return m_FrameBuffer; }
     virtual uint32_t PickNodeId(uint32_t InX, uint32_t InY) const override;
 
+protected:
+    virtual void Initialize() override;
+    virtual void PrepareFrame(RenderContext& InOutContext) override;
+    virtual void TransitionRenderStage(RenderStage* InFrom, RenderStage& InTo, const RenderContext& InContext) override;
+
 private:
-    /** A material's pipeline, rebuilt whenever the resources it was created from are replaced. */
-    struct MaterialPipeline {
-        SharedObjectPtr<Pipeline> Instance;
-        Array<void*> Resources;
-    };
+    void CreateTargets(uint32_t InWidth, uint32_t InHeight);
+    DirectionalLightNode* FindSunLight(World* InWorld) const;
+    void UploadSceneUniforms(const RenderContext& InContext, DirectionalLightNode* InSun);
+    void ResolveGBuffer(RenderStage& InGeometry, RenderStage& InLighting, const RenderContext& InContext);
 
-    CameraNode* ResolveCamera(const RenderParams& InParams) const;
-    DirectionalLightNode* FindSunLight(const RenderParams& InParams) const;
-    void UpdateUniformData(double InDeltaTime, CameraNode* InCamera, DirectionalLightNode* InSun,
-                           const RenderParams& InParams);
-    Pipeline* ResolvePipeline(Material* InMaterial);
+    RenderStage* m_GeometryStage = nullptr;
+    RenderStage* m_LightingStage = nullptr;
+    RenderStage* m_ForwardStage = nullptr;
 
-    SharedObjectPtr<UniformBuffer> m_UniformBuffer;
-    SharedObjectPtr<FrameBuffer> m_FrameBuffer;
-    SharedObjectPtr<Sampler> m_Sampler;
-    Map<UUID, MaterialPipeline> m_MaterialPipelines;
+    SharedObjectPtr<UniformBuffer> m_SceneUniforms;
+    SharedObjectPtr<Shader> m_ResolveShader;
+    SharedObjectPtr<Sampler> m_GBufferSampler;
+    FullscreenQuad m_ResolveQuad;
     ShadowMapPlaceholder m_ShadowPlaceholder;
     WeakObjectPtr<DirectionalLightNode> m_ShadowSource;
     uint32_t m_Width = 0;

@@ -2,7 +2,7 @@
 
 #include "Core/EngineConfig.h"
 #include "Platform/FileIO.h"
-#include "SceneUniforms.h"
+#include "GBuffer.h"
 
 #include <cctype>
 #include <format>
@@ -122,32 +122,35 @@ Vec4 ParseDefaultValue(const String& InText, ShaderValueType InType) {
     return value;
 }
 
-String GetSceneBlock() {
-    return std::format(
-        "layout(binding = 0, std140) uniform SceneBlock {{\n"
-        "    mat4 u_ViewProjection;\n"
-        "    mat4 u_ShadowMatrices[{0}];\n"
-        "    vec4 u_CameraPosition;\n"
-        "    vec4 u_SunDirection;\n"
-        "    vec4 u_SunColor;\n"
-        "    vec4 u_AmbientColor;\n"
-        "    vec4 u_CascadeTexelSizes;\n"
-        "    vec4 u_ShadowParams;\n"
-        "    vec4 u_PointLightPositions[{1}];\n"
-        "    vec4 u_PointLightColors[{1}];\n"
-        "    float u_PointLightCount;\n"
-        "    float u_Time;\n"
-        "}};\n"
-        "layout(push_constant) uniform ShaderDataBlock {{\n"
-        "    mat4 WorldTransform;\n"
-        "    uint NodeId;\n"
-        "}} u_ShaderData;\n",
-        SceneUniformData::ShadowCascadeCount, SceneUniformData::MaxPointLights);
+const Array<String>& GetRenderStateDirectives() {
+    static const Array<String> s_Directives = { "blend", "cull", "depth", "frontface", "renderpath" };
+    return s_Directives;
+}
+
+String GetSceneDeclarations() {
+    return "#include \"/Shaders/Common/Scene.glsl\"\n"
+           "layout(push_constant) uniform ShaderDataBlock {\n"
+           "    mat4 WorldTransform;\n"
+           "    uint NodeId;\n"
+           "} u_ShaderData;\n";
+}
+
+String GetFragmentOutputs(RenderPath InPath) {
+    if (InPath == RenderPath::Forward) {
+        return "layout(location = 0) out vec4 outColor;\n"
+               "layout(location = 1) out vec4 outNodeId;\n";
+    }
+    return std::format("#define SG_DEFERRED 1\n"
+                       "layout(location = {0}) out vec4 outAlbedo;\n"
+                       "layout(location = {1}) out vec4 outNormal;\n"
+                       "layout(location = {2}) out vec4 outEmissive;\n"
+                       "layout(location = {3}) out vec4 outNodeId;\n",
+                       GBufferLayout::Albedo, GBufferLayout::Normal, GBufferLayout::Emissive, GBufferLayout::NodeId);
 }
 
 } // namespace
 
-String ShaderTemplate::GetStageDeclarations(ShaderStage InStage) {
+String ShaderTemplate::GetStageDeclarations(ShaderStage InStage, RenderPath InPath) {
     if (InStage == ShaderStage::Vertex) {
         return String(
             "layout(location = 0) in vec3 a_Position;\n"
@@ -157,16 +160,14 @@ String ShaderTemplate::GetStageDeclarations(ShaderStage InStage) {
             "layout(location = 1) out vec4 v_Color;\n"
             "layout(location = 2) out vec2 v_UV;\n"
             "layout(location = 3) out vec3 v_WorldPosition;\n"
-            "layout(location = 4) out vec3 v_Normal;\n") + GetSceneBlock();
+            "layout(location = 4) out vec3 v_Normal;\n") + GetSceneDeclarations();
     }
 
     return String(
         "layout(location = 1) in vec4 v_Color;\n"
         "layout(location = 2) in vec2 v_UV;\n"
         "layout(location = 3) in vec3 v_WorldPosition;\n"
-        "layout(location = 4) in vec3 v_Normal;\n"
-        "layout(location = 0) out vec4 outColor;\n"
-        "layout(location = 1) out vec4 outNodeId;\n") + GetSceneBlock() +
+        "layout(location = 4) in vec3 v_Normal;\n") + GetFragmentOutputs(InPath) + GetSceneDeclarations() +
         std::format("layout(binding = {0}) uniform sampler2DArrayShadow u_ShadowMap;\n", ShadowMapBinding);
 }
 
@@ -263,7 +264,7 @@ bool ShaderTemplate::ParseSource(const String& InPath, const String& InSource, S
             continue;
         }
 
-        for (const String& state : { String("blend"), String("cull"), String("depth"), String("frontface") }) {
+        for (const String& state : GetRenderStateDirectives()) {
             const String token = "#" + state;
             if (!trimmed.starts_with(token)) {
                 continue;
@@ -291,6 +292,8 @@ bool ShaderTemplate::ParseSource(const String& InPath, const String& InSource, S
                 if (!OutTemplate.m_StateOrder.Contains(state)) {
                     OutTemplate.m_StateOrder.Add(state);
                 }
+            } else {
+                OutTemplate.m_FixedStates[state] = argument;
             }
         }
 
@@ -385,14 +388,36 @@ const ShaderGraphProperty* ShaderTemplate::FindProperty(const String& InName) co
     return nullptr;
 }
 
+String ShaderTemplate::ResolveState(const String& InState, const Map<String, String>& InStates) const {
+    const Array<String> options = GetStateOptions(InState);
+    if (options.IsEmpty()) {
+        return m_FixedStates.ContainsKey(InState) ? m_FixedStates.At(InState) : String();
+    }
+    const String chosen = InStates.ContainsKey(InState) ? InStates.At(InState) : String();
+    return options.Contains(chosen) ? chosen : options[0];
+}
+
+RenderPath ShaderTemplate::ResolveRenderPath(const Map<String, String>& InStates) const {
+    const String blend = ResolveState("blend", InStates);
+    const bool opaque = blend.empty() || blend == "Opaque";
+    return opaque && ResolveState("renderpath", InStates) == "Deferred" ? RenderPath::Deferred : RenderPath::Forward;
+}
+
 String ShaderTemplate::Expand(const Map<String, ShaderPropertyCode>& InCode, const Map<String, String>& InStates,
                               const String& InDeclarations) const {
+    const RenderPath renderPath = ResolveRenderPath(InStates);
+
     String result;
     for (int32_t i = 0; i < m_Lines.Size(); i++) {
         const String& line = m_Lines[i];
         const String trimmed = Trim(line);
 
         if (trimmed.starts_with(Directive)) {
+            continue;
+        }
+
+        if (trimmed.starts_with("#renderpath")) {
+            result += renderPath == RenderPath::Deferred ? "#renderpath Deferred\n" : "#renderpath Forward\n";
             continue;
         }
 
@@ -424,7 +449,7 @@ String ShaderTemplate::Expand(const Map<String, ShaderPropertyCode>& InCode, con
             ShaderStage bufferStage = ShaderStage::Fragment;
             ShaderSource::ParseStageName(Trim(arguments), bufferStage);
 
-            result += GetStageDeclarations(bufferStage);
+            result += GetStageDeclarations(bufferStage, renderPath);
             result += InDeclarations;
             result += GetStageAliases(bufferStage);
             continue;

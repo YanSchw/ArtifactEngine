@@ -29,6 +29,7 @@ void CompiledShader::Serialize(ChunkWriter& OutWriter) const {
     OutWriter << (uint32_t)RenderState.Cull;
     OutWriter << (uint32_t)RenderState.Depth;
     OutWriter << (uint32_t)RenderState.FrontFace;
+    OutWriter << (uint32_t)RenderState.Path;
 
     OutWriter << (uint32_t)Stages.Size();
     for (const CompiledShaderStage& stage : Stages) {
@@ -68,6 +69,7 @@ bool CompiledShader::Deserialize(ChunkReader& InReader) {
     uint32_t cull = 0;
     uint32_t depth = 0;
     uint32_t frontFace = 0;
+    uint32_t path = 0;
     uint32_t stageCount = 0;
 
     InReader >> api;
@@ -75,6 +77,7 @@ bool CompiledShader::Deserialize(ChunkReader& InReader) {
     InReader >> cull;
     InReader >> depth;
     InReader >> frontFace;
+    InReader >> path;
     InReader >> stageCount;
 
     API = (ShaderAPI)api;
@@ -82,6 +85,7 @@ bool CompiledShader::Deserialize(ChunkReader& InReader) {
     RenderState.Cull = (CullMode)cull;
     RenderState.Depth = (DepthMode)depth;
     RenderState.FrontFace = (WindingOrder)frontFace;
+    RenderState.Path = (RenderPath)path;
 
     Stages.Clear();
     for (uint32_t i = 0; i < stageCount; i++) {
