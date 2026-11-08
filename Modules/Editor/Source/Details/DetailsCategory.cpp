@@ -1,6 +1,7 @@
 #include "DetailsCategory.h"
 #include "Tabs/DetailsTab.h"
 #include "UI/EditorStyle.h"
+#include "GameFramework/UIButton.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UISvg.h"
 #include "GameFramework/UIVStack.h"
@@ -29,6 +30,33 @@ DetailsCategory::DetailsCategory() {
     m_Body->Anchor = m_Body->Pivot = Vec2(0.0f);
     m_Body->Position = Vec2(0.0f, HeaderHeight);
     m_Body->Size = { 1.0_rel, 0.0_px };
+
+    m_ResetButton = Add<UIButton>();
+    m_ResetButton->Anchor = m_ResetButton->Pivot = Vec2(1.0f, 0.0f);
+    m_ResetButton->Position = Vec2(-3.0f, (HeaderHeight - 20.0f) * 0.5f);
+    m_ResetButton->Size = Vec2(20.0f, 20.0f);
+    m_ResetButton->NormalColor = Vec4(0.0f);
+    m_ResetButton->HoverColor = EditorStyle::TabHover;
+    m_ResetButton->PressedColor = EditorStyle::ButtonPressed;
+    m_ResetButton->Clicked = [this] {
+        if (ResetAction) {
+            ResetAction();
+        }
+    };
+    UISvg* resetIcon = m_ResetButton->Add<UISvg>();
+    resetIcon->Center(Vec2(13.0f, 13.0f));
+    resetIcon->Tint = EditorStyle::TextDim;
+    resetIcon->Image = AssetManager::Get().GetAsset<VectorImage>(UUID::FromString("b1c2d3e4-0006-4a00-9000-000000000006"));
+}
+
+UINode* DetailsCategory::AddHeaderEditor(float InWidth) {
+    if (!m_HeaderEditor) {
+        m_HeaderEditor = Add<UINode>();
+        m_HeaderEditor->Anchor = m_HeaderEditor->Pivot = Vec2(0.0f);
+    }
+    m_HeaderEditor->Size = Vec2(InWidth, HeaderHeight);
+    m_HeaderEditorWidth = InWidth;
+    return m_HeaderEditor;
 }
 
 void DetailsCategory::SetTitle(const String& InTitle) {
@@ -67,12 +95,14 @@ void DetailsCategory::OnBind() {
     const String effective = (filter.empty() || TitleMatches(filter)) ? String() : filter;
     const bool open = m_Expanded || !filter.empty();
 
+    const bool inactive = Inactive || (IsActive && !IsActive());
     float bodyHeight = 0.0f;
     for (uint32_t i = 0; i < m_Body->GetChildCount(); i++) {
         DetailsItem* item = m_Body->GetChild((int)i)->As<DetailsItem>();
         if (!item) {
             continue;
         }
+        item->Inactive = inactive;
         item->Depth = std::max(item->Depth, item->As<DetailsCategory>() ? Depth + 1 : Depth);
         const float height = open ? item->MeasureHeight(effective) : 0.0f;
         item->SetEnabled(height > 0.0f);
@@ -83,14 +113,23 @@ void DetailsCategory::OnBind() {
     m_Body->Size = { 1.0_rel, bodyHeight };
 
     const float indent = Depth == 0 ? 4.0f : (float)Depth * IndentWidth - 6.0f;
+    const bool overridden = IsOverridden && IsOverridden();
+    m_ResetButton->SetEnabled(ResetAction != nullptr && overridden);
+
+    const float editorWidth = m_HeaderEditor ? m_HeaderEditorWidth + 4.0f : 0.0f;
     m_Arrow->Position = Vec2(indent, (HeaderHeight - 12.0f) * 0.5f);
-    m_TitleLabel->Position = Vec2(indent + 14.0f, 0.0f);
-    m_TitleLabel->Color = Depth == 0 ? EditorStyle::TextBright : EditorStyle::Text;
+    if (m_HeaderEditor) {
+        m_HeaderEditor->Position = Vec2(indent + 14.0f, 0.0f);
+    }
+    m_TitleLabel->Position = Vec2(indent + 14.0f + editorWidth, 0.0f);
+    m_TitleLabel->Color = overridden ? EditorStyle::AccentBright
+                        : (inactive || (IsActive && !IsActive())) ? EditorStyle::TextDim
+                        : Depth == 0 ? EditorStyle::TextBright : EditorStyle::Text;
     if (Depth == 0) {
-        m_TitleLabel->Size = { 1.0_rel - UIValue::Px(indent + 20.0f), HeaderHeight };
+        m_TitleLabel->Size = { 1.0_rel - UIValue::Px(indent + 20.0f + editorWidth), HeaderHeight };
     } else {
         const float split = OwnerTab ? OwnerTab->GetLabelSplit() : 0.32f;
-        m_TitleLabel->Size = { UIValue(split, -(indent + 22.0f)), HeaderHeight };
+        m_TitleLabel->Size = { UIValue(split, -(indent + 22.0f + editorWidth)), HeaderHeight };
     }
     m_Arrow->Image = AssetManager::Get().GetAsset<VectorImage>(UUID::FromString(
         open ? "b1c2d3e4-0002-4a00-9000-000000000002" : "b1c2d3e4-0003-4a00-9000-000000000003"));

@@ -54,7 +54,7 @@ void ArtifactRenderPipeline::CreateTargets(uint32_t InWidth, uint32_t InHeight) 
     sceneDesc.Width = InWidth;
     sceneDesc.Height = InHeight;
     sceneDesc.Samples = SceneSampleCount;
-    sceneDesc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
+    sceneDesc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, PostProcessPass::ChainFormat,
                                                     ImageUsage::ColorAttachment | ImageUsage::Sampled));
     // The id is packed into RGBA8
     sceneDesc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,

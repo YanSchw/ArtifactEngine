@@ -1,7 +1,9 @@
 #pragma once
 #include "DetailsItem.h"
+#include <functional>
 #include "DetailsCategory.gen.h"
 
+class UIButton;
 class UILabel;
 class UISvg;
 class UIVStack;
@@ -18,6 +20,13 @@ public:
 
     void SetTitle(const String& InTitle);
     UINode* GetBody() const;
+    /** Hosts an editor in the header between the arrow and the title. */
+    UINode* AddHeaderEditor(float InWidth);
+
+    /** While this returns false the rows inside are drawn dimmed. */
+    std::function<bool()> IsActive;
+    std::function<void()> ResetAction;
+    std::function<bool()> IsOverridden;
 
     virtual float MeasureHeight(const String& InFilter) const override;
     virtual void OnBind() override;
@@ -31,5 +40,8 @@ private:
     UILabel* m_TitleLabel = nullptr;
     UISvg* m_Arrow = nullptr;
     UIVStack* m_Body = nullptr;
+    UINode* m_HeaderEditor = nullptr;
+    UIButton* m_ResetButton = nullptr;
+    float m_HeaderEditorWidth = 0.0f;
     bool m_Expanded = true;
 };

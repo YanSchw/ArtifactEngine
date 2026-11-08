@@ -100,7 +100,11 @@ public:
     void SetMarkedAsInherited(bool InIsInherited);
     bool IsInherited() const;
 
+    /** Overrides are property paths (see PropertyPath), so single members of a struct can be
+     *  overridden and reset on their own. A path counts as overridden when it, a struct holding it
+     *  or a member inside it is. */
     void MarkPropertyOverridden(const String& InPropertyName);
+    /** Clears InPropertyName and every override inside it. */
     void ClearPropertyOverride(const String& InPropertyName);
     bool IsPropertyOverridden(const String& InPropertyName) const;
     const Array<String>& GetOverriddenProperties() const { return m_OverriddenProperties; }
@@ -139,6 +143,9 @@ private:
     bool m_WasBeginPlayCalled = false;
     bool m_IsPendingKill = false;
     bool m_WasInherited = true; // Editor-only: true if this node was inherited from a parent, false if it was added to the scene directly
+
+    /** Replaces the override of InAncestor by overrides of all its members except those leading to InPath. */
+    void SplitPropertyOverride(const String& InAncestor, const String& InPath);
 
     Array<String> m_OverriddenProperties;
     UUID m_BlueprintId;

@@ -14,18 +14,7 @@ ImageView* PostProcessChain::GetSource() const {
 FrameBuffer& PostProcessChain::AcquireTarget() {
     SharedObjectPtr<FrameBuffer>& target = m_Targets[0].Get() == m_Result ? m_Targets[1] : m_Targets[0];
     const FrameBufferDesc& scene = m_Scene->GetDesc();
-    if (!target || target->GetDesc().Width != scene.Width || target->GetDesc().Height != scene.Height) {
-        if (target) {
-            RenderingAPI::GetInstance()->WaitIdle();
-        }
-        FrameBufferDesc desc;
-        desc.Width = scene.Width;
-        desc.Height = scene.Height;
-        desc.ColorAttachments.Add(ImageView::CreateAttachment(scene.Width, scene.Height, ImageFormat::RGBA8,
-                                                              ImageUsage::ColorAttachment | ImageUsage::Sampled));
-        desc.ClearColor = Vec4(0.0f);
-        target = FrameBuffer::Create(desc);
-    }
+    PostProcessPass::EnsureTarget(target, scene.Width, scene.Height, PostProcessPass::ChainFormat);
     return *target;
 }
 
@@ -38,6 +27,25 @@ FrameBuffer& PostProcessPass::AcquireTarget(const RenderContext& InContext, Post
     return InChain.AcquireTarget();
 }
 
+bool PostProcessPass::EnsureTarget(SharedObjectPtr<FrameBuffer>& InOutTarget, uint32_t InWidth, uint32_t InHeight, ImageFormat InFormat) {
+    if (InOutTarget) {
+        const FrameBufferDesc& current = InOutTarget->GetDesc();
+        if (current.Width == InWidth && current.Height == InHeight
+            && current.ColorAttachments[0]->GetDesc().Format == InFormat) {
+            return false;
+        }
+        RenderingAPI::GetInstance()->WaitIdle();
+    }
+    FrameBufferDesc desc;
+    desc.Width = InWidth;
+    desc.Height = InHeight;
+    desc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, InFormat,
+                                                          ImageUsage::ColorAttachment | ImageUsage::Sampled));
+    desc.ClearColor = Vec4(0.0f);
+    InOutTarget = FrameBuffer::Create(desc);
+    return true;
+}
+
 bool PostProcessPass::IsRunning(const RenderContext& InContext) const {
     return InContext.PostProcessEnabled && IsActive(InContext);
 }
@@ -48,6 +56,7 @@ void PostProcessPass::Execute(const RenderContext& InContext) {
     if (!source || !IsRunning(InContext)) {
         return;
     }
+    RenderIntermediates(InContext, *source);
     FrameBuffer& target = AcquireTarget(InContext, *chain);
     target.Begin();
     Process(InContext, *source, target);

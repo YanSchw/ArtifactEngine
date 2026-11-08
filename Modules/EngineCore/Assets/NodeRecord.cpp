@@ -49,11 +49,11 @@ SharedObjectPtr<NodeRecord> NodeRecord::Capture(Node& InNode) {
     record->Inherited = InNode.IsInherited();
 
     for (const String& name : InNode.GetOverriddenProperties()) {
-        Property* property = Property::FindTypeProperty(InNode.GetClass(), name);
-        if (!property) {
+        const PropertyPath path = PropertyPath::Resolve(InNode.GetClass(), name);
+        if (!path.IsValid()) {
             continue;
         }
-        record->Values[name] = JsonSerializer::SerializeProperty(property, property->GetValuePtr(&InNode));
+        record->Values[name] = JsonSerializer::SerializeProperty(path.Leaf, path.GetValuePtr(&InNode));
     }
 
     for (uint32_t i = 0; i < InNode.GetChildCount(); i++) {
@@ -84,13 +84,13 @@ Node* NodeRecord::Instantiate(Node* InParent) const {
 
 void NodeRecord::Apply(Node& OutNode) const {
     for (const auto& [name, value] : Values.items()) {
-        Property* property = Property::FindTypeProperty(OutNode.GetClass(), name);
-        if (!property) {
+        const PropertyPath path = PropertyPath::Resolve(OutNode.GetClass(), name);
+        if (!path.IsValid()) {
             AE_WARN("Node '{0}' has no property '{1}' anymore; the stored override is dropped", Name, name);
             continue;
         }
-        JsonSerializer::DeserializeProperty(property, property->GetValuePtr(&OutNode), value);
-        property->NotifyChanged(&OutNode);
+        JsonSerializer::DeserializeProperty(path.Leaf, path.GetValuePtr(&OutNode), value);
+        path.Root->NotifyChanged(&OutNode);
         OutNode.MarkPropertyOverridden(name);
     }
 
@@ -126,7 +126,7 @@ void NodeRecord::CollectAssetReferences(Array<UUID>& OutIds) const {
     }
 
     for (const auto& [name, value] : Values.items()) {
-        CollectPropertyAssets(Property::FindTypeProperty(nodeClass, name), value, OutIds);
+        CollectPropertyAssets(PropertyPath::Resolve(nodeClass, name).Leaf, value, OutIds);
     }
 
     for (const SharedObjectPtr<NodeRecord>& child : Children) {

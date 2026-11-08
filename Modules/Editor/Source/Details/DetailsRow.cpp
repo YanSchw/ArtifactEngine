@@ -57,7 +57,7 @@ void DetailsRow::OnBind() {
     const float indent = 8.0f + (float)Depth * IndentWidth;
 
     const bool overridden = IsOverridden && IsOverridden();
-    m_NameLabel->Color = overridden ? EditorStyle::AccentBright : EditorStyle::Text;
+    m_NameLabel->Color = overridden ? EditorStyle::AccentBright : Inactive ? EditorStyle::TextDim : EditorStyle::Text;
     m_ResetButton->SetEnabled(ResetAction != nullptr && overridden);
 
     m_NameLabel->Position = Vec2(indent, 0.0f);

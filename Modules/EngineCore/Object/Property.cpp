@@ -47,6 +47,55 @@ void Property::CopyValue(void* OutInstance, const void* InInstance) const {
     JsonSerializer::DeserializeProperty(const_cast<Property*>(this), GetValuePtr(OutInstance), value);
 }
 
+PropertyPath PropertyPath::Resolve(const Class& InClass, const String& InPath) {
+    PropertyPath path;
+    size_t start = 0;
+    String typeName;
+    while (true) {
+        const size_t dot = InPath.find('.', start);
+        const String segment = InPath.substr(start, dot == String::npos ? String::npos : dot - start);
+        Property* property = path.Root ? nullptr : Property::FindTypeProperty(InClass, segment);
+        if (path.Root) {
+            for (Property* member : Property::GetTypeProperties(typeName)) {
+                if (member->Name == segment) {
+                    property = member;
+                    break;
+                }
+            }
+        }
+        if (!property) {
+            return PropertyPath();
+        }
+        if (!path.Root) {
+            path.Root = property;
+        }
+        if (dot == String::npos) {
+            path.Leaf = property;
+            return path;
+        }
+        StructProperty* structProperty = Cast<StructProperty>(property);
+        if (!structProperty) {
+            return PropertyPath();
+        }
+        path.ContainerOffset += property->Offset;
+        typeName = structProperty->InnerStructTypename;
+        start = dot + 1;
+    }
+}
+
+String PropertyPath::GetRootName(const String& InPath) {
+    return InPath.substr(0, InPath.find('.'));
+}
+
+bool PropertyPath::IsWithin(const String& InPath, const String& InAncestor) {
+    return InPath == InAncestor || (InPath.size() > InAncestor.size() && InPath.starts_with(InAncestor)
+                                    && InPath[InAncestor.size()] == '.');
+}
+
+void PropertyPath::CopyValue(void* OutInstance, const void* InInstance) const {
+    Leaf->CopyValue((char*)OutInstance + ContainerOffset, (const char*)InInstance + ContainerOffset);
+}
+
 struct RegisterMathProperties {
     RegisterMathProperties() {
         const auto axis = [](const char* InName, uint64_t InOffset) {

@@ -26,9 +26,9 @@ float PostProcessVolumeNode::GetInfluence(const Vec3& InWorldPosition) const {
 }
 
 PostProcessParams PostProcessVolumeNode::Evaluate(World* InWorld, const CameraNode* InCamera) {
-    PostProcessParams blended;
+    PostProcessParams result = PostProcessParams::Neutral();
     if (!InWorld) {
-        return blended;
+        return result;
     }
     if (!InCamera) {
         InCamera = InWorld->GetMainCamera();
@@ -51,23 +51,32 @@ PostProcessParams PostProcessVolumeNode::Evaluate(World* InWorld, const CameraNo
         }
     }
     if (contributions.IsEmpty()) {
-        return blended;
+        return result;
     }
 
     std::stable_sort(contributions.begin(), contributions.end(), [](const Contribution& InA, const Contribution& InB) {
         return InA.Volume->m_Layer > InB.Volume->m_Layer;
     });
 
-    const Contribution* dominant = nullptr;
-    for (const Contribution& contribution : contributions) {
-        PostProcessParams::Blend(blended, contribution.Volume->m_Params, contribution.Influence);
-        if (!dominant || contribution.Influence > dominant->Influence
-            || (contribution.Influence == dominant->Influence && contribution.Volume->m_Layer < dominant->Volume->m_Layer)) {
-            dominant = &contribution;
+    PostProcessParams blended = result;
+    for (const StructProperty* effect : PostProcessParams::GetEffects()) {
+        const Contribution* dominant = nullptr;
+        for (const Contribution& contribution : contributions) {
+            const PostProcessParams& params = contribution.Volume->m_Params;
+            if (!PostProcessParams::IsEffectEnabled(params, *effect)) {
+                continue;
+            }
+            PostProcessParams::BlendEffect(blended, params, *effect, contribution.Influence);
+            if (!dominant || contribution.Influence > dominant->Influence
+                || (contribution.Influence == dominant->Influence && contribution.Volume->m_Layer < dominant->Volume->m_Layer)) {
+                dominant = &contribution;
+            }
         }
+        if (!dominant) {
+            continue;
+        }
+        PostProcessParams::CopyEffect(result, dominant->Volume->m_Params, *effect);
+        PostProcessParams::BlendEffect(result, blended, *effect, 1.0f);
     }
-
-    PostProcessParams result = dominant->Volume->m_Params;
-    PostProcessParams::Blend(result, blended, 1.0f);
     return result;
 }

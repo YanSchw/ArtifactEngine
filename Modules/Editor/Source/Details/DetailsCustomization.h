@@ -34,19 +34,25 @@ public:
 
     static DetailsCustomization* FindFor(const Class& InClass);
 
-    static void BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName);
-    static DetailsEditHandler MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab = nullptr);
+    /** InPropertyPath may reach into structs (see PropertyPath); the reset then only touches that member. */
+    static void BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyPath);
+    /** Every edit becomes an undoable transaction titled after InPropertyPath (InRootProperty when empty),
+     *  and marks that path overridden. */
+    static DetailsEditHandler MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab = nullptr,
+                                              const String& InPropertyPath = String());
     /** The members a struct property is edited through, empty for anything edited as one value. */
     static Array<Property*> GetInnerProperties(Property* InProperty);
     /** Builds the widget one property is edited with into InHost. False for types that have none. */
     static bool BuildValueEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
                                  Property* InProperty, const DetailsEditHandler& InOnEdited, const String& InTitle = String());
     /** Marks the override and tells the owning MajorTab. Every row that writes a property itself,
-     *  instead of going through MakeEditHandler, has to end with this. */
+     *  instead of going through MakeEditHandler, has to end with this. InPropertyName may be a path. */
     static void NotifyPropertyEdited(DetailsTab* InTab, Object* InObject, const String& InPropertyName);
     static void NotifyPropertyEdited(class MajorTab* InTab, Object* InObject, const String& InPropertyName);
     static String PrettyClassName(const Class& InClass);
     static String PrettyPropertyName(const String& InName);
+    /** "m_Params.Bloom.Intensity" reads "Bloom Intensity": the members below the root, or the root alone. */
+    static String PrettyPropertyPath(const String& InPath);
 
 protected:
     virtual bool WantsClassCategory(const Class& InClass) const;
@@ -56,5 +62,6 @@ protected:
     static DetailsRow& AddRow(UINode& InParent, DetailsTab& InTab, const String& InLabel, int32_t InDepth);
     static void AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
                                uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
-                               Property* InRootProperty = nullptr, const String& InLabel = String());
+                               Property* InRootProperty = nullptr, const String& InLabel = String(),
+                               const String& InParentPath = String());
 };

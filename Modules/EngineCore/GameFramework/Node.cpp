@@ -332,17 +332,51 @@ bool Node::IsInherited() const {
 }
 
 void Node::MarkPropertyOverridden(const String& InPropertyName) {
-    if (!m_OverriddenProperties.Contains(InPropertyName)) {
-        m_OverriddenProperties.Add(InPropertyName);
+    for (const String& existing : m_OverriddenProperties) {
+        if (PropertyPath::IsWithin(InPropertyName, existing)) {
+            return;
+        }
     }
+    ClearPropertyOverride(InPropertyName);
+    m_OverriddenProperties.Add(InPropertyName);
 }
 
 void Node::ClearPropertyOverride(const String& InPropertyName) {
-    m_OverriddenProperties.Remove(InPropertyName);
+    for (int32_t i = m_OverriddenProperties.Size() - 1; i >= 0; i--) {
+        if (PropertyPath::IsWithin(m_OverriddenProperties[i], InPropertyName)) {
+            m_OverriddenProperties.RemoveAt(i);
+        }
+    }
 }
 
 bool Node::IsPropertyOverridden(const String& InPropertyName) const {
-    return m_OverriddenProperties.Contains(InPropertyName);
+    for (const String& existing : m_OverriddenProperties) {
+        if (PropertyPath::IsWithin(InPropertyName, existing) || PropertyPath::IsWithin(existing, InPropertyName)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Node::SplitPropertyOverride(const String& InAncestor, const String& InPath) {
+    m_OverriddenProperties.Remove(InAncestor);
+    String current = InAncestor;
+    while (current != InPath) {
+        const PropertyPath resolved = PropertyPath::Resolve(GetClass(), current);
+        StructProperty* structProperty = resolved.IsValid() ? Cast<StructProperty>(resolved.Leaf) : nullptr;
+        if (!structProperty) {
+            return;
+        }
+        const size_t start = current.size() + 1;
+        const size_t dot = InPath.find('.', start);
+        const String next = InPath.substr(start, dot == String::npos ? String::npos : dot - start);
+        for (Property* member : Property::GetTypeProperties(structProperty->InnerStructTypename)) {
+            if (member->Name != next) {
+                m_OverriddenProperties.Add(current + "." + member->Name);
+            }
+        }
+        current += "." + next;
+    }
 }
 
 void Node::ClearAllPropertyOverrides() {
@@ -367,10 +401,16 @@ static Node* FindDefaultsFor(Node& InNode, Node*& OutTemplate) {
 }
 
 void Node::ResetPropertyToDefault(const String& InPropertyName) {
+    const Array<String> overridden = m_OverriddenProperties;
+    for (const String& existing : overridden) {
+        if (existing != InPropertyName && PropertyPath::IsWithin(InPropertyName, existing)) {
+            SplitPropertyOverride(existing, InPropertyName);
+        }
+    }
     ClearPropertyOverride(InPropertyName);
 
-    Property* property = Property::FindTypeProperty(GetClass(), InPropertyName);
-    if (!property) {
+    const PropertyPath path = PropertyPath::Resolve(GetClass(), InPropertyName);
+    if (!path.IsValid()) {
         return;
     }
 
@@ -378,8 +418,8 @@ void Node::ResetPropertyToDefault(const String& InPropertyName) {
     Node* source = FindDefaultsFor(*this, defaults);
 
     if (source && source->IsA(GetClass())) {
-        property->CopyValue(this, source);
-        property->NotifyChanged(this);
+        path.CopyValue(this, source);
+        path.Root->NotifyChanged(this);
     } else {
         AE_WARN("'{0}' no longer exists in what defines it, so '{1}' cannot be reset", GetName(), InPropertyName);
     }

@@ -13,9 +13,10 @@ public:
     ARTIFACT_CLASS();
 
     /** The params every pass of a frame should use: all enabled volumes of InWorld, blended for where
-     *  InCamera stands (the world's main camera when null). Volumes are applied from the highest
-     *  layer down, so lower layers end on top; members that cannot be blended come from the volume
-     *  with the greatest influence, the lowest layer breaking ties. Defaults when nothing applies. */
+     *  InCamera stands (the world's main camera when null). Every effect is blended separately across
+     *  only the volumes that enable it, from the highest layer down, so lower layers end on top;
+     *  members that cannot be blended come from the most influential of those volumes, the lowest layer
+     *  breaking ties. An effect no volume enables stays as PostProcessParams::Neutral() has it. */
     static PostProcessParams Evaluate(World* InWorld, const CameraNode* InCamera = nullptr);
 
     /** How strongly this volume applies at InWorldPosition, from 0 up to its weight. */

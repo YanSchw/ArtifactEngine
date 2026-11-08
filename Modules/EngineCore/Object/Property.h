@@ -128,6 +128,25 @@ struct ArrayProperty : public Property {
         : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize), GetElementPtr(getElementPtr), AddDefault(addDefault), Clear(clear) {}
 };
 
+/** A property reached through nested struct members, written as a dotted path such as
+ *  "m_Params.Bloom.Intensity". A path of one segment is a plain property. */
+struct PropertyPath {
+    /** The first segment, the property that owns the change hooks. */
+    Property* Root = nullptr;
+    Property* Leaf = nullptr;
+    /** Offset of the struct holding Leaf, from the start of the instance. */
+    uint64_t ContainerOffset = 0;
+
+    bool IsValid() const { return Leaf != nullptr; }
+    void* GetValuePtr(void* InInstance) const { return (char*)InInstance + ContainerOffset + Leaf->Offset; }
+    void CopyValue(void* OutInstance, const void* InInstance) const;
+
+    static PropertyPath Resolve(const Class& InClass, const String& InPath);
+    static String GetRootName(const String& InPath);
+    /** True when InPath is InAncestor itself or lies inside it. */
+    static bool IsWithin(const String& InPath, const String& InAncestor);
+};
+
 namespace PropertyTypes {
     template<typename T>
     inline bool Matches(Property* InProperty) {

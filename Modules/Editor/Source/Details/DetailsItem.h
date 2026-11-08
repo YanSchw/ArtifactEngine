@@ -15,6 +15,8 @@ public:
 
     DetailsTab* OwnerTab = nullptr;
     int32_t Depth = 0;
+    /** Set by the enclosing category while its toggle is off; the item is drawn dimmed. */
+    bool Inactive = false;
 
     virtual float MeasureHeight(const String& InFilter) const { (void)InFilter; return 0.0f; }
 

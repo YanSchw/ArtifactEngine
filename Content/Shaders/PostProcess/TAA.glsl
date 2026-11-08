@@ -66,7 +66,7 @@ void main() {
     vec2 uv = gl_FragCoord.xy / vec2(size);
 
     // The scene was rendered jittered, so the point at this pixel's centre sits off by the jitter.
-    vec3 current = ToYCoCg(texture(u_Current, uv + u_TaaParams.zw).rgb);
+    vec3 current = ToYCoCg(clamp(texture(u_Current, uv + u_TaaParams.zw).rgb, 0.0, 1.0));
     if (u_TaaParams.y < 0.5) {
         outColor = vec4(FromYCoCg(current), 1.0);
         return;
@@ -79,7 +79,7 @@ void main() {
     for (int y = -1; y <= 1; y++) {
         for (int x = -1; x <= 1; x++) {
             ivec2 neighbour = clamp(texel + ivec2(x, y), ivec2(0), size - 1);
-            vec3 color = ToYCoCg(texelFetch(u_Current, neighbour, 0).rgb);
+            vec3 color = ToYCoCg(clamp(texelFetch(u_Current, neighbour, 0).rgb, 0.0, 1.0));
             neighbourhoodMin = min(neighbourhoodMin, color);
             neighbourhoodMax = max(neighbourhoodMax, color);
             float depth = texelFetch(u_Depth, neighbour, 0).r;

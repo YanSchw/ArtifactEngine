@@ -389,21 +389,23 @@ DetailsRow& DetailsCustomization::AddRow(UINode& InParent, DetailsTab& InTab, co
     return *row;
 }
 
-DetailsEditHandler DetailsCustomization::MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab) {
+DetailsEditHandler DetailsCustomization::MakeEditHandler(const WeakObjectPtr<Object>& InObject, Property* InRootProperty, DetailsTab* InTab,
+                                                         const String& InPropertyPath) {
     const WeakObjectPtr<DetailsTab> tab = InTab;
+    const String path = !InPropertyPath.empty() ? InPropertyPath : InRootProperty ? InRootProperty->Name : String();
     DetailsEditHandler handler;
-    handler.BeginEdit = [InObject, InRootProperty, tab] {
-        if (InRootProperty && tab.Get()) {
-            tab.Get()->RecordEdit("Edit " + PrettyPropertyName(InRootProperty->Name), InObject.Get());
+    handler.BeginEdit = [InObject, path, tab] {
+        if (!path.empty() && tab.Get()) {
+            tab.Get()->RecordEdit("Edit " + PrettyPropertyPath(path), InObject.Get());
         }
     };
-    handler.CommitEdit = [InObject, InRootProperty, tab] {
+    handler.CommitEdit = [InObject, InRootProperty, path, tab] {
         Object* object = InObject.Get();
         if (!object || !InRootProperty) {
             return;
         }
         InRootProperty->NotifyChanged(object);
-        NotifyPropertyEdited(tab.Get(), object, InRootProperty->Name);
+        NotifyPropertyEdited(tab.Get(), object, path);
     };
     return handler;
 }
@@ -417,7 +419,7 @@ void DetailsCustomization::NotifyPropertyEdited(MajorTab* InTab, Object* InObjec
     }
     if (InTab) {
         InTab->OnObjectEdited(InObject);
-        InTab->OnPropertyEdited(InObject, InPropertyName);
+        InTab->OnPropertyEdited(InObject, PropertyPath::GetRootName(InPropertyName));
     }
 }
 
@@ -427,46 +429,85 @@ void DetailsCustomization::NotifyPropertyEdited(DetailsTab* InTab, Object* InObj
         return;
     }
     DetailsCustomization* customization = FindFor(InObject->GetClass());
-    if (customization && customization->RebuildsOnEdit(InPropertyName)) {
+    if (customization && customization->RebuildsOnEdit(PropertyPath::GetRootName(InPropertyName))) {
         InTab->MarkDirty();
     }
 }
 
-void DetailsCustomization::BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyName) {
+static bool BindOverrideActions(const WeakObjectPtr<Object>& InObject, const String& InPropertyPath, DetailsTab* InTab,
+                                std::function<bool()>& OutIsOverridden, std::function<void()>& OutReset) {
     if (!Cast<Node>(InObject.Get())) {
-        return;
+        return false;
     }
-    InRow.IsOverridden = [InObject, InPropertyName] {
+    OutIsOverridden = [InObject, InPropertyPath] {
         Node* node = Cast<Node>(InObject.Get());
-        return node && node->IsPropertyOverridden(InPropertyName);
+        return node && node->IsPropertyOverridden(InPropertyPath);
     };
-    InRow.ResetAction = [InObject, InPropertyName, tab = InRow.OwnerTab] {
-        if (Node* node = Cast<Node>(InObject.Get())) {
-            tab->RecordEdit("Reset " + PrettyPropertyName(InPropertyName), node);
-            node->ResetPropertyToDefault(InPropertyName);
+    OutReset = [InObject, InPropertyPath, tab = WeakObjectPtr<DetailsTab>(InTab)] {
+        Node* node = Cast<Node>(InObject.Get());
+        if (!node || !tab.Get()) {
+            return;
+        }
+        tab.Get()->RecordEdit("Reset " + DetailsCustomization::PrettyPropertyPath(InPropertyPath), node);
+        node->ResetPropertyToDefault(InPropertyPath);
+        if (MajorTab* major = tab.Get()->GetMajorTab()) {
+            major->OnObjectEdited(node);
+            major->OnPropertyEdited(node, PropertyPath::GetRootName(InPropertyPath));
         }
     };
+    return true;
+}
+
+void DetailsCustomization::BindOverride(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, const String& InPropertyPath) {
+    BindOverrideActions(InObject, InPropertyPath, InRow.OwnerTab, InRow.IsOverridden, InRow.ResetAction);
+}
+
+/** A struct with a bool member named Enabled shows it as a checkbox in its category header, and dims
+ *  its other members while it is off. */
+static Property* FindHeaderToggle(const Array<Property*>& InMembers) {
+    for (Property* member : InMembers) {
+        if (member->Name == "Enabled" && Cast<BoolProperty>(member)) {
+            return member;
+        }
+    }
+    return nullptr;
 }
 
 void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
                                           uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
-                                          Property* InRootProperty, const String& InLabel) {
+                                          Property* InRootProperty, const String& InLabel, const String& InParentPath) {
     const uint64_t offset = InBaseOffset + InProperty->Offset;
     Property* root = InRootProperty ? InRootProperty : InProperty;
     const String label = InLabel.empty() ? PrettyPropertyName(InProperty->Name) : InLabel;
+    const String path = !InParentPath.empty() ? InParentPath + "." + InProperty->Name
+                      : InRootProperty ? InRootProperty->Name : InProperty->Name;
 
     const Array<Property*> inner = GetInnerProperties(InProperty);
     if (!inner.IsEmpty()) {
         DetailsCategory& category = AddCategory(InParent, InTab, label, InDepth + 1);
+        Property* toggle = FindHeaderToggle(inner);
+        if (toggle) {
+            const String togglePath = path + "." + toggle->Name;
+            const uint64_t toggleOffset = offset + toggle->Offset;
+            BuildValueEditor(*category.AddHeaderEditor(20.0f), InObject, toggleOffset, toggle,
+                             MakeEditHandler(InObject, root, &InTab, togglePath));
+            category.IsActive = [InObject, toggleOffset] {
+                char* base = ResolveBase(InObject, toggleOffset);
+                return !base || *(bool*)base;
+            };
+            BindOverrideActions(InObject, togglePath, &InTab, category.IsOverridden, category.ResetAction);
+        }
         for (Property* property : inner) {
-            AddPropertyRow(*category.GetBody(), InTab, InObject, offset, property, InDepth + 1, root);
+            if (property != toggle) {
+                AddPropertyRow(*category.GetBody(), InTab, InObject, offset, property, InDepth + 1, root, String(), path);
+            }
         }
         return;
     }
 
     DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
-    BindOverride(row, InObject, root->Name);
-    const DetailsEditHandler onEdited = MakeEditHandler(InObject, root, &InTab);
+    BindOverride(row, InObject, path);
+    const DetailsEditHandler onEdited = MakeEditHandler(InObject, root, &InTab, path);
 
     if (BuildValueEditor(*row.GetValueHost(), InObject, offset, InProperty, onEdited, label)) {
         return;
@@ -515,6 +556,23 @@ String DetailsCustomization::PrettyClassName(const Class& InClass) {
 
 String DetailsCustomization::PrettyPropertyName(const String& InName) {
     return SplitCamelCase(InName.starts_with("m_") ? InName.substr(2) : InName);
+}
+
+String DetailsCustomization::PrettyPropertyPath(const String& InPath) {
+    const size_t firstDot = InPath.find('.');
+    if (firstDot == String::npos) {
+        return PrettyPropertyName(InPath);
+    }
+    String pretty;
+    size_t start = firstDot + 1;
+    while (true) {
+        const size_t dot = InPath.find('.', start);
+        pretty += (pretty.empty() ? "" : " ") + PrettyPropertyName(InPath.substr(start, dot == String::npos ? String::npos : dot - start));
+        if (dot == String::npos) {
+            return pretty;
+        }
+        start = dot + 1;
+    }
 }
 
 DetailsCustomization* DetailsCustomization::FindFor(const Class& InClass) {

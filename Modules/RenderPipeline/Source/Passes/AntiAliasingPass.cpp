@@ -7,8 +7,6 @@
 #include "Rendering/ShaderLibrary.h"
 #include "GameFramework/CameraNode.h"
 
-#include <cstring>
-
 static constexpr uint32_t s_SourceBinding = 16;
 static constexpr uint32_t s_HistoryBinding = 17;
 static constexpr uint32_t s_DepthBinding = 18;
@@ -35,13 +33,6 @@ static float Halton(uint32_t InIndex, uint32_t InBase) {
         InIndex /= InBase;
     }
     return result;
-}
-
-template<typename T>
-static void Upload(UniformBuffer& InBuffer, const T& InData) {
-    void* mapped = InBuffer.MapData(sizeof(T), 0);
-    memcpy(mapped, &InData, sizeof(T));
-    InBuffer.UnmapData();
 }
 
 void AntiAliasingPass::Initialize() {

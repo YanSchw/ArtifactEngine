@@ -26,20 +26,29 @@ float Luma(vec3 InColor) {
     return dot(InColor, vec3(0.299, 0.587, 0.114));
 }
 
+// The chain is HDR; FXAA works on what the display shows.
+vec3 SourceAt(vec2 InUV) {
+    return clamp(texture(u_Source, InUV).rgb, 0.0, 1.0);
+}
+
+vec3 SourceOffset(vec2 InUV, ivec2 InOffset) {
+    return SourceAt(InUV + vec2(InOffset) / vec2(textureSize(u_Source, 0)));
+}
+
 float LumaAt(vec2 InUV) {
-    return Luma(texture(u_Source, InUV).rgb);
+    return Luma(SourceAt(InUV));
 }
 
 void main() {
     vec2 texelSize = 1.0 / vec2(textureSize(u_Source, 0));
     vec2 uv = gl_FragCoord.xy * texelSize;
 
-    vec3 colorCenter = texture(u_Source, uv).rgb;
+    vec3 colorCenter = SourceAt(uv);
     float lumaCenter = Luma(colorCenter);
-    float lumaDown = Luma(textureOffset(u_Source, uv, ivec2(0, -1)).rgb);
-    float lumaUp = Luma(textureOffset(u_Source, uv, ivec2(0, 1)).rgb);
-    float lumaLeft = Luma(textureOffset(u_Source, uv, ivec2(-1, 0)).rgb);
-    float lumaRight = Luma(textureOffset(u_Source, uv, ivec2(1, 0)).rgb);
+    float lumaDown = Luma(SourceOffset(uv, ivec2(0, -1)));
+    float lumaUp = Luma(SourceOffset(uv, ivec2(0, 1)));
+    float lumaLeft = Luma(SourceOffset(uv, ivec2(-1, 0)));
+    float lumaRight = Luma(SourceOffset(uv, ivec2(1, 0)));
 
     float lumaMin = min(lumaCenter, min(min(lumaDown, lumaUp), min(lumaLeft, lumaRight)));
     float lumaMax = max(lumaCenter, max(max(lumaDown, lumaUp), max(lumaLeft, lumaRight)));
@@ -49,10 +58,10 @@ void main() {
         return;
     }
 
-    float lumaDownLeft = Luma(textureOffset(u_Source, uv, ivec2(-1, -1)).rgb);
-    float lumaDownRight = Luma(textureOffset(u_Source, uv, ivec2(1, -1)).rgb);
-    float lumaUpLeft = Luma(textureOffset(u_Source, uv, ivec2(-1, 1)).rgb);
-    float lumaUpRight = Luma(textureOffset(u_Source, uv, ivec2(1, 1)).rgb);
+    float lumaDownLeft = Luma(SourceOffset(uv, ivec2(-1, -1)));
+    float lumaDownRight = Luma(SourceOffset(uv, ivec2(1, -1)));
+    float lumaUpLeft = Luma(SourceOffset(uv, ivec2(-1, 1)));
+    float lumaUpRight = Luma(SourceOffset(uv, ivec2(1, 1)));
 
     // How far the centre stands out from its neighbourhood decides the sub-pixel blur.
     float lumaAverage = (2.0 * (lumaDown + lumaUp + lumaLeft + lumaRight)
@@ -111,5 +120,5 @@ void main() {
     float offset = max(endDarker != centerDarker ? edgeOffset : 0.0, subpixel);
 
     vec2 finalUV = uv + (horizontal ? vec2(0.0, offset * stepLength) : vec2(offset * stepLength, 0.0));
-    outColor = vec4(texture(u_Source, finalUV).rgb, 1.0);
+    outColor = vec4(SourceAt(finalUV), 1.0);
 }
