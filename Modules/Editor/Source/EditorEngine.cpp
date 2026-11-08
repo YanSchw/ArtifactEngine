@@ -10,6 +10,7 @@
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/ShaderLibrary.h"
 #include "Assets/AssetManager.h"
+#include "UI/EditorIcons.h"
 #include "Audio/AudioEngine.h"
 #include "Assets/Scene.h"
 #include "Core/EngineConfig.h"
@@ -153,6 +154,7 @@ void EditorEngine::Initialize() {
     (new AssetManager())->Initialize();
     (new AudioEngine())->Initialize();
     settings.ApplyInterfaceFont();
+    window->SetTitleLogo(EditorIcons::ArtifactLogo());
 
     if (!settings.General.ReopenTabs || !cache.ReopenTabs(*window)) {
         Scene* scene = AssetManager::Get().GetAsset<Scene>(EngineConfig::GetConfigVar<UUID>("DefaultScene"));

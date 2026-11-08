@@ -7,6 +7,8 @@ class UICanvas;
 class UIQuad;
 class UILabel;
 class UIRenderer;
+class UISvg;
+class VectorImage;
 
 /** A general-purpose window with the editor's chrome. */
 class ThemedWindow : public Window {
@@ -26,6 +28,7 @@ public:
     UICanvas* GetCanvas() const { return m_Canvas; }
     UINode* GetContentRoot() const { return m_ContentRoot; }
     void SetTitleText(const String& InText);
+    void SetTitleLogo(VectorImage* InLogo);
 
     virtual void RenderWindow(double InDeltaTime);
     /** Reacting to the user closing the window; return true to let the engine destroy it. */
@@ -59,6 +62,8 @@ private:
     void BuildChrome(const String& InTitle);
 
     UILabel* m_TitleLabel = nullptr;
+    UISvg* m_TitleLogo = nullptr;
+    float m_TitleRightInset = 12.0f;
     bool m_WasCursorDown = false;
     bool m_WasSecondaryDown = false;
 };

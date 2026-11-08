@@ -192,6 +192,9 @@ void EditorWindow::BuildWindowMenu(UIMenuModel& OutMenu) {
 
 void EditorWindow::BuildEditorChrome() {
     BuildTitleBarMenus();
+    if (AssetManager::IsAvailable()) {
+        SetTitleLogo(EditorIcons::ArtifactLogo());
+    }
 
     UIVStack* column = GetContentRoot()->Add<UIVStack>();
     column->Fill();

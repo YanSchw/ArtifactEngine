@@ -12,6 +12,7 @@ public:
     static VectorImage* Get(const char* InUuid) {
         return AssetManager::Get().GetAsset<VectorImage>(UUID::FromString(InUuid));
     }
+    static VectorImage* ArtifactLogo()  { return Get("349fb27d-d2ef-4f75-8529-61d9fc25a4d3"); }
     static VectorImage* Node()          { return Get("b1c2d3e4-0001-4a00-9000-000000000001"); }
     static VectorImage* ArrowDown()     { return Get("b1c2d3e4-0002-4a00-9000-000000000002"); }
     static VectorImage* ArrowRight()    { return Get("b1c2d3e4-0003-4a00-9000-000000000003"); }

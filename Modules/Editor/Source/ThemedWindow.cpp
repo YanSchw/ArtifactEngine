@@ -5,6 +5,7 @@
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/UICanvas.h"
 #include "GameFramework/UIQuad.h"
+#include "GameFramework/UISvg.h"
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/UIRenderer.h"
 #include "InputSystem/KeyboardDevice.h"
@@ -101,6 +102,7 @@ void ThemedWindow::BuildChrome(const String& InTitle) {
     m_TitleLabel->Pivot = Vec2(1.0f, 0.0f);
     m_TitleLabel->Position = Vec2(-labelRightInset, 0.0f);
     m_TitleLabel->Size = { 300.0_px, 1.0_rel };
+    m_TitleRightInset = labelRightInset;
 
     m_ContentRoot = root->Add<UINode>();
     m_ContentRoot->Size = { 1.0_rel, 1.0_rel };
@@ -108,6 +110,21 @@ void ThemedWindow::BuildChrome(const String& InTitle) {
 
 void ThemedWindow::SetTitleText(const String& InText) {
     m_TitleLabel->Text = InText;
+}
+
+void ThemedWindow::SetTitleLogo(VectorImage* InLogo) {
+    if (!m_TitleLogo) {
+        m_TitleLogo = m_TitleBar->Add<UISvg>();
+        m_TitleLogo->Anchor = Vec2(1.0f, 0.5f);
+        m_TitleLogo->Pivot = Vec2(1.0f, 0.5f);
+        m_TitleLogo->Position = Vec2(-m_TitleRightInset, 0.0f);
+        m_TitleLogo->Size = Vec2(EditorStyle::TitleLogoHeight * 5.57f, EditorStyle::TitleLogoHeight);
+        m_TitleLogo->Tint = EditorStyle::TextDim;
+    }
+    m_TitleLogo->Image = InLogo;
+    if (InLogo) {
+        m_TitleLabel->Text = "";
+    }
 }
 
 void ThemedWindow::BuildFrameContext(UIFrameContext& OutContext, double InDeltaTime) {

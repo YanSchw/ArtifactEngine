@@ -68,6 +68,7 @@ public:
 
     // Metrics
     inline static constexpr float TitleBarHeight = 36.0f;
+    inline static constexpr float TitleLogoHeight = 13.0f;
     inline static constexpr float ToolBarHeight = 40.0f;
     inline static constexpr float BottomBarHeight = 34.0f;
     inline static constexpr float TabHeaderHeight = 26.0f;
