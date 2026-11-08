@@ -4,6 +4,8 @@
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIDropdown.h"
+#include "UI/UIContextMenu.h"
+#include "Settings/EditorSettings.h"
 #include "UI/UIViewportSurface.h"
 #include "UI/EditorDragDrop.h"
 #include "Gizmos/GizmoLayer.h"
@@ -30,6 +32,7 @@
 #include "GameFramework/UIHStack.h"
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UIImage.h"
+#include "GameFramework/UISvg.h"
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/UIWorld.h"
 #include "Core/Log.h"
@@ -37,7 +40,8 @@
 #include <format>
 
 static constexpr float s_ToolBarHeight = 30.0f;
-static constexpr float s_ViewGroupWidth = 424.0f;
+static constexpr float s_ViewGroupWidth = 476.0f;
+static constexpr float s_GizmoArrowWidth = 18.0f;
 static constexpr float s_DefaultDropDistance = 8.0f;
 static constexpr float s_MaxDropDistance = 200.0f;
 static const Vec4 s_DesignClearColor = HexColor(0x1B1B1E);
@@ -255,7 +259,7 @@ void ViewportTab::BuildToolBar(UINode& InToolBar) {
     viewGroup->Gap = 6.0f;
 
     UIHStack* sceneView = viewGroup->Add<UIHStack>();
-    sceneView->Size = { 338.0_px, 1.0_rel };
+    sceneView->Size = { 390.0_px, 1.0_rel };
     sceneView->Gap = 4.0f;
     BuildSceneViewOptions(*sceneView);
 
@@ -310,10 +314,59 @@ void ViewportTab::BuildSceneViewOptions(UINode& InParent) {
     view->SelectionChanged = [this](int32_t InIndex) { m_BufferViewIndex = InIndex - 1; };
     view->Add<UITooltip>()->Text = "View";
 
+    BuildGizmoOptions(InParent);
+
     UIButton& stats = EditorStyle::ToolButton(InParent, EditorIcons::Stats(), "Render stats",
                                               [this] { m_ShowRenderStats = !m_ShowRenderStats; });
     UIButton* statsPtr = &stats;
     stats.Bind = [this, statsPtr] { EditorStyle::SetToggled(*statsPtr, m_ShowRenderStats); };
+}
+
+static void ToggleSetting(bool& InValue) {
+    InValue = !InValue;
+    EditorSettings::Get().Save();
+}
+
+static void BuildGizmoMenu(UIMenuModel& OutMenu) {
+    EditorGizmoSettings& gizmos = EditorSettings::Get().Gizmos;
+    auto toggle = [&OutMenu](const String& InLabel, bool& InValue) -> UIMenuModel& {
+        bool* value = &InValue;
+        return OutMenu.Toggle(InLabel, [value] { return *value; }, [value] { ToggleSetting(*value); });
+    };
+
+    toggle("Show Gizmos", gizmos.ShowGizmos).Shortcut("G");
+    OutMenu.Section("Gizmos");
+    toggle("Cameras", gizmos.Cameras).Icon(EditorIcons::GetNodeIcon(CameraNode::StaticClass()));
+    toggle("Directional Lights", gizmos.DirectionalLights).Icon(EditorIcons::DirectionalLight());
+    toggle("Point Lights", gizmos.PointLights).Icon(EditorIcons::PointLight());
+    toggle("Audio Sources", gizmos.AudioSources).Icon(EditorIcons::Audio());
+    toggle("Audio Listeners", gizmos.AudioListeners).Icon(EditorIcons::AudioListener());
+    toggle("Colliders", gizmos.Colliders).Icon(EditorIcons::BoxShape());
+    toggle("Characters", gizmos.Characters).Icon(EditorIcons::Character());
+    toggle("Post Process Volumes", gizmos.PostProcessVolumes).Icon(EditorIcons::PostProcessVolume());
+}
+
+void ViewportTab::BuildGizmoOptions(UINode& InParent) {
+    UIHStack* group = InParent.Add<UIHStack>();
+    group->Size = { UIValue(EditorStyle::ToolButtonWidth + s_GizmoArrowWidth), 1.0_rel };
+
+    UIButton& toggle = EditorStyle::ToolButton(*group, EditorIcons::Gizmos(), "Gizmos (G)",
+                                               [] { ToggleSetting(EditorSettings::Get().Gizmos.ShowGizmos); });
+    EditorStyle::StyleSegment(toggle, true, false);
+    UIButton* togglePtr = &toggle;
+    toggle.Bind = [togglePtr] { EditorStyle::SetToggled(*togglePtr, EditorSettings::Get().Gizmos.ShowGizmos); };
+
+    UIButton& menu = EditorStyle::ToolButton(*group, EditorIcons::ArrowDown(), "Gizmo visibility", nullptr, s_GizmoArrowWidth);
+    UIButton* menuButton = &menu;
+    EditorStyle::StyleSegment(menu, false, true);
+    menu.Clicked = [menuButton] {
+        UIMenuModel model;
+        BuildGizmoMenu(model);
+        UIContextMenu::OpenUnder(*menuButton, model);
+    };
+    if (Node* child = menu.GetChildByClass(UISvg::StaticClass())) {
+        child->As<UISvg>()->Center(Vec2(9.0f));
+    }
 }
 
 UICanvas* ViewportTab::FindWorldCanvas() const {
@@ -554,6 +607,8 @@ void ViewportTab::UpdateToolShortcuts() {
         m_TransformGizmo->Mode = GizmoMode::Scale;
     } else if (keyboard->IsDown(KeyCode::X)) {
         m_TransformGizmo->Space = m_TransformGizmo->Space == GizmoSpace::World ? GizmoSpace::Local : GizmoSpace::World;
+    } else if (keyboard->IsDown(KeyCode::G)) {
+        ToggleSetting(EditorSettings::Get().Gizmos.ShowGizmos);
     }
 }
 

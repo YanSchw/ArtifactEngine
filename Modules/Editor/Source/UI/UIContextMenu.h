@@ -27,7 +27,7 @@ public:
 
     static float HeightFor(const UIMenuEntry& InEntry);
 
-    void SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, bool InArrowColumn);
+    void SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, float InRightInset);
     const UIMenuEntry& GetEntry() const { return m_Entry; }
     bool IsHighlighted() const;
 
@@ -37,6 +37,7 @@ public:
 
 private:
     void ApplyColors(bool InHighlighted);
+    void PaintToggleBox(UIDrawList& OutDrawList, bool InChecked) const;
 
     UIMenuEntry m_Entry;
     UISvg* m_Icon = nullptr;

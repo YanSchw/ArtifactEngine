@@ -44,6 +44,7 @@ void EditorSettings::ResetToDefaults() {
     General = EditorGeneralSettings();
     Appearance = EditorAppearanceSettings();
     Viewport = EditorViewportSettings();
+    Gizmos = EditorGizmoSettings();
 }
 
 void EditorSettings::Sanitize() {

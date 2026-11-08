@@ -47,6 +47,37 @@ struct EditorViewportSettings {
     float DefaultFlySpeed = 5.0f;
 };
 
+struct EditorGizmoSettings {
+    ARTIFACT_STRUCT();
+
+    PROPERTY()
+    bool ShowGizmos = true;
+
+    PROPERTY()
+    bool Cameras = true;
+
+    PROPERTY()
+    bool DirectionalLights = true;
+
+    PROPERTY()
+    bool PointLights = true;
+
+    PROPERTY()
+    bool AudioSources = true;
+
+    PROPERTY()
+    bool AudioListeners = true;
+
+    PROPERTY()
+    bool Colliders = true;
+
+    PROPERTY()
+    bool Characters = true;
+
+    PROPERTY()
+    bool PostProcessVolumes = true;
+};
+
 /** Editor-only preferences shared by every project, stored in the user's config directory. */
 class EditorSettings : public Object {
 public:
@@ -63,6 +94,9 @@ public:
 
     PROPERTY()
     EditorViewportSettings Viewport;
+
+    PROPERTY()
+    EditorGizmoSettings Gizmos;
 
     void Load();
     void Save() const;

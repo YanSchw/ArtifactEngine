@@ -43,6 +43,7 @@ private:
 
     void BuildToolBar(UINode& InToolBar);
     void BuildSceneViewOptions(UINode& InParent);
+    void BuildGizmoOptions(UINode& InParent);
     void BuildRenderStats(UINode& InParent);
     void BuildSceneTools(UINode& InParent);
     void BuildDesignTools(UINode& InParent);

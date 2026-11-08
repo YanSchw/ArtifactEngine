@@ -1,5 +1,6 @@
 #include "GizmoLayer.h"
 #include "Tabs/MajorTab.h"
+#include "Settings/EditorSettings.h"
 #include "UI/EditorStyle.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Mesh.h"
@@ -8,6 +9,9 @@
 #include "GameFramework/CameraNode.h"
 #include "GameFramework/DebugDraw.h"
 #include "GameFramework/DirectionalLightNode.h"
+#include "GameFramework/PointLightNode.h"
+#include "GameFramework/AudioSourceNode.h"
+#include "GameFramework/AudioListenerNode.h"
 #include "GameFramework/Node3D.h"
 #include "GameFramework/PostProcessVolumeNode.h"
 #include <algorithm>
@@ -19,6 +23,10 @@ static const Vec4 s_TriggerColor = HexColor(0x4ADE80);
 static const Vec4 s_CharacterColor = HexColor(0xD98FA8);
 static const Vec4 s_SunColor = HexColor(0xFFD98A);
 static const Vec4 s_VolumeColor = HexColor(0xB48CF2);
+static const Vec4 s_AudioColor = HexColor(0x5EEAD4);
+static const Vec4 s_ListenerColor = HexColor(0x2DD4BF);
+static constexpr float s_RangeAlpha = 0.45f;
+static constexpr float s_MarkerSize = 0.35f;
 static constexpr float s_ScreenScale = 0.13f;
 static constexpr float s_MinScale = 0.12f;
 static constexpr float s_MaxScale = 8.0f;
@@ -125,52 +133,113 @@ void GizmoLayer::DrawSunDirection(World* InWorld, DirectionalLightNode* InLight)
     }
 }
 
+static Vec4 WithAlpha(const Vec4& InColor, float InAlpha) {
+    return Vec4(Vec3(InColor), InAlpha);
+}
+
+void GizmoLayer::DrawMarker(World* InWorld, const Vec3& InCenter, float InSize, const Vec4& InColor) const {
+    const Vec3 tips[6] = { Vec3(InSize, 0, 0), Vec3(-InSize, 0, 0), Vec3(0, InSize, 0),
+                           Vec3(0, -InSize, 0), Vec3(0, 0, InSize), Vec3(0, 0, -InSize) };
+    for (int32_t a = 0; a < 6; a++) {
+        for (int32_t b = a + 1; b < 6; b++) {
+            if (a / 2 != b / 2) {
+                DebugDraw::Line(InWorld, InCenter + tips[a], InCenter + tips[b], InColor, s_GizmoThickness);
+            }
+        }
+    }
+}
+
+void GizmoLayer::DrawPointLight(World* InWorld, PointLightNode* InLight, float InMarkerScale, bool InSelected) const {
+    const Vec4 lightColor = WithAlpha(InLight->GetColor(), 1.0f);
+    DrawMarker(InWorld, InLight->GetPosition(), s_MarkerSize * InMarkerScale, InSelected ? s_CameraSelectedColor : lightColor);
+    if (InSelected) {
+        DebugDraw::Sphere(InWorld, InLight->GetPosition(), InLight->GetRadius(), WithAlpha(lightColor, s_RangeAlpha), s_GizmoThickness);
+    }
+}
+
+void GizmoLayer::DrawAudioSource(World* InWorld, AudioSourceNode* InSource, float InMarkerScale, bool InSelected) const {
+    const Vec4 color = InSelected ? s_CameraSelectedColor : s_AudioColor;
+    DrawMarker(InWorld, InSource->GetPosition(), s_MarkerSize * InMarkerScale, color);
+    if (!InSelected || !InSource->IsSpatial()) {
+        return;
+    }
+    const AudioAttenuation& attenuation = InSource->GetAttenuation();
+    DebugDraw::Sphere(InWorld, InSource->GetPosition(), attenuation.MinDistance, WithAlpha(s_AudioColor, 0.8f), s_GizmoThickness);
+    DebugDraw::Sphere(InWorld, InSource->GetPosition(), attenuation.MaxDistance, WithAlpha(s_AudioColor, s_RangeAlpha), s_GizmoThickness);
+}
+
+void GizmoLayer::DrawAudioListener(World* InWorld, AudioListenerNode* InListener, float InMarkerScale) const {
+    const float size = s_MarkerSize * InMarkerScale;
+    const Vec3 position = InListener->GetPosition();
+    DrawMarker(InWorld, position, size, s_ListenerColor);
+    DebugDraw::Line(InWorld, position, position + InListener->GetForwardVector() * size * 3.0f, s_ListenerColor, s_GizmoThickness);
+}
+
+void GizmoLayer::CollectNode(World* InWorld, Node3D* InNode, CameraNode* InViewCamera, bool InSelected,
+                             const EditorGizmoSettings& InSettings, Array<GizmoDraw>& OutGizmos) const {
+    const Class nodeClass = InNode->GetClass();
+
+    if (nodeClass.IsSubclassOf(Class("ShapeNode"))) {
+        if (InSettings.Colliders) {
+            DrawShapeOutline(InWorld, InNode);
+        }
+    } else if (nodeClass.IsSubclassOf(Class("CharacterNode"))) {
+        if (InSettings.Characters) {
+            DrawCharacterOutline(InWorld, InNode);
+        }
+    }
+
+    if (DirectionalLightNode* light = InNode->As<DirectionalLightNode>()) {
+        if (InSettings.DirectionalLights) {
+            DrawSunDirection(InWorld, light);
+        }
+    } else if (PointLightNode* pointLight = InNode->As<PointLightNode>()) {
+        if (InSettings.PointLights) {
+            DrawPointLight(InWorld, pointLight, ScaleForDistance(pointLight->GetPosition(), InViewCamera), InSelected);
+        }
+    } else if (AudioSourceNode* source = InNode->As<AudioSourceNode>()) {
+        if (InSettings.AudioSources) {
+            DrawAudioSource(InWorld, source, ScaleForDistance(source->GetPosition(), InViewCamera), InSelected);
+        }
+    } else if (AudioListenerNode* listener = InNode->As<AudioListenerNode>()) {
+        if (InSettings.AudioListeners) {
+            DrawAudioListener(InWorld, listener, ScaleForDistance(listener->GetPosition(), InViewCamera));
+        }
+    } else if (PostProcessVolumeNode* volume = InNode->As<PostProcessVolumeNode>()) {
+        if (InSettings.PostProcessVolumes && !volume->IsGlobal()) {
+            DebugDraw::Box(InWorld, volume->GetPosition(), glm::abs(volume->GetExtents() * volume->GetScale()),
+                           volume->GetRotation(), InSelected ? s_CameraSelectedColor : s_VolumeColor, s_GizmoThickness);
+        }
+    }
+
+    CameraNode* camera = InNode->As<CameraNode>();
+    if (!camera || camera == InViewCamera || !InSettings.Cameras) {
+        return;
+    }
+
+    const Vec4 cameraColor = InSelected ? s_CameraSelectedColor : s_CameraColor;
+    DrawCameraFrustum(InWorld, camera, cameraColor);
+
+    if (Mesh* cameraMesh = m_CameraMesh.Get()) {
+        GizmoDraw draw;
+        draw.MeshPtr = cameraMesh;
+        draw.Transform = Node3D::CalculateTransformMatrix(camera->GetPosition(), camera->GetRotation(), Vec3(1.0));
+        draw.Color = cameraColor;
+        draw.NodeId = camera->GetNodeId();
+        OutGizmos.Add(draw);
+    }
+}
+
 void GizmoLayer::Collect(World* InWorld, CameraNode* InViewCamera, MajorTab* InMajorTab, Array<GizmoDraw>& OutGizmos) {
-    Mesh* cameraMesh = m_CameraMesh.Get();
-    if (!InWorld) {
+    const EditorGizmoSettings& settings = EditorSettings::Get().Gizmos;
+    if (!InWorld || !settings.ShowGizmos) {
         return;
     }
 
     for (Node* node : InWorld->GetAllNodes()) {
         Node3D* node3D = node->As<Node3D>();
-        if (!node3D || !node3D->IsEnabled()) {
-            continue;
-        }
-
-        const Class nodeClass = node3D->GetClass();
-        const bool selected = InMajorTab && InMajorTab->IsSelected(node3D);
-
-        if (nodeClass.IsSubclassOf(Class("ShapeNode"))) {
-            DrawShapeOutline(InWorld, node3D);
-        } else if (nodeClass.IsSubclassOf(Class("CharacterNode"))) {
-            DrawCharacterOutline(InWorld, node3D);
-        }
-
-        if (DirectionalLightNode* light = node3D->As<DirectionalLightNode>()) {
-            DrawSunDirection(InWorld, light);
-        }
-
-        PostProcessVolumeNode* volume = node3D->As<PostProcessVolumeNode>();
-        if (volume && !volume->IsGlobal()) {
-            DebugDraw::Box(InWorld, volume->GetPosition(), glm::abs(volume->GetExtents() * volume->GetScale()),
-                           volume->GetRotation(), selected ? s_CameraSelectedColor : s_VolumeColor, s_GizmoThickness);
-        }
-
-        CameraNode* camera = node3D->As<CameraNode>();
-        if (!camera || camera == InViewCamera) {
-            continue;
-        }
-
-        const Vec4 cameraColor = selected ? s_CameraSelectedColor : s_CameraColor;
-        DrawCameraFrustum(InWorld, camera, cameraColor);
-
-        if (cameraMesh) {
-            GizmoDraw draw;
-            draw.MeshPtr = cameraMesh;
-            draw.Transform = Node3D::CalculateTransformMatrix(camera->GetPosition(), camera->GetRotation(), Vec3(1.0));
-            draw.Color = cameraColor;
-            draw.NodeId = camera->GetNodeId();
-            OutGizmos.Add(draw);
+        if (node3D && node3D->IsEnabled()) {
+            CollectNode(InWorld, node3D, InViewCamera, InMajorTab && InMajorTab->IsSelected(node3D), settings, OutGizmos);
         }
     }
 }

@@ -17,6 +17,8 @@ struct UIMenuEntry {
     bool Enabled = true;
     bool Checked = false;
     std::function<void()> Activated;
+    /* Set for toggles: drawn as a live checkbox, and activating one keeps the menu open. */
+    std::function<bool()> IsChecked;
     /* Filled the moment the row opens, so submenu content is only built when it is shown. */
     std::function<void(UIMenuModel&)> Submenu;
 };
@@ -48,6 +50,15 @@ public:
         UIMenuEntry entry;
         entry.Label = InLabel;
         entry.Submenu = std::move(InBuild);
+        m_Entries.Add(std::move(entry));
+        return *this;
+    }
+
+    UIMenuModel& Toggle(const String& InLabel, std::function<bool()> InIsChecked, std::function<void()> InToggled) {
+        UIMenuEntry entry;
+        entry.Label = InLabel;
+        entry.IsChecked = std::move(InIsChecked);
+        entry.Activated = std::move(InToggled);
         m_Entries.Add(std::move(entry));
         return *this;
     }

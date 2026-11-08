@@ -17,6 +17,8 @@
 static constexpr float s_SidePadding = 10.0f;
 static constexpr float s_IconColumn = 32.0f;
 static constexpr float s_ArrowColumn = 22.0f;
+static constexpr float s_ToggleColumn = 34.0f;
+static constexpr float s_ToggleSize = 13.0f;
 static constexpr float s_ShortcutGap = 30.0f;
 static constexpr float s_PanelPadding = 4.0f;
 static constexpr float s_CornerRadius = 5.0f;
@@ -87,10 +89,9 @@ float UIMenuRow::HeightFor(const UIMenuEntry& InEntry) {
     }
 }
 
-void UIMenuRow::SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, bool InArrowColumn) {
+void UIMenuRow::SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, float InRightInset) {
     m_Entry = InEntry;
     const bool action = (m_Entry.Type == UIMenuEntry::Kind::Action);
-    const float rightInset = InArrowColumn ? s_ArrowColumn : s_SidePadding;
 
     Size = { 1.0_rel, UIValue(HeightFor(m_Entry)) };
     Interactable = action;
@@ -103,11 +104,11 @@ void UIMenuRow::SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, bool InA
     m_Label->Text = m_Entry.Label;
     m_Label->FontSize = action ? EditorStyle::FontSize : SectionFontSize();
     m_Label->Position = Vec2(action ? InLabelLeft : s_SidePadding, 0.0f);
-    m_Label->Size = { 1.0_rel - UIValue::Px(InLabelLeft + rightInset), 1.0_rel };
+    m_Label->Size = { 1.0_rel - UIValue::Px(InLabelLeft + InRightInset), 1.0_rel };
 
     m_Shortcut->SetEnabled(!m_Entry.Shortcut.empty());
     m_Shortcut->Text = m_Entry.Shortcut;
-    m_Shortcut->Position = Vec2(-rightInset, 0.0f);
+    m_Shortcut->Position = Vec2(-InRightInset, 0.0f);
 
     m_Arrow->SetEnabled(action && (bool)m_Entry.Submenu);
 
@@ -130,7 +131,7 @@ void UIMenuRow::ApplyColors(bool InHighlighted) {
     }
 
     m_Label->Color = text;
-    m_Icon->Tint = text;
+    m_Icon->Tint = (m_Entry.IsChecked && !m_Entry.IsChecked()) ? EditorStyle::TextDim : text;
     m_Arrow->Tint = text;
     m_Shortcut->Color = InHighlighted ? EditorStyle::TextBright
                                       : (m_Entry.Enabled ? EditorStyle::TextDim : s_DisabledText);
@@ -163,6 +164,27 @@ void UIMenuRow::Paint(UIDrawList& OutDrawList) {
         const Vec4 tick = m_Entry.Enabled ? EditorStyle::AccentBright : s_DisabledText;
         OutDrawList.AddLine(center + Vec2(-5.0f, 0.0f), center + Vec2(-1.5f, 3.5f), 2.0f, tick, m_WorldMatrix);
         OutDrawList.AddLine(center + Vec2(-1.5f, 3.5f), center + Vec2(5.0f, -4.0f), 2.0f, tick, m_WorldMatrix);
+    }
+
+    if (m_Entry.IsChecked) {
+        PaintToggleBox(OutDrawList, m_Entry.IsChecked());
+    }
+}
+
+void UIMenuRow::PaintToggleBox(UIDrawList& OutDrawList, bool InChecked) const {
+    const float size = s_ToggleSize;
+    const Vec2 min(m_Geometry.Max().x - s_SidePadding - size, m_Geometry.Center().y - size * 0.5f);
+    const UIRectF box(min, Vec2(size));
+    const Vec4 border = IsHighlighted() ? EditorStyle::TextBright : (InChecked ? EditorStyle::Accent : EditorStyle::FieldBorder);
+    OutDrawList.AddRoundedRect(box, border, 3.0f, m_WorldMatrix);
+    OutDrawList.AddRoundedRect(box.Deflate(UIPadding(1.0f)), InChecked ? EditorStyle::Accent : EditorStyle::PanelDark,
+                               2.0f, m_WorldMatrix);
+    if (InChecked) {
+        const Vec2 p0 = min + Vec2(size) * Vec2(0.24f, 0.52f);
+        const Vec2 p1 = min + Vec2(size) * Vec2(0.43f, 0.70f);
+        const Vec2 p2 = min + Vec2(size) * Vec2(0.76f, 0.30f);
+        OutDrawList.AddLine(p0, p1, 1.8f, EditorStyle::TextBright, m_WorldMatrix);
+        OutDrawList.AddLine(p1, p2, 1.8f, EditorStyle::TextBright, m_WorldMatrix);
     }
 }
 
@@ -283,12 +305,14 @@ void UIMenuPanel::RebuildRows() {
 
     bool iconColumn = false;
     bool arrowColumn = false;
+    bool toggleColumn = false;
     for (int32_t index : visible) {
         iconColumn = iconColumn || entries[index].Icon || entries[index].Checked;
         arrowColumn = arrowColumn || (bool)entries[index].Submenu;
+        toggleColumn = toggleColumn || (bool)entries[index].IsChecked;
     }
     const float labelLeft = iconColumn ? s_IconColumn : s_SidePadding;
-    const float rightInset = arrowColumn ? s_ArrowColumn : s_SidePadding;
+    const float rightInset = toggleColumn ? s_ToggleColumn : (arrowColumn ? s_ArrowColumn : s_SidePadding);
 
     float width = std::max(m_Model.GetMinWidth(), s_MinPanelWidth);
     float height = 0.0f;
@@ -308,7 +332,7 @@ void UIMenuPanel::RebuildRows() {
         UIMenuRow* row = m_List->Add<UIMenuRow>();
         row->Owner = this;
         row->Index = index;
-        row->SetEntry(entries[index], labelLeft, arrowColumn);
+        row->SetEntry(entries[index], labelLeft, rightInset);
     }
 
     const float chrome = 2.0f + 2.0f * s_PanelPadding + (m_Search ? s_SearchHeight : 0.0f);
@@ -351,7 +375,11 @@ void UIMenuPanel::PlaceUnder(const UIRectF& InAnchorRect) {
     if (y + height > canvas.Max().y - s_ScreenMargin) {
         y = InAnchorRect.Min().y - height - 2.0f;
     }
-    PlaceAt(Vec2(InAnchorRect.Min().x, y));
+    float x = InAnchorRect.Min().x;
+    if (x + Size.X.Pixels > canvas.Max().x - s_ScreenMargin) {
+        x = InAnchorRect.Max().x - Size.X.Pixels;
+    }
+    PlaceAt(Vec2(x, y));
 }
 
 void UIMenuPanel::ActivateRow(int32_t InIndex) {
@@ -365,6 +393,12 @@ void UIMenuPanel::ActivateRow(int32_t InIndex) {
     }
     if (entry.Submenu) {
         OpenSubmenu(InIndex);
+        return;
+    }
+    if (entry.IsChecked) {
+        if (entry.Activated) {
+            entry.Activated();
+        }
         return;
     }
 

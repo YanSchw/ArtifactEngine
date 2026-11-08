@@ -76,6 +76,7 @@ public:
     static VectorImage* Lit()           { return Get("3a824297-6560-4cc0-9d68-3c55b640d21b"); }
     static VectorImage* BufferView()    { return Get("27323ef9-9e7d-4712-816f-1613c2d7bf48"); }
     static VectorImage* Stats()         { return Get("ef2ce730-dc8f-40bf-a5ab-7cd2b4b07e9e"); }
+    static VectorImage* Gizmos()        { return Get("20d37e29-0971-43cf-ab35-5d0535719822"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
     static VectorImage* GetAssetIcon(const Class& InClass);
