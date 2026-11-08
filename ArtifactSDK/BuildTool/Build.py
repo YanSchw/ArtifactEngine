@@ -11,8 +11,10 @@ MSVC_PATTERN = re.compile(
 )
 
 GCC_CLANG_PATTERN = re.compile(
-    r'^(.*?):(\d+)(?::(\d+))?:\s+(error|warning):\s+(.*)$'
+    r'^(.*?):(\d+)(?::(\d+))?:\s+(?:fatal\s+)?(error|warning):\s+(.*)$'
 )
+
+FAILURE_HINT_PATTERN = re.compile(r'FAILED:|undefined reference|multiple definition|ld returned|(?<![\w-])(?:fatal )?error\b|cannot find|No such file', re.IGNORECASE)
 
 def parse_output(output: str):
     errors = []
@@ -261,8 +263,9 @@ def _report_diagnostics(job, errors, warnings, returncode, combined):
     # doesn't match the compiler patterns), show the tail of the raw output so
     # the actual failure is still visible.
     if not errors:
-        tail = [ln for ln in combined.splitlines() if ln.strip()][-12:]
-        for line in tail:
+        lines = [ln for ln in combined.splitlines() if ln.strip()]
+        hints = [ln for ln in lines if FAILURE_HINT_PATTERN.search(ln)]
+        for line in (hints[:30] or lines[-12:]):
             _persist(job, f"{Style.DIM}{line}{Style.RESET_ALL}")
 
     summary = f"{Fore.RED}✖ Build failed{Style.RESET_ALL} with {len(errors)} error(s)"

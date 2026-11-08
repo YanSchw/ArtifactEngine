@@ -204,7 +204,7 @@ class Win64VulkanSDK(Dependency):
 # --- Linux -----------------------------------------------------------------
 
 VULKAN_PACKAGES = {
-    "apt": ["libvulkan-dev", "vulkan-tools", "vulkan-validationlayers-dev", "spirv-tools", "glslang-tools"],
+    "apt": ["libvulkan-dev", "vulkan-tools", "vulkan-validationlayers", "spirv-tools", "glslang-tools"],
     "dnf": ["vulkan-headers", "vulkan-loader-devel", "vulkan-tools", "vulkan-validation-layers",
             "glslang", "spirv-tools"],
     "pacman": ["vulkan-headers", "vulkan-icd-loader", "vulkan-tools", "vulkan-validation-layers",
