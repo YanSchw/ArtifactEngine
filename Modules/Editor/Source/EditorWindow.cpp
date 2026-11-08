@@ -22,6 +22,7 @@
 #include "UI/EditorIcons.h"
 #include "UI/UIContextMenu.h"
 #include "UI/UIMajorTabHandle.h"
+#include "UI/UIDragNumber.h"
 #include "HeroTools/HeroTool.h"
 #include "HeroTools/ContentDrawer.h"
 #include "HeroTools/ConsoleTool.h"
@@ -546,6 +547,26 @@ void EditorWindow::CloseHeroTool() {
     ClearChildren(m_DrawerBody);
 }
 
+static void CollectTabStops(UINode* InNode, Array<UINode*>& OutStops) {
+    if (!InNode->IsEnabled()) {
+        return;
+    }
+    if (InNode->As<UIDragNumber>() || InNode->As<UITextArea>()) {
+        OutStops.Add(InNode);
+        return;
+    }
+    for (uint32_t i = 0; i < InNode->GetChildCount(); i++) {
+        if (UINode* child = InNode->GetChild((int)i)->As<UINode>()) {
+            CollectTabStops(child, OutStops);
+        }
+    }
+}
+
+static UINode* GetTabStop(UITextArea* InFocused) {
+    UINode* parent = InFocused->GetParent() ? InFocused->GetParent()->As<UINode>() : nullptr;
+    return parent && parent->As<UIDragNumber>() ? parent : InFocused;
+}
+
 void EditorWindow::HandleShortcuts() {
     if (!IsFocused()) {
         return;
@@ -557,6 +578,21 @@ void EditorWindow::HandleShortcuts() {
     UICanvas* canvas = GetContentRoot() ? GetContentRoot()->GetCanvas() : nullptr;
     UINode* focused = canvas ? canvas->GetFocusedNode() : nullptr;
     if (focused && focused->As<UITextArea>()) {
+        if (keyboard->IsDown(KeyCode::Tab)) {
+            Array<UINode*> stops;
+            CollectTabStops(canvas, stops);
+            const int32_t index = stops.IndexOf(GetTabStop(focused->As<UITextArea>()));
+            if (index >= 0 && stops.Size() > 1) {
+                const bool back = keyboard->IsPressed(KeyCode::LeftShift) || keyboard->IsPressed(KeyCode::RightShift);
+                UINode* next = stops[(index + (back ? stops.Size() - 1 : 1)) % stops.Size()];
+                if (UIDragNumber* number = next->As<UIDragNumber>()) {
+                    number->BeginEdit();
+                } else if (UITextArea* area = next->As<UITextArea>()) {
+                    canvas->SetFocus(area);
+                    area->SelectAll();
+                }
+            }
+        }
         return;
     }
     const bool ctrl = keyboard->IsPressed(KeyCode::LeftControl) || keyboard->IsPressed(KeyCode::RightControl)

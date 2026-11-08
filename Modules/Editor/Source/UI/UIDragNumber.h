@@ -31,8 +31,9 @@ public:
     virtual void OnReleased(bool InInside) override;
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
 
-private:
     void BeginEdit();
+
+private:
     void CommitEdit(const String& InText);
     void EndEdit();
     void WriteValue(double InValue);
