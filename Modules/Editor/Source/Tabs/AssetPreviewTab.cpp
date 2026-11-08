@@ -35,6 +35,9 @@ static constexpr float s_SwaySpeed = 0.9f;
 static constexpr float s_SpinSpeed = 0.6f;
 static constexpr float s_DragSpeed = 0.008f;
 static constexpr float s_PitchLimit = 1.4f;
+static constexpr float s_ZoomStep = 0.9f;
+static constexpr float s_MinZoom = 0.15f;
+static constexpr float s_MaxZoom = 3.0f;
 
 static Mesh* FindMeshNamed(const String& InName) {
     for (Asset* asset : AssetManager::Get().GetAssetsOfClass(Mesh::StaticClass())) {
@@ -263,6 +266,14 @@ void AssetPreviewTab::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
     m_Pitch = glm::clamp(m_Pitch - InDelta.y * s_DragSpeed, -s_PitchLimit, s_PitchLimit);
 }
 
+bool AssetPreviewTab::OnScroll(const Vec2& InDelta) {
+    if (!IsHovered()) {
+        return false;
+    }
+    m_Zoom = glm::clamp(m_Zoom * glm::pow(s_ZoomStep, InDelta.y), s_MinZoom, s_MaxZoom);
+    return true;
+}
+
 bool AssetPreviewTab::OnSecondaryClick(const Vec2& InCursorPos) {
     WeakObjectPtr<AssetPreviewTab> self = this;
 
@@ -290,7 +301,7 @@ void AssetPreviewTab::UpdateSceneBuffer(float InDeltaTime, const Mesh& InMesh) {
     const float aspect = m_Height > 0 ? (float)m_Width / (float)m_Height : 1.0f;
     Mat4 projection = glm::perspectiveLH(glm::radians(45.0f), aspect, radius * 0.01f, radius * 50.0f);
     projection[1][1] *= -1.0f;
-    const Vec3 eye = Vec3(0.0f, radius * 0.9f, -radius * 3.2f);
+    const Vec3 eye = Vec3(0.0f, radius * 0.9f, -radius * 3.2f) * m_Zoom;
     const Mat4 view = glm::lookAtLH(eye, Vec3(0.0f), VecUtils::Up);
 
     SceneUniformData data;

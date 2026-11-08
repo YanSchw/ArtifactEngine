@@ -39,6 +39,7 @@ public:
     virtual VectorImage* GetTabIcon() const override;
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
     virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
+    virtual bool OnScroll(const Vec2& InDelta) override;
     virtual bool OnSecondaryClick(const Vec2& InCursorPos) override;
 
     /** Leave unset to preview the mesh's own material. */
@@ -82,4 +83,5 @@ private:
     float m_Yaw = 0.0f;
     float m_Pitch = 0.0f;
     float m_SwayPhase = 0.0f;
+    float m_Zoom = 1.0f;
 };
