@@ -27,6 +27,7 @@ void EngineConfig::LoadConfigVars(const Array<String>& InArgs) {
     SetConfigVar("AudioBufferFrames", "512");
     SetConfigVar("AudioMaxVoices", "128");
     SetConfigVar("DefaultScene", "a1b2c3d4-0001-4a00-9000-000000000001");
+    SetConfigVar("DefaultFont", "f0e1d2c3-b4a5-4967-8899-aabbccddeeff");
 
     // 2. Load frozen ConfigVars from packaged build
 #if defined(AE_PACKAGED)

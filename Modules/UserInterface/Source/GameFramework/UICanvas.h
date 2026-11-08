@@ -48,6 +48,7 @@ public:
     UIInputMode InputMode = UIInputMode::Cursor;
 
     UINode* GetFocusedNode() const { return m_FocusedNode.Get(); }
+    UINode* GetHoveredNode() const { return m_HoveredNode.Get(); }
     void SetFocus(UINode* InNode);
 
     /** Pointer shape requested by the topmost hit (or captured) node this frame. */
@@ -56,9 +57,12 @@ public:
     /** Disables InNode now and deletes it at the start of the next frame. */
     void DestroyDeferred(UINode* InNode);
 
-    /** Runs one UI frame — bind, layout, input, paint — filling OutDrawList and returning the
-     *  canvas->clip projection it must be rendered with. Called by UIRenderer. */
+    /** Runs one UI frame — UpdateFrame, then PaintFrame. */
     Mat4 RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList);
+    /** Bind, layout, input and update, without painting. */
+    void UpdateFrame(const Vec2& InViewportSize, const UIFrameContext& InContext);
+    /** Paints the tree as UpdateFrame left it, returning the canvas->clip projection to render it with. */
+    Mat4 PaintFrame(UIDrawList& OutDrawList);
 
 private:
     float ComputeScaleFactor(const Vec2& InViewportSize) const;
@@ -82,6 +86,8 @@ private:
     WeakObjectPtr<UINode> m_SecondaryNode;
     Array<WeakObjectPtr<UINode>> m_PendingDestroy;
     Vec2 m_LastCursor = Vec2(0.0f);
+    Mat4 m_Projection = Mat4(1.0f);
+    Vec2 m_ViewportSize = Vec2(1.0f);
     Vec2 m_SecondaryPress = Vec2(0.0f);
     CursorIcon m_DesiredCursor = CursorIcon::Arrow;
 };

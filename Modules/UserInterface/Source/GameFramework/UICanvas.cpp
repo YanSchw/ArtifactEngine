@@ -76,6 +76,11 @@ void UICanvas::DestroyDeferred(UINode* InNode) {
 }
 
 Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InContext, UIDrawList& OutDrawList) {
+    UpdateFrame(InViewportSize, InContext);
+    return PaintFrame(OutDrawList);
+}
+
+void UICanvas::UpdateFrame(const Vec2& InViewportSize, const UIFrameContext& InContext) {
     if (!m_PendingDestroy.IsEmpty()) {
         if (RenderingAPI::GetInstance()) {
             RenderingAPI::GetInstance()->WaitIdle();
@@ -86,8 +91,9 @@ Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InCont
         m_PendingDestroy.Clear();
     }
 
-    const Mat4 projection = BuildProjection(InViewportSize);
-    SetViewProjection(projection, InViewportSize.x, InViewportSize.y);
+    m_Projection = BuildProjection(InViewportSize);
+    m_ViewportSize = InViewportSize;
+    SetViewProjection(m_Projection, InViewportSize.x, InViewportSize.y);
 
     const UIRectF canvasRect = ComputeCanvasRect(InViewportSize);
 
@@ -99,8 +105,12 @@ Mat4 UICanvas::RunFrame(const Vec2& InViewportSize, const UIFrameContext& InCont
     // re-layout so Paint below never renders a node that hasn't been laid out yet.
     Layout(canvasRect);
     ResolveCursor(InContext);
+}
+
+Mat4 UICanvas::PaintFrame(UIDrawList& OutDrawList) {
+    SetViewProjection(m_Projection, m_ViewportSize.x, m_ViewportSize.y);
     PaintTree(OutDrawList);
-    return projection;
+    return m_Projection;
 }
 
 void UICanvas::ResolveCursor(const UIFrameContext& InContext) {

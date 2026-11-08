@@ -86,7 +86,7 @@ public:
 
     void AccumulateTextInput(uint32_t InCodepoint);
     /** Characters typed on this window since the last call, layout- and modifier-resolved. */
-    String ConsumeTextInput();
+    virtual String ConsumeTextInput() override;
 
     /** Whether a client-area point (window coordinates) lies in the draggable region of an
      *  application-drawn title bar. Queried by the platform for EditorStyle windows; the OS

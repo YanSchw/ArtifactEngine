@@ -48,6 +48,7 @@ private:
 
     void RenderScene(const UIFrameContext& InContext, const UIRectF& InRect);
     void RenderDesign(const UIFrameContext& InContext, const UIRectF& InRect);
+    void RouteGameUI(const UIFrameContext& InContext, const Vec2& InViewportSize);
     UICanvas* FindWorldCanvas() const;
     void CollectDesignRoots(Array<UINode*>& OutRoots) const;
     void EnsureDesignTarget(uint32_t InWidth, uint32_t InHeight);

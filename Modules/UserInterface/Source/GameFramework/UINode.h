@@ -92,6 +92,8 @@ public:
     class UICanvas* GetCanvas() const;
 
     void RunSubtreeFrame(const UIRectF& InRect, const UIFrameContext& InContext, UIDrawList& OutDrawList);
+    void UpdateSubtreeFrame(const UIRectF& InRect, const UIFrameContext& InContext);
+    void PaintSubtreeFrame(UIDrawList& OutDrawList);
     /** Move the owning canvas's keyboard focus to this node. */
     void RequestFocus();
     /** Clear the owning canvas's focus if this node holds it. */

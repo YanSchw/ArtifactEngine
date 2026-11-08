@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Engine.h"
+#include "GameFramework/UIInput.h"
 #include "GameEngine.gen.h"
 
 class GameEngine : public Engine {
@@ -14,4 +15,6 @@ protected:
 
 private:
     void RenderFrame(double InDeltaTime);
+    void RouteUI(const UIFrameContext& InContext);
+    UIFrameContext ReadUIInput(double InDeltaTime) const;
 };

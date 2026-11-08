@@ -125,10 +125,18 @@ void UINode::UpdateTree(const UIFrameContext& InContext) {
 }
 
 void UINode::RunSubtreeFrame(const UIRectF& InRect, const UIFrameContext& InContext, UIDrawList& OutDrawList) {
+    UpdateSubtreeFrame(InRect, InContext);
+    PaintSubtreeFrame(OutDrawList);
+}
+
+void UINode::UpdateSubtreeFrame(const UIRectF& InRect, const UIFrameContext& InContext) {
     BindTree();
     Layout(InRect);
     UpdateTree(InContext);
     Layout(InRect);
+}
+
+void UINode::PaintSubtreeFrame(UIDrawList& OutDrawList) {
     PaintTree(OutDrawList);
 }
 

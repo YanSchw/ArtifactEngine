@@ -33,6 +33,9 @@ public:
     /** Invoked when the host needs a frame outside the normal tick, e.g. during a live resize. */
     virtual void SetRedrawCallback(const std::function<void()>& InCallback) { (void)InCallback; }
 
+    /** Characters typed since the last call. */
+    virtual String ConsumeTextInput() { return String(); }
+
     virtual void SetCursorLocked(bool InLocked) { (void)InLocked; }
     virtual bool IsCursorLocked() const { return false; }
 

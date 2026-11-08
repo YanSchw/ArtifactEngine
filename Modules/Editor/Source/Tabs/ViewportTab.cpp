@@ -30,6 +30,7 @@
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UIImage.h"
 #include "GameFramework/UIBuilder.h"
+#include "GameFramework/UIWorld.h"
 #include "Core/Log.h"
 
 #include <format>
@@ -356,13 +357,19 @@ void ViewportTab::RenderScene(const UIFrameContext& InContext, const UIRectF& In
     Array<GizmoDraw> gizmos;
     if (!IsPossessedByPlay()) {
         m_GizmoLayer->Collect(GetEditedWorld(), m_Camera.Get(), GetMajorTab(), gizmos);
-    }
-    m_Pipeline->Render(InContext.DeltaTime, params);
+        m_Pipeline->Render(InContext.DeltaTime, params);
+    } else {
+        const Mat4 hostProjection = s_ViewProjection;
+        const float hostWidth = s_ViewportW;
+        const float hostHeight = s_ViewportH;
+        RouteGameUI(InContext, Vec2((float)params.Width, (float)params.Height));
+        m_Pipeline->Render(InContext.DeltaTime, params);
+        SetViewProjection(hostProjection, hostWidth, hostHeight);
 
-    if (IsPossessedByPlay()) {
         m_TransformGizmo->EndDrag();
         m_TransformGizmo->ClearHover();
-        m_ViewportArea->Cursor = CursorIcon::Arrow;
+        UIWorld* ui = UIWorld::Get(GetEditedWorld());
+        m_ViewportArea->Cursor = ui ? ui->GetDesiredCursor() : CursorIcon::Arrow;
         m_SceneTexture->SetView(m_Pipeline->GetFinalImageView());
         return;
     }
@@ -379,6 +386,25 @@ void ViewportTab::RenderScene(const UIFrameContext& InContext, const UIRectF& In
     m_GizmoRenderer->RenderOverlay(m_Pipeline->GetFrameBuffer().Get(), m_Camera.Get(), m_TransformGizmo->BuildGeometry());
 
     m_SceneTexture->SetView(m_Pipeline->GetFinalImageView());
+}
+
+void ViewportTab::RouteGameUI(const UIFrameContext& InContext, const Vec2& InViewportSize) {
+    UIWorld* ui = UIWorld::Get(GetEditedWorld());
+    if (!ui) {
+        return;
+    }
+    const bool hovered = m_ViewportArea->IsHovered();
+    UIFrameContext context = m_ViewportArea->IsFocused() ? InContext : UIFrameContext();
+    context.DeltaTime = InContext.DeltaTime;
+    context.CursorPosition = m_ViewportArea->ToRenderPixel(InContext.CursorPosition);
+    context.CursorDown = InContext.CursorDown;
+    context.CursorPressedThisFrame = hovered && InContext.CursorPressedThisFrame;
+    context.CursorReleasedThisFrame = InContext.CursorReleasedThisFrame;
+    context.SecondaryDown = InContext.SecondaryDown;
+    context.SecondaryPressedThisFrame = hovered && InContext.SecondaryPressedThisFrame;
+    context.SecondaryReleasedThisFrame = InContext.SecondaryReleasedThisFrame;
+    context.ScrollDelta = hovered ? InContext.ScrollDelta : Vec2(0.0f);
+    ui->Route(InViewportSize, context);
 }
 
 void ViewportTab::RenderDesign(const UIFrameContext& InContext, const UIRectF& InRect) {
