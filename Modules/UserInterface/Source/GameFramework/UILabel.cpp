@@ -5,7 +5,7 @@
 void UILabel::Paint(UIDrawList& OutDrawList) {
     UINode::Paint(OutDrawList); // optional background
 
-    Font* font = FontAsset ? FontAsset : GetDefaultFont();
+    Font* font = FontAsset.Get() ? FontAsset.Get() : GetDefaultFont();
     if (!font || Text.empty()) {
         return;
     }
