@@ -61,6 +61,8 @@ public:
     static VectorImage* PointLight()    { return Get("1c3c5fc9-c4ae-4b78-99ac-a84fe1b5feb5"); }
     static VectorImage* DirectionalLight() { return Get("b8fd4487-6c48-48a7-bb71-bf8645260b58"); }
     static VectorImage* PostProcessVolume() { return Get("020164d8-0b57-4f63-b4b1-d99a99d668b3"); }
+    static VectorImage* AmbientLight() { return Get("27aa4090-ce8a-484c-bb1a-f71f78e0e326"); }
+    static VectorImage* Skybox()       { return Get("65a6ac03-930c-484b-8cbd-8e937a91f909"); }
     static VectorImage* Record()        { return Get("5b2c8e14-9d33-4f61-8a72-6c0d51e9b3a4"); }
     static VectorImage* Eye()           { return Get("b1c2d3e4-0004-4a00-9000-000000000004"); }
     static VectorImage* Save()          { return Get("e173f6e2-fc21-4933-b11f-0e1bff34ece1"); }

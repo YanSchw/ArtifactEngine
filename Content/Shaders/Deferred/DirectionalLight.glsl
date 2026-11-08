@@ -18,7 +18,6 @@ void main() {
     if (!ReadGBuffer(texel)) {
         discard;
     }
-    vec3 light = SunLighting(texel.WorldPosition, texel.Normal) + u_AmbientColor.rgb;
-    outColor = vec4(texel.Albedo * light, 1.0);
+    outColor = vec4(texel.Albedo * SunLighting(texel.WorldPosition, texel.Normal), 1.0);
     outNodeId = vec4(0.0);
 }

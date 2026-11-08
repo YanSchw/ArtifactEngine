@@ -214,6 +214,33 @@ struct FilmGrainParams {
     bool Animated = true;
 };
 
+ARTIFACT_ENUM();
+enum class TonemappingMode : uint8_t {
+    None = 0,
+    Linear = 1,
+    Reinhard = 2,
+    Hable = 3,
+    ACES = 4,
+    AgX = 5,
+    Neutral = 6
+};
+
+struct TonemappingParams {
+    ARTIFACT_STRUCT();
+
+    PROPERTY()
+    bool Enabled = false;
+
+    PROPERTY()
+    TonemappingMode Mode = TonemappingMode::ACES;
+
+    PROPERTY()
+    float Exposure = 0.0f;
+
+    PROPERTY()
+    float WhitePoint = 4.0f;
+};
+
 /** Everything the PostProcess stage is configured with. */
 struct PostProcessParams {
     ARTIFACT_STRUCT();
@@ -223,6 +250,9 @@ struct PostProcessParams {
 
     PROPERTY()
     BloomParams Bloom;
+
+    PROPERTY()
+    TonemappingParams Tonemapping;
 
     PROPERTY()
     AntiAliasingParams AntiAliasing;

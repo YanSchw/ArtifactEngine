@@ -7,7 +7,7 @@ layout(binding = 0, std140) uniform SceneBlock {
     vec4 u_CameraPosition;
     vec4 u_SunDirection;
     vec4 u_SunColor;
-    vec4 u_AmbientColor;
+    vec4 u_AmbientCube[6];
     vec4 u_CascadeTexelSizes;
     vec4 u_ShadowParams;
     vec4 u_PointLightPositions[16];

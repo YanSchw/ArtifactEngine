@@ -298,7 +298,8 @@ static void BuildAllClassesMenu(UIMenuModel& OutMenu, const WeakObjectPtr<Outlin
 static void BuildAddChildMenu(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent) {
     OutMenu.Submenu("3D", [InOwner, InParent](UIMenuModel& OutSub) {
         BuildQuickAccessMenu(OutSub, InOwner, InParent,
-                             {"Node3D", "StaticMeshNode", "CameraNode", "CameraController", "DirectionalLightNode", "PointLightNode"});
+                             {"Node3D", "StaticMeshNode", "CameraNode", "CameraController", "DirectionalLightNode", "PointLightNode",
+                              "AmbientLightNode", "SkyboxNode"});
     });
     OutMenu.Submenu("Physics", [InOwner, InParent](UIMenuModel& OutSub) {
         BuildQuickAccessMenu(OutSub, InOwner, InParent,

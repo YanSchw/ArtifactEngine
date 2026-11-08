@@ -57,8 +57,15 @@ vec3 SunLighting(vec3 InWorldPosition, vec3 InNormal) {
     return u_SunColor.rgb * lambert * SunShadow(InWorldPosition, InNormal);
 }
 
+vec3 AmbientLighting(vec3 InNormal) {
+    vec3 weights = InNormal * InNormal;
+    return weights.x * (InNormal.x >= 0.0 ? u_AmbientCube[0].rgb : u_AmbientCube[1].rgb)
+         + weights.y * (InNormal.y >= 0.0 ? u_AmbientCube[2].rgb : u_AmbientCube[3].rgb)
+         + weights.z * (InNormal.z >= 0.0 ? u_AmbientCube[4].rgb : u_AmbientCube[5].rgb);
+}
+
 vec3 ShadeSurface(vec3 InBaseColor, vec3 InNormal, vec3 InWorldPosition) {
     vec3 normal = normalize(InNormal);
     vec3 light = SunLighting(InWorldPosition, normal) + PointLighting(InWorldPosition, normal);
-    return InBaseColor * (light + u_AmbientColor.rgb);
+    return InBaseColor * (light + AmbientLighting(normal));
 }

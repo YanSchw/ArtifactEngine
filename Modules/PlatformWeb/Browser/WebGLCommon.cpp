@@ -85,7 +85,7 @@ void ApplyRenderState(const ShaderRenderState& InState) {
 
     if (testsDepth) {
         glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LESS);
+        glDepthFunc(GL_LEQUAL);
     } else {
         glDisable(GL_DEPTH_TEST);
     }

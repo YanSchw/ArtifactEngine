@@ -232,7 +232,7 @@ void VulkanPipeline::Invalidate() {
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = (renderState.Depth == DepthMode::Test || renderState.Depth == DepthMode::TestWrite) ? VK_TRUE : VK_FALSE;
     depthStencil.depthWriteEnable = (renderState.Depth == DepthMode::Write || renderState.Depth == DepthMode::TestWrite) ? VK_TRUE : VK_FALSE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 

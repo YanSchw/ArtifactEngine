@@ -26,6 +26,7 @@ PostProcessParams PostProcessParams::Neutral() {
     params.ChromaticAberration.Intensity = 0.0f;
     params.Vignette.Intensity = 0.0f;
     params.FilmGrain.Intensity = 0.0f;
+    params.Tonemapping.Mode = TonemappingMode::None;
     return params;
 }
 

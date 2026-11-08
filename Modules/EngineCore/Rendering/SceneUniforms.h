@@ -6,6 +6,7 @@
 struct SceneUniformData {
     static constexpr int32_t ShadowCascadeCount = 4;
     static constexpr int32_t MaxPointLights = 16;
+    static constexpr int32_t AmbientCubeFaces = 6;
 
     Mat4 ViewProjection = Mat4(1.0f);
     Mat4 InverseViewProjection = Mat4(1.0f);
@@ -18,7 +19,7 @@ struct SceneUniformData {
     Vec4 SunDirection = Vec4(0.0f, -1.0f, 0.0f, 0.0f);
     /** rgb: color premultiplied by intensity. */
     Color SunColor = Color(0.0f);
-    Color AmbientColor = Color(0.0f);
+    Color AmbientCube[AmbientCubeFaces] = {};
 
     /** World-space size of one shadow texel, per cascade. */
     Vec4 CascadeTexelSizes = Vec4(0.0f);

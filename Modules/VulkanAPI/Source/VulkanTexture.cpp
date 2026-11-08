@@ -1,5 +1,6 @@
 #include "VulkanTexture.h"
 #include "VulkanImage.h"
+#include "Helpers.h"
 
 #include <cstring>
 
@@ -28,13 +29,15 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
         return;
     }
 
-    size_t imageSize = (size_t)InWidth * InHeight * InChannels;
+    const ImageFormat format = InTextureDesc.Format;
+    const VkFormat vkFormat = VulkanHelpers::ImageFormatToVkFormat(format);
+    size_t imageSize = (size_t)InWidth * InHeight * GetBytesPerPixel(format);
 
     // Create Vulkan image
     ImageDesc imageDesc;
     imageDesc.Width = (uint32_t)InWidth;
     imageDesc.Height = (uint32_t)InHeight;
-    imageDesc.Format = ImageFormat::RGBA8;
+    imageDesc.Format = format;
     imageDesc.Usage = ImageUsage::Sampled | ImageUsage::TransferDst;
     imageDesc.MipLevels = 1; // For now, no mipmaps
 
@@ -81,7 +84,7 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
     // Transition image layout to transfer destination
     AE_ASSERT(m_Image->IsA<VulkanImage>(), "Invalid image type");
     TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(),
-                         VK_FORMAT_R8G8B8A8_UNORM,
+                         vkFormat,
                          VK_IMAGE_LAYOUT_UNDEFINED,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          commandBuffer);
@@ -104,7 +107,7 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
 
     // Transition image layout to shader read
     TransitionImageLayout(m_Image->As<VulkanImage>()->GetVkImage(),
-                         VK_FORMAT_R8G8B8A8_UNORM,
+                         vkFormat,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                          commandBuffer);
@@ -118,7 +121,7 @@ VulkanTexture::VulkanTexture(byte* InPixels, uint32_t InWidth, uint32_t InHeight
     // Create image view
     ImageViewDesc viewDesc;
     viewDesc.ImagePtr = m_Image;
-    viewDesc.Format = ImageFormat::RGBA8;
+    viewDesc.Format = format;
     viewDesc.Aspect = ImageAspect::Color;
 
     m_DefaultView = SharedObjectPtr<ImageView>(new VulkanImageView(viewDesc, *m_VulkanAPI));

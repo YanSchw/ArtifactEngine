@@ -26,3 +26,24 @@ bool StbTexture2DImporter::Import(const String& InFilePath, Array<byte>& OutPixe
     stbi_image_free(pixels);
     return true;
 }
+
+bool StbTexture2DImporter::IsHighDynamicRange(const String& InFilePath) const {
+    return stbi_is_hdr(InFilePath.c_str()) != 0;
+}
+
+bool StbTexture2DImporter::ImportHighDynamicRange(const String& InFilePath, Array<float>& OutPixels, uint32_t& OutWidth, uint32_t& OutHeight) {
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    float* pixels = stbi_loadf(InFilePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    if (!pixels) {
+        return false;
+    }
+
+    OutWidth = (uint32_t)width;
+    OutHeight = (uint32_t)height;
+    OutPixels.Resize((size_t)width * height * 4);
+    memcpy(OutPixels.Data(), pixels, OutPixels.Size() * sizeof(float));
+    stbi_image_free(pixels);
+    return true;
+}

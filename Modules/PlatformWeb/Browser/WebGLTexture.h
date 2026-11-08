@@ -13,7 +13,7 @@ public:
     virtual SharedObjectPtr<ImageView> GetDefaultView() const override { return m_DefaultView; }
 
 private:
-    void Create(const byte* InPixels, uint32_t InWidth, uint32_t InHeight, bool InGenerateMips);
+    void Create(const byte* InPixels, uint32_t InWidth, uint32_t InHeight, ImageFormat InFormat, bool InGenerateMips);
 
     SharedObjectPtr<Image> m_Image;
     SharedObjectPtr<ImageView> m_DefaultView;

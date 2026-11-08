@@ -37,6 +37,15 @@ protected:
     virtual const char* GetShaderKey() const override { return "/Shaders/Deferred/DirectionalLight.glsl"; }
 };
 
+class DeferredAmbientLightPass : public DeferredLightPass {
+public:
+    ARTIFACT_CLASS();
+
+protected:
+    virtual const char* GetShaderKey() const override { return "/Shaders/Deferred/AmbientLight.glsl"; }
+    virtual void Execute(const RenderContext& InContext) override;
+};
+
 class DeferredPointLightPass : public DeferredLightPass {
 public:
     ARTIFACT_CLASS();

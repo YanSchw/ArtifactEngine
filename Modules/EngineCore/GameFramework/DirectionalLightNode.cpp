@@ -248,6 +248,19 @@ void DirectionalLightNode::UpdateCascades(const CameraNode& InCamera) {
     }
 }
 
+DirectionalLightNode* DirectionalLightNode::FindSun(World* InWorld) {
+    if (!InWorld) {
+        return nullptr;
+    }
+    for (Node* node : InWorld->GetAllNodes()) {
+        DirectionalLightNode* light = node->As<DirectionalLightNode>();
+        if (light && light->IsEnabled()) {
+            return light;
+        }
+    }
+    return nullptr;
+}
+
 void DirectionalLightNode::RecordCascadePass(World& InWorld, int32_t InCascade) {
     RenderCommandQueue& renderQueue = RenderingAPI::GetInstance()->GetRenderQueue();
     renderQueue.Push(RenderCommandType::BeginRenderPass, CmdBeginRenderPass{ m_CascadeTargets[InCascade] });

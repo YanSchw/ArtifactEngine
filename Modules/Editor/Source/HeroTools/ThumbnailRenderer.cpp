@@ -10,6 +10,7 @@
 #include "GameFramework/StaticMeshNode.h"
 #include "GameFramework/CameraNode.h"
 #include "GameFramework/DirectionalLightNode.h"
+#include "GameFramework/AmbientLightNode.h"
 #include <cmath>
 
 static constexpr uint32_t s_ThumbnailSize = 128;
@@ -113,6 +114,7 @@ void ThumbnailRenderer::RenderEntry(const UUID& InId, Entry& InEntry) {
         DirectionalLightNode* light = scene->Spawn<DirectionalLightNode>();
         light->SetCastShadows(false);
         light->SetLookDirection(s_LightDirection);
+        scene->Spawn<AmbientLightNode>();
 
         InEntry.Scene = scene;
     }

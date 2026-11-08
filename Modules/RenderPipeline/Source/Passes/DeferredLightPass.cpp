@@ -9,6 +9,21 @@
 #include "Rendering/ShaderTemplate.h"
 #include "GameFramework/World.h"
 #include "GameFramework/PointLightNode.h"
+#include "GameFramework/AmbientLightNode.h"
+
+template<typename T>
+static bool HasEnabledNode(World* InWorld) {
+    if (!InWorld) {
+        return false;
+    }
+    for (Node* node : InWorld->GetAllNodes()) {
+        T* typed = node->As<T>();
+        if (typed && typed->IsEnabled()) {
+            return true;
+        }
+    }
+    return false;
+}
 
 PipelineDesc DeferredLightPass::DescribeGBufferRead(FrameBuffer& InTarget, FrameBuffer& InGBuffer, Shader& InShader,
                                                     Sampler& InSampler, const RenderContext& InContext) {
@@ -41,15 +56,14 @@ void DeferredLightPass::Execute(const RenderContext& InContext) {
     m_Quad.Draw(DescribeGBufferRead(*GetStage()->GetTarget(), *gbuffer, *m_Shader, *m_Sampler, InContext));
 }
 
-void DeferredPointLightPass::Execute(const RenderContext& InContext) {
-    if (!InContext.World) {
-        return;
+void DeferredAmbientLightPass::Execute(const RenderContext& InContext) {
+    if (HasEnabledNode<AmbientLightNode>(InContext.World)) {
+        DeferredLightPass::Execute(InContext);
     }
-    for (Node* node : InContext.World->GetAllNodes()) {
-        PointLightNode* light = node->As<PointLightNode>();
-        if (light && light->IsEnabled()) {
-            DeferredLightPass::Execute(InContext);
-            return;
-        }
+}
+
+void DeferredPointLightPass::Execute(const RenderContext& InContext) {
+    if (HasEnabledNode<PointLightNode>(InContext.World)) {
+        DeferredLightPass::Execute(InContext);
     }
 }

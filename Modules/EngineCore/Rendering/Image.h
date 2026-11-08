@@ -40,6 +40,15 @@ enum class SampleCount : uint32_t {
 
 inline bool IsMultisampled(SampleCount InSamples) { return InSamples != SampleCount::None; }
 
+inline uint32_t GetBytesPerPixel(ImageFormat InFormat) {
+    switch (InFormat) {
+        case ImageFormat::None:    return 0;
+        case ImageFormat::RGBA16F: return 8;
+        case ImageFormat::RGBA32F: return 16;
+        default:                   return 4;
+    }
+}
+
 ARTIFACT_ENUM();
 enum class ImageAspect {
     Color,

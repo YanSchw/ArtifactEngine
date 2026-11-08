@@ -40,6 +40,8 @@ public:
     DirectionalLightNode();
     ~DirectionalLightNode();
 
+    static DirectionalLightNode* FindSun(World* InWorld);
+
     Vec3 GetDirection() const { return GetForwardVector(); }
 
     Color GetColor() const { return m_Color; }
@@ -47,12 +49,6 @@ public:
 
     float GetIntensity() const { return m_Intensity; }
     void SetIntensity(float InIntensity) { m_Intensity = InIntensity; }
-
-    Color GetAmbientColor() const { return m_AmbientColor; }
-    void SetAmbientColor(const Color& InColor) { m_AmbientColor = InColor; }
-
-    float GetAmbientIntensity() const { return m_AmbientIntensity; }
-    void SetAmbientIntensity(float InIntensity) { m_AmbientIntensity = InIntensity; }
 
     bool GetCastShadows() const { return m_CastShadows; }
     void SetCastShadows(bool InCastShadows);
@@ -84,12 +80,6 @@ private:
 
     PROPERTY()
     float m_Intensity = 1.2f;
-
-    PROPERTY()
-    Color m_AmbientColor = Color(0.42f, 0.5f, 0.62f, 1.0f);
-
-    PROPERTY()
-    float m_AmbientIntensity = 0.35f;
 
     PROPERTY()
     bool m_CastShadows = true;

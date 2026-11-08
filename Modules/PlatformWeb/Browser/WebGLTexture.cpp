@@ -12,12 +12,12 @@ WebGLTexture::WebGLTexture(const byte* InPixels, uint32_t InWidth, uint32_t InHe
                            const TextureDesc& InTextureDesc) {
     if (!InPixels) {
         const byte magenta[4] = { 255, 0, 255, 255 };
-        Create(magenta, 1, 1, false);
+        Create(magenta, 1, 1, ImageFormat::RGBA8, false);
         return;
     }
 
     if (InChannels == 4) {
-        Create(InPixels, InWidth, InHeight, InTextureDesc.GenerateMips);
+        Create(InPixels, InWidth, InHeight, InTextureDesc.Format, InTextureDesc.GenerateMips);
         return;
     }
 
@@ -29,16 +29,17 @@ WebGLTexture::WebGLTexture(const byte* InPixels, uint32_t InWidth, uint32_t InHe
             rgba[(int32_t)(texel * 4 + channel)] = present ? InPixels[texel * InChannels + channel] : (channel == 3 ? 255 : 0);
         }
     }
-    Create(rgba.Data(), InWidth, InHeight, InTextureDesc.GenerateMips);
+    Create(rgba.Data(), InWidth, InHeight, ImageFormat::RGBA8, InTextureDesc.GenerateMips);
 }
 
-void WebGLTexture::Create(const byte* InPixels, uint32_t InWidth, uint32_t InHeight, bool InGenerateMips) {
-    const bool mipped = InGenerateMips && InWidth > 1 && InHeight > 1;
+void WebGLTexture::Create(const byte* InPixels, uint32_t InWidth, uint32_t InHeight, ImageFormat InFormat, bool InGenerateMips) {
+    // Generating mips needs a color-renderable format, which only RGBA8 is guaranteed to be.
+    const bool mipped = InGenerateMips && InFormat == ImageFormat::RGBA8 && InWidth > 1 && InHeight > 1;
 
     ImageDesc imageDesc;
     imageDesc.Width = InWidth;
     imageDesc.Height = InHeight;
-    imageDesc.Format = ImageFormat::RGBA8;
+    imageDesc.Format = InFormat;
     imageDesc.Usage = ImageUsage::Sampled | ImageUsage::TransferDst;
     imageDesc.MipLevels = mipped ? GetMipCount(InWidth, InHeight) : 1;
 
@@ -51,7 +52,7 @@ void WebGLTexture::Create(const byte* InPixels, uint32_t InWidth, uint32_t InHei
 
     ImageViewDesc viewDesc;
     viewDesc.ImagePtr = m_Image;
-    viewDesc.Format = ImageFormat::RGBA8;
+    viewDesc.Format = InFormat;
     viewDesc.MipCount = imageDesc.MipLevels;
     m_DefaultView = new WebGLImageView(viewDesc);
 }

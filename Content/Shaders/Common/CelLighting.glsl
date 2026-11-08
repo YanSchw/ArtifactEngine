@@ -65,7 +65,7 @@ vec3 ShadeCel(CelSurface InSurface) {
 
     // The sky reaches upward faces and not much reaches the undersides, which is the whole of the
     // ambient occlusion this model has and most of what gives an unlit side any form at all.
-    vec3 skyLight = u_AmbientColor.rgb * mix(0.35, 1.0, normal.y * 0.5 + 0.5);
+    vec3 skyLight = AmbientLighting(normal) * mix(0.35, 1.0, normal.y * 0.5 + 0.5);
 
     // Two painted colors picked per surface, not one color dimmed: the shade keeps the hue and
     // gains saturation as it darkens, and only it collects the ambient, so the lit band lands on

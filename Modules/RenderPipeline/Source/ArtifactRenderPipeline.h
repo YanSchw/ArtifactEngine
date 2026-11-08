@@ -29,7 +29,6 @@ protected:
 
 private:
     void CreateTargets(uint32_t InWidth, uint32_t InHeight);
-    DirectionalLightNode* FindSunLight(World* InWorld) const;
     void UploadSceneUniforms(const RenderContext& InContext, DirectionalLightNode* InSun);
     void ResolveGBuffer(RenderStage& InGeometry, RenderStage& InLighting, const RenderContext& InContext);
     /** Carries the post processed image, the scene's depth and node ids into the UI stage's target. */

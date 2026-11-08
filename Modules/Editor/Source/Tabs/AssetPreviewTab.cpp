@@ -299,7 +299,9 @@ void AssetPreviewTab::UpdateSceneBuffer(float InDeltaTime, const Mesh& InMesh) {
     data.Time = m_Time;
     data.SunDirection = Vec4(s_KeyLightDirection, 0.0f);
     data.SunColor = Vec4(1.15f, 1.13f, 1.06f, 0.0f);
-    data.AmbientColor = Vec4(0.16f, 0.19f, 0.23f, 0.0f);
+    for (Color& ambient : data.AmbientCube) {
+        ambient = Color(0.16f, 0.19f, 0.23f, 0.0f);
+    }
 
     void* mapped = m_SceneBuffer->MapData(sizeof(data), 0);
     memcpy(mapped, &data, sizeof(data));

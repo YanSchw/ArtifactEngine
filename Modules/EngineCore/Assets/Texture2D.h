@@ -2,6 +2,7 @@
 #include "Asset.h"
 #include "Common/Types.h"
 #include "Object/Pointer.h"
+#include "Rendering/Image.h"
 #include "Texture2D.gen.h"
 
 class Texture;
@@ -28,7 +29,7 @@ public:
     void Reimport();
 
 private:
-    bool ImportSource(Array<byte>& OutPixels, uint32_t& OutWidth, uint32_t& OutHeight) const;
+    bool ImportSource(Array<byte>& OutPixels, uint32_t& OutWidth, uint32_t& OutHeight, ImageFormat& OutFormat) const;
 
     SharedObjectPtr<Texture> m_Texture = nullptr;
 

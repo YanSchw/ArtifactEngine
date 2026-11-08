@@ -12,6 +12,7 @@
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
 #include "GameFramework/PointLightNode.h"
+#include "GameFramework/AmbientLightNode.h"
 
 static const Vec4 s_BackgroundColor = Vec4(0.08f, 0.09f, 0.11f, 1.0f);
 
@@ -90,7 +91,7 @@ void ArtifactRenderPipeline::PrepareFrame(RenderContext& InOutContext) {
         camera->SetAspectRatio(InOutContext.Width / (float)InOutContext.Height);
     }
 
-    DirectionalLightNode* sun = FindSunLight(InOutContext.World);
+    DirectionalLightNode* sun = DirectionalLightNode::FindSun(InOutContext.World);
     const bool shadowsRendered = sun && camera && sun->RenderShadowMaps(*InOutContext.World, *camera);
     if (!shadowsRendered) {
         m_ShadowPlaceholder.Clear();
@@ -157,19 +158,6 @@ void ArtifactRenderPipeline::Composite(RenderStage& InUI, const RenderContext& I
     m_CompositeQuad.Draw(desc);
 }
 
-DirectionalLightNode* ArtifactRenderPipeline::FindSunLight(World* InWorld) const {
-    if (!InWorld) {
-        return nullptr;
-    }
-    for (Node* node : InWorld->GetAllNodes()) {
-        DirectionalLightNode* light = node->As<DirectionalLightNode>();
-        if (light && light->IsEnabled()) {
-            return light;
-        }
-    }
-    return nullptr;
-}
-
 void ArtifactRenderPipeline::UploadSceneUniforms(const RenderContext& InContext, DirectionalLightNode* InSun) {
     m_Time += (float)InContext.DeltaTime;
 
@@ -185,7 +173,6 @@ void ArtifactRenderPipeline::UploadSceneUniforms(const RenderContext& InContext,
     if (InSun) {
         data.SunDirection = Vec4(InSun->GetDirection(), 0.0f);
         data.SunColor = InSun->GetColor() * InSun->GetIntensity();
-        data.AmbientColor = InSun->GetAmbientColor() * InSun->GetAmbientIntensity();
         data.CascadeTexelSizes = InSun->GetCascadeTexelSizes();
         data.ShadowParams = m_ShadowSource.Get() == InSun ? InSun->GetShadowParams() : Vec4(0.0f);
         for (int32_t cascade = 0; cascade < SceneUniformData::ShadowCascadeCount; cascade++) {
@@ -195,6 +182,11 @@ void ArtifactRenderPipeline::UploadSceneUniforms(const RenderContext& InContext,
 
     if (InContext.World) {
         for (Node* node : InContext.World->GetAllNodes()) {
+            AmbientLightNode* ambient = node->As<AmbientLightNode>();
+            if (ambient && ambient->IsEnabled()) {
+                ambient->AccumulateCube(data.AmbientCube);
+                continue;
+            }
             PointLightNode* light = node->As<PointLightNode>();
             if (!light || !light->IsEnabled() || data.PointLightCount >= SceneUniformData::MaxPointLights) {
                 continue;
