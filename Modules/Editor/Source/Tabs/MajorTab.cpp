@@ -76,6 +76,7 @@ Node* MajorTab::SpawnFromAsset(Asset* InAsset, Node& InParent) {
         StaticMeshNode* node = Cast<StaticMeshNode>(InParent.AttachChild(StaticMeshNode::StaticClass()));
         if (node) {
             node->SetMesh(mesh);
+            node->MarkPropertyOverridden("m_Mesh");
             node->SetName(mesh->GetDisplayName());
         }
         return node;
