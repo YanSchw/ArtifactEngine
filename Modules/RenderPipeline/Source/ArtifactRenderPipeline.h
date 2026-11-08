@@ -2,6 +2,7 @@
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/FullscreenQuad.h"
 #include "Rendering/Image.h"
+#include "Rendering/PostProcessPass.h"
 #include "Object/Pointer.h"
 #include "GameFramework/DirectionalLightNode.h"
 #include "ArtifactRenderPipeline.gen.h"
@@ -30,15 +31,24 @@ private:
     DirectionalLightNode* FindSunLight(World* InWorld) const;
     void UploadSceneUniforms(const RenderContext& InContext, DirectionalLightNode* InSun);
     void ResolveGBuffer(RenderStage& InGeometry, RenderStage& InLighting, const RenderContext& InContext);
+    /** Carries the post processed image, the scene's depth and node ids into the UI stage's target. */
+    void Composite(RenderStage& InUI);
 
     RenderStage* m_GeometryStage = nullptr;
     RenderStage* m_LightingStage = nullptr;
     RenderStage* m_ForwardStage = nullptr;
+    RenderStage* m_PostProcessStage = nullptr;
+    RenderStage* m_UIStage = nullptr;
 
     SharedObjectPtr<UniformBuffer> m_SceneUniforms;
     SharedObjectPtr<Shader> m_ResolveShader;
     SharedObjectPtr<Sampler> m_GBufferSampler;
     FullscreenQuad m_ResolveQuad;
+    SharedObjectPtr<Shader> m_CompositeShader;
+    SharedObjectPtr<FrameBuffer> m_SceneTarget;
+    SharedObjectPtr<FrameBuffer> m_CompositeTarget;
+    FullscreenQuad m_CompositeQuad;
+    PostProcessChain m_PostChain;
     ShadowMapPlaceholder m_ShadowPlaceholder;
     WeakObjectPtr<DirectionalLightNode> m_ShadowSource;
     uint32_t m_Width = 0;

@@ -21,6 +21,8 @@ class StaticMeshDeferredPass : public StaticMeshPass {
 public:
     ARTIFACT_CLASS();
 
+    virtual RenderStageName GetStageName() const override { return RenderStageName::DeferredGeometry; }
+
 protected:
     virtual RenderPath GetRenderPath() const override { return RenderPath::Deferred; }
 };
@@ -28,6 +30,8 @@ protected:
 class StaticMeshForwardPass : public StaticMeshPass {
 public:
     ARTIFACT_CLASS();
+
+    virtual RenderStageName GetStageName() const override { return RenderStageName::Forward; }
 
 protected:
     virtual RenderPath GetRenderPath() const override { return RenderPath::Forward; }

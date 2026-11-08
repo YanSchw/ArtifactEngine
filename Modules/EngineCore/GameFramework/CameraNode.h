@@ -38,10 +38,15 @@ public:
     const Mat4& GetViewProjectionMatrix() const { return m_ViewProjection; }
     void SetClearColor(Vec4 color) { m_ClearColor = color; }
     Vec4 GetClearColor() const { return m_ClearColor; }
+    bool IsPostProcessingEnabled() const { return m_EnablePostProcessing; }
+    void SetPostProcessingEnabled(bool InEnabled) { m_EnablePostProcessing = InEnabled; }
 
 protected:
     Mat4 m_Projection = Mat4(1.0f);
     Mat4 m_ViewProjection = Mat4(1.0f);
+
+    PROPERTY()
+    bool m_EnablePostProcessing = true;
 
 private:
     ProjectionType m_ProjectionType = ProjectionType::Perspective;

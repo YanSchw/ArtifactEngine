@@ -131,6 +131,12 @@ void WebGLFrameBuffer::EndPass() {
                           GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
 
+    if (m_Desc.DepthAttachment) {
+        glBlitFramebuffer(0, 0, (GLint)m_Desc.Width, (GLint)m_Desc.Height,
+                          0, 0, (GLint)m_Desc.Width, (GLint)m_Desc.Height,
+                          GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    }
+
     glBindFramebuffer(GL_FRAMEBUFFER, m_FrameBuffer);
     SetDrawBuffers(-1);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

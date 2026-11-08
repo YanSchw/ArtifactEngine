@@ -7,6 +7,63 @@ from HeaderTool.Enum import Enum
 from SDK.Util import get_module_name_from_path, smart_open
 from BuildTool.Module import ArtifactModule
 
+def _code_chars(code: str, start: int):
+    """Yields (index, char) for every character of code from start on that is outside comments and literals."""
+    i = start
+    n = len(code)
+    while i < n:
+        c = code[i]
+        if code.startswith('//', i):
+            end = code.find('\n', i)
+            i = n if end < 0 else end
+            continue
+        if code.startswith('/*', i):
+            end = code.find('*/', i + 2)
+            i = n if end < 0 else end + 2
+            continue
+        if c == '"' or c == "'":
+            j = i + 1
+            while j < n and code[j] != c and code[j] != '\n':
+                j += 2 if code[j] == '\\' else 1
+            i = j + 1
+            continue
+        yield i, c
+        i += 1
+
+
+def _find_scope_end(code: str, open_pos: int) -> int:
+    """Index of the '}' closing the scope whose '{' sits right before open_pos."""
+    depth = 1
+    for i, c in _code_chars(code, open_pos):
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                return i
+    return code.find('};', open_pos)
+
+
+def _top_level(body: str) -> str:
+    """body with every nested scope blanked out (newlines kept)."""
+    code_positions = {i for i, _ in _code_chars(body, 0)}
+    result = []
+    depth = 0
+    for i, c in enumerate(body):
+        is_code = i in code_positions
+        if is_code and c == '}':
+            depth -= 1
+        result.append(' ' if depth > 0 and c != '\n' else c)
+        if is_code and c == '{':
+            depth += 1
+    return ''.join(result)
+
+
+def _find_marker_line(body: str, start_line_num: int, marker: str) -> int:
+    match = re.search(r'\b' + marker + r'\(\);', body)
+    return -1 if match is None else start_line_num + body[:match.start()].count('\n')
+
+
 class HeaderTool:
     def __init__(self, target_platform: str):
         self.target_platform = target_platform
@@ -88,21 +145,11 @@ class HeaderTool:
                 class_name = match.group(1)
                 parent_class = match.group(2)
                 class_start_pos = match.end()
-                # Find end of class by naive closing '};' after class_start_pos
-                # TODO: consider same scope and count opening and closing braces to find the correct end of class body
-                class_body_end_pos = code.find('};', class_start_pos)
-                class_body = code[class_start_pos:class_body_end_pos]
-                # Determine actual line numbers of class body range
+                class_body = _top_level(code[class_start_pos:_find_scope_end(code, class_start_pos)])
                 start_line_num = code[:class_start_pos].count('\n') + 1
-                end_line_num = code[:class_body_end_pos].count('\n') + 1
-                # Extract lines only within this class's body
-                class_lines = code_lines[start_line_num - 1:end_line_num]
-                # Search for ARTIFACT_CLASS() inside this range
-                for offset, line in enumerate(class_lines):
-                    if re.search(r'\bARTIFACT_CLASS\(\);', line):
-                        ARTIFACT_class_line = start_line_num + offset
-                        results.append(Class(class_name, ARTIFACT_class_line, class_body, parent_class, module_name))
-                        break
+                ARTIFACT_class_line = _find_marker_line(class_body, start_line_num, 'ARTIFACT_CLASS')
+                if ARTIFACT_class_line >= 0:
+                    results.append(Class(class_name, ARTIFACT_class_line, class_body, parent_class, module_name))
 
             
             # ARTIFACT_STRUCT()
@@ -110,21 +157,11 @@ class HeaderTool:
             for match in pattern.finditer(code):
                 class_name = match.group(1)
                 class_start_pos = match.end()
-                # Find end of struct by naive closing '};' after class_start_pos
-                # TODO: consider same scope and count opening and closing braces to find the correct end of class body
-                class_body_end_pos = code.find('};', class_start_pos)
-                class_body = code[class_start_pos:class_body_end_pos]
-                # Determine actual line numbers of class body range
+                class_body = _top_level(code[class_start_pos:_find_scope_end(code, class_start_pos)])
                 start_line_num = code[:class_start_pos].count('\n') + 1
-                end_line_num = code[:class_body_end_pos].count('\n') + 1
-                # Extract lines only within this class's body
-                class_lines = code_lines[start_line_num - 1:end_line_num]
-                # Search for ARTIFACT_STRUCT() inside this range
-                for offset, line in enumerate(class_lines):
-                    if re.search(r'\bARTIFACT_STRUCT\(\);', line):
-                        ARTIFACT_struct_line = start_line_num + offset
-                        results.append(Struct(class_name, ARTIFACT_struct_line, class_body))
-                        break
+                ARTIFACT_struct_line = _find_marker_line(class_body, start_line_num, 'ARTIFACT_STRUCT')
+                if ARTIFACT_struct_line >= 0:
+                    results.append(Struct(class_name, ARTIFACT_struct_line, class_body))
 
             # ARTIFACT_ENUM()
             pattern = re.compile(r'enum\s+(class\s+)?(\w+)(?:\s*:\s*([\w:]+))?\s*\{', re.MULTILINE)

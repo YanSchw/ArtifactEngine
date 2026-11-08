@@ -111,6 +111,7 @@ public:
     const ImageViewDesc& GetDesc() const { return m_Desc; }
 
     static SharedObjectPtr<ImageView> Create(const ImageViewDesc& InImageViewDesc);
+    static SharedObjectPtr<ImageView> CreateAttachment(uint32_t InWidth, uint32_t InHeight, ImageFormat InFormat, ImageUsage InUsage);
 protected:
     ImageViewDesc m_Desc;
 };

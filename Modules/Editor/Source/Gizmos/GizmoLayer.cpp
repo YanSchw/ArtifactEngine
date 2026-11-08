@@ -9,6 +9,7 @@
 #include "GameFramework/DebugDraw.h"
 #include "GameFramework/DirectionalLightNode.h"
 #include "GameFramework/Node3D.h"
+#include "GameFramework/PostProcessVolumeNode.h"
 #include <algorithm>
 
 static const Vec4 s_CameraColor = HexColor(0xB9C2CC);
@@ -17,6 +18,7 @@ static const Vec4 s_ColliderColor = HexColor(0xE0566E);
 static const Vec4 s_TriggerColor = HexColor(0x4ADE80);
 static const Vec4 s_CharacterColor = HexColor(0xD98FA8);
 static const Vec4 s_SunColor = HexColor(0xFFD98A);
+static const Vec4 s_VolumeColor = HexColor(0xB48CF2);
 static constexpr float s_ScreenScale = 0.13f;
 static constexpr float s_MinScale = 0.12f;
 static constexpr float s_MaxScale = 8.0f;
@@ -146,6 +148,12 @@ void GizmoLayer::Collect(World* InWorld, CameraNode* InViewCamera, MajorTab* InM
 
         if (DirectionalLightNode* light = node3D->As<DirectionalLightNode>()) {
             DrawSunDirection(InWorld, light);
+        }
+
+        PostProcessVolumeNode* volume = node3D->As<PostProcessVolumeNode>();
+        if (volume && !volume->IsGlobal()) {
+            DebugDraw::Box(InWorld, volume->GetPosition(), glm::abs(volume->GetExtents() * volume->GetScale()),
+                           volume->GetRotation(), selected ? s_CameraSelectedColor : s_VolumeColor, s_GizmoThickness);
         }
 
         CameraNode* camera = node3D->As<CameraNode>();

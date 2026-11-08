@@ -41,6 +41,9 @@ public:
     SampleCount GetSamples() const { return m_Desc.Samples; }
     bool IsMultisampled() const { return ::IsMultisampled(m_Desc.Samples); }
 
+    /** Starts a render pass on this framebuffer, which clears it. */
+    void Begin();
+
     /** Reads back one texel of an R32UI attachment. Stalls the GPU! */
     virtual uint32_t ReadPixelUint(int32_t InAttachment, uint32_t InX, uint32_t InY) const = 0;
 

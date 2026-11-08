@@ -57,6 +57,7 @@ public:
     static VectorImage* InputMapping()  { return Get("3c00f557-6c65-4ca3-b35d-6bfa9c50fd2f"); }
     static VectorImage* Audio()         { return Get("87b011c9-7a52-4b36-880b-f817fdaaa9ca"); }
     static VectorImage* AudioListener() { return Get("a012916e-b923-43e3-bb3d-e85d3d191de2"); }
+    static VectorImage* PostProcessVolume() { return Get("020164d8-0b57-4f63-b4b1-d99a99d668b3"); }
     static VectorImage* Record()        { return Get("5b2c8e14-9d33-4f61-8a72-6c0d51e9b3a4"); }
     static VectorImage* Eye()           { return Get("b1c2d3e4-0004-4a00-9000-000000000004"); }
     static VectorImage* Save()          { return Get("e173f6e2-fc21-4933-b11f-0e1bff34ece1"); }

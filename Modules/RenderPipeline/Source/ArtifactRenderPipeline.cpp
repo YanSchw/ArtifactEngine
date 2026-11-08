@@ -1,7 +1,5 @@
 #include "ArtifactRenderPipeline.h"
-#include "Passes/DebugDrawPass.h"
 #include "Passes/DeferredLightPass.h"
-#include "Passes/StaticMeshPass.h"
 #include "Rendering/RenderingAPI.h"
 #include "Rendering/Sampler.h"
 #include "Rendering/Buffer.h"
@@ -17,33 +15,16 @@
 
 static const Vec4 s_BackgroundColor = Vec4(0.08f, 0.09f, 0.11f, 1.0f);
 
-static SharedObjectPtr<ImageView> CreateAttachment(uint32_t InWidth, uint32_t InHeight, ImageFormat InFormat, ImageUsage InUsage) {
-    ImageDesc imageDesc;
-    imageDesc.Width = InWidth;
-    imageDesc.Height = InHeight;
-    imageDesc.Format = InFormat;
-    imageDesc.Usage = InUsage;
-
-    ImageViewDesc viewDesc;
-    viewDesc.ImagePtr = Image::Create(imageDesc);
-    viewDesc.Format = InFormat;
-    viewDesc.Aspect = (InUsage & ImageUsage::DepthStencil) != ImageUsage::None ? ImageAspect::Depth : ImageAspect::Color;
-    return ImageView::Create(viewDesc);
-}
-
 void ArtifactRenderPipeline::Initialize() {
     m_GeometryStage = SetFirstStage(RenderStageName::DeferredGeometry);
     m_LightingStage = m_GeometryStage->Then(RenderStageName::DeferredLighting);
     m_ForwardStage = m_LightingStage->Then(RenderStageName::Forward);
-
-    m_GeometryStage->AddPass<StaticMeshDeferredPass>();
-    m_LightingStage->AddPass<DeferredDirectionalLightPass>();
-    m_LightingStage->AddPass<DeferredPointLightPass>();
-    m_ForwardStage->AddPass<StaticMeshForwardPass>();
-    m_ForwardStage->AddPass<DebugDrawPass>();
+    m_PostProcessStage = m_ForwardStage->Then(RenderStageName::PostProcess);
+    m_UIStage = m_PostProcessStage->Then(RenderStageName::UI);
 
     m_SceneUniforms = UniformBuffer::Create(0, sizeof(SceneUniformData));
     m_ResolveShader = ShaderLibrary::CreateShader("/Shaders/Deferred/Resolve.glsl");
+    m_CompositeShader = ShaderLibrary::CreateShader("/Shaders/PostProcess/Composite.glsl");
     m_GBufferSampler = Sampler::Create({ FilterMode::Nearest, FilterMode::Nearest,
                                          AddressMode::Clamp, AddressMode::Clamp, AddressMode::Clamp });
     m_ShadowPlaceholder.Create();
@@ -61,10 +42,10 @@ void ArtifactRenderPipeline::CreateTargets(uint32_t InWidth, uint32_t InHeight) 
     gbufferDesc.Width = InWidth;
     gbufferDesc.Height = InHeight;
     for (int32_t attachment = 0; attachment < GBufferLayout::AttachmentCount; attachment++) {
-        gbufferDesc.ColorAttachments.Add(CreateAttachment(InWidth, InHeight, GBufferLayout::Format,
+        gbufferDesc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, GBufferLayout::Format,
                                                           ImageUsage::ColorAttachment | ImageUsage::Sampled));
     }
-    gbufferDesc.DepthAttachment = CreateAttachment(InWidth, InHeight, GBufferLayout::DepthFormat,
+    gbufferDesc.DepthAttachment = ImageView::CreateAttachment(InWidth, InHeight, GBufferLayout::DepthFormat,
                                                    ImageUsage::DepthStencil | ImageUsage::Sampled);
     gbufferDesc.ClearColor = Vec4(0.0f);
     m_GeometryStage->SetTarget(FrameBuffer::Create(gbufferDesc));
@@ -73,18 +54,30 @@ void ArtifactRenderPipeline::CreateTargets(uint32_t InWidth, uint32_t InHeight) 
     sceneDesc.Width = InWidth;
     sceneDesc.Height = InHeight;
     sceneDesc.Samples = SceneSampleCount;
-    sceneDesc.ColorAttachments.Add(CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
+    sceneDesc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
                                                     ImageUsage::ColorAttachment | ImageUsage::Sampled));
     // The id is packed into RGBA8
-    sceneDesc.ColorAttachments.Add(CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
+    sceneDesc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
                                                     ImageUsage::ColorAttachment | ImageUsage::TransferSrc | ImageUsage::Sampled));
-    sceneDesc.DepthAttachment = CreateAttachment(InWidth, InHeight, ImageFormat::Depth32F, ImageUsage::DepthStencil);
+    sceneDesc.DepthAttachment = ImageView::CreateAttachment(InWidth, InHeight, ImageFormat::Depth32F,
+                                                           ImageUsage::DepthStencil | ImageUsage::Sampled);
     sceneDesc.ClearColor = s_BackgroundColor;
     sceneDesc.ClearColors.Add(s_BackgroundColor);
     sceneDesc.ClearColors.Add(Vec4(0.0f));
-    SharedObjectPtr<FrameBuffer> scene = FrameBuffer::Create(sceneDesc);
-    m_LightingStage->SetTarget(scene);
-    m_ForwardStage->SetTarget(scene);
+    m_SceneTarget = FrameBuffer::Create(sceneDesc);
+    m_LightingStage->SetTarget(m_SceneTarget);
+    m_ForwardStage->SetTarget(m_SceneTarget);
+    m_PostProcessStage->SetTarget(m_SceneTarget);
+    m_UIStage->SetTarget(m_SceneTarget);
+
+    FrameBufferDesc compositeDesc = sceneDesc;
+    compositeDesc.ColorAttachments.Clear();
+    compositeDesc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
+                                                                   ImageUsage::ColorAttachment | ImageUsage::Sampled));
+    compositeDesc.ColorAttachments.Add(ImageView::CreateAttachment(InWidth, InHeight, ImageFormat::RGBA8,
+                                                                   ImageUsage::ColorAttachment | ImageUsage::TransferSrc | ImageUsage::Sampled));
+    compositeDesc.DepthAttachment = ImageView::CreateAttachment(InWidth, InHeight, ImageFormat::Depth32F, ImageUsage::DepthStencil);
+    m_CompositeTarget = FrameBuffer::Create(compositeDesc);
 }
 
 void ArtifactRenderPipeline::PrepareFrame(RenderContext& InOutContext) {
@@ -105,12 +98,21 @@ void ArtifactRenderPipeline::PrepareFrame(RenderContext& InOutContext) {
     m_ShadowSource = shadowsRendered ? sun : nullptr;
 
     InOutContext.SceneUniforms = m_SceneUniforms.Get();
+    InOutContext.PostChain = &m_PostChain;
     InOutContext.ShadowMap = shadowsRendered ? sun->GetShadowMapView() : m_ShadowPlaceholder.GetView();
     InOutContext.ShadowSampler = shadowsRendered ? sun->GetShadowSampler() : m_ShadowPlaceholder.GetSampler();
     UploadSceneUniforms(InOutContext, sun);
 }
 
 void ArtifactRenderPipeline::TransitionRenderStage(RenderStage* InFrom, RenderStage& InTo, const RenderContext& InContext) {
+    if (&InTo == m_PostProcessStage) {
+        m_PostChain.Begin(*m_SceneTarget);
+        return;
+    }
+    if (&InTo == m_UIStage) {
+        Composite(InTo);
+        return;
+    }
     if (InFrom && InFrom->GetTarget() == InTo.GetTarget()) {
         return;
     }
@@ -128,6 +130,25 @@ void ArtifactRenderPipeline::ResolveGBuffer(RenderStage& InGeometry, RenderStage
     }
     m_ResolveQuad.Draw(DeferredLightPass::DescribeGBufferRead(*InLighting.GetTarget(), *InGeometry.GetTarget(),
                                                               *m_ResolveShader, *m_GBufferSampler, InContext));
+}
+
+void ArtifactRenderPipeline::Composite(RenderStage& InUI) {
+    // Nothing post processed: the scene's render pass is still open, so overlays go straight into it.
+    if (!m_PostChain.HasProcessed() || !m_CompositeShader) {
+        InUI.SetTarget(m_SceneTarget);
+        return;
+    }
+    InUI.SetTarget(m_CompositeTarget);
+    InUI.BeginTarget();
+
+    const FrameBufferDesc& scene = m_SceneTarget->GetDesc();
+    PipelineDesc desc;
+    desc.Target = m_CompositeTarget;
+    desc.Shader = m_CompositeShader;
+    desc.ImageBindings.Add({ 16, m_PostChain.GetSource(), m_GBufferSampler });
+    desc.ImageBindings.Add({ 17, scene.ColorAttachments[NodeIdAttachment], m_GBufferSampler });
+    desc.ImageBindings.Add({ 18, scene.DepthAttachment, m_GBufferSampler });
+    m_CompositeQuad.Draw(desc);
 }
 
 DirectionalLightNode* ArtifactRenderPipeline::FindSunLight(World* InWorld) const {
@@ -149,7 +170,8 @@ void ArtifactRenderPipeline::UploadSceneUniforms(const RenderContext& InContext,
     SceneUniformData data;
     data.Time = m_Time;
     if (InContext.Camera) {
-        data.ViewProjection = InContext.Camera->GetViewProjectionMatrix();
+        data.ViewProjection = glm::translate(Mat4(1.0f), Vec3(InContext.ProjectionJitter, 0.0f))
+                            * InContext.Camera->GetViewProjectionMatrix();
         data.InverseViewProjection = glm::inverse(data.ViewProjection);
         data.CameraPosition = Vec4(InContext.Camera->GetPosition(), 1.0f);
     }

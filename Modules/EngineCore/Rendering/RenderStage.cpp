@@ -27,7 +27,7 @@ void RenderStage::SetTarget(FrameBuffer* InTarget) {
 
 void RenderStage::BeginTarget() const {
     AE_ASSERT(m_Target, "a stage needs a target before it can begin");
-    RenderingAPI::GetInstance()->GetRenderQueue().Push(RenderCommandType::BeginRenderPass, CmdBeginRenderPass{ m_Target });
+    m_Target->Begin();
 }
 
 void RenderStage::RunPasses(const RenderContext& InContext) {
@@ -38,7 +38,11 @@ void RenderStage::RunPasses(const RenderContext& InContext) {
 
 void RenderStage::AddPass(RenderPass* InPass) {
     AE_ASSERT(InPass && !InPass->GetStage(), "a pass can only be attached to one stage");
-    m_Passes.Add(InPass);
+    int32_t index = m_Passes.Size();
+    while (index > 0 && m_Passes[index - 1]->GetOrderPreferenceIndex() > InPass->GetOrderPreferenceIndex()) {
+        index--;
+    }
+    m_Passes.Insert(index, InPass);
     InPass->Attach(*this);
 }
 

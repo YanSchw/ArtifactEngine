@@ -6,6 +6,9 @@
 #include "Core/EngineConfig.h"
 #include "GameFramework/World.h"
 #include "GameFramework/CameraNode.h"
+#include "GameFramework/PostProcessVolumeNode.h"
+
+#include <algorithm>
 
 static constexpr uint32_t s_PresentBinding = 16;
 static constexpr const char* s_PresentShader = "/Shaders/Passthrough.glsl";
@@ -17,7 +20,29 @@ SharedObjectPtr<RenderPipeline> RenderPipeline::Create() {
 
     pipeline->Initialize();
     AE_ASSERT(pipeline->GetFirstStage(), "a RenderPipeline has to define at least one RenderStage");
+    pipeline->AttachPasses();
     return pipeline;
+}
+
+void RenderPipeline::AttachPasses() {
+    Array<Class> passClasses = Class::GetSubclassesOf(RenderPass::StaticClass());
+    std::sort(passClasses.begin(), passClasses.end(), [](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
+
+    for (const Class& passClass : passClasses) {
+        SharedObjectPtr<RenderPass> pass = Cast<RenderPass>(Object::Create(passClass));
+        if (!pass) {
+            continue;
+        }
+        RenderStage* stage = FindStage(pass->GetStageName());
+        if (!stage) {
+            continue;
+        }
+        if (!pass->CheckSupport()) {
+            AE_WARN("{0} is left out: the rendering API lacks capabilities it requires", pass->GetName());
+            continue;
+        }
+        stage->AddPass(pass.Get());
+    }
 }
 
 RenderStage* RenderPipeline::SetFirstStage(RenderStageName InName) {
@@ -58,12 +83,23 @@ void RenderPipeline::Render(double InDeltaTime, const RenderParams& InParams) {
 
     RenderContext context;
     context.DeltaTime = InDeltaTime;
+    context.FrameIndex = m_FrameIndex++;
     context.Width = glm::max(InParams.Width, 1u);
     context.Height = glm::max(InParams.Height, 1u);
     context.World = InParams.m_World;
     context.Camera = InParams.CameraOverride;
     if (!context.Camera && context.World) {
         context.Camera = context.World->GetMainCamera();
+    }
+    context.PostProcess = PostProcessVolumeNode::Evaluate(context.World, context.Camera);
+    context.PostProcessEnabled = !context.Camera || context.Camera->IsPostProcessingEnabled();
+
+    for (RenderStage* stage = GetFirstStage(); stage; stage = stage->GetNext()) {
+        for (const SharedObjectPtr<RenderPass>& pass : stage->GetPasses()) {
+            if (pass->IsEnabled()) {
+                pass->PrepareFrame(context);
+            }
+        }
     }
     PrepareFrame(context);
 

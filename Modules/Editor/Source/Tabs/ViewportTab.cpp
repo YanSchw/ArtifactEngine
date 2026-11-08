@@ -352,12 +352,12 @@ void ViewportTab::RenderScene(const UIFrameContext& InContext, const UIRectF& In
     params.Height = (uint32_t)glm::max(InRect.Size.y, 1.0f);
     params.m_World = GetEditedWorld();
     params.CameraOverride = GetViewCamera();
-    m_Pipeline->Render(InContext.DeltaTime, params);
 
     Array<GizmoDraw> gizmos;
     if (!IsPossessedByPlay()) {
         m_GizmoLayer->Collect(GetEditedWorld(), m_Camera.Get(), GetMajorTab(), gizmos);
     }
+    m_Pipeline->Render(InContext.DeltaTime, params);
 
     if (IsPossessedByPlay()) {
         m_TransformGizmo->EndDrag();

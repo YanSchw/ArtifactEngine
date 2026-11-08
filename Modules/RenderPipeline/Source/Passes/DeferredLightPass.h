@@ -16,6 +16,8 @@ public:
     static PipelineDesc DescribeGBufferRead(FrameBuffer& InTarget, FrameBuffer& InGBuffer, Shader& InShader,
                                             Sampler& InSampler, const RenderContext& InContext);
 
+    virtual RenderStageName GetStageName() const override { return RenderStageName::DeferredLighting; }
+
 protected:
     virtual const char* GetShaderKey() const = 0;
     virtual void Initialize() override;

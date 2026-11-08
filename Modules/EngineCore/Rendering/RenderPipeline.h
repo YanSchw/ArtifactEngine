@@ -59,6 +59,7 @@ protected:
     RenderStage* SetFirstStage(RenderStageName InName);
 
 private:
+    void AttachPasses();
     void Present(Surface& InSurface);
 
     SharedObjectPtr<RenderStage> m_FirstStage;
@@ -66,4 +67,5 @@ private:
     SharedObjectPtr<Sampler> m_PresentSampler;
     FullscreenQuad m_PresentQuad;
     RenderTimer m_Timer;
+    uint64_t m_FrameIndex = 0;
 };

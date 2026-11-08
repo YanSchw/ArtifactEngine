@@ -6,16 +6,8 @@
 class FrameBuffer;
 class RenderPipeline;
 
-ARTIFACT_ENUM();
-enum class RenderStageName : uint32_t {
-    DeferredGeometry,
-    DeferredLighting,
-    Forward,
-    PostProcess,
-    UI
-};
-
-/** A link in a RenderPipeline's chain of stages. Its passes run in the order they were added. */
+/** A link in a RenderPipeline's chain of stages. Its passes run by their order preference index,
+ *  in the order they were added among equal ones. */
 class RenderStage : public Object {
 public:
     ARTIFACT_CLASS();

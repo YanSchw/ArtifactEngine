@@ -146,6 +146,10 @@ void VulkanFrameBuffer::TransitionToAttachmentLayout(VkCommandBuffer InCmdBuffer
         TransitionAttachment(InCmdBuffer, depthAttachment,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
     }
+    if (IsMultisampled() && IsDepthSampled(m_Desc.DepthAttachment)) {
+        TransitionAttachment(InCmdBuffer, m_Desc.DepthAttachment,
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+    }
 }
 
 static VkImageLayout GetShaderReadLayout(const SharedObjectPtr<ImageView>& InAttachment) {
@@ -218,10 +222,11 @@ uint32_t VulkanFrameBuffer::ReadPixelUint(int32_t InAttachment, uint32_t InX, ui
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(cmd, &beginInfo);
 
-    // The pass left the attachment in its color-attachment layout; borrow it for the copy
-    // and hand it back so the next frame's rendering finds what it expects.
+    // Every pass ends by handing its attachments over for sampling, so that is the layout the
+    // last submitted frame left this one in; borrow it for the copy and hand it back unchanged.
+    const VkImageLayout restingLayout = image->GetShaderReadLayout();
     VulkanHelpers::TransitionImage(cmd, image->GetVkImage(),
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        restingLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         VK_IMAGE_ASPECT_COLOR_BIT);
 
     VkBufferImageCopy region{};
@@ -237,7 +242,7 @@ uint32_t VulkanFrameBuffer::ReadPixelUint(int32_t InAttachment, uint32_t InX, ui
     vkCmdCopyImageToBuffer(cmd, image->GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging, 1, &region);
 
     VulkanHelpers::TransitionImage(cmd, image->GetVkImage(),
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, restingLayout,
         VK_IMAGE_ASPECT_COLOR_BIT);
 
     vkEndCommandBuffer(cmd);
@@ -271,6 +276,14 @@ VkRenderingAttachmentInfo VulkanFrameBuffer::GetDepthAttachmentInfo() const {
     attachmentInfo.storeOp = IsDepthSampled(m_Desc.DepthAttachment) ? VK_ATTACHMENT_STORE_OP_STORE
                                                                     : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachmentInfo.clearValue.depthStencil = {1.0f, 0};
+
+    // A sampled depth of a multisampled pass receives the first sample of each pixel.
+    if (IsMultisampled() && IsDepthSampled(m_Desc.DepthAttachment)) {
+        attachmentInfo.resolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
+        attachmentInfo.resolveImageView = m_Desc.DepthAttachment->As<VulkanImageView>()->GetVkImageView();
+        attachmentInfo.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    }
 
     return attachmentInfo;
 }
