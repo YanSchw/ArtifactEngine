@@ -14,6 +14,7 @@ struct RenderParams {
     uint32_t Height;
     class World* m_World = nullptr;
     class CameraNode* CameraOverride = nullptr;
+    const RenderBufferView* BufferView = nullptr;
     /** Receives the final stage's image. Without one it stays in GetFinalImageView(). */
     Surface* PresentTarget = nullptr;
 };
@@ -44,6 +45,9 @@ public:
 
     const RenderTiming& GetTiming() const { return m_Timer.GetTiming(); }
 
+    /** Every attachment the stages before the final one render, to show in place of the image. */
+    virtual Array<RenderBufferView> GetBufferViews() const;
+
     SharedObjectPtr<FrameBuffer> GetFrameBuffer() const;
     SharedObjectPtr<ImageView> GetFinalImageView() const;
     virtual uint32_t PickNodeId(uint32_t InX, uint32_t InY) const { (void)InX; (void)InY; return 0; }
@@ -57,6 +61,8 @@ protected:
     virtual void TransitionRenderStage(RenderStage* InFrom, RenderStage& InTo, const RenderContext& InContext) = 0;
 
     RenderStage* SetFirstStage(RenderStageName InName);
+    /** Draws InView's attachment, made readable, into the open render pass of InTarget. */
+    void DrawBufferView(const RenderBufferView& InView, FrameBuffer& InTarget, const RenderContext& InContext);
 
 private:
     void AttachPasses();
@@ -66,6 +72,9 @@ private:
     SharedObjectPtr<class Shader> m_PresentShader;
     SharedObjectPtr<Sampler> m_PresentSampler;
     FullscreenQuad m_PresentQuad;
+    SharedObjectPtr<class Shader> m_BufferViewShader;
+    SharedObjectPtr<class UniformBuffer> m_BufferViewUniforms;
+    FullscreenQuad m_BufferViewQuad;
     RenderTimer m_Timer;
     uint64_t m_FrameIndex = 0;
 };

@@ -34,6 +34,7 @@ public:
     String SearchPlaceholder;
 
     std::function<String()> GetSelectedLabel;
+    std::function<VectorImage*()> GetSelectedIcon;
     std::function<Array<UIDropdownOption>()> GetOptions;
     std::function<int32_t()> GetSelectedIndex;
     std::function<void(int32_t)> SelectionChanged;
@@ -47,6 +48,7 @@ public:
 
 private:
     UILabel* m_ValueLabel = nullptr;
+    UISvg* m_ValueIcon = nullptr;
     UISvg* m_Arrow = nullptr;
     WeakObjectPtr<UIDropdownPopup> m_Popup;
 };
@@ -69,6 +71,7 @@ private:
     void RebuildRows();
     void AddRow(int32_t InIndex);
     float RowHeight() const;
+    float LabelLeft() const;
 
     WeakObjectPtr<UIDropdown> m_Owner;
     UINode* m_Panel = nullptr;
@@ -79,5 +82,6 @@ private:
     float m_ListHeight = 0.0f;
     int32_t m_Selected = -1;
     bool m_HasThumbnails = false;
+    bool m_HasIcons = false;
     bool m_CloseRequested = false;
 };

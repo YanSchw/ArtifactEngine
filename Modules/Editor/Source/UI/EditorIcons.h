@@ -57,6 +57,8 @@ public:
     static VectorImage* InputMapping()  { return Get("3c00f557-6c65-4ca3-b35d-6bfa9c50fd2f"); }
     static VectorImage* Audio()         { return Get("87b011c9-7a52-4b36-880b-f817fdaaa9ca"); }
     static VectorImage* AudioListener() { return Get("a012916e-b923-43e3-bb3d-e85d3d191de2"); }
+    static VectorImage* PointLight()    { return Get("1c3c5fc9-c4ae-4b78-99ac-a84fe1b5feb5"); }
+    static VectorImage* DirectionalLight() { return Get("b8fd4487-6c48-48a7-bb71-bf8645260b58"); }
     static VectorImage* PostProcessVolume() { return Get("020164d8-0b57-4f63-b4b1-d99a99d668b3"); }
     static VectorImage* Record()        { return Get("5b2c8e14-9d33-4f61-8a72-6c0d51e9b3a4"); }
     static VectorImage* Eye()           { return Get("b1c2d3e4-0004-4a00-9000-000000000004"); }
@@ -68,6 +70,11 @@ public:
     static VectorImage* RectTool()      { return Get("029e2b33-c934-4392-928b-7e27d38f0bf9"); }
     static VectorImage* WorldSpace()    { return Get("c25d2ba0-a8db-4a5f-a315-5f366fbc8ad0"); }
     static VectorImage* LocalSpace()    { return Get("8cc2ddce-1fc9-4375-b4aa-b6eaed517caa"); }
+    static VectorImage* Perspective()   { return Get("174f84e6-e3bc-431b-8f3c-152cab720fde"); }
+    static VectorImage* Orthographic()  { return Get("5caf61cf-70e6-4d1e-811e-64b79c134e8e"); }
+    static VectorImage* Lit()           { return Get("3a824297-6560-4cc0-9d68-3c55b640d21b"); }
+    static VectorImage* BufferView()    { return Get("27323ef9-9e7d-4712-816f-1613c2d7bf48"); }
+    static VectorImage* Stats()         { return Get("ef2ce730-dc8f-40bf-a5ab-7cd2b4b07e9e"); }
 
     static VectorImage* GetNodeIcon(const Class& InClass);
     static VectorImage* GetAssetIcon(const Class& InClass);

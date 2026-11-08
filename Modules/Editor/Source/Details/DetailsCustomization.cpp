@@ -11,6 +11,7 @@
 #include "UI/UICheckbox.h"
 #include "UI/UIColorSwatch.h"
 #include "HeroTools/ThumbnailRenderer.h"
+#include "GameFramework/UIHStack.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UISvg.h"
@@ -132,6 +133,37 @@ static void BuildNumberEditor(UINode& InHost, const WeakObjectPtr<Object>& InObj
                 } else {
                     *(float*)base = (float)InValue;
                 }
+                InOnEdited();
+            }
+        };
+    }
+}
+
+static int32_t VectorComponentCount(const String& InTypename) {
+    return InTypename == "Vec2" ? 2 : InTypename == "Vec3" ? 3 : InTypename == "Vec4" ? 4 : 0;
+}
+
+static void BuildVectorEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, int32_t InComponents,
+                              const DetailsEditHandler& InOnEdited) {
+    static const char* s_Names[4] = { "X", "Y", "Z", "W" };
+    const Vec4 colors[4] = { EditorStyle::TransformX, EditorStyle::TransformY, EditorStyle::TransformZ, EditorStyle::TextDim };
+
+    UIHStack* stack = InHost.Add<UIHStack>();
+    stack->Fill();
+    stack->Gap = 2.0f;
+    for (int32_t component = 0; component < InComponents; component++) {
+        UIDragNumber* drag = stack->Add<UIDragNumber>();
+        drag->Size = { UIValue::Rel(1.0f / (float)InComponents), 1.0_rel };
+        drag->Prefix = s_Names[component];
+        drag->PrefixColor = colors[component];
+        drag->Get = [InObject, InOffset, component]() -> double {
+            char* base = ResolveBase(InObject, InOffset);
+            return base ? (double)reinterpret_cast<float*>(base)[component] : 0.0;
+        };
+        drag->Set = [InObject, InOffset, component, InOnEdited](double InValue) {
+            if (char* base = ResolveBase(InObject, InOffset)) {
+                InOnEdited.Record();
+                reinterpret_cast<float*>(base)[component] = (float)InValue;
                 InOnEdited();
             }
         };
@@ -273,7 +305,8 @@ static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObject
 
 Array<Property*> DetailsCustomization::GetInnerProperties(Property* InProperty) {
     StructProperty* structProperty = Cast<StructProperty>(InProperty);
-    if (!structProperty || structProperty->InnerStructTypename == "Color") {
+    if (!structProperty || structProperty->InnerStructTypename == "Color"
+        || VectorComponentCount(structProperty->InnerStructTypename) > 0) {
         return Array<Property*>();
     }
     return Property::GetTypeProperties(structProperty->InnerStructTypename);
@@ -290,10 +323,13 @@ bool DetailsCustomization::BuildValueEditor(UINode& InHost, const WeakObjectPtr<
     } else if (EnumProperty* enumProperty = Cast<EnumProperty>(InProperty)) {
         BuildEnumEditor(InHost, InObject, InOffset, enumProperty, InOnEdited);
     } else if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
-        if (structProperty->InnerStructTypename != "Color") {
+        if (const int32_t components = VectorComponentCount(structProperty->InnerStructTypename)) {
+            BuildVectorEditor(InHost, InObject, InOffset, components, InOnEdited);
+        } else if (structProperty->InnerStructTypename == "Color") {
+            BuildColorEditor(InHost, InObject, InOffset, InTitle, InOnEdited);
+        } else {
             return false;
         }
-        BuildColorEditor(InHost, InObject, InOffset, InTitle, InOnEdited);
     } else {
         return false;
     }

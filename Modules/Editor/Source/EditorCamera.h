@@ -18,6 +18,8 @@ public:
     void CancelNavigation();
 
     void Dolly(float InSteps);
+    void SetOrthographicView(bool InOrthographic);
+    bool IsOrthographicView() const { return GetProjectionType() == ProjectionType::Orthographic; }
 
     bool IsNavigating() const { return m_Mode != NavMode::None; }
 

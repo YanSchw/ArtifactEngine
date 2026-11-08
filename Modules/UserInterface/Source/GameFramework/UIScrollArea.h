@@ -12,6 +12,8 @@ public:
     float ScrollSpeed = 40.0f;
     Vec4 ScrollbarColor = Vec4(1.0f, 1.0f, 1.0f, 0.25f);
     float ScrollbarWidth = 4.0f;
+    /** While scrolled to the bottom, stay there as the content grows. */
+    bool StickToBottom = false;
 
     const Vec2& GetContentSize() const { return m_ContentSize; }
 
@@ -27,6 +29,7 @@ protected:
 
 private:
     void ClampScrollOffset();
+    void UpdateStuckToBottom();
     UIRectF ComputeVerticalThumbRect(const UIRectF& InContent) const;
     UIRectF ComputeHorizontalThumbRect(const UIRectF& InContent) const;
     /** Screen point -> local position along InAxis (0=x, 1=y) by parametrizing the cursor along
@@ -38,4 +41,5 @@ private:
     float m_DragGrabOffset = 0.0f;
 
     Vec2 m_ContentSize = Vec2(0.0f);
+    bool m_StuckToBottom = true;
 };

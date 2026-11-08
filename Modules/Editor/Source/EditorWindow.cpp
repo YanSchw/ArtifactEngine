@@ -28,6 +28,7 @@
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/UICanvas.h"
 #include "GameFramework/UIQuad.h"
+#include <format>
 #include "GameFramework/UISvg.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UITextArea.h"
@@ -393,6 +394,14 @@ void EditorWindow::RebuildToolBar() {
     }
 }
 
+static void AddBottomBarDivider(UINode& InRow) {
+    UINode* slot = InRow.Add<UINode>();
+    slot->Size = { 1.0_px, 1.0_rel };
+    UIQuad* line = slot->Add<UIQuad>();
+    line->Center({ 1.0_px, 0.6_rel });
+    line->Color = EditorStyle::FieldBorder;
+}
+
 void EditorWindow::RebuildBottomBar() {
     ClearChildren(m_BottomRow);
 
@@ -402,7 +411,9 @@ void EditorWindow::RebuildBottomBar() {
         }
     }
 
+    AddBottomBarDivider(*m_BottomRow);
     AddLogStatusButton(*m_BottomRow);
+    AddBottomBarDivider(*m_BottomRow);
 
     m_TabBar = m_BottomRow->Add<UIHStack>();
     m_TabBar->Size = { 1.0_rel, 1.0_rel };
@@ -426,11 +437,8 @@ void EditorWindow::RebuildBottomBar() {
             stats->Text = "";
             return;
         }
-        const double ms = m_FrameSeconds * 1000.0;
-        String text = "FPS: " + std::to_string(m_FrameSeconds > 0.0 ? (int)std::lround(1.0 / m_FrameSeconds) : 0);
-        String msText = std::to_string(ms);
-        text += "   " + msText.substr(0, msText.find('.') + 3) + "ms";
-        stats->Text = text;
+        const int fps = m_FrameSeconds > 0.0 ? (int)std::lround(1.0 / m_FrameSeconds) : 0;
+        stats->Text = std::format("{} FPS  \u00B7  {:.2f} ms", fps, m_FrameSeconds * 1000.0);
     };
 
     RebuildTabBar();
@@ -455,6 +463,7 @@ void EditorWindow::AddHeroToolButton(UINode& InRow, HeroTool* InTool) {
     button->NormalColor = EditorStyle::BottomBar;
     button->HoverColor = EditorStyle::TabHover;
     button->PressedColor = EditorStyle::ButtonPressed;
+    button->CornerRadius = Vec4(EditorStyle::ButtonRadius);
 
     HeroTool* toolPtr = InTool;
     button->Clicked = [this, toolPtr] { ToggleHeroTool(toolPtr); };
@@ -497,6 +506,8 @@ void EditorWindow::AddLogStatusButton(UINode& InRow) {
     button->NormalColor = EditorStyle::BottomBar;
     button->HoverColor = EditorStyle::TabHover;
     button->PressedColor = EditorStyle::ButtonPressed;
+    button->CornerRadius = Vec4(EditorStyle::ButtonRadius);
+    button->Add<UITooltip>()->Text = "Console (" + EditorStyle::CommandKey + "+.)";
     button->Clicked = [this, console] { ToggleHeroTool(console); };
     button->Bind = [this, button, console] {
         button->NormalColor = IsHeroToolOpen(console) ? EditorStyle::Panel : EditorStyle::BottomBar;

@@ -29,5 +29,18 @@ bool UIButton::OnSecondaryClick(const Vec2& InCursorPos) {
 
 void UIButton::Paint(UIDrawList& OutDrawList) {
     const Vec4 color = (IsPressed() && IsHovered()) ? PressedColor : (IsHovered() ? HoverColor : NormalColor);
-    OutDrawList.AddRect(m_Geometry, color, m_WorldMatrix);
+    if (CornerRadius == Vec4(0.0f) && BorderColor.a <= 0.0f) {
+        OutDrawList.AddRect(m_Geometry, color, m_WorldMatrix);
+        return;
+    }
+
+    UIRectF fill = m_Geometry;
+    Vec4 radius = CornerRadius;
+    if (BorderColor.a > 0.0f) {
+        OutDrawList.AddRoundedRectEx(m_Geometry, BorderColor, BorderColor,
+                                     radius.x, radius.y, radius.z, radius.w, m_WorldMatrix);
+        fill = UIRectF(m_Geometry.Min() + Vec2(1.0f), m_Geometry.Size - Vec2(2.0f));
+        radius = glm::max(radius - Vec4(1.0f), Vec4(0.0f));
+    }
+    OutDrawList.AddRoundedRectEx(fill, color, color, radius.x, radius.y, radius.z, radius.w, m_WorldMatrix);
 }

@@ -553,16 +553,14 @@ void AnimationTimelineTab::BuildTransport(UINode& InParent) {
     preview->Bind = [this, preview] {
         AnimationEditorTab* editor = GetEditor();
         const bool on = editor && editor->IsPreviewing();
-        preview->NormalColor = on ? EditorStyle::Accent : EditorStyle::Button;
+        EditorStyle::SetToggled(*preview, on);
         preview->HoverColor = on ? EditorStyle::AccentBright : EditorStyle::ButtonHover;
     };
 
     const auto iconButton = [&row](VectorImage* InIcon, float InRotation, const Vec4& InTint, std::function<void()> InAction) {
         UIButton* button = row->Add<UIButton>();
         button->Size = { 26.0_px, 1.0_rel };
-        button->NormalColor = EditorStyle::Button;
-        button->HoverColor = EditorStyle::ButtonHover;
-        button->PressedColor = EditorStyle::ButtonPressed;
+        EditorStyle::StyleButton(*button);
         button->Clicked = std::move(InAction);
         UISvg* icon = button->Add<UISvg>();
         icon->Center(Vec2(11.0f, 11.0f));
@@ -588,7 +586,7 @@ void AnimationTimelineTab::BuildTransport(UINode& InParent) {
     });
     play->Bind = [this, play] {
         AnimationEditorTab* editor = GetEditor();
-        play->NormalColor = (editor && editor->IsPlaying()) ? EditorStyle::Accent : EditorStyle::Button;
+        EditorStyle::SetToggled(*play, editor && editor->IsPlaying());
     };
 
     iconButton(EditorIcons::ArrowRight(), 0.0f, EditorStyle::Text, [this] { StepToAdjacentKey(1); });

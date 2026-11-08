@@ -3,6 +3,7 @@
 #include "MajorTab.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
+#include "UI/UIDropdown.h"
 #include "UI/UIViewportSurface.h"
 #include "UI/EditorDragDrop.h"
 #include "Gizmos/GizmoLayer.h"
@@ -36,6 +37,7 @@
 #include <format>
 
 static constexpr float s_ToolBarHeight = 30.0f;
+static constexpr float s_ViewGroupWidth = 424.0f;
 static constexpr float s_DefaultDropDistance = 8.0f;
 static constexpr float s_MaxDropDistance = 200.0f;
 static const Vec4 s_DesignClearColor = HexColor(0x1B1B1E);
@@ -62,6 +64,7 @@ CameraNode* ViewportTab::GetViewCamera() const {
 ViewportTab::ViewportTab() {
     m_Camera = Object::Create<EditorCamera>();
     m_Pipeline = RenderPipeline::Create();
+    m_BufferViews = m_Pipeline->GetBufferViews();
     m_SceneTexture = Object::Create<RenderTargetTexture>();
     m_GizmoLayer = Object::Create<GizmoLayer>();
     m_GizmoRenderer = Object::Create<GizmoRenderer>();
@@ -108,7 +111,7 @@ void ViewportTab::BuildSceneTools(UINode& InParent) {
                                                    [this, mode] { m_TransformGizmo->Mode = mode; });
         UIButton* buttonPtr = &button;
         button.Bind = [this, buttonPtr, mode] {
-            buttonPtr->NormalColor = (m_TransformGizmo->Mode == mode) ? EditorStyle::Accent : EditorStyle::Button;
+            EditorStyle::SetToggled(*buttonPtr, m_TransformGizmo->Mode == mode);
         };
     }
 
@@ -135,7 +138,7 @@ void ViewportTab::BuildDesignTools(UINode& InParent) {
                                                    [this, tool] { m_LayoutGizmo->Tool = tool; });
         UIButton* buttonPtr = &button;
         button.Bind = [this, buttonPtr, tool] {
-            buttonPtr->NormalColor = (m_LayoutGizmo->Tool == tool) ? EditorStyle::Accent : EditorStyle::Button;
+            EditorStyle::SetToggled(*buttonPtr, m_LayoutGizmo->Tool == tool);
         };
     }
 
@@ -143,7 +146,7 @@ void ViewportTab::BuildDesignTools(UINode& InParent) {
                                                 [this] { m_PreviewInput = !m_PreviewInput; });
     UIButton* previewPtr = &preview;
     preview.Bind = [this, previewPtr] {
-        previewPtr->NormalColor = m_PreviewInput ? EditorStyle::Accent : EditorStyle::Button;
+        EditorStyle::SetToggled(*previewPtr, m_PreviewInput);
     };
 }
 
@@ -204,7 +207,7 @@ void ViewportTab::BuildRenderStats(UINode& InParent) {
         toggle->Clicked = [InPass] { InPass->SetEnabled(!InPass->IsEnabled()); };
         UILabel* caption = toggle->GetChildByClass(UILabel::StaticClass())->As<UILabel>();
         toggle->Bind = [InPass, toggle, caption, name] {
-            toggle->NormalColor = InPass->IsEnabled() ? EditorStyle::Accent : EditorStyle::Button;
+            EditorStyle::SetToggled(*toggle, InPass->IsEnabled());
             caption->Text = !InPass->IsSupported() ? "N/A" : InPass->IsEnabled() ? "On" : "Off";
             name->Color = InPass->IsEnabled() ? EditorStyle::Text : EditorStyle::TextDim;
         };
@@ -220,11 +223,18 @@ void ViewportTab::BuildRenderStats(UINode& InParent) {
     }
 }
 
+static UIDropdownOption IconOption(const char* InLabel, VectorImage* InIcon) {
+    UIDropdownOption option(InLabel);
+    option.Icon = InIcon;
+    option.IconTint = EditorStyle::Text;
+    return option;
+}
+
 void ViewportTab::BuildToolBar(UINode& InToolBar) {
     UIHStack* sceneTools = InToolBar.Add<UIHStack>();
     sceneTools->Anchor = sceneTools->Pivot = Vec2(0.0f);
     sceneTools->Position = Vec2(0.0f);
-    sceneTools->Size = { 1.0_rel - 270.0_px, 1.0_rel };
+    sceneTools->Size = { 1.0_rel - UIValue(s_ViewGroupWidth), 1.0_rel };
     sceneTools->Padding = UIPadding(4.0f, 3.0f);
     sceneTools->Gap = 2.0f;
     BuildSceneTools(*sceneTools);
@@ -232,50 +242,78 @@ void ViewportTab::BuildToolBar(UINode& InToolBar) {
     UIHStack* designTools = InToolBar.Add<UIHStack>();
     designTools->Anchor = designTools->Pivot = Vec2(0.0f);
     designTools->Position = Vec2(0.0f);
-    designTools->Size = { 1.0_rel - 270.0_px, 1.0_rel };
+    designTools->Size = { 1.0_rel - UIValue(s_ViewGroupWidth), 1.0_rel };
     designTools->Padding = UIPadding(4.0f, 3.0f);
     designTools->Gap = 2.0f;
     BuildDesignTools(*designTools);
 
-    InToolBar.Bind = [this, sceneTools, designTools] {
-        sceneTools->SetEnabled(!m_DesignMode);
-        designTools->SetEnabled(m_DesignMode);
-    };
-
     UIHStack* viewGroup = InToolBar.Add<UIHStack>();
     viewGroup->Anchor = viewGroup->Pivot = Vec2(1.0f, 0.0f);
     viewGroup->Position = Vec2(0.0f);
-    viewGroup->Size = { 270.0_px, 1.0_rel };
+    viewGroup->Size = { UIValue(s_ViewGroupWidth), 1.0_rel };
     viewGroup->Padding = UIPadding(4.0f, 3.0f);
-    viewGroup->Gap = 2.0f;
+    viewGroup->Gap = 6.0f;
 
-    UIButton& dimension = UI::Button(*viewGroup, "3D", [this] { m_DesignMode = !m_DesignMode; });
-    dimension.Size = { 44.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(dimension);
-    UIButton* dimensionPtr = &dimension;
-    if (Node* caption = dimension.GetChildByClass(UILabel::StaticClass())) {
-        UILabel* label = caption->As<UILabel>();
-        dimension.Bind = [this, dimensionPtr, label] {
-            label->Text = m_DesignMode ? "2D" : "3D";
-            dimensionPtr->NormalColor = m_DesignMode ? EditorStyle::Accent : EditorStyle::Button;
+    UIHStack* sceneView = viewGroup->Add<UIHStack>();
+    sceneView->Size = { 338.0_px, 1.0_rel };
+    sceneView->Gap = 4.0f;
+    BuildSceneViewOptions(*sceneView);
+
+    InToolBar.Bind = [this, sceneTools, designTools, sceneView] {
+        sceneTools->SetEnabled(!m_DesignMode);
+        designTools->SetEnabled(m_DesignMode);
+        sceneView->SetEnabled(!m_DesignMode);
+    };
+
+    UIHStack* dimension = viewGroup->Add<UIHStack>();
+    dimension->Size = { 64.0_px, 1.0_rel };
+    for (const bool design : { false, true }) {
+        UIButton& button = UI::Button(*dimension, design ? "UI" : "3D", [this, design] { m_DesignMode = design; });
+        button.Size = { 32.0_px, 1.0_rel };
+        EditorStyle::ApplyButtonStyle(button);
+        EditorStyle::StyleSegment(button, !design, design);
+        button.Add<UITooltip>()->Text = design ? "UI design (2)" : "Scene (2)";
+        UIButton* buttonPtr = &button;
+        button.Bind = [this, buttonPtr, design] {
+            EditorStyle::SetToggled(*buttonPtr, m_DesignMode == design);
         };
     }
+}
 
-    UIButton& perspective = UI::Button(*viewGroup, "Perspective", [] { AE_INFO("ViewportTab: Perspective"); });
-    perspective.Size = { 96.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(perspective);
-
-    UIButton& lit = UI::Button(*viewGroup, "Lit", [] { AE_INFO("ViewportTab: Lit"); });
-    lit.Size = { 54.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(lit);
-
-    UIButton& stats = UI::Button(*viewGroup, "Stats", [this] { m_ShowRenderStats = !m_ShowRenderStats; });
-    stats.Size = { 48.0_px, 1.0_rel };
-    EditorStyle::ApplyButtonStyle(stats);
-    UIButton* statsPtr = &stats;
-    stats.Bind = [this, statsPtr] {
-        statsPtr->NormalColor = m_ShowRenderStats ? EditorStyle::Accent : EditorStyle::Button;
+void ViewportTab::BuildSceneViewOptions(UINode& InParent) {
+    UIDropdown* projection = InParent.Add<UIDropdown>();
+    projection->Size = { 124.0_px, 1.0_rel };
+    projection->GetOptions = [] {
+        return Array<UIDropdownOption>{ IconOption("Perspective", EditorIcons::Perspective()),
+                                        IconOption("Orthographic", EditorIcons::Orthographic()) };
     };
+    projection->GetSelectedIndex = [this] { return m_Camera->IsOrthographicView() ? 1 : 0; };
+    projection->GetSelectedLabel = [this] { return String(m_Camera->IsOrthographicView() ? "Orthographic" : "Perspective"); };
+    projection->GetSelectedIcon = [this] {
+        return m_Camera->IsOrthographicView() ? EditorIcons::Orthographic() : EditorIcons::Perspective();
+    };
+    projection->SelectionChanged = [this](int32_t InIndex) { m_Camera->SetOrthographicView(InIndex == 1); };
+    projection->Add<UITooltip>()->Text = "Projection";
+
+    UIDropdown* view = InParent.Add<UIDropdown>();
+    view->Size = { 172.0_px, 1.0_rel };
+    view->GetOptions = [this] {
+        Array<UIDropdownOption> options = { IconOption("Lit", EditorIcons::Lit()) };
+        for (const RenderBufferView& bufferView : m_BufferViews) {
+            options.Add(IconOption(bufferView.Label.c_str(), EditorIcons::BufferView()));
+        }
+        return options;
+    };
+    view->GetSelectedIndex = [this] { return m_BufferViewIndex + 1; };
+    view->GetSelectedLabel = [this] { return m_BufferViewIndex < 0 ? String("Lit") : m_BufferViews[m_BufferViewIndex].Label; };
+    view->GetSelectedIcon = [this] { return m_BufferViewIndex < 0 ? EditorIcons::Lit() : EditorIcons::BufferView(); };
+    view->SelectionChanged = [this](int32_t InIndex) { m_BufferViewIndex = InIndex - 1; };
+    view->Add<UITooltip>()->Text = "View";
+
+    UIButton& stats = EditorStyle::ToolButton(InParent, EditorIcons::Stats(), "Render stats",
+                                              [this] { m_ShowRenderStats = !m_ShowRenderStats; });
+    UIButton* statsPtr = &stats;
+    stats.Bind = [this, statsPtr] { EditorStyle::SetToggled(*statsPtr, m_ShowRenderStats); };
 }
 
 UICanvas* ViewportTab::FindWorldCanvas() const {
@@ -353,6 +391,7 @@ void ViewportTab::RenderScene(const UIFrameContext& InContext, const UIRectF& In
     params.Height = (uint32_t)glm::max(InRect.Size.y, 1.0f);
     params.m_World = GetEditedWorld();
     params.CameraOverride = GetViewCamera();
+    params.BufferView = m_BufferViewIndex < 0 ? nullptr : &m_BufferViews[m_BufferViewIndex];
 
     Array<GizmoDraw> gizmos;
     if (!IsPossessedByPlay()) {

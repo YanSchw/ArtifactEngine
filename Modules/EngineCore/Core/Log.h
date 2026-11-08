@@ -19,6 +19,7 @@ struct LogEntry {
     LogLevel Level = LogLevel::INFO;
     std::string Category;
     std::string Message;
+    int64_t TimeMs = 0; /** Wall-clock milliseconds since the Unix epoch. */
 };
 
 class Logging {

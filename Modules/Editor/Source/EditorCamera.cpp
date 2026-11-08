@@ -10,6 +10,11 @@ static constexpr float s_SpeedStepFactor = 1.25f;
 static constexpr float s_DollyStepFactor = 0.25f;
 static constexpr float s_PanUnitsPerPixel = 0.002f;
 static constexpr float s_MaxLookPixelsPerFrame = 60.0f;
+static constexpr float s_OrthoZoomStepFactor = 0.85f;
+static constexpr float s_OrthoPanPerPixel = 0.0015f;
+static constexpr float s_OrthoMinSize = 0.1f;
+static constexpr float s_OrthoMaxSize = 2000.0f;
+static constexpr float s_OrthoFarClip = 2000.0f;
 
 EditorCamera::EditorCamera() {
     SetName("EditorCamera");
@@ -104,12 +109,26 @@ void EditorCamera::UpdateFly(float InDeltaTime, const Vec2& InCursorDelta) {
 }
 
 void EditorCamera::UpdatePan(const Vec2& InCursorDelta) {
-    const float unitsPerPixel = m_FlySpeed * s_PanUnitsPerPixel;
+    const float unitsPerPixel = IsOrthographicView() ? GetOrthographicSize() * s_OrthoPanPerPixel
+                                                     : m_FlySpeed * s_PanUnitsPerPixel;
     AddWorldOffset((GetRightVector() * InCursorDelta.x - GetUpVector() * InCursorDelta.y) * unitsPerPixel);
 }
 
 void EditorCamera::Dolly(float InSteps) {
+    if (IsOrthographicView()) {
+        SetOrthographicSize(glm::clamp(GetOrthographicSize() * std::pow(s_OrthoZoomStepFactor, InSteps),
+                                       s_OrthoMinSize, s_OrthoMaxSize));
+        return;
+    }
     AddWorldOffset(GetForwardVector() * InSteps * m_FlySpeed * s_DollyStepFactor);
+}
+
+void EditorCamera::SetOrthographicView(bool InOrthographic) {
+    if (InOrthographic) {
+        SetOrthographic(GetOrthographicSize(), 0.01f, s_OrthoFarClip);
+    } else {
+        SetProjectionType(ProjectionType::Perspective);
+    }
 }
 
 void EditorCamera::ApplyYawPitch() {

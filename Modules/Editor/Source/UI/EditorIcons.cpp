@@ -31,6 +31,8 @@ VectorImage* EditorIcons::GetNodeIcon(const Class& InClass) {
         s_NodeIcons["AudioSourceNode"] = Audio();
         s_NodeIcons["AudioListenerNode"] = AudioListener();
         s_NodeIcons["PostProcessVolumeNode"] = PostProcessVolume();
+        s_NodeIcons["PointLightNode"] = PointLight();
+        s_NodeIcons["DirectionalLightNode"] = DirectionalLight();
         s_NodeIcons["UINode"] = Get("d5ff8074-f233-41a8-b202-f6ced99f2d8f");
         s_NodeIcons["UICanvas"] = Get("26818e74-f484-4f52-8f97-b06dcb64c58b");
         s_NodeIcons["UIQuad"] = Get("62670d8d-e97b-4c2e-afdd-3f69ebbddb83");

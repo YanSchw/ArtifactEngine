@@ -22,6 +22,7 @@ public:
     void SetActive(bool InActive) { m_Active = InActive; }
 
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
+    virtual void Paint(UIDrawList& OutDrawList) override;
     virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
     virtual void OnPressed(const Vec2& InCursorPos) override;
     virtual void OnReleased(bool InInside) override;

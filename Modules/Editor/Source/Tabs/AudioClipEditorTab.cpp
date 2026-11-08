@@ -127,7 +127,7 @@ void AudioClipEditorTab::BuildToolBar(UINode& InToolBar) {
     UIButton& loop = EditorStyle::ToolButton(InToolBar, EditorIcons::Loop(), "Loop", [this] { SetLooping(!m_Loop); });
     UIButton* loopButton = &loop;
     loop.Bind = [this, loopButton] {
-        loopButton->NormalColor = m_Loop ? EditorStyle::Accent : EditorStyle::Button;
+        EditorStyle::SetToggled(*loopButton, m_Loop);
         loopButton->HoverColor = m_Loop ? EditorStyle::AccentBright : EditorStyle::ButtonHover;
     };
 }

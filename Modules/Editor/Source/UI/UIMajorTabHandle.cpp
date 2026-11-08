@@ -6,6 +6,7 @@
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UIButton.h"
 #include "Assets/Font.h"
+#include "Rendering/UIDrawList.h"
 
 static constexpr float s_IconInset = 9.0f;
 static constexpr float s_IconSize = 15.0f;
@@ -15,9 +16,12 @@ static constexpr float s_CloseSize = 18.0f;
 static constexpr float s_CloseIconSize = 12.0f;
 static constexpr float s_RightPad = 6.0f;
 static constexpr float s_CollapsedWidth = s_IconInset * 2.0f + s_IconSize;
+static constexpr float s_UnderlineInset = 6.0f;
+static constexpr float s_UnderlineThickness = 2.0f;
 
 UIMajorTabHandle::UIMajorTabHandle() {
     ClipChildren = true;
+    CornerRadius = Vec4(EditorStyle::ButtonRadius);
 
     m_Icon = Add<UISvg>();
     m_Icon->Anchor = m_Icon->Pivot = Vec2(0.0f, 0.5f);
@@ -37,6 +41,7 @@ UIMajorTabHandle::UIMajorTabHandle() {
     m_Close->NormalColor = Vec4(0.0f);
     m_Close->HoverColor = EditorStyle::ButtonHover;
     m_Close->PressedColor = EditorStyle::ButtonPressed;
+    m_Close->CornerRadius = Vec4(EditorStyle::ButtonRadius - 1.0f);
     m_Close->Clicked = [this] {
         if (Tab && OwnerWindow) {
             OwnerWindow->CloseTab(Tab);
@@ -81,6 +86,15 @@ void UIMajorTabHandle::OnUIUpdate(const UIFrameContext& InContext) {
     const Vec4 base = m_Active ? EditorStyle::TextBright : EditorStyle::TextDim;
     m_Label->Color = Vec4(base.r, base.g, base.b, base.a * t);
     m_CloseIcon->Tint = Vec4(base.r, base.g, base.b, base.a * t);
+}
+
+void UIMajorTabHandle::Paint(UIDrawList& OutDrawList) {
+    UIButton::Paint(OutDrawList);
+    if (m_Active) {
+        const UIRectF underline(Vec2(m_Geometry.Min().x + s_UnderlineInset, m_Geometry.Max().y - s_UnderlineThickness),
+                                Vec2(m_Geometry.Size.x - 2.0f * s_UnderlineInset, s_UnderlineThickness));
+        OutDrawList.AddRoundedRect(underline, EditorStyle::Accent, s_UnderlineThickness * 0.5f, m_WorldMatrix);
+    }
 }
 
 void UIMajorTabHandle::OnPressed(const Vec2& InCursorPos) {

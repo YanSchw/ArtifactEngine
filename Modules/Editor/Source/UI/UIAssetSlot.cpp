@@ -124,9 +124,7 @@ void UIAssetSlot::BuildActionButtons() {
         button->Anchor = button->Pivot = Vec2(0.0f, 0.5f);
         button->Position = Vec2(InX, 0.5f * (s_ThumbnailSize - s_ActionButtonSize));
         button->Size = Vec2(s_ActionButtonSize, s_ActionButtonSize);
-        button->NormalColor = EditorStyle::Button;
-        button->HoverColor = EditorStyle::ButtonHover;
-        button->PressedColor = EditorStyle::ButtonPressed;
+        EditorStyle::StyleButton(*button);
         button->Clicked = [InTarget, InAction] {
             if (Asset* target = InTarget()) {
                 InAction(target);

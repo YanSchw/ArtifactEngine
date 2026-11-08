@@ -417,7 +417,7 @@ void AnimationEditorTab::BuildToolBar(UINode& InToolBar) {
     loop->Bind = [this, loop] {
         Animation* animation = m_Animation.Get();
         const bool looping = animation && animation->IsLooping();
-        loop->NormalColor = looping ? EditorStyle::Accent : EditorStyle::Button;
+        EditorStyle::SetToggled(*loop, looping);
         loop->HoverColor = looping ? EditorStyle::AccentBright : EditorStyle::ButtonHover;
     };
 }

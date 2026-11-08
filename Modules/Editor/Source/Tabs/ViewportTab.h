@@ -1,6 +1,7 @@
 #pragma once
 #include "MinorTab.h"
 #include "Object/Pointer.h"
+#include "Rendering/RenderPass.h"
 #include "ViewportTab.gen.h"
 
 class EditorCamera;
@@ -41,6 +42,7 @@ private:
     CameraNode* GetViewCamera() const;
 
     void BuildToolBar(UINode& InToolBar);
+    void BuildSceneViewOptions(UINode& InParent);
     void BuildRenderStats(UINode& InParent);
     void BuildSceneTools(UINode& InParent);
     void BuildDesignTools(UINode& InParent);
@@ -81,5 +83,7 @@ private:
     Vec2 m_DesignViewport = Vec2(1.0f);
     bool m_DesignMode = false;
     bool m_ShowRenderStats = false;
+    Array<RenderBufferView> m_BufferViews;
+    int32_t m_BufferViewIndex = -1;
     bool m_PreviewInput = false;
 };

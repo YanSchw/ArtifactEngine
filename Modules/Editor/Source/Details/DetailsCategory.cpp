@@ -8,6 +8,7 @@
 #include "Assets/VectorImage.h"
 #include "Common/UUID.h"
 #include "Rendering/UIDrawList.h"
+#include <algorithm>
 
 DetailsCategory::DetailsCategory() {
     Interactable = true;
@@ -55,7 +56,8 @@ float DetailsCategory::MeasureHeight(const String& InFilter) const {
         return 0.0f;
     }
     const bool open = m_Expanded || !InFilter.empty();
-    return HeaderHeight + ((open && bodyHeight > 0.0f) ? bodyHeight + BodyPadding : 0.0f);
+    const float padding = Depth == 0 ? BodyPadding : 0.0f;
+    return HeaderHeight + ((open && bodyHeight > 0.0f) ? bodyHeight + padding : 0.0f);
 }
 
 void DetailsCategory::OnBind() {
@@ -71,6 +73,7 @@ void DetailsCategory::OnBind() {
         if (!item) {
             continue;
         }
+        item->Depth = std::max(item->Depth, item->As<DetailsCategory>() ? Depth + 1 : Depth);
         const float height = open ? item->MeasureHeight(effective) : 0.0f;
         item->SetEnabled(height > 0.0f);
         item->Size = { 1.0_rel, height };
@@ -79,17 +82,35 @@ void DetailsCategory::OnBind() {
     m_Body->SetEnabled(open && bodyHeight > 0.0f);
     m_Body->Size = { 1.0_rel, bodyHeight };
 
-    const float indent = 4.0f + (float)Depth * 12.0f;
+    const float indent = Depth == 0 ? 4.0f : (float)Depth * IndentWidth - 6.0f;
     m_Arrow->Position = Vec2(indent, (HeaderHeight - 12.0f) * 0.5f);
-    m_TitleLabel->Position = Vec2(indent + 16.0f, 0.0f);
-    m_TitleLabel->Size = { 1.0_rel - UIValue::Px(indent + 20.0f), HeaderHeight };
+    m_TitleLabel->Position = Vec2(indent + 14.0f, 0.0f);
+    m_TitleLabel->Color = Depth == 0 ? EditorStyle::TextBright : EditorStyle::Text;
+    if (Depth == 0) {
+        m_TitleLabel->Size = { 1.0_rel - UIValue::Px(indent + 20.0f), HeaderHeight };
+    } else {
+        const float split = OwnerTab ? OwnerTab->GetLabelSplit() : 0.32f;
+        m_TitleLabel->Size = { UIValue(split, -(indent + 22.0f)), HeaderHeight };
+    }
     m_Arrow->Image = AssetManager::Get().GetAsset<VectorImage>(UUID::FromString(
         open ? "b1c2d3e4-0002-4a00-9000-000000000002" : "b1c2d3e4-0003-4a00-9000-000000000003"));
 }
 
 void DetailsCategory::Paint(UIDrawList& OutDrawList) {
     const UIRectF header(m_Geometry.Position, Vec2(m_Geometry.Size.x, HeaderHeight));
-    OutDrawList.AddRect(header, IsHovered() ? EditorStyle::TabHover : EditorStyle::Button, m_WorldMatrix);
+    const UIRectF bottom(Vec2(header.Min().x, header.Max().y - 1.0f), Vec2(header.Size.x, 1.0f));
+    if (Depth == 0) {
+        OutDrawList.AddRect(header, IsHovered() ? EditorStyle::TabHover : EditorStyle::Button, m_WorldMatrix);
+        OutDrawList.AddRect(bottom, EditorStyle::Border, m_WorldMatrix);
+        return;
+    }
+
+    OutDrawList.AddRect(header, Vec4(1.0f, 1.0f, 1.0f, IsHovered() ? 0.06f : 0.03f), m_WorldMatrix);
+    const float split = OwnerTab ? OwnerTab->GetLabelSplit() : 0.32f;
+    const UIRectF splitter(Vec2(header.Min().x + header.Size.x * split, header.Min().y), Vec2(1.0f, HeaderHeight));
+    OutDrawList.AddRect(splitter, EditorStyle::Border, m_WorldMatrix);
+    OutDrawList.AddRect(bottom, EditorStyle::Border, m_WorldMatrix);
+    PaintIndentGutter(OutDrawList, Depth - 1, header);
 }
 
 void DetailsCategory::OnPressed(const Vec2& InCursorPos) {

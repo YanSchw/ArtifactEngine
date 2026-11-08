@@ -15,6 +15,10 @@ public:
     Vec4 NormalColor = Vec4(0.20f, 0.22f, 0.26f, 1.0f);
     Vec4 HoverColor = Vec4(0.28f, 0.32f, 0.38f, 1.0f);
     Vec4 PressedColor = Vec4(0.14f, 0.16f, 0.20f, 1.0f);
+    /** Painted 1px wide inside the rect while its alpha is above 0. */
+    Vec4 BorderColor = Vec4(0.0f);
+    /** Per corner, ordered top-left, top-right, bottom-right, bottom-left. */
+    Vec4 CornerRadius = Vec4(0.0f);
     std::function<void()> Clicked;
     std::function<void(const Vec2&)> SecondaryClicked;
 

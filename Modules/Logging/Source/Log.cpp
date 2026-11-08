@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <unordered_map>
 #include <mutex>
+#include <chrono>
 
 #undef ERROR // windows.h/wingdi.h defines ERROR as 0, which clashes with LogLevel::ERROR
 
@@ -158,7 +159,8 @@ void Logging::Log(LogLevel level, const std::string& file, const std::string& me
     GetLogger(file)->log(static_cast<spdlog::level::level_enum>(level), message);
 
     std::lock_guard<std::mutex> lock(s_CaptureMutex);
-    s_RecentEntries.push_back(LogEntry{ level, ConvertSourceFilenameToLoggerLabel(file), message });
+    const int64_t timeMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    s_RecentEntries.push_back(LogEntry{ level, ConvertSourceFilenameToLoggerLabel(file), message, timeMs });
     if (s_RecentEntries.size() > s_MaxRecentEntries) {
         s_RecentEntries.erase(s_RecentEntries.begin(), s_RecentEntries.begin() + (s_MaxRecentEntries / 4));
     }

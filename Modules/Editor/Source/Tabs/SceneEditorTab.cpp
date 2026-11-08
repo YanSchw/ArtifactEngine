@@ -10,6 +10,9 @@
 #include "GameFramework/UIHStack.h"
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UISvg.h"
+#include "GameFramework/UILabel.h"
+#include "UI/UIRoundedQuad.h"
+#include "Assets/Font.h"
 #include "GameFramework/Node3D.h"
 #include "GameFramework/SceneRootNode.h"
 #include "Assets/AssetManager.h"
@@ -215,46 +218,80 @@ VectorImage* SceneEditorTab::GetTabIcon() const {
     return EditorIcons::Level();
 }
 
+static constexpr float s_PlaySegmentWidth = 38.0f;
+static constexpr float s_PlayStatusInset = 9.0f;
+static constexpr float s_PlayStatusDot = 7.0f;
+static constexpr float s_PlayStatusGap = 6.0f;
+
+static void AddPlaySegment(UINode& InGroup, VectorImage* InIcon, const Vec4& InTint, const String& InTooltip,
+                           bool InFirst, bool InLast, std::function<void()> InAction) {
+    UIButton& button = EditorStyle::ToolButton(InGroup, InIcon, InTooltip, std::move(InAction), s_PlaySegmentWidth);
+    EditorStyle::StyleSegment(button, InFirst, InLast);
+    button.HoverColor = Vec4(glm::mix(Vec3(EditorStyle::ButtonHover), Vec3(InTint), 0.2f), 1.0f);
+    if (UISvg* icon = button.GetChildByClass(UISvg::StaticClass())->As<UISvg>()) {
+        icon->Tint = InTint;
+    }
+}
+
+static void AddPlayStatus(UINode& InToolBar, const String& InText, const Vec4& InColor) {
+    Font* font = UINode::GetDefaultFont();
+    const float textWidth = font ? font->GetTextWidth(InText, EditorStyle::FontSize) : 7.0f * (float)InText.size();
+    const float textLeft = s_PlayStatusInset + s_PlayStatusDot + s_PlayStatusGap;
+
+    UINode* slot = InToolBar.Add<UINode>();
+    slot->Size = { UIValue(textLeft + textWidth + s_PlayStatusInset), 1.0_rel };
+
+    UIRoundedQuad* pill = slot->Add<UIRoundedQuad>();
+    pill->Center({ 1.0_rel, 22.0_px });
+    pill->Color = Vec4(Vec3(InColor), 0.14f);
+    pill->CornerRadius = Vec4(11.0f);
+
+    UIRoundedQuad* dot = pill->Add<UIRoundedQuad>();
+    dot->Anchor = dot->Pivot = Vec2(0.0f, 0.5f);
+    dot->Position = Vec2(s_PlayStatusInset, 0.0f);
+    dot->Size = Vec2(s_PlayStatusDot);
+    dot->Color = InColor;
+    dot->CornerRadius = Vec4(s_PlayStatusDot * 0.5f);
+
+    UILabel* label = pill->Add<UILabel>();
+    label->Anchor = label->Pivot = Vec2(0.0f, 0.5f);
+    label->Position = Vec2(textLeft, 0.0f);
+    label->Size = { UIValue(textWidth + 2.0f), 1.0_rel };
+    label->FontSize = EditorStyle::FontSize;
+    label->Color = InColor;
+    label->VAlign = UIVAlign::Middle;
+    label->Text = InText;
+}
+
 void SceneEditorTab::BuildPlayControls(UINode& InToolBar) {
+    const bool running = m_PlayState != PlayState::Editor;
+    const bool playing = m_PlayState == PlayState::Playing;
+
     UIQuad* divider = InToolBar.Add<UIQuad>();
     divider->Size = { 1.0_px, 1.0_rel };
     divider->Color = EditorStyle::Border;
 
-    if (m_PlayState == PlayState::Editor) {
-        EditorStyle::IconButton(InToolBar, EditorIcons::Play(), EditorStyle::TransformY, "Play", 74.0f,
-                                [this] { PlayInEditor(PlayState::Playing); });
-        EditorStyle::IconButton(InToolBar, EditorIcons::Simulate(), EditorStyle::Text, "Simulate", 92.0f,
-                                [this] { PlayInEditor(PlayState::Simulating); });
+    UIHStack* group = InToolBar.Add<UIHStack>();
+    group->Size = { UIValue(s_PlaySegmentWidth * 2.0f), 1.0_rel };
+
+    if (!running) {
+        AddPlaySegment(*group, EditorIcons::Play(), EditorStyle::TransformY, "Play (F5)", true, false,
+                       [this] { PlayInEditor(PlayState::Playing); });
+        AddPlaySegment(*group, EditorIcons::Simulate(), EditorStyle::Text, "Simulate (F6)", false, true,
+                       [this] { PlayInEditor(PlayState::Simulating); });
         return;
     }
 
-    EditorStyle::IconButton(InToolBar, EditorIcons::Stop(), EditorStyle::TransformX, "Stop", 72.0f,
-                            [this] { StopPlayInEditor(); });
-
-    const bool playing = (m_PlayState == PlayState::Playing);
-    EditorStyle::IconButton(InToolBar, playing ? EditorIcons::Eject() : EditorIcons::Possess(),
-                            EditorStyle::AccentBright, playing ? "Eject" : "Possess", 88.0f,
-                            [this, playing] { SetPlayState(playing ? PlayState::Simulating : PlayState::Playing); });
-
-    UILabel* status = InToolBar.Add<UILabel>();
-    status->Size = { 96.0_px, 1.0_rel };
-    status->FontSize = EditorStyle::FontSize;
-    status->Color = EditorStyle::AccentBright;
-    status->VAlign = UIVAlign::Middle;
-    status->Padding = UIPadding(8.0f, 0.0f, 0.0f, 0.0f);
-    status->Bind = [this, status] {
-        status->Text = m_PlayState == PlayState::Playing ? "Playing" : "Simulating";
-    };
+    AddPlaySegment(*group, EditorIcons::Stop(), EditorStyle::TransformX, "Stop (F5)", true, false,
+                   [this] { StopPlayInEditor(); });
+    AddPlaySegment(*group, playing ? EditorIcons::Eject() : EditorIcons::Possess(), EditorStyle::AccentBright,
+                   playing ? "Eject (F7)" : "Possess (F7)", false, true,
+                   [this, playing] { SetPlayState(playing ? PlayState::Simulating : PlayState::Playing); });
+    AddPlayStatus(InToolBar, playing ? "Playing" : "Simulating", playing ? EditorStyle::TransformY : EditorStyle::AccentBright);
 }
 
 void SceneEditorTab::BuildToolBar(UINode& InToolBar) {
-    const auto addButton = [&InToolBar](const String& InCaption, std::function<void()> InAction) {
-        UIButton& button = UI::Button(InToolBar, InCaption, std::move(InAction));
-        button.Size = { 70.0_px, 1.0_rel };
-        EditorStyle::ApplyButtonStyle(button);
-    };
     EditorStyle::ToolButton(InToolBar, EditorIcons::Save(), "Save", [this] { Save(); });
-    addButton("Settings", [] { AE_INFO("SceneEditorTab: Settings"); });
 
     BuildPlayControls(InToolBar);
 }

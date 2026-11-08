@@ -3,6 +3,8 @@
 #include "GameFramework/UIButton.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UISvg.h"
+#include "Assets/Font.h"
+#include <algorithm>
 #include "UITooltip.h"
 
 inline Vec4 HexColor(uint32_t InRGB, float InAlpha = 1.0f) {
@@ -48,6 +50,7 @@ public:
     inline static Vec4 ButtonHover = HexColor(0x3A3A3A);
     inline static Vec4 ButtonPressed = HexColor(0x232323);
     inline static Vec4 FieldBorder = HexColor(0x3A3A3A);
+    inline static Vec4 ButtonBorder = HexColor(0x3C3C3C);
     inline static const Vec4 CaptionHover = Vec4(1.0f, 1.0f, 1.0f, 0.07f);
     inline static const Vec4 CaptionCloseHover = HexColor(0xC42B1C);
     inline static const Vec4 DropPreview = HexColor(0x26BBFF, 0.28f);
@@ -71,15 +74,36 @@ public:
     inline static constexpr float CaptionButtonWidth = 46.0f;
     inline static constexpr float ToolButtonWidth = 30.0f;
     inline static constexpr float ToolIconSize = 16.0f;
+    inline static constexpr float ButtonRadius = 4.0f;
     inline static constexpr float SplitterThickness = 4.0f;
     inline static constexpr float MinPanelSize = 90.0f;
     inline static float FontSize = 13.0f;
     inline static constexpr float MacTrafficLightInset = 76.0f;
 
-    static void ApplyButtonStyle(UIButton& InButton, float InFontSize = FontSize) {
+    static void StyleButton(UIButton& InButton) {
         InButton.NormalColor = Button;
         InButton.HoverColor = ButtonHover;
         InButton.PressedColor = ButtonPressed;
+        InButton.BorderColor = ButtonBorder;
+        InButton.CornerRadius = Vec4(ButtonRadius);
+    }
+
+    static void SetToggled(UIButton& InButton, bool InToggled) {
+        const Vec4 accentHover = Vec4(glm::mix(Vec3(Accent), Vec3(1.0f), 0.15f), 1.0f);
+        InButton.NormalColor = InToggled ? Accent : Button;
+        InButton.HoverColor = InToggled ? accentHover : ButtonHover;
+        InButton.BorderColor = InToggled ? accentHover : ButtonBorder;
+    }
+
+    /** Rounds only the outer corners, so adjacent buttons read as one control. */
+    static void StyleSegment(UIButton& InButton, bool InFirst, bool InLast) {
+        StyleButton(InButton);
+        InButton.CornerRadius = Vec4(InFirst ? ButtonRadius : 0.0f, InLast ? ButtonRadius : 0.0f,
+                                     InLast ? ButtonRadius : 0.0f, InFirst ? ButtonRadius : 0.0f);
+    }
+
+    static void ApplyButtonStyle(UIButton& InButton, float InFontSize = FontSize) {
+        StyleButton(InButton);
         if (Node* child = InButton.GetChildByClass(UILabel::StaticClass())) {
             UILabel* label = child->As<UILabel>();
             label->FontSize = InFontSize;
@@ -93,9 +117,7 @@ public:
         UIButton* button = InParent.Add<UIButton>();
         button->Clicked = std::move(InAction);
         button->Size = { UIValue(InWidth), 1.0_rel };
-        button->NormalColor = Button;
-        button->HoverColor = ButtonHover;
-        button->PressedColor = ButtonPressed;
+        StyleButton(*button);
 
         UISvg* icon = button->Add<UISvg>();
         icon->Center(Vec2(ToolIconSize));
@@ -106,26 +128,34 @@ public:
         return *button;
     }
 
+    /** Icon and caption centered as one group; InMinWidth only ever widens the button. */
     static UIButton& IconButton(UINode& InParent, VectorImage* InIcon, const Vec4& InIconTint,
-                                const String& InCaption, float InWidth, std::function<void()> InAction) {
+                                const String& InCaption, float InMinWidth, std::function<void()> InAction) {
+        constexpr float iconSize = 14.0f;
+        constexpr float iconGap = 6.0f;
+        constexpr float padding = 12.0f;
+        Font* font = UINode::GetDefaultFont();
+        const float textWidth = font ? font->GetTextWidth(InCaption, FontSize) : 8.0f * (float)InCaption.size();
+        const float contentWidth = iconSize + iconGap + textWidth;
+        const float width = std::max(InMinWidth, contentWidth + 2.0f * padding);
+        const float left = (width - contentWidth) * 0.5f;
+
         UIButton* button = InParent.Add<UIButton>();
         button->Clicked = std::move(InAction);
-        button->Size = { UIValue(InWidth), 1.0_rel };
-        button->NormalColor = Button;
-        button->HoverColor = ButtonHover;
-        button->PressedColor = ButtonPressed;
+        button->Size = { UIValue(width), 1.0_rel };
+        StyleButton(*button);
 
         UISvg* icon = button->Add<UISvg>();
         icon->Anchor = icon->Pivot = Vec2(0.0f, 0.5f);
-        icon->Position = Vec2(9.0f, 0.0f);
-        icon->Size = Vec2(12.0f, 12.0f);
+        icon->Position = Vec2(left, 0.0f);
+        icon->Size = Vec2(iconSize);
         icon->Tint = InIconTint;
         icon->Image = InIcon;
 
         UILabel* label = button->Add<UILabel>();
         label->Anchor = label->Pivot = Vec2(0.0f, 0.5f);
-        label->Position = Vec2(26.0f, 0.0f);
-        label->Size = { 1.0_rel - 30.0_px, 1.0_rel };
+        label->Position = Vec2(left + iconSize + iconGap, 0.0f);
+        label->Size = { UIValue(textWidth + 4.0f), 1.0_rel };
         label->FontSize = FontSize;
         label->Color = Text;
         label->VAlign = UIVAlign::Middle;

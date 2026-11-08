@@ -20,7 +20,13 @@ bool UIScrollArea::OnScroll(const Vec2& InDelta) {
     }
     ScrollOffset -= InDelta * ScrollSpeed;
     ClampScrollOffset();
+    UpdateStuckToBottom();
     return true;
+}
+
+void UIScrollArea::UpdateStuckToBottom() {
+    const float maxOffset = std::max(0.0f, m_ContentSize.y - GetContentRect().Size.y);
+    m_StuckToBottom = ScrollOffset.y >= maxOffset - 1.0f;
 }
 
 void UIScrollArea::ClampScrollOffset() {
@@ -62,6 +68,16 @@ void UIScrollArea::LayoutChildren(const UIRectF& InContent) {
     Vec2 maxCorner = scrolled.Min();
     MaxSubtreeCorner(this, maxCorner);
     m_ContentSize = maxCorner - scrolled.Min();
+
+    const float bottom = std::max(0.0f, m_ContentSize.y - InContent.Size.y);
+    if (StickToBottom && m_StuckToBottom && ScrollOffset.y != bottom) {
+        ScrollOffset.y = bottom;
+        scrolled = InContent;
+        scrolled.Position -= ScrollOffset;
+        for (UINode* child : CollectUIChildren()) {
+            LayoutChild(*child, scrolled, m_WorldMatrix);
+        }
+    }
 }
 
 UIRectF UIScrollArea::ComputeVerticalThumbRect(const UIRectF& InContent) const {
@@ -162,6 +178,7 @@ void UIScrollArea::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
             const float thumbY = ScreenPosToLocalAxis(InCursorPos, content, 1) - m_DragGrabOffset;
             const float t = std::clamp((thumbY - content.Position.y) / travel, 0.0f, 1.0f);
             ScrollOffset.y = t * maxOffset;
+            UpdateStuckToBottom();
         }
     } else {
         const float thumbW = ComputeHorizontalThumbRect(content).Size.x;

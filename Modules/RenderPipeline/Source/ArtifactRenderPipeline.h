@@ -20,6 +20,7 @@ public:
     static constexpr SampleCount SceneSampleCount = SampleCount::X8;
 
     virtual uint32_t PickNodeId(uint32_t InX, uint32_t InY) const override;
+    virtual Array<RenderBufferView> GetBufferViews() const override;
 
 protected:
     virtual void Initialize() override;
@@ -32,7 +33,7 @@ private:
     void UploadSceneUniforms(const RenderContext& InContext, DirectionalLightNode* InSun);
     void ResolveGBuffer(RenderStage& InGeometry, RenderStage& InLighting, const RenderContext& InContext);
     /** Carries the post processed image, the scene's depth and node ids into the UI stage's target. */
-    void Composite(RenderStage& InUI);
+    void Composite(RenderStage& InUI, const RenderContext& InContext);
 
     RenderStage* m_GeometryStage = nullptr;
     RenderStage* m_LightingStage = nullptr;

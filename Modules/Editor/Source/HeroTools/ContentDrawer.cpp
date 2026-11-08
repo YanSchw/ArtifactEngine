@@ -64,6 +64,17 @@ static constexpr float s_TypeBarHeight = 3.0f;
 static constexpr float s_NameRowHeight = 20.0f;
 static constexpr float s_TypeRowHeight = 15.0f;
 static constexpr float s_LabelInset = 5.0f;
+static constexpr float s_FolderIconTop = 18.0f;
+static constexpr float s_FolderIconHeight = 64.0f;
+static constexpr float s_SearchWidth = 220.0f;
+
+static String Lowercase(const String& InText) {
+    String lowered = InText;
+    for (char& character : lowered) {
+        character = (char)std::tolower((unsigned char)character);
+    }
+    return lowered;
+}
 
 static void ClearChildren(UINode* InNode) {
     while (InNode->HasChildren()) {
@@ -251,6 +262,7 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
     m_Breadcrumb = nullptr;
     m_Tree = nullptr;
     m_Grid = nullptr;
+    m_GridHost = nullptr;
     m_DropTargets.Clear();
     m_Dragging = false;
     CancelEdit();
@@ -269,22 +281,18 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
     toolbarRow->Padding = UIPadding(8.0f, 6.0f);
     toolbarRow->Gap = 6.0f;
 
-    const auto labelButton = [](UIStack& InRow, const String& InCaption, float InWidth, const Vec4& InColor,
-                                std::function<void()> InOnClick) {
-        UIButton* button = InRow.Add<UIButton>();
-        button->Size = { UIValue(InWidth), 1.0_rel };
-        button->SetCaption(InCaption);
-        EditorStyle::ApplyButtonStyle(*button);
-        button->NormalColor = InColor;
-        button->Clicked = std::move(InOnClick);
-        return button;
+    const auto applyAddStyle = [](UIButton& InButton, bool InAdd) {
+        EditorStyle::StyleButton(InButton);
+        if (InAdd) {
+            InButton.NormalColor = s_AddGreen;
+            InButton.HoverColor = Vec4(glm::mix(Vec3(s_AddGreen), Vec3(1.0f), 0.12f), 1.0f);
+            InButton.BorderColor = InButton.HoverColor;
+        }
     };
     const auto arrowButton = [](UIStack& InRow, VectorImage* InIcon, float InRotation, std::function<void()> InOnClick) {
         UIButton* button = InRow.Add<UIButton>();
         button->Size = { 26.0_px, 1.0_rel };
-        button->NormalColor = EditorStyle::Button;
-        button->HoverColor = EditorStyle::ButtonHover;
-        button->PressedColor = EditorStyle::ButtonPressed;
+        EditorStyle::StyleButton(*button);
         button->Clicked = std::move(InOnClick);
         UISvg* icon = button->Add<UISvg>();
         icon->Center(Vec2(11.0f, 11.0f));
@@ -293,20 +301,23 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
         icon->Rotation = Vec3(0.0f, 0.0f, InRotation);
     };
 
-    UIButton* addButton = labelButton(*toolbarRow, "+ Add", 62.0f, s_AddGreen, [] {});
+    UIButton* addButton = toolbarRow->Add<UIButton>();
+    addButton->Size = { 70.0_px, 1.0_rel };
+    addButton->SetCaption("+ Add");
+    EditorStyle::ApplyButtonStyle(*addButton);
     addButton->Clicked = [this, addButton] {
         UIMenuModel menu;
         BuildAddMenu(menu);
         UIContextMenu::OpenUnder(*addButton, menu);
     };
-    addButton->Bind = [this, addButton] {
+    addButton->Bind = [this, addButton, applyAddStyle] {
         addButton->SetCaption(IsInsideCollection() ? "Settings" : "+ Add");
-        addButton->NormalColor = IsInsideCollection() ? EditorStyle::Button : s_AddGreen;
+        applyAddStyle(*addButton, !IsInsideCollection());
     };
-    labelButton(*toolbarRow, "Import", 62.0f, EditorStyle::Button, [this] {
+    EditorStyle::IconButton(*toolbarRow, EditorIcons::Document(), EditorStyle::Text, "Import", 0.0f, [this] {
         ImportFiles(PlatformHooks::Get().OpenFilesDialog("Import Assets"));
-    });
-    labelButton(*toolbarRow, "Save All", 74.0f, EditorStyle::Button, [this] {
+    }).Add<UITooltip>()->Text = "Import files into this folder";
+    EditorStyle::IconButton(*toolbarRow, EditorIcons::Save(), EditorStyle::Text, "Save All", 0.0f, [this] {
         EditorWindow* window = GetOwnerWindow();
         for (MajorTab* tab : window ? window->GetOpenTabs() : Array<MajorTab*>()) {
             if (SceneEditorTab* sceneTab = tab->As<SceneEditorTab>()) {
@@ -317,7 +328,7 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
                 animationTab->Save();
             }
         }
-    });
+    }).Add<UITooltip>()->Text = "Save every open scene, blueprint and animation";
 
     arrowButton(*toolbarRow, EditorIcons::ArrowRight(), 180.0f, [this] { GoBack(); });
     arrowButton(*toolbarRow, EditorIcons::ArrowRight(), 0.0f, [this] { GoForward(); });
@@ -325,6 +336,31 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
     m_Breadcrumb = toolbarRow->Add<UIHStack>();
     m_Breadcrumb->Size = { 1.0_rel, 1.0_rel };
     m_Breadcrumb->Gap = 2.0f;
+
+    UINode* search = toolbarRow->Add<UINode>();
+    search->Size = { UIValue(s_SearchWidth), 1.0_rel };
+    UITextArea* searchField = search->Add<UITextArea>();
+    searchField->Fill();
+    searchField->Padding = UIPadding(24.0f, 0.0f, 6.0f, 0.0f);
+    searchField->SingleLine = true;
+    searchField->Placeholder = "Search folder...";
+    searchField->FontSize = EditorStyle::FontSize;
+    searchField->TextColor = EditorStyle::Text;
+    searchField->PlaceholderColor = EditorStyle::TextDim;
+    searchField->BackgroundColor = EditorStyle::PanelDark;
+    searchField->FocusedBorderColor = EditorStyle::Accent;
+    searchField->CornerRadius = EditorStyle::ButtonRadius;
+    searchField->Text = m_Filter;
+    searchField->TextChanged = [this](const String& InText) {
+        m_Filter = InText;
+        m_NavDirty = true;
+    };
+    UISvg* searchIcon = search->Add<UISvg>();
+    searchIcon->Anchor = searchIcon->Pivot = Vec2(0.0f, 0.5f);
+    searchIcon->Position = Vec2(8.0f, 0.0f);
+    searchIcon->Size = Vec2(11.0f);
+    searchIcon->Image = EditorIcons::Search();
+    searchIcon->Tint = EditorStyle::TextDim;
 
     // --- Body: tree | grid ---
     UIHStack* body = root->Add<UIHStack>();
@@ -338,8 +374,12 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
     treeScroll->Fill();
     UIVStack* tree = treeScroll->Add<UIVStack>();
     tree->Fill();
-    tree->Padding = UIPadding(2.0f, 4.0f);
+    tree->Padding = UIPadding(4.0f, 4.0f);
     m_Tree = tree;
+
+    UIQuad* divider = body->Add<UIQuad>();
+    divider->Size = { 1.0_px, 1.0_rel };
+    divider->Color = EditorStyle::Border;
 
     // The panel doubles as the grid's empty-space hit target: a right-click on nothing bubbles
     // out of the scroll area and lands here.
@@ -356,6 +396,7 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
         UIContextMenu::OpenAt(*rightPanel, InCursorPos, menu);
     };
 
+    m_GridHost = rightPanel;
     UIScrollArea* gridScroll = rightPanel->Add<UIScrollArea>();
     gridScroll->Fill();
     UIGrid* grid = gridScroll->Add<UIGrid>();
@@ -419,6 +460,7 @@ void ContentDrawer::BuildBreadcrumb() {
         crumb->Size = { 12.0_px + UINode::GetDefaultFont()->GetTextWidth(caption, EditorStyle::FontSize), 1.0_rel };
         crumb->NormalColor = Vec4(0.0f);
         crumb->HoverColor = EditorStyle::TabHover;
+        crumb->CornerRadius = Vec4(EditorStyle::ButtonRadius);
         crumb->PressedColor = EditorStyle::ButtonPressed;
         const String mount = m_Mount;
         crumb->Clicked = [this, mount, targetRel] { NavigateTo(mount, targetRel); };
@@ -644,6 +686,7 @@ void ContentDrawer::BuildTreeNode(const String& InMount, const String& InRel, co
 
     UIButton* row = m_Tree->Add<UIButton>();
     row->Size = { 1.0_rel, 22.0_px };
+    row->CornerRadius = Vec4(EditorStyle::ButtonRadius - 1.0f);
     row->HoverColor = EditorStyle::TabHover;
     row->PressedColor = EditorStyle::ButtonPressed;
     const String mount = InMount;
@@ -756,6 +799,9 @@ Array<ContentDrawer::Item> ContentDrawer::CollectItems() const {
 
 void ContentDrawer::BuildGrid() {
     ClearChildren(m_Grid);
+    if (UINode* empty = m_EmptyLabel.Get()) {
+        delete empty;
+    }
 
     Array<Item> items = CollectItems();
 
@@ -768,12 +814,29 @@ void ContentDrawer::BuildGrid() {
         items.Insert(m_Edit.IsFolder ? 0 : items.Size(), placeholder);
     }
 
+    const String filter = Lowercase(m_Filter);
+    int32_t shown = 0;
     for (const Item& item : items) {
+        if (!filter.empty() && !IsEditing(item) && Lowercase(item.Name).find(filter) == String::npos) {
+            continue;
+        }
         if (item.IsFolder) {
             BuildFolderTile(item);
         } else {
             BuildAssetTile(item);
         }
+        shown++;
+    }
+
+    if (shown == 0) {
+        UILabel* empty = m_GridHost->Add<UILabel>();
+        empty->Fill();
+        empty->HAlign = UIHAlign::Center;
+        empty->VAlign = UIVAlign::Middle;
+        empty->FontSize = EditorStyle::FontSize;
+        empty->Color = EditorStyle::TextDim;
+        empty->Text = filter.empty() ? String("This folder is empty") : "No items match \"" + m_Filter + "\"";
+        m_EmptyLabel = empty;
     }
 }
 
@@ -839,14 +902,14 @@ void ContentDrawer::BuildFolderTile(const Item& InItem) {
 
     UISvg* folderIcon = card->Add<UISvg>();
     folderIcon->Anchor = folderIcon->Pivot = Vec2(0.5f, 0.0f);
-    folderIcon->Position = Vec2(0.0f, 16.0f);
-    folderIcon->Size = { 1.0_rel - 22.0_px, 58.0_px };
+    folderIcon->Position = Vec2(0.0f, s_FolderIconTop);
+    folderIcon->Size = { 1.0_rel - 18.0_px, UIValue(s_FolderIconHeight) };
     folderIcon->Image = EditorIcons::Folder();
     folderIcon->Tint = EditorStyle::Folder;
 
     UINode* nameRow = card->Add<UINode>();
-    nameRow->Anchor = nameRow->Pivot = Vec2(0.5f, 1.0f);
-    nameRow->Position = Vec2(0.0f, -6.0f);
+    nameRow->Anchor = nameRow->Pivot = Vec2(0.5f, 0.0f);
+    nameRow->Position = Vec2(0.0f, s_FolderIconTop + s_FolderIconHeight + 6.0f);
     nameRow->Size = { 1.0_rel - 8.0_px, UIValue(s_NameRowHeight) };
 
     if (editing) {

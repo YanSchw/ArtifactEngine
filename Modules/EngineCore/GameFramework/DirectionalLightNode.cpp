@@ -186,12 +186,15 @@ void DirectionalLightNode::UpdateCascades(const CameraNode& InCamera) {
     const Vec3 cameraUp = glm::normalize(Vec3(cameraTransform[1]));
     const Vec3 cameraForward = glm::normalize(Vec3(cameraTransform[2]));
 
+    const bool orthographic = InCamera.GetProjectionType() == CameraNode::ProjectionType::Orthographic;
     const float tanHalfHeight = glm::tan(glm::radians(InCamera.GetPerspectiveVerticalFOV()) * 0.5f);
     const float tanHalfWidth = tanHalfHeight * InCamera.GetAspectRatio();
+    const float orthoHalfHeight = InCamera.GetOrthographicSize() * 0.5f;
+    const float orthoHalfWidth = orthoHalfHeight * InCamera.GetAspectRatio();
 
-    const float nearClip = glm::max(InCamera.GetPerspectiveNearClip(), 0.01f);
-    const float farClip = glm::max(glm::min(InCamera.GetPerspectiveFarClip(), nearClip + m_ShadowDistance),
-                                   nearClip + 1.0f);
+    const float nearClip = glm::max(orthographic ? InCamera.GetOrthographicNearClip() : InCamera.GetPerspectiveNearClip(), 0.01f);
+    const float cameraFar = orthographic ? InCamera.GetOrthographicFarClip() : InCamera.GetPerspectiveFarClip();
+    const float farClip = glm::max(glm::min(cameraFar, nearClip + m_ShadowDistance), nearClip + 1.0f);
 
     const Vec3 direction = GetDirection();
     const Vec3 lightUp = glm::abs(direction.y) > 0.99f ? VecUtils::Forward : VecUtils::Up;
@@ -208,9 +211,11 @@ void DirectionalLightNode::UpdateCascades(const CameraNode& InCamera) {
         Vec3 corners[8];
         for (int32_t i = 0; i < 8; i++) {
             const float distance = (i & 4) ? splitFar : splitNear;
+            const float halfWidth = orthographic ? orthoHalfWidth : distance * tanHalfWidth;
+            const float halfHeight = orthographic ? orthoHalfHeight : distance * tanHalfHeight;
             corners[i] = cameraPosition + cameraForward * distance
-                       + cameraRight * (distance * tanHalfWidth * ((i & 1) ? 1.0f : -1.0f))
-                       + cameraUp * (distance * tanHalfHeight * ((i & 2) ? 1.0f : -1.0f));
+                       + cameraRight * (halfWidth * ((i & 1) ? 1.0f : -1.0f))
+                       + cameraUp * (halfHeight * ((i & 2) ? 1.0f : -1.0f));
         }
 
         Vec3 center = Vec3(0.0f);

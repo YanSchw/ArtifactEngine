@@ -127,6 +127,7 @@ private:
     Array<Location> m_History;
     int32_t m_HistoryPos = -1;
     bool m_NavDirty = false;
+    String m_Filter;
 
     InlineEdit m_Edit;
 
@@ -139,5 +140,7 @@ private:
     UIStack* m_Breadcrumb = nullptr;
     UIStack* m_Tree = nullptr;
     UINode* m_Grid = nullptr;
+    UINode* m_GridHost = nullptr;
+    WeakObjectPtr<UINode> m_EmptyLabel;
     SharedObjectPtr<ThumbnailRenderer> m_Thumbnails;
 };

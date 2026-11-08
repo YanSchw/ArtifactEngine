@@ -17,6 +17,23 @@ enum class RenderStageName : uint32_t {
     UI
 };
 
+enum class RenderBufferKind : uint8_t {
+    Color,
+    Depth,
+    NodeId
+};
+
+/** One attachment of a stage's target, shown in place of the finished image. */
+struct RenderBufferView {
+    static constexpr int32_t DepthAttachment = -1;
+
+    String Label;
+    RenderStageName Stage = RenderStageName::Forward;
+    /** A color attachment index, or DepthAttachment. */
+    int32_t Attachment = 0;
+    RenderBufferKind Kind = RenderBufferKind::Color;
+};
+
 /** What every stage and pass of one RenderPipeline::Render call works from. */
 struct RenderContext {
     double DeltaTime = 0.0;
@@ -25,6 +42,8 @@ struct RenderContext {
     uint32_t Height = 1;
     class World* World = nullptr;
     class CameraNode* Camera = nullptr;
+    /** Rendering stops after this view's stage and the final stage shows it instead. */
+    const RenderBufferView* BufferView = nullptr;
 
     class UniformBuffer* SceneUniforms = nullptr;
     class ImageView* ShadowMap = nullptr;

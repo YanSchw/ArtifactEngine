@@ -54,7 +54,7 @@ float DetailsRow::MeasureHeight(const String& InFilter) const {
 void DetailsRow::OnBind() {
     UINode::OnBind();
     const float split = OwnerTab ? OwnerTab->GetLabelSplit() : 0.32f;
-    const float indent = 8.0f + (float)Depth * 12.0f;
+    const float indent = 8.0f + (float)Depth * IndentWidth;
 
     const bool overridden = IsOverridden && IsOverridden();
     m_NameLabel->Color = overridden ? EditorStyle::AccentBright : EditorStyle::Text;
@@ -78,6 +78,7 @@ void DetailsRow::Paint(UIDrawList& OutDrawList) {
 
     const UIRectF bottom(Vec2(m_Geometry.Min().x, m_Geometry.Max().y - 1.0f), Vec2(m_Geometry.Size.x, 1.0f));
     OutDrawList.AddRect(bottom, EditorStyle::Border, m_WorldMatrix);
+    PaintIndentGutter(OutDrawList, Depth, m_Geometry);
 }
 
 bool DetailsRow::IsNearSplitter(const Vec2& InScreenPos) const {

@@ -110,7 +110,7 @@ void ArtifactRenderPipeline::TransitionRenderStage(RenderStage* InFrom, RenderSt
         return;
     }
     if (&InTo == m_UIStage) {
-        Composite(InTo);
+        Composite(InTo, InContext);
         return;
     }
     if (InFrom && InFrom->GetTarget() == InTo.GetTarget()) {
@@ -132,7 +132,13 @@ void ArtifactRenderPipeline::ResolveGBuffer(RenderStage& InGeometry, RenderStage
                                                               *m_ResolveShader, *m_GBufferSampler, InContext));
 }
 
-void ArtifactRenderPipeline::Composite(RenderStage& InUI) {
+void ArtifactRenderPipeline::Composite(RenderStage& InUI, const RenderContext& InContext) {
+    if (InContext.BufferView) {
+        InUI.SetTarget(m_CompositeTarget);
+        InUI.BeginTarget();
+        DrawBufferView(*InContext.BufferView, *m_CompositeTarget, InContext);
+        return;
+    }
     // Nothing post processed: the scene's render pass is still open, so overlays go straight into it.
     if (!m_PostChain.HasProcessed() || !m_CompositeShader) {
         InUI.SetTarget(m_SceneTarget);
@@ -203,6 +209,21 @@ void ArtifactRenderPipeline::UploadSceneUniforms(const RenderContext& InContext,
     void* mapped = m_SceneUniforms->MapData(sizeof(data), 0);
     memcpy(mapped, &data, sizeof(data));
     m_SceneUniforms->UnmapData();
+}
+
+Array<RenderBufferView> ArtifactRenderPipeline::GetBufferViews() const {
+    const RenderStageName gbuffer = RenderStageName::DeferredGeometry;
+    return {
+        { "GBuffer Base Color", gbuffer, GBufferLayout::Albedo, RenderBufferKind::Color },
+        { "GBuffer World Normal", gbuffer, GBufferLayout::Normal, RenderBufferKind::Color },
+        { "GBuffer Emissive", gbuffer, GBufferLayout::Emissive, RenderBufferKind::Color },
+        { "GBuffer Node ID", gbuffer, GBufferLayout::NodeId, RenderBufferKind::NodeId },
+        { "GBuffer Depth", gbuffer, RenderBufferView::DepthAttachment, RenderBufferKind::Depth },
+        { "After Deferred Lighting", RenderStageName::DeferredLighting, 0, RenderBufferKind::Color },
+        { "After Forward", RenderStageName::Forward, 0, RenderBufferKind::Color },
+        { "Scene Depth", RenderStageName::Forward, RenderBufferView::DepthAttachment, RenderBufferKind::Depth },
+        { "Scene Node ID", RenderStageName::Forward, NodeIdAttachment, RenderBufferKind::NodeId },
+    };
 }
 
 uint32_t ArtifactRenderPipeline::PickNodeId(uint32_t InX, uint32_t InY) const {
