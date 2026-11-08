@@ -188,7 +188,7 @@ def cmd_docs(args):
     except JobError as e:
         sys.exit(e.returncode)
 
-LINT_EXCLUDED_DIRS = {"node_modules", "venv", "dist", ".git", ".angular"}
+LINT_EXCLUDED_DIRS = {"node_modules", "venv", "dist", ".git", ".angular", "Intermediate", "Build", "Binaries", "Saved"}
 
 def _collect_lint_files(root_path):
     files = []

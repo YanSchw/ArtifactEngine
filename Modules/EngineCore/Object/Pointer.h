@@ -127,4 +127,3 @@ protected:
 
 template<class T> using WeakObjectPtr     = TObjectPtr<T, false>;
 template<class T> using SharedObjectPtr   = TObjectPtr<T, true>;
-

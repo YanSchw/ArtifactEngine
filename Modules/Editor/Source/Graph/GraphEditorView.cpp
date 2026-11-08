@@ -789,4 +789,3 @@ void GraphEditorView::PaintMarquee(UIDrawList& OutDrawList) const {
     OutDrawList.AddRect(UIRectF(rect.Min(), Vec2(1.0f, rect.Size.y)), GraphEditorStyle::MarqueeBorder, m_WorldMatrix);
     OutDrawList.AddRect(UIRectF(Vec2(rect.Max().x, rect.Min().y), Vec2(1.0f, rect.Size.y)), GraphEditorStyle::MarqueeBorder, m_WorldMatrix);
 }
-
