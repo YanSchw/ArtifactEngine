@@ -1,0 +1,20 @@
+{
+    "$type": "Mesh",
+    "AssetClass": "Mesh",
+    "m_Id": "06fac0ef-a0f4-47d9-a53c-848996022a8a",
+    "m_ImportOffset": {
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 0.0
+    },
+    "m_ImportScale": {
+        "X": 1.0,
+        "Y": 1.0,
+        "Z": 1.0
+    },
+    "m_Materials": [
+        "d351ca39-9ab6-43cf-9921-4965ec126be8"
+    ],
+    "m_MeshPath": "/Meshes/Capsule.obj",
+    "m_StreamType": "AlwaysLoaded"
+}
