@@ -80,11 +80,7 @@ void UIClassPicker::CollectHierarchy() {
         if (Filter && !Filter(candidate)) {
             continue;
         }
-        // Reflected classes without a default constructor cannot be created, and probing is the
-        // only way to tell them apart.
-        Object* probe = Object::Create(candidate);
-        m_Pickable[candidate.Name] = probe != nullptr;
-        delete probe;
+        m_Pickable[candidate.Name] = candidate.IsDefaultConstructable();
         if (candidate != RootClass) {
             m_Children[candidate.GetParentClass().Name].Add(candidate);
         }

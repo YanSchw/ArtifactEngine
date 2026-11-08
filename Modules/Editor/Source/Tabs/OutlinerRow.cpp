@@ -237,14 +237,6 @@ static void AttachChildFromMenu(const WeakObjectPtr<OutlinerTab>& InOwner, const
     owner->HandleRowClick(child, false, false);
 }
 
-static bool CanSpawn(const Class& InClass) {
-    // Reflected classes without a default constructor cannot be spawned; probing is the only
-    // way to tell, and CreateChild would assert on them.
-    Object* probe = Object::Create(InClass);
-    delete probe;
-    return probe != nullptr;
-}
-
 static void AddClassItem(UIMenuModel& OutMenu, const WeakObjectPtr<OutlinerTab>& InOwner, const WeakObjectPtr<Node>& InParent,
                          const Class& InClass) {
     OutMenu.Item(InClass.Name, [InOwner, InParent, InClass] {
@@ -256,7 +248,7 @@ static void BuildQuickAccessMenu(UIMenuModel& OutMenu, const WeakObjectPtr<Outli
                                  std::initializer_list<const char*> InClassNames) {
     for (const char* name : InClassNames) {
         const Class nodeClass(name);
-        if (CanSpawn(nodeClass)) {
+        if (nodeClass.IsDefaultConstructable()) {
             AddClassItem(OutMenu, InOwner, InParent, nodeClass);
         }
     }
@@ -297,7 +289,7 @@ static void BuildAllClassesMenu(UIMenuModel& OutMenu, const WeakObjectPtr<Outlin
 
     OutMenu.Section("Classes");
     for (const Class& nodeClass : classes) {
-        if (CanSpawn(nodeClass)) {
+        if (nodeClass.IsDefaultConstructable()) {
             AddClassItem(OutMenu, InOwner, InParent, nodeClass);
         }
     }

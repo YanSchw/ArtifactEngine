@@ -546,19 +546,14 @@ bool GraphEditorView::OnSecondaryClick(const Vec2& InCursorPos) {
     };
     Array<Item> items;
     for (const Class& nodeClass : Class::GetSubclassesOf(GraphNode::StaticClass())) {
-        if (nodeClass == GraphNode::StaticClass() || !m_Graph->AllowsNodeClass(nodeClass)) {
+        if (nodeClass == GraphNode::StaticClass() || !m_Graph->AllowsNodeClass(nodeClass) || !nodeClass.IsDefaultConstructable()) {
             continue;
         }
-        Object* probe = Object::Create(nodeClass);
-        if (!probe) {
-            continue;
+        GraphNode* node = Cast<GraphNode>(Object::Create(nodeClass));
+        if (node && node->IsUserCreatable()) {
+            items.Add({ node->GetCategory(), node->GetTitle(), nodeClass });
         }
-        if (GraphNode* node = probe->As<GraphNode>()) {
-            if (node->IsUserCreatable()) {
-                items.Add({ node->GetCategory(), node->GetTitle(), nodeClass });
-            }
-        }
-        delete probe;
+        delete node;
     }
     items.Sort([](const Item& InA, const Item& InB) {
         return InA.Category == InB.Category ? InA.Title < InB.Title : InA.Category < InB.Category;

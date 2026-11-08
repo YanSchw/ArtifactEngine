@@ -106,14 +106,9 @@ Array<Class> AnimationEditorTab::GetSelectablePlaceholderClasses() const {
 
     Array<Class> spawnable;
     for (const Class& nodeClass : classes) {
-        if (nodeClass.IsSubclassOf(Component::StaticClass())) {
+        if (nodeClass.IsSubclassOf(Component::StaticClass()) || !nodeClass.IsDefaultConstructable()) {
             continue;
         }
-        Object* probe = Object::Create(nodeClass);
-        if (!probe) {
-            continue;
-        }
-        delete probe;
         spawnable.Add(nodeClass);
     }
     return spawnable;

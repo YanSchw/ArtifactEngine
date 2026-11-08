@@ -22,6 +22,7 @@ struct Class {
 
     static Array<Class> GetAllClasses();
 
+    bool IsDefaultConstructable() const;
     bool IsBlueprint() const { return !Name.empty() && Name[0] == BlueprintPrefix; }
     UUID GetBlueprintId() const;
     static Class FromBlueprint(const UUID& InBlueprintId);
@@ -80,21 +81,20 @@ public:
     template<typename T>
     struct RegisterArtifactClass {
         RegisterArtifactClass() {
-            Object::s_ObjectAllocators[T::StaticClass().Name] = Object::InternalAllocate<T>;
+            if constexpr (std::is_default_constructible<T>::value) {
+                Object::s_ObjectAllocators[T::StaticClass().Name] = Object::InternalAllocate<T>;
+            }
         }
     };
 private:
     template<typename T>
     static Object* InternalAllocate() {
-        if constexpr (std::is_default_constructible<T>::value) {
-            return (Object*) new T();
-        } else {
-            return nullptr;
-        }
+        return (Object*) new T();
     }
 
     inline static std::unordered_map<std::string, Object*(*)(void)> s_ObjectAllocators;
     template<typename T> friend struct RegisterArtifactClass;
+    friend struct Class;
 };
 
 #define GENERATED_BODY_CONCAT(line) _GENERATED_BODY_##line

@@ -102,14 +102,9 @@ Array<Class> BlueprintEditorTab::GetSelectableParentClasses() const {
     Array<Class> native = Class::GetSubclassesOf(Node::StaticClass());
     native.Sort([](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
     for (const Class& nodeClass : native) {
-        if (nodeClass.IsSubclassOf(Component::StaticClass())) {
+        if (nodeClass.IsSubclassOf(Component::StaticClass()) || !nodeClass.IsDefaultConstructable()) {
             continue;
         }
-        Object* probe = Object::Create(nodeClass);
-        if (!probe) {
-            continue;
-        }
-        delete probe;
         classes.Add(nodeClass);
     }
 

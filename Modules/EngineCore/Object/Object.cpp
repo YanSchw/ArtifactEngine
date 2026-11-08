@@ -112,15 +112,20 @@ Class::RegisterParentChildClassRelationship::RegisterParentChildClassRelationshi
     (*GetListOfAllClasses()).Add(Class(InChild));
 }
 
+bool Class::IsDefaultConstructable() const {
+    if (IsBlueprint()) {
+        return FindBlueprint(*this) != nullptr;
+    }
+    return Object::s_ObjectAllocators.contains(Name);
+}
+
 Object* Object::Create(const Class& type) {
     if (type.IsBlueprint()) {
         Blueprint* blueprint = FindBlueprint(type);
         return blueprint ? (Object*)blueprint->CreateInstance() : nullptr;
     }
-    if (s_ObjectAllocators.find(type.Name) == s_ObjectAllocators.end()) {
-        return nullptr;
-    }
-    return s_ObjectAllocators.at(type.Name)();
+    auto allocator = s_ObjectAllocators.find(type.Name);
+    return allocator != s_ObjectAllocators.end() ? allocator->second() : nullptr;
 }
 
 Object::~Object() {
