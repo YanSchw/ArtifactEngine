@@ -29,7 +29,10 @@ public:
 
     class ThumbnailRenderer& GetThumbnails();
 
-    void MarkDirty() { m_Inspected = nullptr; }
+    void MarkDirty() { m_RebuildPending = true; }
+
+    bool IsCollapsed(const String& InKey) const { return m_CollapsedKeys.Contains(InKey); }
+    void SetCollapsed(const String& InKey, bool InCollapsed);
 
     /** Inspects this object instead of the MajorTab's selection, for panels outside of one. */
     void Inspect(Object* InObject) { m_Pinned = InObject; }
@@ -51,4 +54,6 @@ private:
     float m_HeaderHeight = 0.0f;
     float m_LabelSplit = 0.32f;
     String m_Filter;
+    Array<String> m_CollapsedKeys;
+    bool m_RebuildPending = false;
 };

@@ -28,6 +28,14 @@ ARRAY_LAMBDAS = """
 /* Clear */
 [](void* ptr) {{
     reinterpret_cast<Array<{PROPERTY_TYPE}>*>(ptr)->Clear();
+}},
+/* RemoveAt */
+[](void* ptr, size_t i) {{
+    reinterpret_cast<Array<{PROPERTY_TYPE}>*>(ptr)->RemoveAt((int32_t)i);
+}},
+/* Swap */
+[](void* ptr, size_t a, size_t b) {{
+    reinterpret_cast<Array<{PROPERTY_TYPE}>*>(ptr)->SwapElements((int32_t)a, (int32_t)b);
 }}
 """
 

@@ -71,6 +71,14 @@ ThumbnailRenderer& DetailsTab::GetThumbnails() {
     return *m_Thumbnails.Get();
 }
 
+void DetailsTab::SetCollapsed(const String& InKey, bool InCollapsed) {
+    if (InCollapsed && !m_CollapsedKeys.Contains(InKey)) {
+        m_CollapsedKeys.Add(InKey);
+    } else if (!InCollapsed) {
+        m_CollapsedKeys.Remove(InKey);
+    }
+}
+
 void DetailsTab::SetLabelSplit(float InSplit) {
     m_LabelSplit = std::clamp(InSplit, 0.2f, 0.8f);
 }
@@ -93,9 +101,13 @@ void DetailsTab::Refresh() {
     DetailsCustomization* customization = sole ? DetailsCustomization::FindFor(sole->GetClass()) : nullptr;
     Object* inspected = customization ? sole : nullptr;
 
-    if (inspected != m_Inspected.Get()) {
+    if (inspected != m_Inspected.Get() || m_RebuildPending) {
+        const bool sameObject = inspected == m_Inspected.Get();
+        m_RebuildPending = false;
         RebuildInspector(inspected, customization);
-        m_Scroll->ScrollOffset = Vec2(0.0f);
+        if (!sameObject) {
+            m_Scroll->ScrollOffset = Vec2(0.0f);
+        }
     }
 
     const bool inspecting = m_Inspected.Get() != nullptr;

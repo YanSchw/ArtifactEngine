@@ -117,15 +117,21 @@ struct ArrayProperty : public Property {
     using GetElementPtrFn = void*(*)(void*, size_t);
     using AddDefaultFn = void(*)(void*);
     using ClearFn = void(*)(void*);
+    using RemoveAtFn = void(*)(void*, size_t);
+    using SwapFn = void(*)(void*, size_t, size_t);
 
     Property* InnerProperty;
     GetSizeFn GetSize;
     GetElementPtrFn GetElementPtr;
     AddDefaultFn AddDefault;
     ClearFn Clear;
+    RemoveAtFn RemoveAt;
+    SwapFn Swap;
 
-    ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty, GetSizeFn getSize, GetElementPtrFn getElementPtr, AddDefaultFn addDefault, ClearFn clear)
-        : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize), GetElementPtr(getElementPtr), AddDefault(addDefault), Clear(clear) {}
+    ArrayProperty(const std::string& name, uint64_t offset, Property* innerProperty, GetSizeFn getSize, GetElementPtrFn getElementPtr,
+                  AddDefaultFn addDefault, ClearFn clear, RemoveAtFn removeAt, SwapFn swap)
+        : Property(name, offset), InnerProperty(innerProperty), GetSize(getSize), GetElementPtr(getElementPtr), AddDefault(addDefault),
+          Clear(clear), RemoveAt(removeAt), Swap(swap) {}
 };
 
 /** A property reached through nested struct members, written as a dotted path such as

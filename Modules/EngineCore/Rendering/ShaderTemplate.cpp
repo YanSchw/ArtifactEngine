@@ -154,7 +154,7 @@ String ShaderTemplate::GetStageDeclarations(ShaderStage InStage, RenderPath InPa
     if (InStage == ShaderStage::Vertex) {
         return String(
             "layout(location = 0) in vec3 a_Position;\n"
-            "layout(location = 1) in vec3 a_Color;\n"
+            "layout(location = 1) in vec4 a_Color;\n"
             "layout(location = 2) in vec2 a_UV;\n"
             "layout(location = 3) in vec3 a_Normal;\n"
             "layout(location = 1) out vec4 v_Color;\n"
@@ -174,7 +174,7 @@ String ShaderTemplate::GetStageDeclarations(ShaderStage InStage, RenderPath InPa
 String ShaderTemplate::GetStageAliases(ShaderStage InStage) {
     if (InStage == ShaderStage::Vertex) {
         return "#define sg_UV a_UV\n"
-               "#define sg_VertexColor vec4(a_Color, 1.0)\n"
+               "#define sg_VertexColor a_Color\n"
                "#define sg_WorldPosition (u_ShaderData.WorldTransform * vec4(a_Position, 1.0)).xyz\n"
                "#define sg_Normal normalize(mat3(u_ShaderData.WorldTransform) * a_Normal)\n"
                "#define sg_Time u_Time\n";

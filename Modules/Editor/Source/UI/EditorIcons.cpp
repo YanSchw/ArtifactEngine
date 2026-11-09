@@ -30,6 +30,7 @@ VectorImage* EditorIcons::GetNodeIcon(const Class& InClass) {
         s_NodeIcons["CharacterNode"] = Character();
         s_NodeIcons["AudioSourceNode"] = Audio();
         s_NodeIcons["AudioListenerNode"] = AudioListener();
+        s_NodeIcons["ParticleSystemEmitterNode"] = Particles();
         s_NodeIcons["PostProcessVolumeNode"] = PostProcessVolume();
         s_NodeIcons["PointLightNode"] = PointLight();
         s_NodeIcons["DirectionalLightNode"] = DirectionalLight();
@@ -72,6 +73,7 @@ VectorImage* EditorIcons::GetAssetIcon(const Class& InClass) {
         s_AssetIcons["Animation"] = Animation();
         s_AssetIcons["InputActionMapping"] = InputMapping();
         s_AssetIcons["AudioClip"] = Audio();
+        s_AssetIcons["ParticleSystemAsset"] = Particles();
     }
 
     VectorImage* icon = nullptr;
@@ -94,6 +96,7 @@ Vec4 EditorIcons::GetAssetColor(const Class& InClass) {
         s_AssetColors["Animation"] = HexColor(0x6FD84A);
         s_AssetColors["InputActionMapping"] = HexColor(0xE05A6E);
         s_AssetColors["AudioClip"] = HexColor(0x7A7CE0);
+        s_AssetColors["ParticleSystemAsset"] = HexColor(0xFFC94A);
     }
 
     Vec4 color(0.0f);

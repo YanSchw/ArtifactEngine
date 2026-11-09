@@ -25,6 +25,7 @@
 #include "Assets/Material.h"
 #include "Assets/CollectionAsset.h"
 #include "Assets/AudioClip.h"
+#include "Assets/ParticleSystemAsset.h"
 #include "Audio/AudioPreview.h"
 #include "UI/UIAudioWaveform.h"
 #include "Import/CollectionSettingsWindow.h"
@@ -566,6 +567,11 @@ void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu) {
             return (Asset*)Material::CreateEmpty(InDir, InName);
         });
     }).Icon(EditorIcons::Material());
+    OutMenu.Item("Particle System", [this] {
+        BeginCreateAsset(ParticleSystemAsset::StaticClass(), "NewParticleSystem", [](const String& InDir, const String& InName) {
+            return (Asset*)ParticleSystemAsset::CreateEmpty(InDir, InName);
+        });
+    }).Icon(EditorIcons::Particles());
     OutMenu.Item("Input Mapping", [this] {
         BeginCreateAsset(InputActionMapping::StaticClass(), "NewInputMapping", [](const String& InDir, const String& InName) {
             return (Asset*)InputActionMapping::CreateEmpty(InDir, InName);

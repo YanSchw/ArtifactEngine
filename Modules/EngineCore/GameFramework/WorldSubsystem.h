@@ -12,6 +12,7 @@ public:
 
     virtual void Initialize() {}
     virtual void WorldUpdate(float InDeltaTime) { (void)InDeltaTime; }
+    virtual void LateWorldUpdate(float InDeltaTime) { (void)InDeltaTime; }
     virtual void Shutdown() {}
 
     World& GetWorld() const { return *m_World; }

@@ -452,6 +452,14 @@ void UIDrawList::PushClipRect(const UIRectF& InRectPx) {
     m_ClipStack.Add(rect);
 }
 
+bool UIDrawList::IsClippedOutVertically(const UIRectF& InRectPx, float InMargin) const {
+    if (m_ClipStack.IsEmpty()) {
+        return false;
+    }
+    const UIRectF& clip = m_ClipStack[m_ClipStack.Last()];
+    return InRectPx.Max().y + InMargin <= clip.Min().y || InRectPx.Min().y - InMargin >= clip.Max().y;
+}
+
 void UIDrawList::PopClipRect() {
     if (!m_ClipStack.IsEmpty()) {
         m_ClipStack.RemoveLastItem();

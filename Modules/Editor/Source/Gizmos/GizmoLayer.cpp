@@ -14,6 +14,8 @@
 #include "GameFramework/AudioListenerNode.h"
 #include "GameFramework/Node3D.h"
 #include "GameFramework/PostProcessVolumeNode.h"
+#include "GameFramework/ParticleSystemEmitterNode.h"
+#include "Particles/ParticlePreview.h"
 #include <algorithm>
 
 static const Vec4 s_CameraColor = HexColor(0xB9C2CC);
@@ -209,6 +211,10 @@ void GizmoLayer::CollectNode(World* InWorld, Node3D* InNode, CameraNode* InViewC
         if (InSettings.PostProcessVolumes && !volume->IsGlobal()) {
             DebugDraw::Box(InWorld, volume->GetPosition(), glm::abs(volume->GetExtents() * volume->GetScale()),
                            volume->GetRotation(), InSelected ? s_CameraSelectedColor : s_VolumeColor, s_GizmoThickness);
+        }
+    } else if (ParticleSystemEmitterNode* emitter = InNode->As<ParticleSystemEmitterNode>()) {
+        if (InSelected && emitter->GetSystem()) {
+            ParticlePreview::DrawShapes(*InWorld, *emitter->GetSystem(), emitter->GetTransformMatrix());
         }
     }
 

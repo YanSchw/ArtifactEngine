@@ -246,7 +246,7 @@ void VulkanVertexBuffer::Update(const void* InVertexData, uint32_t InVertexByteS
     const VkDeviceSize indicesSize = (VkDeviceSize)(InIndices.Size() * sizeof(uint32_t));
     m_IndexCount = (uint32_t)InIndices.Size();
 
-    if (verticesSize == 0 || indicesSize == 0) {
+    if (verticesSize == 0) {
         m_IndexCount = 0;
         return;
     }
@@ -258,7 +258,9 @@ void VulkanVertexBuffer::Update(const void* InVertexData, uint32_t InVertexByteS
     EnsureSlotCapacity(slot, verticesSize, indicesSize);
 
     memcpy(slot.VertexMapped, InVertexData, verticesSize);
-    memcpy(slot.IndexMapped, &InIndices[0], indicesSize);
+    if (indicesSize > 0) {
+        memcpy(slot.IndexMapped, &InIndices[0], indicesSize);
+    }
 
     m_VertexBuffer = slot.VertexBuffer;
     m_IndexBuffer = slot.IndexBuffer;

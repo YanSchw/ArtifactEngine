@@ -1299,11 +1299,21 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
                 break;
             }
 
+            case RenderCommandType::BindInstanceBuffer: {
+                const auto& data = std::get<CmdBindInstanceBuffer>(cmd.Data);
+                VulkanVertexBuffer* vkBuffer = data.Buffer ? data.Buffer->As<VulkanVertexBuffer>() : nullptr;
+                if (!vkBuffer || vkBuffer->m_VertexBuffer == VK_NULL_HANDLE)
+                    continue;
+                VkDeviceSize offset = 0;
+                vkCmdBindVertexBuffers(InCmdBuffer, 1, 1, &vkBuffer->m_VertexBuffer, &offset);
+                break;
+            }
+
             case RenderCommandType::DrawIndexed: {
                 const auto& data = std::get<CmdDrawIndexed>(cmd.Data);
                 if (!currentPipeline || !hasRenderPassBegun)
                     continue;
-                vkCmdDrawIndexed(InCmdBuffer, data.IndexCount, 1, data.FirstIndex, data.VertexOffset, 0);
+                vkCmdDrawIndexed(InCmdBuffer, data.IndexCount, data.InstanceCount, data.FirstIndex, data.VertexOffset, data.FirstInstance);
                 hasDrawnSinceDispatch = true;
                 break;
             }

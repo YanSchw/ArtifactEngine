@@ -8,6 +8,8 @@
 #include "Tabs/AudioClipEditorTab.h"
 #include "Tabs/AnimationEditorTab.h"
 #include "Tabs/InputMappingEditorTab.h"
+#include "Tabs/ParticleSystemEditorTab.h"
+#include "Assets/ParticleSystemAsset.h"
 #include "Tabs/EditorSettingsTab.h"
 #include "Settings/EditorSettings.h"
 #include "Assets/Scene.h"
@@ -337,6 +339,11 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     if (Animation* animation = Cast<Animation>(InAsset)) {
         AnimationEditorTab* tab = OpenTab<AnimationEditorTab>();
         tab->OpenAnimation(animation);
+        return tab;
+    }
+    if (ParticleSystemAsset* system = Cast<ParticleSystemAsset>(InAsset)) {
+        ParticleSystemEditorTab* tab = OpenTab<ParticleSystemEditorTab>();
+        tab->OpenSystem(system);
         return tab;
     }
     if (InputActionMapping* mapping = Cast<InputActionMapping>(InAsset)) {

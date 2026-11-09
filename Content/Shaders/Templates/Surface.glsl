@@ -13,7 +13,7 @@ void main() {
     vec4 worldPosition = u_ShaderData.WorldTransform * vec4(a_Position, 1.0);
     gl_Position = u_ViewProjection * worldPosition;
 
-    v_Color = vec4(a_Color, 1.0);
+    v_Color = a_Color;
     v_UV = a_UV;
     v_WorldPosition = worldPosition.xyz;
     v_Normal = mat3(transpose(inverse(u_ShaderData.WorldTransform))) * a_Normal;

@@ -49,6 +49,12 @@ static void ApplyBlendMode(BlendMode InBlendMode, VkPipelineColorBlendAttachment
             OutState.srcAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
             OutState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
             break;
+        case BlendMode::Premultiplied:
+            OutState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+            OutState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            OutState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            OutState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            break;
     }
 }
 
@@ -134,9 +140,9 @@ void VulkanPipeline::Invalidate() {
     CreateVertexDescriptions();
     VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
     vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-    vertexInputCreateInfo.pVertexBindingDescriptions = &m_VertexBindingDescription;
-    vertexInputCreateInfo.vertexAttributeDescriptionCount = m_Desc.VertexLayout.Size();
+    vertexInputCreateInfo.vertexBindingDescriptionCount = (uint32_t)m_VertexBindingDescriptions.size();
+    vertexInputCreateInfo.pVertexBindingDescriptions = m_VertexBindingDescriptions.data();
+    vertexInputCreateInfo.vertexAttributeDescriptionCount = (uint32_t)m_VertexAttributeDescriptions.size();
     vertexInputCreateInfo.pVertexAttributeDescriptions = m_VertexAttributeDescriptions.data();
 
     // Describe input assembly
@@ -274,46 +280,50 @@ void VulkanPipeline::Invalidate() {
     }
 }
 
-void VulkanPipeline::CreateVertexDescriptions() {
-    // attribute descriptions
-    m_VertexAttributeDescriptions.clear();
-    size_t offset = 0;
-    for (size_t i = 0; i < m_Desc.VertexLayout.Size(); i++) {
-        ShaderDataType type = m_Desc.VertexLayout[i];
-        if (type == ShaderDataType::Float4) {
-            VkVertexInputAttributeDescription attributeDescription = {};
-            attributeDescription.binding = 0;
-            attributeDescription.location = (uint32_t)i;
-            attributeDescription.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-            attributeDescription.offset = offset;
-            m_VertexAttributeDescriptions.push_back(attributeDescription);
-            offset += sizeof(float) * 4;
-        } else if (type == ShaderDataType::Float3) {
-            VkVertexInputAttributeDescription attributeDescription = {};
-            attributeDescription.binding = 0;
-            attributeDescription.location = (uint32_t)i;
-            attributeDescription.format = VK_FORMAT_R32G32B32_SFLOAT;
-            attributeDescription.offset = offset;
-            m_VertexAttributeDescriptions.push_back(attributeDescription);
-            offset += sizeof(float) * 3;
-        } else if (type == ShaderDataType::Float2) {
-            VkVertexInputAttributeDescription attributeDescription = {};
-            attributeDescription.binding = 0;
-            attributeDescription.location = (uint32_t)i;
-            attributeDescription.format = VK_FORMAT_R32G32_SFLOAT;
-            attributeDescription.offset = offset;
-            m_VertexAttributeDescriptions.push_back(attributeDescription);
-            offset += sizeof(float) * 2;
-        } else {
+static uint32_t VertexComponents(ShaderDataType InType) {
+    switch (InType) {
+        case ShaderDataType::Float:  return 1;
+        case ShaderDataType::Float2: return 2;
+        case ShaderDataType::Float3: return 3;
+        case ShaderDataType::Float4: return 4;
+        default:
             AE_ERROR("unsupported vertex attribute type in pipeline vertex layout");
             exit(1);
-        }
     }
+}
 
-    // Binding
-    m_VertexBindingDescription.binding = 0;
-    m_VertexBindingDescription.stride = offset;
-    m_VertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+static VkFormat VertexFormat(ShaderDataType InType) {
+    static constexpr VkFormat s_Formats[] = { VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT };
+    return s_Formats[VertexComponents(InType) - 1];
+}
+
+void VulkanPipeline::CreateVertexDescriptions() {
+    m_VertexAttributeDescriptions.clear();
+    m_VertexBindingDescriptions.clear();
+
+    uint32_t location = 0;
+    const auto addBinding = [&](const Array<ShaderDataType>& InLayout, uint32_t InBinding, VkVertexInputRate InRate) {
+        uint32_t offset = 0;
+        for (ShaderDataType type : InLayout) {
+            VkVertexInputAttributeDescription attribute = {};
+            attribute.binding = InBinding;
+            attribute.location = location++;
+            attribute.format = VertexFormat(type);
+            attribute.offset = offset;
+            m_VertexAttributeDescriptions.push_back(attribute);
+            offset += VertexComponents(type) * (uint32_t)sizeof(float);
+        }
+        VkVertexInputBindingDescription binding = {};
+        binding.binding = InBinding;
+        binding.stride = offset;
+        binding.inputRate = InRate;
+        m_VertexBindingDescriptions.push_back(binding);
+    };
+
+    addBinding(m_Desc.VertexLayout, 0, VK_VERTEX_INPUT_RATE_VERTEX);
+    if (!m_Desc.InstanceLayout.IsEmpty()) {
+        addBinding(m_Desc.InstanceLayout, 1, VK_VERTEX_INPUT_RATE_INSTANCE);
+    }
 }
 
 void VulkanPipeline::Destroy() {

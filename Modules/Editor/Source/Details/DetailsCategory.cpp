@@ -1,4 +1,5 @@
 #include "DetailsCategory.h"
+#include "DetailsRow.h"
 #include "Tabs/DetailsTab.h"
 #include "UI/EditorStyle.h"
 #include "GameFramework/UIButton.h"
@@ -59,6 +60,24 @@ UINode* DetailsCategory::AddHeaderEditor(float InWidth) {
     return m_HeaderEditor;
 }
 
+UINode* DetailsCategory::AddHeaderValue() {
+    if (!m_HeaderValue) {
+        m_HeaderValue = Add<UINode>();
+        m_HeaderValue->Anchor = m_HeaderValue->Pivot = Vec2(0.0f);
+    }
+    return m_HeaderValue;
+}
+
+String DetailsCategory::GetStateKey() const {
+    String key = m_Title;
+    for (Node* parent = GetParent(); parent; parent = parent->GetParent()) {
+        if (DetailsCategory* category = Cast<DetailsCategory>(parent)) {
+            key = category->m_Title + "/" + key;
+        }
+    }
+    return key;
+}
+
 void DetailsCategory::SetTitle(const String& InTitle) {
     m_Title = InTitle;
     m_TitleLabel->Text = InTitle;
@@ -91,6 +110,11 @@ float DetailsCategory::MeasureHeight(const String& InFilter) const {
 void DetailsCategory::OnBind() {
     UINode::OnBind();
 
+    if (!m_StateRestored && OwnerTab) {
+        m_StateRestored = true;
+        m_Expanded = !OwnerTab->IsCollapsed(GetStateKey());
+    }
+
     const String filter = OwnerTab ? OwnerTab->GetFilter() : String();
     const String effective = (filter.empty() || TitleMatches(filter)) ? String() : filter;
     const bool open = m_Expanded || !filter.empty();
@@ -122,6 +146,11 @@ void DetailsCategory::OnBind() {
         m_HeaderEditor->Position = Vec2(indent + 14.0f, 0.0f);
     }
     m_TitleLabel->Position = Vec2(indent + 14.0f + editorWidth, 0.0f);
+    if (m_HeaderValue) {
+        const float split = OwnerTab ? OwnerTab->GetLabelSplit() : 0.32f;
+        m_HeaderValue->Position = { UIValue(split, 5.0f), 2.0f };
+        m_HeaderValue->Size = { UIValue(1.0f - split, -(5.0f + 3.0f + DetailsRow::ResetColumnWidth)), HeaderHeight - 4.0f };
+    }
     m_TitleLabel->Color = overridden ? EditorStyle::AccentBright
                         : (inactive || (IsActive && !IsActive())) ? EditorStyle::TextDim
                         : Depth == 0 ? EditorStyle::TextBright : EditorStyle::Text;
@@ -156,5 +185,8 @@ void DetailsCategory::OnPressed(const Vec2& InCursorPos) {
     const UIRectF header(m_Geometry.Position, Vec2(m_Geometry.Size.x, HeaderHeight));
     if (HitTestRect(header, InCursorPos)) {
         m_Expanded = !m_Expanded;
+        if (OwnerTab) {
+            OwnerTab->SetCollapsed(GetStateKey(), !m_Expanded);
+        }
     }
 }

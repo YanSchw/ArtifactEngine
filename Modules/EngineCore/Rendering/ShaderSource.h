@@ -16,7 +16,8 @@ enum class BlendMode : uint32_t {
     Opaque,
     Alpha,
     Additive,
-    Multiply
+    Multiply,
+    Premultiplied
 };
 
 ARTIFACT_ENUM();

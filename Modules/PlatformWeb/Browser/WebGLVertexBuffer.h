@@ -15,6 +15,8 @@ public:
 
     /** Binds the vertex array, rebuilding its attribute setup when the layout changes. */
     void Bind(const Array<ShaderDataType>& InLayout);
+    /** Points the attributes after InFirstLocation at this buffer, advancing once per instance. Returns the locations used. */
+    uint32_t BindAsInstances(const Array<ShaderDataType>& InLayout, uint32_t InFirstLocation, uint32_t InFirstInstance);
 
 private:
     void Upload(const void* InVertexData, uint32_t InVertexByteSize, const Array<uint32_t>& InIndices);

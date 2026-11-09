@@ -62,6 +62,7 @@ static void ApplyBlendMode(BlendMode InBlend) {
         case BlendMode::Alpha:    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); break;
         case BlendMode::Additive: glBlendFunc(GL_SRC_ALPHA, GL_ONE); break;
         case BlendMode::Multiply: glBlendFunc(GL_DST_COLOR, GL_ZERO); break;
+        case BlendMode::Premultiplied: glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); break;
         case BlendMode::Opaque:   break;
     }
 }

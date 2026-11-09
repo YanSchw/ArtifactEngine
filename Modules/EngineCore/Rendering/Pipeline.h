@@ -7,6 +7,8 @@
 
 struct PipelineDesc : public PipelineResources {
     Array<ShaderDataType> VertexLayout = Vertex::GetLayout();
+    /** Per-instance attributes. */
+    Array<ShaderDataType> InstanceLayout;
 
     /* Target has to be of class Surface or FrameBuffer */
     SharedObjectPtr<Object> Target = nullptr;

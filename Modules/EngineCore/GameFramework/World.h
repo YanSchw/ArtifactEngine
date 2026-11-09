@@ -1,10 +1,12 @@
 #pragma once
 #include "Object/Object.h"
 #include "Object/Pointer.h"
+#include "Particles/ParticleHandle.h"
 #include "World.gen.h"
 
 class Node;
 class CameraNode;
+class ParticleSystemAsset;
 class Scene;
 class SceneRootNode;
 class WorldSubsystem;
@@ -40,6 +42,10 @@ public:
     }
 
     SceneRootNode* Populate(Scene* InScene);
+
+    ParticleHandle EmitParticle(ParticleSystemAsset* InSystem, const Mat4& InTransform);
+    ParticleHandle EmitParticle(ParticleSystemAsset* InSystem, const Vec3& InPosition,
+                                const Quat& InRotation = Quat(1.0f, 0.0f, 0.0f, 0.0f), const Vec3& InScale = Vec3(1.0f));
 
 private:
     struct LocalUpdateChunk {

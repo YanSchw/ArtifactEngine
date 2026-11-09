@@ -30,6 +30,6 @@ private:
     VkPipeline m_Pipeline = VK_NULL_HANDLE;
     VulkanPipelineLayout m_Layout;
 
-    VkVertexInputBindingDescription m_VertexBindingDescription;
+    std::vector<VkVertexInputBindingDescription> m_VertexBindingDescriptions;
     std::vector<VkVertexInputAttributeDescription> m_VertexAttributeDescriptions;
 };

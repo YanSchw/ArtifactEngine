@@ -10,7 +10,7 @@
 #include "Rendering/ShaderTemplate.h"
 #include "Rendering/Texture.h"
 
-MaterialPipelineCache::MaterialPipelineCache() {
+MaterialPipelineCache::MaterialPipelineCache(const Array<ShaderDataType>& InVertexLayout) : m_VertexLayout(InVertexLayout) {
     SamplerDesc samplerDesc;
     samplerDesc.MagFilter = FilterMode::Linear;
     samplerDesc.MinFilter = FilterMode::Linear;
@@ -41,6 +41,7 @@ Pipeline* MaterialPipelineCache::Resolve(Material& InMaterial, FrameBuffer& InTa
     PipelineDesc desc;
     desc.Target = &InTarget;
     desc.Shader = shader;
+    desc.VertexLayout = m_VertexLayout;
     desc.Buffers.Add(InContext.SceneUniforms);
     if (UniformBuffer* properties = InMaterial.GetPropertyBuffer()) {
         desc.Buffers.Add(properties);

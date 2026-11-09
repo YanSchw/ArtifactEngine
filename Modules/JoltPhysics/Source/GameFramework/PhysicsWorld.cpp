@@ -6,6 +6,8 @@
 #include "Physics/JoltSystem.h"
 #include "Physics/PhysicsWorldImpl.h"
 #include "GameFramework/Node3D.h"
+#include "GameFramework/ParticleWorld.h"
+#include "GameFramework/World.h"
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
@@ -47,6 +49,18 @@ void PhysicsWorld::Initialize() {
     m_Impl->System.Init(MaxBodies, 0, MaxBodyPairs, MaxContactConstraints, m_Impl->BroadPhaseLayers, m_Impl->BroadPhaseFilter, m_Impl->LayerFilter);
     m_Impl->System.SetContactListener(&m_Impl->ContactListener);
     m_Impl->System.SetGravity(ToJolt(m_Gravity));
+
+    ParticleWorld::SetRayCast([](World& InWorld, const Vec3& InFrom, const Vec3& InTo, Vec3& OutPosition, Vec3& OutNormal) {
+        const PhysicsWorld* physics = InWorld.GetSubsystem<PhysicsWorld>();
+        const float distance = glm::distance(InFrom, InTo);
+        PhysicsHit hit;
+        if (!physics || distance < 1e-6f || !physics->RayCast(InFrom, InTo - InFrom, distance, hit)) {
+            return false;
+        }
+        OutPosition = hit.Position;
+        OutNormal = hit.Normal;
+        return true;
+    });
 }
 
 PhysicsWorld::~PhysicsWorld() {

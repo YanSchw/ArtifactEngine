@@ -55,6 +55,7 @@ public:
 
     void PushClipRect(const UIRectF& InRectPx);
     void PopClipRect();
+    bool IsClippedOutVertically(const UIRectF& InRectPx, float InMargin) const;
 
     const Array<UIVertex>& GetVertices() const { return m_Vertices; }
     const Array<uint32_t>& GetIndices() const { return m_Indices; }

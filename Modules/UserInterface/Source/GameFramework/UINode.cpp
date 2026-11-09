@@ -54,10 +54,16 @@ void UINode::Layout(const UIRectF& InParentContentRect, const Mat4& InParentWorl
 
     // Rotate this node (and, through m_WorldMatrix, its children) about its pivot, on top of the
     // parent's transform. Layout stays axis-aligned; rotation/perspective apply at paint/hit-test.
-    const Vec2 pivotPx = m_Geometry.Min() + Pivot * m_Geometry.Size;
-    m_WorldMatrix = InParentWorld * RotationAbout(pivotPx, Rotation);
+    if (Rotation == Vec3(0.0f)) {
+        m_WorldMatrix = InParentWorld;
+    } else {
+        const Vec2 pivotPx = m_Geometry.Min() + Pivot * m_Geometry.Size;
+        m_WorldMatrix = InParentWorld * RotationAbout(pivotPx, Rotation);
+    }
 
-    LayoutChildren(GetContentRect());
+    if (IsEnabled()) {
+        LayoutChildren(GetContentRect());
+    }
 }
 
 void UINode::LayoutChildren(const UIRectF& InContent) {
@@ -97,7 +103,10 @@ void UINode::PaintTree(UIDrawList& OutDrawList) {
     if (!IsEnabled()) {
         return;
     }
-    Paint(OutDrawList);
+    static constexpr float s_PaintCullMargin = 16.0f;
+    if (!OutDrawList.IsClippedOutVertically(m_Geometry, s_PaintCullMargin)) {
+        Paint(OutDrawList);
+    }
     if (ClipChildren) {
         OutDrawList.PushClipRect(GetContentRect());
     }

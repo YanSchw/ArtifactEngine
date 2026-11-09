@@ -22,6 +22,8 @@ public:
     UINode* GetBody() const;
     /** Hosts an editor in the header between the arrow and the title. */
     UINode* AddHeaderEditor(float InWidth);
+    UINode* AddHeaderValue();
+    String GetStateKey() const;
 
     /** While this returns false the rows inside are drawn dimmed. */
     std::function<bool()> IsActive;
@@ -41,7 +43,9 @@ private:
     UISvg* m_Arrow = nullptr;
     UIVStack* m_Body = nullptr;
     UINode* m_HeaderEditor = nullptr;
+    UINode* m_HeaderValue = nullptr;
     UIButton* m_ResetButton = nullptr;
     float m_HeaderEditorWidth = 0.0f;
     bool m_Expanded = true;
+    bool m_StateRestored = false;
 };

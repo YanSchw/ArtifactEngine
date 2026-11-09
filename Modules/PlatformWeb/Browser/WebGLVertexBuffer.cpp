@@ -30,6 +30,24 @@ void WebGLVertexBuffer::Update(const void* InVertexData, uint32_t InVertexByteSi
     Upload(InVertexData, InVertexByteSize, InIndices);
 }
 
+uint32_t WebGLVertexBuffer::BindAsInstances(const Array<ShaderDataType>& InLayout, uint32_t InFirstLocation, uint32_t InFirstInstance) {
+    GLsizei stride = 0;
+    for (ShaderDataType type : InLayout) {
+        stride += (GLsizei)GetTypeSize(type);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, m_VertexBuffer);
+    size_t offset = (size_t)stride * InFirstInstance;
+    for (int32_t i = 0; i < InLayout.Size(); i++) {
+        const GLuint location = InFirstLocation + (GLuint)i;
+        glEnableVertexAttribArray(location);
+        glVertexAttribPointer(location, (GLint)GetComponentCount(InLayout[i]), GL_FLOAT, GL_FALSE, stride, (const void*)offset);
+        glVertexAttribDivisor(location, 1);
+        offset += GetTypeSize(InLayout[i]);
+    }
+    return (uint32_t)InLayout.Size();
+}
+
 void WebGLVertexBuffer::Bind(const Array<ShaderDataType>& InLayout) {
     glBindVertexArray(m_VertexArray);
     if (m_Layout == InLayout) {

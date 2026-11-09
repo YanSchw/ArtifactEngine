@@ -10,6 +10,8 @@
 #include "UI/UIAssetSlot.h"
 #include "UI/UICheckbox.h"
 #include "UI/UIColorSwatch.h"
+#include "UI/UICurveEditor.h"
+#include "UI/UIGradientEditor.h"
 #include "HeroTools/ThumbnailRenderer.h"
 #include "GameFramework/UIHStack.h"
 #include "GameFramework/UILabel.h"
@@ -23,15 +25,68 @@
 #include "Assets/Asset.h"
 #include "GameFramework/Node.h"
 #include "Common/Map.h"
+#include "Particles/ParticleModules.h"
+#include "Serialization/Json.h"
+#include "Serialization/ThirdParty/nlohmann/json.hpp"
+#include "UI/UIContextMenu.h"
+#include "UI/UIMenuModel.h"
+#include "UI/UITooltip.h"
+#include "GameFramework/UIButton.h"
 #include <cctype>
 #include <cstring>
 #include <memory>
 
 static constexpr float AssetRowHeight = 52.0f;
 
+struct ArrayElementAddress {
+    uint64_t ArrayOffset = 0;
+    ArrayProperty* Array = nullptr;
+    int32_t Index = 0;
+};
+
+static constexpr uint64_t s_ArrayElementBit = 1ull << 63;
+static constexpr uint64_t s_ElementMemberMask = 0xFFFFFFFFull;
+
+static Array<ArrayElementAddress>& GetArrayElementAddresses() {
+    static Array<ArrayElementAddress> s_Addresses;
+    return s_Addresses;
+}
+
+static uint64_t ArrayElementOffset(uint64_t InArrayOffset, ArrayProperty* InArray, int32_t InIndex) {
+    Array<ArrayElementAddress>& addresses = GetArrayElementAddresses();
+    int32_t slot = -1;
+    for (int32_t i = 0; i < addresses.Size() && slot < 0; i++) {
+        const ArrayElementAddress& address = addresses[i];
+        if (address.ArrayOffset == InArrayOffset && address.Array == InArray && address.Index == InIndex) {
+            slot = i;
+        }
+    }
+    if (slot < 0) {
+        slot = addresses.Size();
+        addresses.Add(ArrayElementAddress{ InArrayOffset, InArray, InIndex });
+    }
+    return s_ArrayElementBit | ((uint64_t)slot << 32);
+}
+
 static char* ResolveBase(const WeakObjectPtr<Object>& InObject, uint64_t InOffset) {
-    Object* object = InObject.Get();
-    return object ? (char*)object + InOffset : nullptr;
+    if (!(InOffset & s_ArrayElementBit)) {
+        Object* object = InObject.Get();
+        return object ? (char*)object + InOffset : nullptr;
+    }
+    const ArrayElementAddress address = GetArrayElementAddresses()[(int32_t)((InOffset & ~s_ArrayElementBit) >> 32)];
+    char* array = ResolveBase(InObject, address.ArrayOffset);
+    if (!array || address.Index >= (int32_t)address.Array->GetSize(array)) {
+        return nullptr;
+    }
+    return (char*)address.Array->GetElementPtr(array, (size_t)address.Index) + (InOffset & s_ElementMemberMask);
+}
+
+static bool IsOverridablePath(const String& InPath) {
+    return InPath.find('[') == String::npos;
+}
+
+static String OverridablePath(const String& InPath) {
+    return InPath.substr(0, InPath.find('['));
 }
 
 static double ReadIntValue(const IntProperty& InProperty, const void* InPtr) {
@@ -188,6 +243,49 @@ static void BuildColorEditor(UINode& InHost, const WeakObjectPtr<Object>& InObje
     };
 }
 
+static bool IsInlinePair(const String& InTypename) {
+    const Array<Property*> members = Property::GetTypeProperties(InTypename);
+    if (members.Size() != 2) {
+        return false;
+    }
+    const bool named = (members[0]->Name == "Min" && members[1]->Name == "Max")
+                    || (members[0]->Name == "Time" && members[1]->Name == "Value");
+    const auto isInline = [](Property* InMember) {
+        StructProperty* structMember = Cast<StructProperty>(InMember);
+        return Cast<FloatProperty>(InMember) || (structMember && structMember->InnerStructTypename == "Color");
+    };
+    return named && isInline(members[0]) && isInline(members[1]);
+}
+
+static void BuildInlinePairEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, const String& InTypename,
+                                  const String& InTitle, const DetailsEditHandler& InOnEdited) {
+    UIHStack* stack = InHost.Add<UIHStack>();
+    stack->Fill();
+    stack->Gap = 2.0f;
+    for (Property* member : Property::GetTypeProperties(InTypename)) {
+        const uint64_t offset = InOffset + member->Offset;
+        if (!Cast<FloatProperty>(member)) {
+            UINode* cell = stack->Add<UINode>();
+            cell->Size = { UIValue::Rel(0.5f), 1.0_rel };
+            BuildColorEditor(*cell, InObject, offset, InTitle + " " + member->Name, InOnEdited);
+            continue;
+        }
+        UIDragNumber* drag = stack->Add<UIDragNumber>();
+        drag->Size = { UIValue::Rel(0.5f), 1.0_rel };
+        drag->Get = [InObject, offset]() -> double {
+            char* base = ResolveBase(InObject, offset);
+            return base ? (double)*reinterpret_cast<float*>(base) : 0.0;
+        };
+        drag->Set = [InObject, offset, InOnEdited](double InValue) {
+            if (char* base = ResolveBase(InObject, offset)) {
+                InOnEdited.Record();
+                *reinterpret_cast<float*>(base) = (float)InValue;
+                InOnEdited();
+            }
+        };
+    }
+}
+
 static void BuildBoolEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
                             const DetailsEditHandler& InOnEdited) {
     UICheckbox* checkbox = InHost.Add<UICheckbox>();
@@ -281,11 +379,9 @@ static void BuildEnumEditor(UINode& InHost, const WeakObjectPtr<Object>& InObjec
     };
 }
 
-static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                          const Class& InAssetClass, bool InIsWeak, const DetailsEditHandler& InOnEdited) {
-    InRow.Height = AssetRowHeight;
-
-    UIAssetSlot* slot = InRow.GetValueHost()->Add<UIAssetSlot>();
+static void BuildAssetSlot(UINode& InHost, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                           const Class& InAssetClass, bool InIsWeak, const DetailsEditHandler& InOnEdited) {
+    UIAssetSlot* slot = InHost.Add<UIAssetSlot>();
     slot->Fill();
     slot->AssetClass = InAssetClass;
     slot->Thumbnails = &InTab.GetThumbnails();
@@ -303,10 +399,84 @@ static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObject
     slot->Build();
 }
 
+static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                          const Class& InAssetClass, bool InIsWeak, const DetailsEditHandler& InOnEdited) {
+    InRow.Height = AssetRowHeight;
+    BuildAssetSlot(*InRow.GetValueHost(), InTab, InObject, InOffset, InAssetClass, InIsWeak, InOnEdited);
+}
+
+static const Class* FindAssetReferenceClass(Property* InProperty, bool& OutIsWeak) {
+    if (WeakObjectPtrProperty* weak = Cast<WeakObjectPtrProperty>(InProperty)) {
+        OutIsWeak = true;
+        return weak->InnerClass.IsSubclassOf(Asset::StaticClass()) ? &weak->InnerClass : nullptr;
+    }
+    if (SharedObjectPtrProperty* shared = Cast<SharedObjectPtrProperty>(InProperty)) {
+        OutIsWeak = false;
+        return shared->InnerClass.IsSubclassOf(Asset::StaticClass()) ? &shared->InnerClass : nullptr;
+    }
+    return nullptr;
+}
+
+static bool IsEditableArrayElement(Property* InProperty) {
+    bool isWeak = false;
+    if (Cast<WeakObjectPtrProperty>(InProperty) || Cast<SharedObjectPtrProperty>(InProperty)) {
+        return FindAssetReferenceClass(InProperty, isWeak) != nullptr;
+    }
+    return Cast<IntProperty>(InProperty) || Cast<FloatProperty>(InProperty) || Cast<BoolProperty>(InProperty)
+        || Cast<StringProperty>(InProperty) || Cast<EnumProperty>(InProperty) || Cast<StructProperty>(InProperty);
+}
+
+static UIButton& AddHeaderIconButton(UINode& InParent, VectorImage* InIcon, const String& InTooltip, float InRightInset,
+                                     std::function<void()> InAction) {
+    UIButton* button = InParent.Add<UIButton>();
+    button->Anchor = button->Pivot = Vec2(1.0f, 0.5f);
+    button->Position = Vec2(-InRightInset, 0.0f);
+    button->Size = Vec2(20.0f, 20.0f);
+    button->NormalColor = Vec4(0.0f);
+    button->HoverColor = EditorStyle::TabHover;
+    button->PressedColor = EditorStyle::ButtonPressed;
+    button->Clicked = std::move(InAction);
+
+    UISvg* icon = button->Add<UISvg>();
+    icon->Center(Vec2(12.0f, 12.0f));
+    icon->Tint = EditorStyle::TextDim;
+    icon->Image = InIcon;
+
+    button->Add<UITooltip>()->Text = InTooltip;
+    return *button;
+}
+
+static void EditArray(const WeakObjectPtr<DetailsTab>& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                      Property* InRootProperty, const String& InPath, const String& InTitle, const std::function<void(char*)>& InEdit) {
+    DetailsTab* tab = InTab.Get();
+    Object* object = InObject.Get();
+    char* array = ResolveBase(InObject, InOffset);
+    if (!tab || !object || !array) {
+        return;
+    }
+    tab->RecordEdit(InTitle, object);
+    InEdit(array);
+    InRootProperty->NotifyChanged(object);
+    DetailsCustomization::NotifyPropertyEdited(tab, object, InPath);
+    if (MajorTab* major = tab->GetMajorTab()) {
+        major->EndTransaction();
+    }
+    tab->MarkDirty();
+}
+
+static void MoveArrayElement(ArrayProperty& InArray, char* InData, int32_t InFrom, int32_t InTo) {
+    for (int32_t i = InFrom; i > InTo; i--) {
+        InArray.Swap(InData, (size_t)i, (size_t)i - 1);
+    }
+    for (int32_t i = InFrom; i < InTo; i++) {
+        InArray.Swap(InData, (size_t)i, (size_t)i + 1);
+    }
+}
+
 Array<Property*> DetailsCustomization::GetInnerProperties(Property* InProperty) {
     StructProperty* structProperty = Cast<StructProperty>(InProperty);
     if (!structProperty || structProperty->InnerStructTypename == "Color"
-        || VectorComponentCount(structProperty->InnerStructTypename) > 0) {
+        || VectorComponentCount(structProperty->InnerStructTypename) > 0 || IsInlinePair(structProperty->InnerStructTypename)) {
         return Array<Property*>();
     }
     return Property::GetTypeProperties(structProperty->InnerStructTypename);
@@ -327,6 +497,8 @@ bool DetailsCustomization::BuildValueEditor(UINode& InHost, const WeakObjectPtr<
             BuildVectorEditor(InHost, InObject, InOffset, components, InOnEdited);
         } else if (structProperty->InnerStructTypename == "Color") {
             BuildColorEditor(InHost, InObject, InOffset, InTitle, InOnEdited);
+        } else if (IsInlinePair(structProperty->InnerStructTypename)) {
+            BuildInlinePairEditor(InHost, InObject, InOffset, structProperty->InnerStructTypename, InTitle, InOnEdited);
         } else {
             return false;
         }
@@ -414,12 +586,13 @@ void DetailsCustomization::NotifyPropertyEdited(MajorTab* InTab, Object* InObjec
     if (!InObject) {
         return;
     }
+    const String path = OverridablePath(InPropertyName);
     if (Node* node = Cast<Node>(InObject)) {
-        node->MarkPropertyOverridden(InPropertyName);
+        node->MarkPropertyOverridden(path);
     }
     if (InTab) {
         InTab->OnObjectEdited(InObject);
-        InTab->OnPropertyEdited(InObject, PropertyPath::GetRootName(InPropertyName));
+        InTab->OnPropertyEdited(InObject, PropertyPath::GetRootName(path));
     }
 }
 
@@ -429,7 +602,7 @@ void DetailsCustomization::NotifyPropertyEdited(DetailsTab* InTab, Object* InObj
         return;
     }
     DetailsCustomization* customization = FindFor(InObject->GetClass());
-    if (customization && customization->RebuildsOnEdit(PropertyPath::GetRootName(InPropertyName))) {
+    if (customization && customization->RebuildsOnEdit(PropertyPath::GetRootName(OverridablePath(InPropertyName)))) {
         InTab->MarkDirty();
     }
 }
@@ -484,29 +657,20 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
 
     const Array<Property*> inner = GetInnerProperties(InProperty);
     if (!inner.IsEmpty()) {
-        DetailsCategory& category = AddCategory(InParent, InTab, label, InDepth + 1);
-        Property* toggle = FindHeaderToggle(inner);
-        if (toggle) {
-            const String togglePath = path + "." + toggle->Name;
-            const uint64_t toggleOffset = offset + toggle->Offset;
-            BuildValueEditor(*category.AddHeaderEditor(20.0f), InObject, toggleOffset, toggle,
-                             MakeEditHandler(InObject, root, &InTab, togglePath));
-            category.IsActive = [InObject, toggleOffset] {
-                char* base = ResolveBase(InObject, toggleOffset);
-                return !base || *(bool*)base;
-            };
-            BindOverrideActions(InObject, togglePath, &InTab, category.IsOverridden, category.ResetAction);
-        }
-        for (Property* property : inner) {
-            if (property != toggle) {
-                AddPropertyRow(*category.GetBody(), InTab, InObject, offset, property, InDepth + 1, root, String(), path);
-            }
-        }
+        AddStructCategory(InParent, InTab, InObject, offset, inner, InDepth, root, label, path);
+        return;
+    }
+
+    ArrayProperty* editableArray = Cast<ArrayProperty>(InProperty);
+    if (editableArray && IsEditableArrayElement(editableArray->InnerProperty)) {
+        AddArrayRows(InParent, InTab, InObject, offset, editableArray, InDepth, root, label, path);
         return;
     }
 
     DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
-    BindOverride(row, InObject, path);
+    if (IsOverridablePath(path)) {
+        BindOverride(row, InObject, path);
+    }
     const DetailsEditHandler onEdited = MakeEditHandler(InObject, root, &InTab, path);
 
     if (BuildValueEditor(*row.GetValueHost(), InObject, offset, InProperty, onEdited, label)) {
@@ -535,6 +699,205 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
         };
     } else {
         AddValueLabel(*row.GetValueHost(), "Unsupported");
+    }
+}
+
+/** The key type of a curve or gradient, found through its Keys array. Empty for any other struct. */
+static String FindKeyType(const Array<Property*>& InMembers) {
+    for (Property* member : InMembers) {
+        ArrayProperty* keys = Cast<ArrayProperty>(member);
+        StructProperty* key = keys && member->Name == "Keys" ? Cast<StructProperty>(keys->InnerProperty) : nullptr;
+        if (key && (key->InnerStructTypename == "ParticleCurveKey" || key->InnerStructTypename == "ParticleGradientKey")) {
+            return key->InnerStructTypename;
+        }
+    }
+    return String();
+}
+
+static void BuildKeyGraph(DetailsRow& InRow, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, bool InGradient,
+                          const DetailsEditHandler& InOnEdited) {
+    const auto resolve = [InObject, InOffset] { return ResolveBase(InObject, InOffset); };
+    const auto beginChange = [InOnEdited] { InOnEdited.Record(); };
+    const auto changed = [InOnEdited] { InOnEdited(); };
+    if (InGradient) {
+        InRow.Height = 36.0f;
+        UIGradientEditor* editor = InRow.GetValueHost()->Add<UIGradientEditor>();
+        editor->Fill();
+        editor->GetGradient = [resolve] { return reinterpret_cast<ParticleGradient*>(resolve()); };
+        editor->BeginChange = beginChange;
+        editor->Changed = changed;
+        return;
+    }
+    InRow.Height = 80.0f;
+    UICurveEditor* editor = InRow.GetValueHost()->Add<UICurveEditor>();
+    editor->Fill();
+    editor->GetCurve = [resolve] { return reinterpret_cast<ParticleCurve*>(resolve()); };
+    editor->BeginChange = beginChange;
+    editor->Changed = changed;
+}
+
+DetailsCategory& DetailsCustomization::AddStructCategory(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
+                                                         uint64_t InOffset, const Array<Property*>& InMembers, int32_t InDepth,
+                                                         Property* InRootProperty, const String& InLabel, const String& InPath) {
+    DetailsCategory& category = AddCategory(InParent, InTab, InLabel, InDepth + 1);
+    Property* toggle = FindHeaderToggle(InMembers);
+    if (toggle) {
+        const String togglePath = InPath + "." + toggle->Name;
+        const uint64_t toggleOffset = InOffset + toggle->Offset;
+        BuildValueEditor(*category.AddHeaderEditor(20.0f), InObject, toggleOffset, toggle,
+                         MakeEditHandler(InObject, InRootProperty, &InTab, togglePath));
+        category.IsActive = [InObject, toggleOffset] {
+            char* base = ResolveBase(InObject, toggleOffset);
+            return !base || *(bool*)base;
+        };
+        if (IsOverridablePath(togglePath)) {
+            BindOverrideActions(InObject, togglePath, &InTab, category.IsOverridden, category.ResetAction);
+        }
+    }
+    const String keyType = FindKeyType(InMembers);
+    if (!keyType.empty()) {
+        const bool gradient = keyType == "ParticleGradientKey";
+        BuildKeyGraph(AddRow(*category.GetBody(), InTab, gradient ? "Gradient" : "Curve", InDepth + 1), InObject, InOffset, gradient,
+                      MakeEditHandler(InObject, InRootProperty, &InTab, InPath));
+    }
+    for (Property* member : InMembers) {
+        if (member != toggle) {
+            AddPropertyRow(*category.GetBody(), InTab, InObject, InOffset, member, InDepth + 1, InRootProperty, String(), InPath);
+        }
+    }
+    return category;
+}
+
+void DetailsCustomization::AddArrayRows(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                                        ArrayProperty* InArray, int32_t InDepth, Property* InRootProperty,
+                                        const String& InLabel, const String& InPath) {
+    DetailsCategory& category = AddCategory(InParent, InTab, InLabel, InDepth + 1);
+    if (IsOverridablePath(InPath)) {
+        BindOverrideActions(InObject, InPath, &InTab, category.IsOverridden, category.ResetAction);
+    }
+
+    char* data = ResolveBase(InObject, InOffset);
+    const int32_t count = data ? (int32_t)InArray->GetSize(data) : 0;
+    const WeakObjectPtr<DetailsTab> tab = &InTab;
+    category.Bind = [tab, InObject, InOffset, InArray, count] {
+        char* current = ResolveBase(InObject, InOffset);
+        if (current && (int32_t)InArray->GetSize(current) != count && tab.Get()) {
+            tab.Get()->MarkDirty();
+        }
+    };
+
+    UINode* header = category.AddHeaderValue();
+    UILabel& summary = AddValueLabel(*header, "");
+    summary.Size = { 1.0_rel - 50.0_px, 1.0_rel };
+    summary.Bind = [summary = &summary, InObject, InOffset, InArray] {
+        char* current = ResolveBase(InObject, InOffset);
+        const size_t size = current ? InArray->GetSize(current) : 0;
+        summary->Text = std::to_string(size) + (size == 1 ? " element" : " elements");
+    };
+
+    const String name = PrettyPropertyPath(OverridablePath(InPath));
+    AddHeaderIconButton(*header, EditorIcons::Add(), "Add element", 24.0f, [=] {
+        EditArray(tab, InObject, InOffset, InRootProperty, InPath, "Add " + name + " Element", [InArray](char* InData) {
+            InArray->AddDefault(InData);
+        });
+    });
+    AddHeaderIconButton(*header, EditorIcons::Delete(), "Remove all elements", 0.0f, [=] {
+        EditArray(tab, InObject, InOffset, InRootProperty, InPath, "Clear " + name, [InArray](char* InData) {
+            InArray->Clear(InData);
+        });
+    });
+
+    for (int32_t index = 0; index < count; index++) {
+        AddArrayElement(*category.GetBody(), InTab, InObject, InOffset, InArray, index, InDepth + 1, InRootProperty, InPath);
+    }
+}
+
+void DetailsCustomization::AddArrayElement(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InArrayOffset,
+                                           ArrayProperty* InArray, int32_t InIndex, int32_t InDepth, Property* InRootProperty,
+                                           const String& InArrayPath) {
+    const uint64_t offset = ArrayElementOffset(InArrayOffset, InArray, InIndex);
+    String label = "Element " + std::to_string(InIndex);
+    char* elementData = ResolveBase(InObject, offset);
+    for (Property* member : GetInnerProperties(InArray->InnerProperty)) {
+        if (elementData && member->Name == "Name" && Cast<StringProperty>(member)) {
+            label = std::to_string(InIndex) + ": " + *reinterpret_cast<String*>(elementData + member->Offset);
+        }
+    }
+    const String path = InArrayPath + "[" + std::to_string(InIndex) + "]";
+    const String name = PrettyPropertyPath(OverridablePath(InArrayPath));
+    const WeakObjectPtr<DetailsTab> tab = &InTab;
+
+    const auto buildMenu = [=](UIMenuModel& OutMenu) {
+        char* data = ResolveBase(InObject, InArrayOffset);
+        const int32_t size = data ? (int32_t)InArray->GetSize(data) : 0;
+        const auto edit = [=](const String& InTitle, std::function<void(char*)> InEdit) {
+            EditArray(tab, InObject, InArrayOffset, InRootProperty, InArrayPath, InTitle + " " + name + " Element", InEdit);
+        };
+        OutMenu.Section(label);
+        OutMenu.Item("Insert", [=] {
+            edit("Insert", [InArray, InIndex](char* InData) {
+                InArray->AddDefault(InData);
+                MoveArrayElement(*InArray, InData, (int32_t)InArray->GetSize(InData) - 1, InIndex);
+            });
+        }).Icon(EditorIcons::Add());
+        OutMenu.Item("Duplicate", [=] {
+            edit("Duplicate", [InArray, InIndex](char* InData) {
+                InArray->AddDefault(InData);
+                const int32_t last = (int32_t)InArray->GetSize(InData) - 1;
+                const nlohmann::json copy = JsonSerializer::SerializeProperty(InArray->InnerProperty, InArray->GetElementPtr(InData, (size_t)InIndex));
+                JsonSerializer::DeserializeProperty(InArray->InnerProperty, InArray->GetElementPtr(InData, (size_t)last), copy);
+                MoveArrayElement(*InArray, InData, last, InIndex + 1);
+            });
+        });
+        OutMenu.Separator();
+        OutMenu.Item("Move Up", [=] {
+            edit("Move", [InArray, InIndex](char* InData) { MoveArrayElement(*InArray, InData, InIndex, InIndex - 1); });
+        }).Enabled(InIndex > 0 && InIndex < size);
+        OutMenu.Item("Move Down", [=] {
+            edit("Move", [InArray, InIndex](char* InData) { MoveArrayElement(*InArray, InData, InIndex, InIndex + 1); });
+        }).Enabled(InIndex + 1 < size);
+        OutMenu.Separator();
+        OutMenu.Item("Delete", [=] {
+            edit("Delete", [InArray, InIndex](char* InData) {
+                if (InIndex < (int32_t)InArray->GetSize(InData)) {
+                    InArray->RemoveAt(InData, (size_t)InIndex);
+                }
+            });
+        }).Icon(EditorIcons::Delete()).Enabled(InIndex < size);
+    };
+    const auto addMenuButton = [buildMenu](UINode& InHost) {
+        UIButton& button = AddHeaderIconButton(InHost, EditorIcons::More(), "Element actions", 0.0f, nullptr);
+        button.Clicked = [button = &button, buildMenu] {
+            UIMenuModel menu;
+            buildMenu(menu);
+            UIContextMenu::OpenUnder(*button, menu);
+        };
+    };
+
+    Property* element = InArray->InnerProperty;
+    const Array<Property*> members = GetInnerProperties(element);
+    if (!members.IsEmpty()) {
+        DetailsCategory& category = AddStructCategory(InParent, InTab, InObject, offset, members, InDepth, InRootProperty, label, path);
+        addMenuButton(*category.AddHeaderValue());
+        return;
+    }
+
+    DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
+    UINode* editor = row.GetValueHost()->Add<UINode>();
+    editor->Fill();
+    editor->Size = { 1.0_rel - 26.0_px, 1.0_rel };
+    addMenuButton(*row.GetValueHost());
+
+    const DetailsEditHandler onEdited = MakeEditHandler(InObject, InRootProperty, &InTab, path);
+    if (BuildValueEditor(*editor, InObject, offset, element, onEdited, label)) {
+        return;
+    }
+    bool isWeak = false;
+    if (const Class* assetClass = FindAssetReferenceClass(element, isWeak)) {
+        row.Height = AssetRowHeight;
+        BuildAssetSlot(*editor, InTab, InObject, offset, *assetClass, isWeak, onEdited);
+    } else if (StructProperty* structProperty = Cast<StructProperty>(element)) {
+        AddValueLabel(*editor, structProperty->InnerStructTypename);
     }
 }
 

@@ -1,6 +1,8 @@
 #include "World.h"
 #include "Node.h"
+#include "Node3D.h"
 #include "Component.h"
+#include "ParticleWorld.h"
 #include "WorldSubsystem.h"
 #include "Assets/Scene.h"
 #include "Common/Map.h"
@@ -173,7 +175,21 @@ void World::Update(double InDeltatime) {
     HalfWorldUpdate((float)InDeltatime);
     LocalUpdate((float)InDeltatime);
 
+    for (const SharedObjectPtr<WorldSubsystem>& subsystem : m_Subsystems) {
+        subsystem->LateWorldUpdate((float)InDeltatime);
+    }
+
     ResolvePendingKills();
+}
+
+ParticleHandle World::EmitParticle(ParticleSystemAsset* InSystem, const Mat4& InTransform) {
+    AE_ASSERT_MAIN_THREAD("World::EmitParticle");
+    ParticleWorld* particles = GetSubsystem<ParticleWorld>();
+    return particles ? particles->Emit(InSystem, InTransform) : ParticleHandle();
+}
+
+ParticleHandle World::EmitParticle(ParticleSystemAsset* InSystem, const Vec3& InPosition, const Quat& InRotation, const Vec3& InScale) {
+    return EmitParticle(InSystem, Node3D::CalculateTransformMatrix(InPosition, InRotation, InScale));
 }
 
 Node* World::Spawn(const Class& InClass) {

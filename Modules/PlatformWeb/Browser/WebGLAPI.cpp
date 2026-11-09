@@ -37,6 +37,7 @@ void WebGLAPI::Execute() {
     WebGLFrameBuffer* openFrameBuffer = nullptr;
     WebGLPipeline* currentPipeline = nullptr;
     WebGLVertexBuffer* currentVertexBuffer = nullptr;
+    WebGLVertexBuffer* currentInstanceBuffer = nullptr;
 
     for (const RenderCommand& command : m_RenderQueue.commands) {
         switch (command.Type) {
@@ -70,6 +71,13 @@ void WebGLAPI::Execute() {
             case RenderCommandType::BindVertexBuffer: {
                 VertexBuffer* buffer = std::get<CmdBindVertexBuffer>(command.Data).Buffer.Get();
                 currentVertexBuffer = buffer ? buffer->As<WebGLVertexBuffer>() : nullptr;
+                currentInstanceBuffer = nullptr;
+                break;
+            }
+
+            case RenderCommandType::BindInstanceBuffer: {
+                VertexBuffer* buffer = std::get<CmdBindInstanceBuffer>(command.Data).Buffer.Get();
+                currentInstanceBuffer = buffer ? buffer->As<WebGLVertexBuffer>() : nullptr;
                 break;
             }
 
@@ -78,9 +86,23 @@ void WebGLAPI::Execute() {
                 if (!currentVertexBuffer || !currentPipeline) {
                     break;
                 }
-                currentVertexBuffer->Bind(currentPipeline->GetDesc().VertexLayout);
-                glDrawElements(GL_TRIANGLES, (GLsizei)draw.IndexCount, GL_UNSIGNED_INT,
-                               (const void*)(size_t)(draw.FirstIndex * sizeof(uint32_t)));
+                const PipelineDesc& desc = currentPipeline->GetDesc();
+                currentVertexBuffer->Bind(desc.VertexLayout);
+                const void* firstIndex = (const void*)(size_t)(draw.FirstIndex * sizeof(uint32_t));
+                if (desc.InstanceLayout.IsEmpty()) {
+                    glDrawElements(GL_TRIANGLES, (GLsizei)draw.IndexCount, GL_UNSIGNED_INT, firstIndex);
+                    break;
+                }
+                if (!currentInstanceBuffer) {
+                    break;
+                }
+                const GLuint firstLocation = (GLuint)desc.VertexLayout.Size();
+                const uint32_t count = currentInstanceBuffer->BindAsInstances(desc.InstanceLayout, firstLocation, draw.FirstInstance);
+                glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)draw.IndexCount, GL_UNSIGNED_INT, firstIndex, (GLsizei)draw.InstanceCount);
+                for (uint32_t i = 0; i < count; i++) {
+                    glVertexAttribDivisor(firstLocation + i, 0);
+                    glDisableVertexAttribArray(firstLocation + i);
+                }
                 break;
             }
 

@@ -8,6 +8,9 @@
 #include "Assets/Mesh.h"
 #include "Assets/Blueprint.h"
 #include "GameFramework/StaticMeshNode.h"
+#include "GameFramework/ParticleSystemEmitterNode.h"
+#include "Assets/ParticleSystemAsset.h"
+#include "Particles/ParticlePreview.h"
 
 static constexpr float s_TransactionTimeout = 0.35f;
 static constexpr int32_t s_HistoryDepth = 256;
@@ -68,7 +71,8 @@ void MajorTab::BroadcastAssetSaved(Asset* InAsset, MajorTab* InSource) {
 }
 
 bool MajorTab::IsSpawnableAsset(Asset* InAsset) {
-    return InAsset && (InAsset->IsA(Mesh::StaticClass()) || InAsset->IsA(Blueprint::StaticClass()));
+    return InAsset && (InAsset->IsA(Mesh::StaticClass()) || InAsset->IsA(Blueprint::StaticClass())
+                       || InAsset->IsA(ParticleSystemAsset::StaticClass()));
 }
 
 Node* MajorTab::SpawnFromAsset(Asset* InAsset, Node& InParent) {
@@ -78,6 +82,15 @@ Node* MajorTab::SpawnFromAsset(Asset* InAsset, Node& InParent) {
             node->SetMesh(mesh);
             node->MarkPropertyOverridden("m_Mesh");
             node->SetName(mesh->GetDisplayName());
+        }
+        return node;
+    }
+    if (ParticleSystemAsset* system = Cast<ParticleSystemAsset>(InAsset)) {
+        ParticleSystemEmitterNode* node = Cast<ParticleSystemEmitterNode>(InParent.AttachChild(ParticleSystemEmitterNode::StaticClass()));
+        if (node) {
+            node->SetSystem(system);
+            node->MarkPropertyOverridden("m_System");
+            node->SetName(system->GetDisplayName());
         }
         return node;
     }
@@ -101,6 +114,10 @@ void MajorTab::OnBind() {
 
 void MajorTab::OnUIUpdate(const UIFrameContext& InContext) {
     Super::OnUIUpdate(InContext);
+
+    if (World* world = GetAuthoringWorld(); world && GetPlayState() == PlayState::Editor) {
+        ParticlePreview::Tick(*world, (float)InContext.DeltaTime);
+    }
 
     if (m_OpenTransaction) {
         m_TransactionIdle += InContext.DeltaTime;

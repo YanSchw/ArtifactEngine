@@ -36,6 +36,9 @@ public:
     static VectorImage* GraphEditor()   { return Get("b1c2d3e4-0018-4a00-9000-000000000018"); }
     static VectorImage* Message()       { return Get("b1c2d3e4-0019-4a00-9000-000000000019"); }
     static VectorImage* Close()         { return Get("b1c2d3e4-001a-4a00-9000-00000000001a"); }
+    static VectorImage* Add()           { return Get("fb692866-32ef-41cb-aa53-415b6232b156"); }
+    static VectorImage* Delete()        { return Get("820568f7-f75b-4d20-9bad-aae0a62804f4"); }
+    static VectorImage* More()          { return Get("ec94f9cf-6a03-4090-ac6e-9a9e5d01f939"); }
     static VectorImage* Reset()         { return Get("b1c2d3e4-0006-4a00-9000-000000000006"); }
     static VectorImage* Settings()      { return Get("bad42a9c-6ed5-4480-87b5-80327decc45d"); }
     static VectorImage* UseSelected()   { return Get("c605a931-fe32-4afc-b054-ff46bc5d9ecf"); }
@@ -57,6 +60,7 @@ public:
     static VectorImage* Animation()     { return Get("3f0e57a2-1c4b-4d90-9d0e-7a1b2c3d4e5f"); }
     static VectorImage* InputMapping()  { return Get("3c00f557-6c65-4ca3-b35d-6bfa9c50fd2f"); }
     static VectorImage* Audio()         { return Get("87b011c9-7a52-4b36-880b-f817fdaaa9ca"); }
+    static VectorImage* Particles()     { return Get("e189f678-8272-4319-862f-1b80e116b2ce"); }
     static VectorImage* AudioListener() { return Get("a012916e-b923-43e3-bb3d-e85d3d191de2"); }
     static VectorImage* PointLight()    { return Get("1c3c5fc9-c4ae-4b78-99ac-a84fe1b5feb5"); }
     static VectorImage* DirectionalLight() { return Get("b8fd4487-6c48-48a7-bb71-bf8645260b58"); }

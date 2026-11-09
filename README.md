@@ -29,6 +29,7 @@ Artifact is a modular game engine written in C++.
 - Physics via JoltPhysics
 - Networking
 - Audio
+- Particles
 
 ## Supported platforms
 

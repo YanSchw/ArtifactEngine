@@ -64,4 +64,13 @@ protected:
                                uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
                                Property* InRootProperty = nullptr, const String& InLabel = String(),
                                const String& InParentPath = String());
+    static DetailsCategory& AddStructCategory(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
+                                              uint64_t InOffset, const Array<Property*>& InMembers, int32_t InDepth,
+                                              Property* InRootProperty, const String& InLabel, const String& InPath);
+    static void AddArrayRows(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                             ArrayProperty* InArray, int32_t InDepth, Property* InRootProperty,
+                             const String& InLabel, const String& InPath);
+    static void AddArrayElement(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InArrayOffset,
+                                ArrayProperty* InArray, int32_t InIndex, int32_t InDepth, Property* InRootProperty,
+                                const String& InArrayPath);
 };
