@@ -195,7 +195,7 @@ def _collect_lint_files(root_path):
     for root, dirs, filenames in os.walk(root_path):
         dirs[:] = [d for d in dirs if d not in LINT_EXCLUDED_DIRS]
         for name in filenames:
-            if name.endswith((".cpp", ".h")):
+            if name.endswith((".cpp", ".h", ".glsl")):
                 files.append(os.path.join(root, name))
     return files
 
