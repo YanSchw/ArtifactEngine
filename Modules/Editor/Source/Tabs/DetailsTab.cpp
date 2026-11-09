@@ -71,11 +71,22 @@ ThumbnailRenderer& DetailsTab::GetThumbnails() {
     return *m_Thumbnails.Get();
 }
 
+bool DetailsTab::IsCollapsed(const String& InKey) const {
+    if (m_CollapsedKeys.Contains(InKey)) {
+        return true;
+    }
+    if (m_ExpandedKeys.Contains(InKey)) {
+        return false;
+    }
+    return CollapsedByDefault && CollapsedByDefault(InKey);
+}
+
 void DetailsTab::SetCollapsed(const String& InKey, bool InCollapsed) {
-    if (InCollapsed && !m_CollapsedKeys.Contains(InKey)) {
-        m_CollapsedKeys.Add(InKey);
-    } else if (!InCollapsed) {
-        m_CollapsedKeys.Remove(InKey);
+    Array<String>& add = InCollapsed ? m_CollapsedKeys : m_ExpandedKeys;
+    Array<String>& remove = InCollapsed ? m_ExpandedKeys : m_CollapsedKeys;
+    remove.Remove(InKey);
+    if (!add.Contains(InKey)) {
+        add.Add(InKey);
     }
 }
 

@@ -31,8 +31,11 @@ public:
 
     void MarkDirty() { m_RebuildPending = true; }
 
-    bool IsCollapsed(const String& InKey) const { return m_CollapsedKeys.Contains(InKey); }
+    bool IsCollapsed(const String& InKey) const;
     void SetCollapsed(const String& InKey, bool InCollapsed);
+
+    /** Decides whether a category the user has not toggled yet starts collapsed. */
+    std::function<bool(const String& InKey)> CollapsedByDefault;
 
     /** Inspects this object instead of the MajorTab's selection, for panels outside of one. */
     void Inspect(Object* InObject) { m_Pinned = InObject; }
@@ -55,5 +58,6 @@ private:
     float m_LabelSplit = 0.32f;
     String m_Filter;
     Array<String> m_CollapsedKeys;
+    Array<String> m_ExpandedKeys;
     bool m_RebuildPending = false;
 };

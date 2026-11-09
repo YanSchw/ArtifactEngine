@@ -17,6 +17,8 @@
 #include "Settings/EditorSettings.h"
 #include "UI/UIDragNumber.h"
 
+#include <algorithm>
+
 static constexpr float s_RestartDelay = 0.6f;
 
 ParticleSystemEditorTab::ParticleSystemEditorTab() {
@@ -24,7 +26,10 @@ ParticleSystemEditorTab::ParticleSystemEditorTab() {
 
     UIDockArea* area = GetDockArea();
     m_Viewport = area->DockNew<ViewportTab>(UIDockSlot::Center);
-    area->DockNew<DetailsTab>(UIDockSlot::Right, nullptr, 0.38f);
+    DetailsTab* details = area->DockNew<DetailsTab>(UIDockSlot::Right, nullptr, 0.38f);
+    details->CollapsedByDefault = [](const String& InKey) {
+        return std::count(InKey.begin(), InKey.end(), '/') == 3;
+    };
 }
 
 void ParticleSystemEditorTab::OpenSystem(ParticleSystemAsset* InSystem) {
