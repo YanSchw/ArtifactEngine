@@ -13,7 +13,9 @@ public:
         return shape;
     }
 
+    FUNCTION(Pure)
     float GetRadius() const { return m_Radius; }
+    FUNCTION()
     void SetRadius(float InRadius) {
         m_Radius = InRadius;
         RefreshShape();

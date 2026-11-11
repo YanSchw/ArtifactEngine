@@ -19,6 +19,13 @@ void UIButton::SetCaption(const String& InText) {
     m_Label->Text = InText;
 }
 
+void UIButton::OnClick() {
+    OnClicked.Broadcast();
+    if (Clicked) {
+        Clicked();
+    }
+}
+
 bool UIButton::OnSecondaryClick(const Vec2& InCursorPos) {
     if (!SecondaryClicked) {
         return false;

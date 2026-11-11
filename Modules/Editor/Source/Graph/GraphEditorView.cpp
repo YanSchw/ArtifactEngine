@@ -237,6 +237,15 @@ void GraphEditorView::DeleteSelection() {
     NotifyGraphChanged();
 }
 
+void GraphEditorView::FocusNode(uint64_t InNodeId) {
+    if (!m_Graph || !m_Graph->FindNode(InNodeId)) {
+        return;
+    }
+    SelectOnly(InNodeId);
+    NotifySelectionChanged();
+    FrameContent();
+}
+
 void GraphEditorView::RecordEdit(const String& InTitle) {
     if (MajorTab* document = MajorTab::FindFor(*this)) {
         document->BeginTransaction(InTitle, m_Graph.Get());

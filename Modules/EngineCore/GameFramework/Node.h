@@ -72,6 +72,7 @@ public:
     FUNCTION(Pure)
     bool IsEnabled() const;
     /** This node's own enabled flag, ignoring disabled ancestors (IsEnabled() reflects those). */
+    FUNCTION(Pure)
     bool IsSelfEnabled() const;
     FUNCTION()
     void SetEnabled(bool InEnabled);
@@ -87,17 +88,25 @@ public:
 
     Node* GetChild(int InIndex) const;
     Node* GetDirectChildByName(const String& InName) const;
+    FUNCTION(Pure)
     Node* GetChildByName(const String& InName, bool InIncludeSelf = false);
     Node* GetChildByClass(const Class& InClass, bool InIncludeSelf = false);
+    FUNCTION(Pure)
     int32_t GetSiblingIndex() const;
+    FUNCTION()
     void SetSiblingIndex(int32_t InIndex);
+    FUNCTION(Pure)
     uint32_t GetChildCount() const;
+    FUNCTION(Pure)
     bool HasChildren() const;
 
     FUNCTION(Pure)
     Node* GetParent() const;
+    FUNCTION()
     virtual void SetParent(Node* InParent, bool InKeepWorldTransform = true);
+    FUNCTION(Pure)
     bool IsChildOf(Node* InOther) const;
+    FUNCTION(Pure)
     Node* GetRootNode();
 
     virtual Node3D* GetTransform();

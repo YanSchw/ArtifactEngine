@@ -7,7 +7,15 @@ UIToggle::UIToggle() {
 }
 
 void UIToggle::OnClick() {
-    IsOn = !IsOn;
+    SetToggledOn(!IsOn);
+}
+
+void UIToggle::SetToggledOn(bool InIsOn) {
+    if (IsOn == InIsOn) {
+        return;
+    }
+    IsOn = InIsOn;
+    OnChanged.Broadcast(IsOn);
     if (Changed) {
         Changed(IsOn);
     }

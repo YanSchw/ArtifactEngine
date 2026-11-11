@@ -9,7 +9,9 @@ public:
 
     void AccumulateCube(Color (&InOutCube)[SceneUniformData::AmbientCubeFaces]) const;
 
+    FUNCTION(Pure)
     float GetIntensity() const { return m_Intensity; }
+    FUNCTION()
     void SetIntensity(float InIntensity) { m_Intensity = InIntensity; }
 
 private:

@@ -19,6 +19,9 @@ public:
 
     GraphEditorView* GetView() const { return m_View; }
     EventGraph* GetGraph() const { return m_Graph.Get(); }
+    void RevealNode(uint64_t InNodeId);
+
+    static EventGraphTab* FindIn(UINode& InMajorTab);
 
 private:
     void SyncGraph();
@@ -28,4 +31,5 @@ private:
     GraphEditorView* m_View = nullptr;
     SharedObjectPtr<EventGraph> m_Graph;
     WeakObjectPtr<Asset> m_Asset;
+    uint64_t m_PendingReveal = 0;
 };

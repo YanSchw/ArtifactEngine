@@ -43,10 +43,14 @@ public:
 
     static SkyboxNode* FindActive(World* InWorld);
 
+    FUNCTION(Pure)
     SkyboxMode GetMode() const { return m_Mode; }
+    FUNCTION()
     void SetMode(SkyboxMode InMode) { m_Mode = InMode; }
 
+    FUNCTION(Pure)
     float GetIntensity() const { return m_Intensity; }
+    FUNCTION()
     void SetIntensity(float InIntensity) { m_Intensity = InIntensity; }
 
     const SkyGradientParams& GetGradient() const { return m_Gradient; }

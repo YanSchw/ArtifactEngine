@@ -20,21 +20,32 @@ public:
     static PostProcessParams Evaluate(World* InWorld, const CameraNode* InCamera = nullptr);
 
     /** How strongly this volume applies at InWorldPosition, from 0 up to its weight. */
+    FUNCTION(Pure)
     float GetInfluence(const Vec3& InWorldPosition) const;
 
+    FUNCTION(Pure)
     bool IsGlobal() const { return m_Global; }
+    FUNCTION()
     void SetGlobal(bool InGlobal) { m_Global = InGlobal; }
 
+    FUNCTION(Pure)
     Vec3 GetExtents() const { return m_Extents; }
+    FUNCTION()
     void SetExtents(const Vec3& InExtents) { m_Extents = InExtents; }
 
+    FUNCTION(Pure)
     float GetBlendDistance() const { return m_BlendDistance; }
+    FUNCTION()
     void SetBlendDistance(float InDistance) { m_BlendDistance = InDistance; }
 
+    FUNCTION(Pure)
     float GetWeight() const { return m_Weight; }
+    FUNCTION()
     void SetWeight(float InWeight) { m_Weight = InWeight; }
 
+    FUNCTION(Pure)
     int32_t GetLayer() const { return m_Layer; }
+    FUNCTION()
     void SetLayer(int32_t InLayer) { m_Layer = InLayer; }
 
     const PostProcessParams& GetParams() const { return m_Params; }
@@ -52,7 +63,7 @@ private:
     PROPERTY()
     float m_BlendDistance = 2.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float m_Weight = 1.0f;
 
     /** Lower layers are applied on top of higher ones. */

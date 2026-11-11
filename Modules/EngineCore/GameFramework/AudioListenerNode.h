@@ -9,6 +9,8 @@ public:
     virtual void BeginPlay() override;
     virtual void EndPlay() override;
 
+    FUNCTION()
     void Activate();
+    FUNCTION(Pure)
     bool IsActive() const;
 };

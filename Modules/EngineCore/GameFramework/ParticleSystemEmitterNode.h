@@ -22,29 +22,44 @@ public:
     virtual void EndPlay() override;
     virtual void WorldUpdate(float InDeltaTime) override;
 
+    FUNCTION()
     void Play();
     void Stop(ParticleStopBehavior InBehavior = ParticleStopBehavior::StopEmitting);
+    FUNCTION()
     void Pause() { SetPaused(true); }
+    FUNCTION()
     void SetPaused(bool InPaused);
+    FUNCTION()
     void Clear();
+    FUNCTION()
     void Restart();
     void Emit(int32_t InCount, const ParticleEmitParams& InParams = {});
 
+    FUNCTION(Pure)
     bool IsPlaying() const { return m_Instance.IsPlaying(); }
+    FUNCTION(Pure)
     bool IsPaused() const { return m_Instance.IsPaused(); }
+    FUNCTION(Pure)
     bool IsEmitting() const { return m_Instance.IsEmitting(); }
+    FUNCTION(Pure)
     bool IsAlive() const { return m_Instance.IsAlive(); }
     int32_t GetParticleCount() const { return m_Instance.GetParticleCount(); }
     const ParticleHandle& GetInstance() const { return m_Instance; }
 
+    FUNCTION(Pure)
     ParticleSystemAsset* GetSystem() const;
+    FUNCTION()
     void SetSystem(ParticleSystemAsset* InSystem);
 
     bool GetAutoPlay() const { return m_AutoPlay; }
     void SetAutoPlay(bool InAutoPlay) { m_AutoPlay = InAutoPlay; }
+    FUNCTION(Pure)
     float GetSimulationSpeed() const { return m_SimulationSpeed; }
+    FUNCTION()
     void SetSimulationSpeed(float InSpeed);
+    FUNCTION(Pure)
     ParticleStopAction GetStopAction() const { return m_StopAction; }
+    FUNCTION()
     void SetStopAction(ParticleStopAction InAction) { m_StopAction = InAction; }
     bool GetDetachOnDestroy() const { return m_DetachOnDestroy; }
     void SetDetachOnDestroy(bool InDetach) { m_DetachOnDestroy = InDetach; }

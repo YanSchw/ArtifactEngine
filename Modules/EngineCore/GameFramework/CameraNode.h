@@ -11,18 +11,30 @@ public:
     CameraNode();
     void BeginPlay() override;
     virtual void TickTransform(bool inWorldSpace) override;
+    FUNCTION()
     void SetPerspective(float verticalFOV, float nearClip, float farClip);
+    FUNCTION()
     void SetOrthographic(float size, float nearClip, float farClip);
     void SetViewportSize(uint32_t width, uint32_t height);
+    FUNCTION()
     void SetAspectRatio(float aspect) { m_AspectRatio = aspect; RecalculateProjection(); }
+    FUNCTION(Pure)
     float GetAspectRatio() const { return m_AspectRatio; }
+    FUNCTION(Pure)
     float GetPerspectiveVerticalFOV() const { return m_PerspectiveFOV; }
+    FUNCTION()
     void SetPerspectiveVerticalFOV(float verticalFov) { m_PerspectiveFOV = verticalFov; RecalculateProjection(); }
+    FUNCTION(Pure)
     float GetPerspectiveNearClip() const { return m_PerspectiveNear; }
+    FUNCTION()
     void SetPerspectiveNearClip(float nearClip) { m_PerspectiveNear = nearClip; RecalculateProjection(); }
+    FUNCTION(Pure)
     float GetPerspectiveFarClip() const { return m_PerspectiveFar; }
+    FUNCTION()
     void SetPerspectiveFarClip(float farClip) { m_PerspectiveFar = farClip; RecalculateProjection(); }
+    FUNCTION(Pure)
     float GetOrthographicSize() const { return m_OrthographicSize; }
+    FUNCTION()
     void SetOrthographicSize(float size) { m_OrthographicSize = size; RecalculateProjection(); }
     float GetOrthographicNearClip() const { return m_OrthographicNear; }
     void SetOrthographicNearClip(float nearClip) { m_OrthographicNear = nearClip; RecalculateProjection(); }
@@ -36,9 +48,13 @@ public:
     void RecalculateProjection();
     const Mat4& GetProjectionMatrix() const { return m_Projection; }
     const Mat4& GetViewProjectionMatrix() const { return m_ViewProjection; }
+    FUNCTION()
     void SetClearColor(Vec4 color) { m_ClearColor = color; }
+    FUNCTION(Pure)
     Vec4 GetClearColor() const { return m_ClearColor; }
+    FUNCTION(Pure)
     bool IsPostProcessingEnabled() const { return m_EnablePostProcessing; }
+    FUNCTION()
     void SetPostProcessingEnabled(bool InEnabled) { m_EnablePostProcessing = InEnabled; }
 
 protected:

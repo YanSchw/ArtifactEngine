@@ -1,6 +1,7 @@
 #pragma once
 #include "UINode.h"
 #include "InputSystem/KeyCodes.h"
+#include "Common/Delegate.h"
 #include <functional>
 #include "UITextArea.gen.h"
 
@@ -37,6 +38,20 @@ public:
     std::function<void(const String&)> Submitted;    // Enter on a SingleLine field
     std::function<void()> Cancelled;                 // Escape (the field also gives up focus)
     std::function<void()> FocusLost;
+
+    PROPERTY(Params = (Text))
+    Delegate<const String&> OnTextChanged;
+
+    PROPERTY(Params = (Text))
+    Delegate<const String&> OnSubmitted;
+
+    PROPERTY()
+    Delegate<> OnFocusLost;
+
+    FUNCTION(Pure)
+    String GetText() const { return Text; }
+    FUNCTION()
+    void SetText(const String& InText) { Text = InText; }
 
     /** Places the caret (clamped to [0, Text length]) and collapses any selection. */
     void SetCaret(int32_t InIndex);

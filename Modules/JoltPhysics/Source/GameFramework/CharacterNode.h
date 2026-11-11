@@ -19,33 +19,48 @@ public:
     virtual void EndPlay() override;
 
     /** Horizontal movement for this frame; the vertical speed stays under the character's control. */
+    FUNCTION()
     void Move(const Vec3& InVelocity);
     FUNCTION()
     void Jump(float InJumpSpeed);
 
+    FUNCTION(Pure)
     Vec3 GetVelocity() const;
     FUNCTION()
     void SetVelocity(const Vec3& InVelocity);
 
     FUNCTION(Pure)
     bool IsGrounded() const;
+    FUNCTION(Pure)
     bool IsOnSteepGround() const;
+    FUNCTION(Pure)
     Vec3 GetGroundNormal() const;
+    FUNCTION(Pure)
     Node3D* GetGroundNode() const;
 
+    FUNCTION(Pure)
     float GetRadius() const { return m_Radius; }
+    FUNCTION()
     void SetRadius(float InRadius);
 
+    FUNCTION(Pure)
     float GetHeight() const { return m_Height; }
+    FUNCTION()
     void SetHeight(float InHeight);
 
+    FUNCTION(Pure)
     float GetMaxSlopeAngle() const { return m_MaxSlopeAngle; }
+    FUNCTION()
     void SetMaxSlopeAngle(float InDegrees);
 
+    FUNCTION(Pure)
     float GetStepHeight() const { return m_StepHeight; }
+    FUNCTION()
     void SetStepHeight(float InStepHeight) { m_StepHeight = InStepHeight; }
 
+    FUNCTION(Pure)
     float GetMass() const { return m_Mass; }
+    FUNCTION()
     void SetMass(float InMass);
 
 private:

@@ -18,6 +18,7 @@ public:
 
     /** Centers the view on the selection, or on the whole graph when nothing is selected. */
     void FrameContent();
+    void FocusNode(uint64_t InNodeId);
 
     /** Invoked on Ctrl/Cmd+S while the cursor is over the view. */
     std::function<void()> OnSaveRequested;

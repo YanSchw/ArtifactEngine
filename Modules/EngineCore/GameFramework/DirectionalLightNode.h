@@ -44,13 +44,19 @@ public:
 
     Vec3 GetDirection() const { return GetForwardVector(); }
 
+    FUNCTION(Pure)
     Color GetColor() const { return m_Color; }
+    FUNCTION()
     void SetColor(const Color& InColor) { m_Color = InColor; }
 
+    FUNCTION(Pure)
     float GetIntensity() const { return m_Intensity; }
+    FUNCTION()
     void SetIntensity(float InIntensity) { m_Intensity = InIntensity; }
 
+    FUNCTION(Pure)
     bool GetCastShadows() const { return m_CastShadows; }
+    FUNCTION()
     void SetCastShadows(bool InCastShadows);
 
     /** Fits the cascades to InCamera's view and records one depth-only pass per cascade, drawing
@@ -92,7 +98,7 @@ private:
     float m_ShadowDistance = 100.0f;
 
     /** 0 spaces the cascades evenly, 1 spaces them logarithmically. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float m_CascadeDistribution = 0.9f;
 
     /** Spacing between the filter taps, in shadow texels. Raise it for softer edges. */

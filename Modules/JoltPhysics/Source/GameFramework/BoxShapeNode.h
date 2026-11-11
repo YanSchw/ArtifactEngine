@@ -13,7 +13,9 @@ public:
         return shape;
     }
 
+    FUNCTION(Pure)
     Vec3 GetHalfExtents() const { return m_HalfExtents; }
+    FUNCTION()
     void SetHalfExtents(const Vec3& InHalfExtents) {
         m_HalfExtents = InHalfExtents;
         RefreshShape();

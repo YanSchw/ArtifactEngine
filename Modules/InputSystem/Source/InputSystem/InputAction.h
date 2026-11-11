@@ -21,13 +21,19 @@ public:
     Array<SharedObjectPtr<InputBinding>> Bindings;
 
     // Polling API
+    FUNCTION(Pure)
     bool  ReadBool()  const { return m_Value.AsBool(); }
+    FUNCTION(Pure)
     float ReadFloat() const { return m_Value.AsFloat(); }
+    FUNCTION(Pure)
     Vec2  ReadVec2()  const { return m_Value.AsVec2(); }
     InputValue Value() const { return m_Value; }
 
+    FUNCTION(Pure)
     bool IsActive() const;
+    FUNCTION(Pure)
     bool WasPerformedThisFrame() const;  // inactive -> active this frame
+    FUNCTION(Pure)
     bool WasReleasedThisFrame() const;   // active -> inactive this frame
 
     // Callback API. Each listener lives only as long as InOwner:

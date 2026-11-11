@@ -3,6 +3,7 @@
 #include "SceneEditorTab.h"
 #include "BlueprintEditorTab.h"
 #include "Graph/GraphEditorView.h"
+#include "UI/UIDockNode.h"
 #include "UI/EditorIcons.h"
 #include "Assets/NodeAsset.h"
 #include "GameFramework/Node.h"
@@ -33,6 +34,32 @@ VectorImage* EventGraphTab::GetTabIcon() const {
 void EventGraphTab::OnBind() {
     SyncGraph();
     MinorTab::OnBind();
+    if (m_PendingReveal != 0) {
+        m_View->FocusNode(m_PendingReveal);
+        m_PendingReveal = 0;
+    }
+}
+
+void EventGraphTab::RevealNode(uint64_t InNodeId) {
+    m_PendingReveal = InNodeId;
+    if (UIDockNode* dock = GetDockNode()) {
+        dock->SetActiveTab(this);
+    }
+}
+
+EventGraphTab* EventGraphTab::FindIn(UINode& InMajorTab) {
+    for (uint32_t i = 0; i < InMajorTab.GetChildCount(); i++) {
+        Node* child = InMajorTab.GetChild((int)i);
+        if (EventGraphTab* tab = Cast<EventGraphTab>(child)) {
+            return tab;
+        }
+        if (UINode* node = Cast<UINode>(child)) {
+            if (EventGraphTab* nested = FindIn(*node)) {
+                return nested;
+            }
+        }
+    }
+    return nullptr;
 }
 
 void EventGraphTab::SyncGraph() {

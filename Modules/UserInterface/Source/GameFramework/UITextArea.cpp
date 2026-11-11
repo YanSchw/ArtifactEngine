@@ -104,6 +104,7 @@ String UITextArea::SanitizeInput(const String& InText) const {
 
 void UITextArea::NotifyEdited() {
     m_CaretBlink = 0.0f;
+    OnTextChanged.Broadcast(Text);
     if (TextChanged) {
         TextChanged(Text);
     }
@@ -282,6 +283,7 @@ void UITextArea::OnFocusChanged(bool InFocused) {
         // The view only tracks the caret while focused; show the start of the text otherwise, so
         // a later external change to Text can't leave the field scrolled past its new end.
         m_ScrollX = 0.0f;
+        OnFocusLost.Broadcast();
         if (FocusLost) {
             FocusLost();
         }
@@ -340,6 +342,7 @@ void UITextArea::HandleEditKeys(KeyboardDevice* InKeyboard, float InDeltaTime) {
     }
     if (PollEditKey(InKeyboard, KeyCode::Enter, InDeltaTime) || PollEditKey(InKeyboard, KeyCode::KPEnter, InDeltaTime)) {
         if (SingleLine) {
+            OnSubmitted.Broadcast(Text);
             if (Submitted) {
                 Submitted(Text);
             }

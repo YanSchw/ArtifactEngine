@@ -29,11 +29,11 @@ struct AntiAliasingParams {
     float FxaaEdgeThresholdMin = 0.0833f;
 
     /** How much sub-pixel aliasing is smoothed away, 0 to 1. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float FxaaSubpixelBlend = 0.75f;
 
     /** Share of the reprojected history kept each frame; higher is smoother but ghosts more. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float TaaFeedback = 0.9f;
 };
 
@@ -66,7 +66,7 @@ struct AmbientOcclusionParams {
 
     /** Brightly lit pixels receive this much less occlusion, 0 to 1, as the occlusion is applied
      *  after lighting and would otherwise darken direct light too. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float LuminanceInfluence = 0.0f;
 
     /** Camera distance at which occlusion has faded out completely. */
@@ -74,11 +74,11 @@ struct AmbientOcclusionParams {
     float MaxDistance = 100.0f;
 
     /** Share of MaxDistance over which occlusion fades out, 0 to 1. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float DistanceFalloff = 0.25f;
 
     /** Occluders searched per pixel, 4 to 32. */
-    PROPERTY()
+    PROPERTY(Range = (4, 32))
     int32_t SampleCount = 12;
 
     /** Computes occlusion at half the resolution in each direction, roughly four times cheaper. */
@@ -110,11 +110,11 @@ struct BloomParams {
     float Threshold = 1.0f;
 
     /** Width of the transition around Threshold, 0 (hard cut) to 1 (very gradual). */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float SoftKnee = 0.5f;
 
     /** How far the bloom spreads out, 0 to 1. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Scatter = 0.7f;
 
     /** Brightness every pixel is clamped to before it blooms, so single hot pixels do not flicker. */
@@ -125,7 +125,7 @@ struct BloomParams {
     Color Tint = Color(1.0f, 1.0f, 1.0f, 1.0f);
 
     /** How many times the image is halved for the blur, 1 to 8; more spreads wider and costs more. */
-    PROPERTY()
+    PROPERTY(Range = (1, 8))
     int32_t MipCount = 6;
 };
 
@@ -142,7 +142,7 @@ struct ChromaticAberrationParams {
     float Intensity = 0.5f;
 
     /** Distance from the centre where the fringes begin, 0 (centre) to 1 (corners). */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float StartRadius = 0.2f;
 
     /** Shapes the growth from StartRadius to the corners; above 1 keeps the fringes to the edges. */
@@ -150,7 +150,7 @@ struct ChromaticAberrationParams {
     float Falloff = 1.5f;
 
     /** Taps across the spectrum, 3 to 16. 3 is a plain red/green/blue split, more blend into a rainbow. */
-    PROPERTY()
+    PROPERTY(Range = (3, 16))
     int32_t SampleCount = 6;
 };
 
@@ -166,11 +166,11 @@ struct VignetteParams {
     float Intensity = 0.1f;
 
     /** Softness of the falloff, 0.01 (hard) to 1 (soft). */
-    PROPERTY()
+    PROPERTY(Range = (0.01, 1))
     float Smoothness = 0.4f;
 
     /** 1 is a perfect circle, 0 follows the screen's aspect ratio. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Roundness = 0.0f;
 
     /** Centre of the vignette in screen space, (0.5, 0.5) being the middle of the screen. */
@@ -198,11 +198,11 @@ struct FilmGrainParams {
     float Size = 1.6f;
 
     /** How much the grain fades out in bright areas, 0 (even everywhere) to 1 (only in shadows). */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float LuminanceResponse = 0.8f;
 
     /** 0 is monochrome grain, 1 gives each colour channel its own grain. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Colorfulness = 0.0f;
 
     /** New grain this many times per second; 0 renews it every frame. */

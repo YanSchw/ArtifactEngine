@@ -20,6 +20,11 @@ public:
     PROPERTY()
     String Text;
 
+    FUNCTION(Pure)
+    String GetText() const { return Text; }
+    FUNCTION()
+    void SetText(const String& InText) { Text = InText; }
+
     PROPERTY()
     WeakObjectPtr<Font> FontAsset;
 

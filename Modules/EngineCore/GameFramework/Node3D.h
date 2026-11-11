@@ -31,24 +31,38 @@ public:
     FUNCTION()
     void AddLocalOffset(const Vec3& InLocalOffset);
 
+    FUNCTION(Pure)
     Quat GetRotation() const;
+    FUNCTION(Pure)
     Quat GetLocalRotation() const;
     FUNCTION(Pure)
     Vec3 GetEulerRotation() const;
+    FUNCTION(Pure)
     Vec3 GetLocalEulerRotation() const;
+    FUNCTION()
     void SetRotation(const Quat& InWorldRotation);
+    FUNCTION()
     void SetLocalRotation(const Quat& InLocalRotation);
     FUNCTION()
     void SetEulerRotation(const Vec3& InWorldEulerAngles);
+    FUNCTION()
     void SetLocalEulerRotation(const Vec3& InLocalEulerAngles);
+    FUNCTION()
     void Rotate(const Quat& InDeltaRotation);
+    FUNCTION()
     void RotateEuler(const Vec3& InDeltaEulerAngles);
+    FUNCTION()
     void RotateWithAxis(const Vec3& InAxis, float InAngle);
+    FUNCTION()
     void SetLookDirection(const Vec3& InWorldDirection, const Vec3& InWorldUpDirection = VecUtils::Up);
 
+    FUNCTION(Pure)
     Vec3 GetScale() const;
+    FUNCTION(Pure)
     Vec3 GetLocalScale() const;
+    FUNCTION()
     void SetScale(const Vec3& InWorldScale);
+    FUNCTION()
     void SetLocalScale(const Vec3& InLocalScale);
 
     Mat4 GetTransformMatrix() const;
@@ -58,8 +72,11 @@ public:
     static Mat4 CalculateTransformMatrix(const Vec3& InPosition, const Vec3& InEulerAngles, const Vec3& InScale);
     static Mat4 CalculateTransformMatrix(const Vec3& InPosition, const Quat& InRotation, const Vec3& InScale);
 
+    FUNCTION(Pure)
     Vec3 GetRightVector() const;
+    FUNCTION(Pure)
     Vec3 GetUpVector() const;
+    FUNCTION(Pure)
     Vec3 GetForwardVector() const;
 
 protected:

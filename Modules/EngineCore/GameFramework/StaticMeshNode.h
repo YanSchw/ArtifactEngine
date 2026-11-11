@@ -22,16 +22,23 @@ public:
     ~StaticMeshNode();
     ShaderData* GetPerMeshShaderData();
 
+    FUNCTION(Pure)
     Mesh* GetMesh() const;
+    FUNCTION()
     void SetMesh(Mesh* InMesh);
 
     /** The slot's override, or the mesh's own material for that slot when there is none. */
+    FUNCTION(Pure)
     Material* GetMaterial(int32_t InSlot = 0) const;
+    FUNCTION(Pure)
     Material* GetMaterialOverride(int32_t InSlot) const;
     /** Null clears the override. */
+    FUNCTION()
     void SetMaterialOverride(int32_t InSlot, Material* InMaterial);
 
+    FUNCTION(Pure)
     bool GetCastShadow() const { return m_CastShadow; }
+    FUNCTION()
     void SetCastShadow(bool InCastShadow) { m_CastShadow = InCastShadow; }
 
 private:

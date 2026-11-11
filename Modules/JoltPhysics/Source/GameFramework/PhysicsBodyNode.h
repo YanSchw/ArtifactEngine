@@ -34,45 +34,73 @@ public:
     PROPERTY(Params = (Other))
     Delegate<Node3D*> OnTriggerExited;
 
+    FUNCTION(Pure)
     PhysicsBodyType GetBodyType() const { return m_BodyType; }
+    FUNCTION()
     void SetBodyType(PhysicsBodyType InBodyType);
 
+    FUNCTION(Pure)
     bool IsTrigger() const { return m_IsTrigger; }
     FUNCTION()
     void SetTrigger(bool InIsTrigger);
 
+    FUNCTION(Pure)
     float GetMass() const { return m_Mass; }
+    FUNCTION()
     void SetMass(float InMass);
 
+    FUNCTION(Pure)
     float GetFriction() const { return m_Friction; }
+    FUNCTION()
     void SetFriction(float InFriction);
 
+    FUNCTION(Pure)
     float GetRestitution() const { return m_Restitution; }
+    FUNCTION()
     void SetRestitution(float InRestitution);
 
+    FUNCTION(Pure)
     float GetLinearDamping() const { return m_LinearDamping; }
+    FUNCTION()
     void SetLinearDamping(float InDamping);
 
+    FUNCTION(Pure)
     float GetAngularDamping() const { return m_AngularDamping; }
+    FUNCTION()
     void SetAngularDamping(float InDamping);
 
+    FUNCTION(Pure)
     float GetGravityFactor() const { return m_GravityFactor; }
+    FUNCTION()
     void SetGravityFactor(float InFactor);
 
+    FUNCTION(Pure)
     Vec3 GetLinearVelocity() const;
+    FUNCTION()
     void SetLinearVelocity(const Vec3& InVelocity);
+    FUNCTION(Pure)
     Vec3 GetAngularVelocity() const;
+    FUNCTION()
     void SetAngularVelocity(const Vec3& InVelocity);
 
+    FUNCTION()
     void AddForce(const Vec3& InForce);
+    FUNCTION()
     void AddForceAtPosition(const Vec3& InForce, const Vec3& InPosition);
+    FUNCTION()
     void AddImpulse(const Vec3& InImpulse);
+    FUNCTION()
     void AddImpulseAtPosition(const Vec3& InImpulse, const Vec3& InPosition);
+    FUNCTION()
     void AddTorque(const Vec3& InTorque);
+    FUNCTION()
     void AddAngularImpulse(const Vec3& InImpulse);
 
+    FUNCTION(Pure)
     bool IsActive() const;
+    FUNCTION()
     void Activate();
+    FUNCTION()
     void Deactivate();
 
     bool GetAllowSleeping() const { return m_AllowSleeping; }

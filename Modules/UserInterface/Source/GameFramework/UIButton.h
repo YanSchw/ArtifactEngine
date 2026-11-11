@@ -1,6 +1,7 @@
 #pragma once
 #include "UINode.h"
 #include "Object/Pointer.h"
+#include "Common/Delegate.h"
 #include <functional>
 #include "UIButton.gen.h"
 
@@ -22,10 +23,14 @@ public:
     std::function<void()> Clicked;
     std::function<void(const Vec2&)> SecondaryClicked;
 
+    PROPERTY()
+    Delegate<> OnClicked;
+
+    FUNCTION()
     void SetCaption(const String& InText);
 
     virtual void Paint(UIDrawList& OutDrawList) override;
-    virtual void OnClick() override { if (Clicked) Clicked(); }
+    virtual void OnClick() override;
     virtual bool OnSecondaryClick(const Vec2& InCursorPos) override;
 
 private:

@@ -2,6 +2,8 @@
 #include "Graph/NodeGraph.h"
 #include "EventGraph.gen.h"
 
+class DelegateEventNode;
+
 class EventGraph : public NodeGraph {
 public:
     ARTIFACT_CLASS();
@@ -18,6 +20,10 @@ public:
     static String PrettyName(const String& InName);
 
     void RefreshNodes();
+
+    DelegateEventNode* FindDelegateEvent(const String& InNodeName, const String& InDelegateName) const;
+    DelegateEventNode* AddDelegateEvent(const String& InNodeName, const String& InDelegateName, const Class& InOwnerClass);
+    Vec2 FindFreeSpot() const;
 
     virtual bool ArePinTypesCompatible(const String& InOutputType, const String& InInputType) const override;
     virtual bool AllowsNodeClass(const Class& InNodeClass) const override;

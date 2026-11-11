@@ -88,6 +88,37 @@ void EventGraph::RefreshNodes() {
     PruneInvalidConnections();
 }
 
+DelegateEventNode* EventGraph::FindDelegateEvent(const String& InNodeName, const String& InDelegateName) const {
+    for (const SharedObjectPtr<GraphNode>& node : Nodes) {
+        DelegateEventNode* event = Cast<DelegateEventNode>(node.Get());
+        if (event && event->NodeName == InNodeName && event->DelegateName == InDelegateName) {
+            return event;
+        }
+    }
+    return nullptr;
+}
+
+DelegateEventNode* EventGraph::AddDelegateEvent(const String& InNodeName, const String& InDelegateName, const Class& InOwnerClass) {
+    return Cast<DelegateEventNode>(CreateNode(DelegateEventNode::StaticClass(), FindFreeSpot(), [&](GraphNode& OutNode) {
+        DelegateEventNode* event = Cast<DelegateEventNode>(&OutNode);
+        event->NodeName = InNodeName;
+        event->DelegateName = InDelegateName;
+        event->OwnerClass = InOwnerClass.Name;
+    }));
+}
+
+Vec2 EventGraph::FindFreeSpot() const {
+    float bottom = -160.0f;
+    float left = 0.0f;
+    for (const SharedObjectPtr<GraphNode>& node : Nodes) {
+        if (node && node->GetPosition().y > bottom) {
+            bottom = node->GetPosition().y;
+            left = node->GetPosition().x;
+        }
+    }
+    return Vec2(left, bottom + 160.0f);
+}
+
 static bool IsSubtype(const String& InType, const String& InBaseType, const char* InPrefix) {
     const size_t length = std::char_traits<char>::length(InPrefix);
     return InType.starts_with(InPrefix) && InBaseType.starts_with(InPrefix)

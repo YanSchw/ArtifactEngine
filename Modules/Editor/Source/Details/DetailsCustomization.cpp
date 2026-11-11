@@ -13,6 +13,10 @@
 #include "UI/UICurveEditor.h"
 #include "UI/UIGradientEditor.h"
 #include "Assets/Blueprint.h"
+#include "Assets/NodeAsset.h"
+#include "Scripting/EventGraph.h"
+#include "Scripting/EventGraphNodes.h"
+#include "Tabs/EventGraphTab.h"
 #include "Core/Log.h"
 #include "HeroTools/ThumbnailRenderer.h"
 #include "GameFramework/UIHStack.h"
@@ -642,6 +646,60 @@ static void AddMenuButton(UINode& InHost, const String& InTooltip, std::function
     };
 }
 
+static bool BuildEventButton(UINode& InHost, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, DelegateProperty* InDelegate) {
+    MajorTab* major = InTab.GetMajorTab();
+    Node* node = Cast<Node>(InObject.Get());
+    Node* root = major ? major->GetAssetRootNode() : nullptr;
+    if (!major || !node || !root || !Cast<NodeAsset>(major->GetEditedAsset()) || (node != root && !node->IsChildOf(root))) {
+        return false;
+    }
+
+    const WeakObjectPtr<MajorTab> weakMajor = major;
+    const auto eventName = [weakMajor, InObject]() -> String {
+        Node* target = Cast<Node>(InObject.Get());
+        MajorTab* owner = weakMajor.Get();
+        return target && owner && target != owner->GetAssetRootNode() ? target->GetName() : String();
+    };
+    const auto findEvent = [weakMajor, eventName, InDelegate]() -> DelegateEventNode* {
+        NodeAsset* asset = weakMajor.Get() ? Cast<NodeAsset>(weakMajor.Get()->GetEditedAsset()) : nullptr;
+        EventGraph* graph = asset ? asset->GetEventGraph() : nullptr;
+        return graph ? graph->FindDelegateEvent(eventName(), InDelegate->Name) : nullptr;
+    };
+
+    UIButton* button = InHost.Add<UIButton>();
+    button->Anchor = button->Pivot = Vec2(0.0f, 0.5f);
+    button->Size = { 116.0_px, 1.0_rel };
+    EditorStyle::StyleButton(*button);
+    UILabel* caption = button->Add<UILabel>();
+    caption->Fill();
+    caption->HAlign = UIHAlign::Center;
+    caption->VAlign = UIVAlign::Middle;
+    caption->FontSize = EditorStyle::FontSize;
+    caption->Color = EditorStyle::TextBright;
+    button->Bind = [caption, findEvent] {
+        caption->Text = findEvent() ? "Go to Event" : "+ Add Event";
+    };
+    button->Clicked = [weakMajor, InObject, eventName, findEvent, InDelegate] {
+        MajorTab* owner = weakMajor.Get();
+        Node* target = Cast<Node>(InObject.Get());
+        NodeAsset* asset = owner ? Cast<NodeAsset>(owner->GetEditedAsset()) : nullptr;
+        if (!owner || !target || !asset) {
+            return;
+        }
+        DelegateEventNode* event = findEvent();
+        if (!event) {
+            EventGraph* graph = asset->GetOrCreateEventGraph();
+            owner->BeginTransaction("Add Event", graph);
+            event = graph->AddDelegateEvent(eventName(), InDelegate->Name, target->GetClass());
+            owner->EndTransaction();
+        }
+        if (EventGraphTab* graphTab = event ? EventGraphTab::FindIn(*owner) : nullptr) {
+            graphTab->RevealNode(event->NodeId);
+        }
+    };
+    return true;
+}
+
 static String MapKeyLabel(const MapProperty& InMap, const String& InKeyText) {
     const nlohmann::json key = nlohmann::json::parse(InKeyText, nullptr, false);
     if (key.is_null() || key.is_discarded()) {
@@ -978,6 +1036,9 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
     DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
     row.SetTooltip(InProperty->Comment);
     if (DelegateProperty* delegateProperty = Cast<DelegateProperty>(InProperty)) {
+        if (InBaseOffset == 0 && BuildEventButton(*row.GetValueHost(), InTab, InObject, delegateProperty)) {
+            return;
+        }
         UILabel& summary = AddValueLabel(*row.GetValueHost(), "");
         summary.Bind = [summary = &summary, InObject, offset, delegateProperty] {
             char* base = ResolveBase(InObject, offset);
