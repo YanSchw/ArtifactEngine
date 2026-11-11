@@ -3,6 +3,7 @@
 #include "WorldSubsystem.gen.h"
 
 class World;
+class Node;
 
 /** A per-World singleton. Every WorldSubsystem subclass is instantiated once by each World,
 *   which owns it for its entire lifetime and updates it before its Nodes. */
@@ -13,6 +14,8 @@ public:
     virtual void Initialize() {}
     virtual void WorldUpdate(float InDeltaTime) { (void)InDeltaTime; }
     virtual void LateWorldUpdate(float InDeltaTime) { (void)InDeltaTime; }
+    virtual void OnNodeBeginPlay(Node& InNode) { (void)InNode; }
+    virtual void OnNodeEndPlay(Node& InNode) { (void)InNode; }
     virtual void Shutdown() {}
 
     World& GetWorld() const { return *m_World; }

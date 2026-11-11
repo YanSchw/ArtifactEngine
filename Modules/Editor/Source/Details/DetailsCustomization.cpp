@@ -12,6 +12,8 @@
 #include "UI/UIColorSwatch.h"
 #include "UI/UICurveEditor.h"
 #include "UI/UIGradientEditor.h"
+#include "Assets/Blueprint.h"
+#include "Core/Log.h"
 #include "HeroTools/ThumbnailRenderer.h"
 #include "GameFramework/UIHStack.h"
 #include "GameFramework/UILabel.h"
@@ -38,47 +40,127 @@
 
 static constexpr float AssetRowHeight = 52.0f;
 
-struct ArrayElementAddress {
-    uint64_t ArrayOffset = 0;
+struct ContainerElementAddress {
+    uint64_t ContainerOffset = 0;
     ArrayProperty* Array = nullptr;
+    MapProperty* Map = nullptr;
     int32_t Index = 0;
+    String KeyText;
+    std::shared_ptr<void> Key;
+    std::shared_ptr<void> PendingKey;
+    String ExternalKey;
+    std::function<void*(Object*)> Resolve;
 };
 
-static constexpr uint64_t s_ArrayElementBit = 1ull << 63;
+static constexpr uint64_t s_ElementBit = 1ull << 63;
+static constexpr uint64_t s_MapKeyBit = 1ull << 62;
 static constexpr uint64_t s_ElementMemberMask = 0xFFFFFFFFull;
 
-static Array<ArrayElementAddress>& GetArrayElementAddresses() {
-    static Array<ArrayElementAddress> s_Addresses;
+static Array<ContainerElementAddress>& GetElementAddresses() {
+    static Array<ContainerElementAddress> s_Addresses;
     return s_Addresses;
 }
 
+static int32_t ElementSlot(uint64_t InOffset) {
+    return (int32_t)((InOffset & ~(s_ElementBit | s_MapKeyBit)) >> 32);
+}
+
+static uint64_t ElementOffset(int32_t InSlot) {
+    return s_ElementBit | ((uint64_t)InSlot << 32);
+}
+
 static uint64_t ArrayElementOffset(uint64_t InArrayOffset, ArrayProperty* InArray, int32_t InIndex) {
-    Array<ArrayElementAddress>& addresses = GetArrayElementAddresses();
+    Array<ContainerElementAddress>& addresses = GetElementAddresses();
+    for (int32_t i = 0; i < addresses.Size(); i++) {
+        const ContainerElementAddress& address = addresses[i];
+        if (address.ContainerOffset == InArrayOffset && address.Array == InArray && address.Index == InIndex) {
+            return ElementOffset(i);
+        }
+    }
+    ContainerElementAddress address;
+    address.ContainerOffset = InArrayOffset;
+    address.Array = InArray;
+    address.Index = InIndex;
+    addresses.Add(address);
+    return ElementOffset(addresses.Last());
+}
+
+static nlohmann::json ReadMapKey(const MapProperty& InMap, const void* InKey) {
+    return JsonSerializer::SerializeProperty(InMap.KeyProperty, const_cast<void*>(InKey));
+}
+
+static void WriteMapKey(const MapProperty& InMap, void* OutKey, const nlohmann::json& InValue) {
+    JsonSerializer::DeserializeProperty(InMap.KeyProperty, OutKey, InValue);
+}
+
+static uint64_t MapEntryOffset(uint64_t InMapOffset, MapProperty* InMap, const void* InKey) {
+    const nlohmann::json key = ReadMapKey(*InMap, InKey);
+    const String keyText = key.dump();
+    Array<ContainerElementAddress>& addresses = GetElementAddresses();
     int32_t slot = -1;
     for (int32_t i = 0; i < addresses.Size() && slot < 0; i++) {
-        const ArrayElementAddress& address = addresses[i];
-        if (address.ArrayOffset == InArrayOffset && address.Array == InArray && address.Index == InIndex) {
+        const ContainerElementAddress& address = addresses[i];
+        if (address.ContainerOffset == InMapOffset && address.Map == InMap && address.KeyText == keyText) {
             slot = i;
         }
     }
     if (slot < 0) {
-        slot = addresses.Size();
-        addresses.Add(ArrayElementAddress{ InArrayOffset, InArray, InIndex });
+        ContainerElementAddress address;
+        address.ContainerOffset = InMapOffset;
+        address.Map = InMap;
+        address.KeyText = keyText;
+        address.Key = InMap->MakeKey();
+        address.PendingKey = InMap->MakeKey();
+        addresses.Add(address);
+        slot = addresses.Last();
     }
-    return s_ArrayElementBit | ((uint64_t)slot << 32);
+    WriteMapKey(*InMap, addresses[slot].Key.get(), key);
+    WriteMapKey(*InMap, addresses[slot].PendingKey.get(), key);
+    return ElementOffset(slot);
 }
 
 static char* ResolveBase(const WeakObjectPtr<Object>& InObject, uint64_t InOffset) {
-    if (!(InOffset & s_ArrayElementBit)) {
+    if (!(InOffset & s_ElementBit)) {
         Object* object = InObject.Get();
         return object ? (char*)object + InOffset : nullptr;
     }
-    const ArrayElementAddress address = GetArrayElementAddresses()[(int32_t)((InOffset & ~s_ArrayElementBit) >> 32)];
-    char* array = ResolveBase(InObject, address.ArrayOffset);
-    if (!array || address.Index >= (int32_t)address.Array->GetSize(array)) {
+    const ContainerElementAddress& address = GetElementAddresses()[ElementSlot(InOffset)];
+    if (address.Resolve) {
+        Object* object = InObject.Get();
+        char* external = object ? (char*)address.Resolve(object) : nullptr;
+        return external ? external + (InOffset & s_ElementMemberMask) : nullptr;
+    }
+    char* container = ResolveBase(InObject, address.ContainerOffset);
+    if (!container) {
         return nullptr;
     }
-    return (char*)address.Array->GetElementPtr(array, (size_t)address.Index) + (InOffset & s_ElementMemberMask);
+    const uint64_t member = InOffset & s_ElementMemberMask;
+    if (address.Array) {
+        if (address.Index >= (int32_t)address.Array->GetSize(container)) {
+            return nullptr;
+        }
+        return (char*)address.Array->GetElementPtr(container, (size_t)address.Index) + member;
+    }
+    char* value = (char*)address.Map->Find(container, address.Key.get());
+    if (!value) {
+        return nullptr;
+    }
+    return (InOffset & s_MapKeyBit) ? (char*)address.PendingKey.get() + member : value + member;
+}
+
+uint64_t DetailsCustomization::MakeExternalOffset(const String& InKey, std::function<void*(Object*)> InResolve) {
+    Array<ContainerElementAddress>& addresses = GetElementAddresses();
+    for (int32_t i = 0; i < addresses.Size(); i++) {
+        if (addresses[i].Resolve && addresses[i].ExternalKey == InKey) {
+            addresses[i].Resolve = std::move(InResolve);
+            return ElementOffset(i);
+        }
+    }
+    ContainerElementAddress address;
+    address.ExternalKey = InKey;
+    address.Resolve = std::move(InResolve);
+    addresses.Add(address);
+    return ElementOffset(addresses.Last());
 }
 
 static bool IsOverridablePath(const String& InPath) {
@@ -191,6 +273,11 @@ static void BuildNumberEditor(UINode& InHost, const WeakObjectPtr<Object>& InObj
                 InOnEdited();
             }
         };
+    }
+    if (InProperty->HasRange) {
+        drag->MinValue = std::max(drag->MinValue, InProperty->RangeMin);
+        drag->MaxValue = InProperty->RangeMax;
+        drag->Slider = true;
     }
 }
 
@@ -379,6 +466,73 @@ static void BuildEnumEditor(UINode& InHost, const WeakObjectPtr<Object>& InObjec
     };
 }
 
+static Array<Class> GetClassOptions(const Class& InBaseClass) {
+    const bool allowEditorClasses = InBaseClass.GetModuleName() == "Editor";
+    Array<Class> classes;
+    for (const Class& candidate : Class::GetSubclassesOf(InBaseClass)) {
+        if (candidate.IsDefaultConstructable() && (allowEditorClasses || candidate.GetModuleName() != "Editor")) {
+            classes.Add(candidate);
+        }
+    }
+    for (Asset* asset : AssetManager::Get().GetAssetsOfClass(Blueprint::StaticClass())) {
+        const Class blueprint = Class::FromBlueprint(asset->GetId());
+        if (blueprint.IsSubclassOf(InBaseClass)) {
+            classes.Add(blueprint);
+        }
+    }
+    classes.Sort([](const Class& InA, const Class& InB) { return InA.GetDisplayName() < InB.GetDisplayName(); });
+    return classes;
+}
+
+static String ClassLabel(const Class& InClass) {
+    return InClass == Class::None ? String("None") : InClass.GetDisplayName();
+}
+
+static void BuildClassEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset, SubclassOfProperty* InProperty,
+                             const DetailsEditHandler& InOnEdited) {
+    const auto read = [InObject, InOffset, InProperty]() -> Class {
+        char* base = ResolveBase(InObject, InOffset);
+        return base ? InProperty->Read(base) : Class::None;
+    };
+
+    UIDropdown* dropdown = InHost.Add<UIDropdown>();
+    dropdown->Fill();
+    dropdown->SearchPlaceholder = "Search classes";
+    dropdown->GetSelectedLabel = [read] { return ClassLabel(read()); };
+    dropdown->GetSelectedIcon = [read]() -> VectorImage* {
+        return read().IsBlueprint() ? EditorIcons::Node() : nullptr;
+    };
+    dropdown->GetOptions = [InProperty] {
+        Array<UIDropdownOption> options;
+        options.Add(UIDropdownOption("None"));
+        for (const Class& option : GetClassOptions(InProperty->BaseClass)) {
+            UIDropdownOption entry(option.GetDisplayName());
+            entry.Icon = option.IsBlueprint() ? EditorIcons::Node() : nullptr;
+            options.Add(entry);
+        }
+        return options;
+    };
+    dropdown->GetSelectedIndex = [read, InProperty]() -> int32_t {
+        const Class current = read();
+        if (current == Class::None) {
+            return 0;
+        }
+        const int32_t index = GetClassOptions(InProperty->BaseClass).IndexOf(current);
+        return index < 0 ? -1 : index + 1;
+    };
+    dropdown->SelectionChanged = [InObject, InOffset, InProperty, InOnEdited](int32_t InIndex) {
+        const Array<Class> options = GetClassOptions(InProperty->BaseClass);
+        if (InIndex < 0 || InIndex > options.Size()) {
+            return;
+        }
+        if (char* base = ResolveBase(InObject, InOffset)) {
+            InOnEdited.Record();
+            InProperty->Write(base, InIndex == 0 ? Class::None : options[InIndex - 1]);
+            InOnEdited();
+        }
+    };
+}
+
 static void BuildAssetSlot(UINode& InHost, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
                            const Class& InAssetClass, bool InIsWeak, const DetailsEditHandler& InOnEdited) {
     UIAssetSlot* slot = InHost.Add<UIAssetSlot>();
@@ -423,7 +577,8 @@ static bool IsEditableArrayElement(Property* InProperty) {
         return FindAssetReferenceClass(InProperty, isWeak) != nullptr;
     }
     return Cast<IntProperty>(InProperty) || Cast<FloatProperty>(InProperty) || Cast<BoolProperty>(InProperty)
-        || Cast<StringProperty>(InProperty) || Cast<EnumProperty>(InProperty) || Cast<StructProperty>(InProperty);
+        || Cast<StringProperty>(InProperty) || Cast<EnumProperty>(InProperty) || Cast<StructProperty>(InProperty)
+        || Cast<SubclassOfProperty>(InProperty);
 }
 
 static UIButton& AddHeaderIconButton(UINode& InParent, VectorImage* InIcon, const String& InTooltip, float InRightInset,
@@ -446,22 +601,167 @@ static UIButton& AddHeaderIconButton(UINode& InParent, VectorImage* InIcon, cons
     return *button;
 }
 
-static void EditArray(const WeakObjectPtr<DetailsTab>& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                      Property* InRootProperty, const String& InPath, const String& InTitle, const std::function<void(char*)>& InEdit) {
+static void EditContainer(const WeakObjectPtr<DetailsTab>& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                          Property* InRootProperty, const String& InPath, const String& InTitle, const std::function<void(char*)>& InEdit) {
     DetailsTab* tab = InTab.Get();
     Object* object = InObject.Get();
-    char* array = ResolveBase(InObject, InOffset);
-    if (!tab || !object || !array) {
+    char* container = ResolveBase(InObject, InOffset);
+    if (!tab || !object || !container) {
         return;
     }
     tab->RecordEdit(InTitle, object);
-    InEdit(array);
+    InEdit(container);
     InRootProperty->NotifyChanged(object);
     DetailsCustomization::NotifyPropertyEdited(tab, object, InPath);
     if (MajorTab* major = tab->GetMajorTab()) {
         major->EndTransaction();
     }
     tab->MarkDirty();
+}
+
+static String Plural(size_t InCount, const String& InSingular, const String& InPlural) {
+    return std::to_string(InCount) + " " + (InCount == 1 ? InSingular : InPlural);
+}
+
+static void AddContainerHeader(DetailsCategory& InCategory, std::function<String()> InSummary, const String& InAddTooltip,
+                               std::function<void()> InAdd, const String& InClearTooltip, std::function<void()> InClear) {
+    UINode* header = InCategory.AddHeaderValue();
+    UILabel& summary = AddValueLabel(*header, "");
+    summary.Size = { 1.0_rel - 50.0_px, 1.0_rel };
+    summary.Bind = [summary = &summary, InSummary] { summary->Text = InSummary(); };
+    AddHeaderIconButton(*header, EditorIcons::Add(), InAddTooltip, 24.0f, std::move(InAdd));
+    AddHeaderIconButton(*header, EditorIcons::Delete(), InClearTooltip, 0.0f, std::move(InClear));
+}
+
+static void AddMenuButton(UINode& InHost, const String& InTooltip, std::function<void(UIMenuModel&)> InBuildMenu) {
+    UIButton& button = AddHeaderIconButton(InHost, EditorIcons::More(), InTooltip, 0.0f, nullptr);
+    button.Clicked = [button = &button, InBuildMenu] {
+        UIMenuModel menu;
+        InBuildMenu(menu);
+        UIContextMenu::OpenUnder(*button, menu);
+    };
+}
+
+static String MapKeyLabel(const MapProperty& InMap, const String& InKeyText) {
+    const nlohmann::json key = nlohmann::json::parse(InKeyText, nullptr, false);
+    if (key.is_null() || key.is_discarded()) {
+        return "None";
+    }
+    if (!key.is_string()) {
+        return key.dump();
+    }
+    const String text = key.get<String>();
+    if (Cast<SubclassOfProperty>(InMap.KeyProperty)) {
+        return ClassLabel(Class(text));
+    }
+    return text.empty() ? String("(empty)") : text;
+}
+
+static Array<MapProperty::Entry> SortedMapEntries(const MapProperty& InMap, char* InData) {
+    Array<MapProperty::Entry> entries;
+    InMap.GetEntries(InData, entries);
+    Array<std::pair<nlohmann::json, MapProperty::Entry>> keyed;
+    for (const MapProperty::Entry& entry : entries) {
+        keyed.Add({ ReadMapKey(InMap, entry.Key), entry });
+    }
+    keyed.Sort([](const auto& InA, const auto& InB) { return InA.first < InB.first; });
+    Array<MapProperty::Entry> sorted;
+    for (const auto& [key, entry] : keyed) {
+        sorted.Add(entry);
+    }
+    return sorted;
+}
+
+static bool MakeUniqueMapKey(const MapProperty& InMap, char* InData, void* InOutKey) {
+    const auto isFree = [&] { return InMap.Find(InData, InOutKey) == nullptr; };
+    Property* keyProperty = InMap.KeyProperty;
+    if (Cast<UUIDProperty>(keyProperty)) {
+        *(UUID*)InOutKey = UUID::Generate();
+        return isFree();
+    }
+    if (EnumProperty* enumProperty = Cast<EnumProperty>(keyProperty)) {
+        for (const Enum::EnumValue& value : Enum(enumProperty->InnerEnumTypename).GetValues()) {
+            std::memcpy(InOutKey, &value.Value, enumProperty->ByteSize);
+            if (isFree()) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (isFree()) {
+        return true;
+    }
+    if (Cast<StringProperty>(keyProperty)) {
+        const String base = ((String*)InOutKey)->empty() ? String("Key") : *(String*)InOutKey;
+        for (size_t i = 1; i <= InMap.GetSize(InData) + 1; i++) {
+            *(String*)InOutKey = base + " " + std::to_string(i);
+            if (isFree()) {
+                return true;
+            }
+        }
+    } else if (IntProperty* intProperty = Cast<IntProperty>(keyProperty)) {
+        for (size_t i = 0; i <= InMap.GetSize(InData) + 1; i++) {
+            WriteIntValue(*intProperty, InOutKey, (double)i);
+            if (isFree()) {
+                return true;
+            }
+        }
+    } else if (Cast<BoolProperty>(keyProperty)) {
+        *(bool*)InOutKey = !*(bool*)InOutKey;
+        return isFree();
+    } else if (SubclassOfProperty* subclassProperty = Cast<SubclassOfProperty>(keyProperty)) {
+        for (const Class& option : GetClassOptions(subclassProperty->BaseClass)) {
+            *(Class*)InOutKey = option;
+            if (isFree()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static bool InsertMapEntry(const MapProperty& InMap, char* InData, const void* InSourceKey) {
+    const std::shared_ptr<void> key = InMap.MakeKey();
+    if (InSourceKey) {
+        WriteMapKey(InMap, key.get(), ReadMapKey(InMap, InSourceKey));
+    }
+    if (!MakeUniqueMapKey(InMap, InData, key.get())) {
+        AE_WARN("Every possible key of '{0}' is already in use", InMap.Name);
+        return false;
+    }
+    void* value = InMap.FindOrAdd(InData, key.get());
+    if (void* source = InSourceKey ? InMap.Find(InData, InSourceKey) : nullptr) {
+        JsonSerializer::DeserializeProperty(InMap.ValueProperty, value, JsonSerializer::SerializeProperty(InMap.ValueProperty, source));
+    }
+    return true;
+}
+
+static void CommitMapKey(const WeakObjectPtr<DetailsTab>& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InEntryOffset,
+                         Property* InRootProperty, const String& InMapPath) {
+    ContainerElementAddress& address = GetElementAddresses()[ElementSlot(InEntryOffset)];
+    DetailsTab* tab = InTab.Get();
+    Object* object = InObject.Get();
+    char* data = ResolveBase(InObject, address.ContainerOffset);
+    MapProperty* map = address.Map;
+    if (!tab || !object || !data || !map) {
+        return;
+    }
+    const nlohmann::json current = ReadMapKey(*map, address.Key.get());
+    const nlohmann::json pending = ReadMapKey(*map, address.PendingKey.get());
+    if (pending == current) {
+        return;
+    }
+    if (map->Find(data, address.PendingKey.get())) {
+        AE_WARN("'{0}' already has an entry for {1}", DetailsCustomization::PrettyPropertyPath(OverridablePath(InMapPath)), pending.dump());
+        WriteMapKey(*map, address.PendingKey.get(), current);
+        return;
+    }
+    tab->RecordEdit("Edit " + DetailsCustomization::PrettyPropertyPath(OverridablePath(InMapPath)) + " Key", object);
+    map->RenameKey(data, address.Key.get(), address.PendingKey.get());
+    WriteMapKey(*map, address.Key.get(), pending);
+    address.KeyText = pending.dump();
+    InRootProperty->NotifyChanged(object);
+    DetailsCustomization::NotifyPropertyEdited(tab, object, InMapPath);
 }
 
 static void MoveArrayElement(ArrayProperty& InArray, char* InData, int32_t InFrom, int32_t InTo) {
@@ -492,6 +792,8 @@ bool DetailsCustomization::BuildValueEditor(UINode& InHost, const WeakObjectPtr<
         BuildStringEditor(InHost, InObject, InOffset, InOnEdited);
     } else if (EnumProperty* enumProperty = Cast<EnumProperty>(InProperty)) {
         BuildEnumEditor(InHost, InObject, InOffset, enumProperty, InOnEdited);
+    } else if (SubclassOfProperty* subclassProperty = Cast<SubclassOfProperty>(InProperty)) {
+        BuildClassEditor(InHost, InObject, InOffset, subclassProperty, InOnEdited);
     } else if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
         if (const int32_t components = VectorComponentCount(structProperty->InnerStructTypename)) {
             BuildVectorEditor(InHost, InObject, InOffset, components, InOnEdited);
@@ -657,17 +959,33 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
 
     const Array<Property*> inner = GetInnerProperties(InProperty);
     if (!inner.IsEmpty()) {
-        AddStructCategory(InParent, InTab, InObject, offset, inner, InDepth, root, label, path);
+        AddStructCategory(InParent, InTab, InObject, offset, inner, InDepth, root, label, path).SetTooltip(InProperty->Comment);
         return;
     }
 
     ArrayProperty* editableArray = Cast<ArrayProperty>(InProperty);
     if (editableArray && IsEditableArrayElement(editableArray->InnerProperty)) {
-        AddArrayRows(InParent, InTab, InObject, offset, editableArray, InDepth, root, label, path);
+        AddArrayRows(InParent, InTab, InObject, offset, editableArray, InDepth, root, label, path).SetTooltip(InProperty->Comment);
+        return;
+    }
+
+    MapProperty* editableMap = Cast<MapProperty>(InProperty);
+    if (editableMap && IsEditableArrayElement(editableMap->ValueProperty)) {
+        AddMapRows(InParent, InTab, InObject, offset, editableMap, InDepth, root, label, path).SetTooltip(InProperty->Comment);
         return;
     }
 
     DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
+    row.SetTooltip(InProperty->Comment);
+    if (DelegateProperty* delegateProperty = Cast<DelegateProperty>(InProperty)) {
+        UILabel& summary = AddValueLabel(*row.GetValueHost(), "");
+        summary.Bind = [summary = &summary, InObject, offset, delegateProperty] {
+            char* base = ResolveBase(InObject, offset);
+            const int32_t count = base ? delegateProperty->GetBindingCount(base) : 0;
+            summary->Text = "void(" + delegateProperty->Signature + ")   " + Plural((size_t)count, "listener", "listeners");
+        };
+        return;
+    }
     if (IsOverridablePath(path)) {
         BindOverride(row, InObject, path);
     }
@@ -695,7 +1013,13 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
         UILabel& label = AddValueLabel(*row.GetValueHost(), "");
         label.Bind = [label = &label, InObject, offset, arrayProperty] {
             char* base = ResolveBase(InObject, offset);
-            label->Text = base ? std::to_string(arrayProperty->GetSize(base)) + " elements" : "";
+            label->Text = base ? Plural(arrayProperty->GetSize(base), "element", "elements") : "";
+        };
+    } else if (MapProperty* mapProperty = Cast<MapProperty>(InProperty)) {
+        UILabel& label = AddValueLabel(*row.GetValueHost(), "");
+        label.Bind = [label = &label, InObject, offset, mapProperty] {
+            char* base = ResolveBase(InObject, offset);
+            label->Text = base ? Plural(mapProperty->GetSize(base), "entry", "entries") : "";
         };
     } else {
         AddValueLabel(*row.GetValueHost(), "Unsupported");
@@ -738,8 +1062,12 @@ static void BuildKeyGraph(DetailsRow& InRow, const WeakObjectPtr<Object>& InObje
 
 DetailsCategory& DetailsCustomization::AddStructCategory(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
                                                          uint64_t InOffset, const Array<Property*>& InMembers, int32_t InDepth,
-                                                         Property* InRootProperty, const String& InLabel, const String& InPath) {
+                                                         Property* InRootProperty, const String& InLabel, const String& InPath,
+                                                         const std::function<void(DetailsCategory&)>& InBeforeMembers) {
     DetailsCategory& category = AddCategory(InParent, InTab, InLabel, InDepth + 1);
+    if (InBeforeMembers) {
+        InBeforeMembers(category);
+    }
     Property* toggle = FindHeaderToggle(InMembers);
     if (toggle) {
         const String togglePath = InPath + "." + toggle->Name;
@@ -768,9 +1096,9 @@ DetailsCategory& DetailsCustomization::AddStructCategory(UINode& InParent, Detai
     return category;
 }
 
-void DetailsCustomization::AddArrayRows(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                                        ArrayProperty* InArray, int32_t InDepth, Property* InRootProperty,
-                                        const String& InLabel, const String& InPath) {
+DetailsCategory& DetailsCustomization::AddArrayRows(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                                                    ArrayProperty* InArray, int32_t InDepth, Property* InRootProperty,
+                                                    const String& InLabel, const String& InPath) {
     DetailsCategory& category = AddCategory(InParent, InTab, InLabel, InDepth + 1);
     if (IsOverridablePath(InPath)) {
         BindOverrideActions(InObject, InPath, &InTab, category.IsOverridden, category.ResetAction);
@@ -786,23 +1114,16 @@ void DetailsCustomization::AddArrayRows(UINode& InParent, DetailsTab& InTab, con
         }
     };
 
-    UINode* header = category.AddHeaderValue();
-    UILabel& summary = AddValueLabel(*header, "");
-    summary.Size = { 1.0_rel - 50.0_px, 1.0_rel };
-    summary.Bind = [summary = &summary, InObject, InOffset, InArray] {
-        char* current = ResolveBase(InObject, InOffset);
-        const size_t size = current ? InArray->GetSize(current) : 0;
-        summary->Text = std::to_string(size) + (size == 1 ? " element" : " elements");
-    };
-
     const String name = PrettyPropertyPath(OverridablePath(InPath));
-    AddHeaderIconButton(*header, EditorIcons::Add(), "Add element", 24.0f, [=] {
-        EditArray(tab, InObject, InOffset, InRootProperty, InPath, "Add " + name + " Element", [InArray](char* InData) {
+    AddContainerHeader(category, [InObject, InOffset, InArray] {
+        char* current = ResolveBase(InObject, InOffset);
+        return Plural(current ? InArray->GetSize(current) : 0, "element", "elements");
+    }, "Add element", [=] {
+        EditContainer(tab, InObject, InOffset, InRootProperty, InPath, "Add " + name + " Element", [InArray](char* InData) {
             InArray->AddDefault(InData);
         });
-    });
-    AddHeaderIconButton(*header, EditorIcons::Delete(), "Remove all elements", 0.0f, [=] {
-        EditArray(tab, InObject, InOffset, InRootProperty, InPath, "Clear " + name, [InArray](char* InData) {
+    }, "Remove all elements", [=] {
+        EditContainer(tab, InObject, InOffset, InRootProperty, InPath, "Clear " + name, [InArray](char* InData) {
             InArray->Clear(InData);
         });
     });
@@ -810,6 +1131,7 @@ void DetailsCustomization::AddArrayRows(UINode& InParent, DetailsTab& InTab, con
     for (int32_t index = 0; index < count; index++) {
         AddArrayElement(*category.GetBody(), InTab, InObject, InOffset, InArray, index, InDepth + 1, InRootProperty, InPath);
     }
+    return category;
 }
 
 void DetailsCustomization::AddArrayElement(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InArrayOffset,
@@ -831,7 +1153,7 @@ void DetailsCustomization::AddArrayElement(UINode& InParent, DetailsTab& InTab, 
         char* data = ResolveBase(InObject, InArrayOffset);
         const int32_t size = data ? (int32_t)InArray->GetSize(data) : 0;
         const auto edit = [=](const String& InTitle, std::function<void(char*)> InEdit) {
-            EditArray(tab, InObject, InArrayOffset, InRootProperty, InArrayPath, InTitle + " " + name + " Element", InEdit);
+            EditContainer(tab, InObject, InArrayOffset, InRootProperty, InArrayPath, InTitle + " " + name + " Element", InEdit);
         };
         OutMenu.Section(label);
         OutMenu.Item("Insert", [=] {
@@ -865,14 +1187,7 @@ void DetailsCustomization::AddArrayElement(UINode& InParent, DetailsTab& InTab, 
             });
         }).Icon(EditorIcons::Delete()).Enabled(InIndex < size);
     };
-    const auto addMenuButton = [buildMenu](UINode& InHost) {
-        UIButton& button = AddHeaderIconButton(InHost, EditorIcons::More(), "Element actions", 0.0f, nullptr);
-        button.Clicked = [button = &button, buildMenu] {
-            UIMenuModel menu;
-            buildMenu(menu);
-            UIContextMenu::OpenUnder(*button, menu);
-        };
-    };
+    const auto addMenuButton = [buildMenu](UINode& InHost) { AddMenuButton(InHost, "Element actions", buildMenu); };
 
     Property* element = InArray->InnerProperty;
     const Array<Property*> members = GetInnerProperties(element);
@@ -897,6 +1212,131 @@ void DetailsCustomization::AddArrayElement(UINode& InParent, DetailsTab& InTab, 
         row.Height = AssetRowHeight;
         BuildAssetSlot(*editor, InTab, InObject, offset, *assetClass, isWeak, onEdited);
     } else if (StructProperty* structProperty = Cast<StructProperty>(element)) {
+        AddValueLabel(*editor, structProperty->InnerStructTypename);
+    }
+}
+
+DetailsCategory& DetailsCustomization::AddMapRows(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                                                  MapProperty* InMap, int32_t InDepth, Property* InRootProperty,
+                                                  const String& InLabel, const String& InPath) {
+    DetailsCategory& category = AddCategory(InParent, InTab, InLabel, InDepth + 1);
+    if (IsOverridablePath(InPath)) {
+        BindOverrideActions(InObject, InPath, &InTab, category.IsOverridden, category.ResetAction);
+    }
+
+    Array<uint64_t> entries;
+    if (char* data = ResolveBase(InObject, InOffset)) {
+        for (const MapProperty::Entry& entry : SortedMapEntries(*InMap, data)) {
+            entries.Add(MapEntryOffset(InOffset, InMap, entry.Key));
+        }
+    }
+    const WeakObjectPtr<DetailsTab> tab = &InTab;
+    category.Bind = [tab, InObject, InOffset, InMap, entries] {
+        char* current = ResolveBase(InObject, InOffset);
+        if (!current || !tab.Get()) {
+            return;
+        }
+        bool stale = (int32_t)InMap->GetSize(current) != entries.Size();
+        for (int32_t i = 0; i < entries.Size() && !stale; i++) {
+            stale = ResolveBase(InObject, entries[i]) == nullptr;
+        }
+        if (stale) {
+            tab.Get()->MarkDirty();
+        }
+    };
+
+    const String name = PrettyPropertyPath(OverridablePath(InPath));
+    AddContainerHeader(category, [InObject, InOffset, InMap] {
+        char* current = ResolveBase(InObject, InOffset);
+        return Plural(current ? InMap->GetSize(current) : 0, "entry", "entries");
+    }, "Add entry", [=] {
+        EditContainer(tab, InObject, InOffset, InRootProperty, InPath, "Add " + name + " Entry", [InMap](char* InData) {
+            InsertMapEntry(*InMap, InData, nullptr);
+        });
+    }, "Remove all entries", [=] {
+        EditContainer(tab, InObject, InOffset, InRootProperty, InPath, "Clear " + name, [InMap](char* InData) {
+            InMap->Clear(InData);
+        });
+    });
+
+    for (uint64_t entry : entries) {
+        AddMapEntry(*category.GetBody(), InTab, InObject, entry, InMap, InDepth + 1, InRootProperty, InPath);
+    }
+    return category;
+}
+
+void DetailsCustomization::AddMapEntry(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InEntryOffset,
+                                       MapProperty* InMap, int32_t InDepth, Property* InRootProperty, const String& InMapPath) {
+    const uint64_t mapOffset = GetElementAddresses()[ElementSlot(InEntryOffset)].ContainerOffset;
+    const String keyLabel = MapKeyLabel(*InMap, GetElementAddresses()[ElementSlot(InEntryOffset)].KeyText);
+    const String path = InMapPath + "[" + keyLabel + "]";
+    const String name = PrettyPropertyPath(OverridablePath(InMapPath));
+    const WeakObjectPtr<DetailsTab> tab = &InTab;
+    const auto followKey = [InMap, InEntryOffset](std::function<void(const String&)> InApply) {
+        return [InMap, InEntryOffset, InApply, shown = GetElementAddresses()[ElementSlot(InEntryOffset)].KeyText]() mutable {
+            const String& keyText = GetElementAddresses()[ElementSlot(InEntryOffset)].KeyText;
+            if (keyText != shown) {
+                shown = keyText;
+                InApply(MapKeyLabel(*InMap, keyText));
+            }
+        };
+    };
+
+    const auto buildMenu = [=](UIMenuModel& OutMenu) {
+        const auto entryKey = [InEntryOffset] { return GetElementAddresses()[ElementSlot(InEntryOffset)].Key.get(); };
+        OutMenu.Section(MapKeyLabel(*InMap, GetElementAddresses()[ElementSlot(InEntryOffset)].KeyText));
+        OutMenu.Item("Duplicate", [=] {
+            EditContainer(tab, InObject, mapOffset, InRootProperty, InMapPath, "Duplicate " + name + " Entry", [InMap, entryKey](char* InData) {
+                InsertMapEntry(*InMap, InData, entryKey());
+            });
+        });
+        OutMenu.Separator();
+        OutMenu.Item("Delete", [=] {
+            EditContainer(tab, InObject, mapOffset, InRootProperty, InMapPath, "Delete " + name + " Entry", [InMap, entryKey](char* InData) {
+                InMap->Remove(InData, entryKey());
+            });
+        }).Icon(EditorIcons::Delete());
+    };
+
+    DetailsEditHandler keyEdited;
+    keyEdited.CommitEdit = [tab, InObject, InEntryOffset, InRootProperty, InMapPath] {
+        CommitMapKey(tab, InObject, InEntryOffset, InRootProperty, InMapPath);
+    };
+    const auto buildKeyEditor = [&](UINode& InHost) {
+        if (!BuildValueEditor(InHost, InObject, InEntryOffset | s_MapKeyBit, InMap->KeyProperty, keyEdited, keyLabel)) {
+            AddValueLabel(InHost, keyLabel);
+        }
+    };
+
+    Property* value = InMap->ValueProperty;
+    const Array<Property*> members = GetInnerProperties(value);
+    if (!members.IsEmpty()) {
+        DetailsCategory& entry = AddStructCategory(InParent, InTab, InObject, InEntryOffset, members, InDepth, InRootProperty, keyLabel, path,
+                                                   [&](DetailsCategory& InCategory) {
+            buildKeyEditor(*AddRow(*InCategory.GetBody(), InTab, "Key", InDepth + 1).GetValueHost());
+        });
+        entry.Bind = followKey([entry = &entry](const String& InLabel) { entry->SetTitle(InLabel); });
+        AddMenuButton(*entry.AddHeaderValue(), "Entry actions", buildMenu);
+        return;
+    }
+
+    DetailsRow& row = AddRow(InParent, InTab, keyLabel, InDepth);
+    row.Bind = followKey([row = &row](const String& InLabel) { row->SetLabel(InLabel); });
+    buildKeyEditor(*row.AddLabelHost());
+    UINode* editor = row.GetValueHost()->Add<UINode>();
+    editor->Fill();
+    editor->Size = { 1.0_rel - 26.0_px, 1.0_rel };
+    AddMenuButton(*row.GetValueHost(), "Entry actions", buildMenu);
+
+    const DetailsEditHandler onEdited = MakeEditHandler(InObject, InRootProperty, &InTab, path);
+    if (BuildValueEditor(*editor, InObject, InEntryOffset, value, onEdited, keyLabel)) {
+        return;
+    }
+    bool isWeak = false;
+    if (const Class* assetClass = FindAssetReferenceClass(value, isWeak)) {
+        row.Height = AssetRowHeight;
+        BuildAssetSlot(*editor, InTab, InObject, InEntryOffset, *assetClass, isWeak, onEdited);
+    } else if (StructProperty* structProperty = Cast<StructProperty>(value)) {
         AddValueLabel(*editor, structProperty->InnerStructTypename);
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "GameFramework/Node3D.h"
 #include "PhysicsTypes.h"
+#include "Common/Delegate.h"
 #include "PhysicsBodyNode.gen.h"
 
 class PhysicsWorld;
@@ -21,10 +22,23 @@ public:
     virtual void OnTriggerEnter(Node3D* InOther) { (void)InOther; }
     virtual void OnTriggerExit(Node3D* InOther) { (void)InOther; }
 
+    PROPERTY(Params = (Other))
+    Delegate<PhysicsBodyNode*> OnCollisionEntered;
+
+    PROPERTY(Params = (Other))
+    Delegate<PhysicsBodyNode*> OnCollisionExited;
+
+    PROPERTY(Params = (Other))
+    Delegate<Node3D*> OnTriggerEntered;
+
+    PROPERTY(Params = (Other))
+    Delegate<Node3D*> OnTriggerExited;
+
     PhysicsBodyType GetBodyType() const { return m_BodyType; }
     void SetBodyType(PhysicsBodyType InBodyType);
 
     bool IsTrigger() const { return m_IsTrigger; }
+    FUNCTION()
     void SetTrigger(bool InIsTrigger);
 
     float GetMass() const { return m_Mass; }

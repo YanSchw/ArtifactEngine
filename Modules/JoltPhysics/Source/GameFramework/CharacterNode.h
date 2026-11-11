@@ -20,11 +20,14 @@ public:
 
     /** Horizontal movement for this frame; the vertical speed stays under the character's control. */
     void Move(const Vec3& InVelocity);
+    FUNCTION()
     void Jump(float InJumpSpeed);
 
     Vec3 GetVelocity() const;
+    FUNCTION()
     void SetVelocity(const Vec3& InVelocity);
 
+    FUNCTION(Pure)
     bool IsGrounded() const;
     bool IsOnSteepGround() const;
     Vec3 GetGroundNormal() const;

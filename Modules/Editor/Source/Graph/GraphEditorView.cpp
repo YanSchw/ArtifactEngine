@@ -1,4 +1,6 @@
 #include "GraphEditorView.h"
+#include "Assets/VectorImage.h"
+#include "UI/EditorIcons.h"
 #include "GraphEditorStyle.h"
 #include "ThemedWindow.h"
 #include "Tabs/MajorTab.h"
@@ -83,10 +85,12 @@ GraphEditorView::NodeLayout GraphEditorView::ComputeNodeLayout(GraphNode& InNode
     float maxInputLabel = 0.0f;
     float maxOutputLabel = 0.0f;
     for (GraphPin* pin : inputs) {
-        maxInputLabel = std::max(maxInputLabel, measure(pin->Name, GraphEditorStyle::PinFontSize));
+        const String value = GetInputValueText(InNode, *pin);
+        const float valueWidth = value.empty() ? 0.0f : measure(value, GraphEditorStyle::PinFontSize) + GraphEditorStyle::PinLabelGap;
+        maxInputLabel = std::max(maxInputLabel, measure(InNode.GetPinLabel(*pin), GraphEditorStyle::PinFontSize) + valueWidth);
     }
     for (GraphPin* pin : outputs) {
-        maxOutputLabel = std::max(maxOutputLabel, measure(pin->Name, GraphEditorStyle::PinFontSize));
+        maxOutputLabel = std::max(maxOutputLabel, measure(InNode.GetPinLabel(*pin), GraphEditorStyle::PinFontSize));
     }
 
     const float titleWidth = measure(InNode.GetTitle(), GraphEditorStyle::TitleFontSize) + 2.0f * GraphEditorStyle::NodePaddingX;
@@ -110,6 +114,10 @@ GraphEditorView::NodeLayout GraphEditorView::ComputeNodeLayout(GraphNode& InNode
         layout.Slots.Add({ outputs[i], Vec2(layout.Bounds.Max().x, rowCenterY(i)) });
     }
     return layout;
+}
+
+String GraphEditorView::GetInputValueText(GraphNode& InNode, const GraphPin& InPin) const {
+    return InPin.IsInput() && m_Graph && !m_Graph->IsPinConnected(InNode, InPin) ? InNode.GetPinValueText(InPin) : String();
 }
 
 GraphNode* GraphEditorView::FindNodeAt(const Vec2& InGraphPos) const {
@@ -539,23 +547,9 @@ bool GraphEditorView::OnSecondaryClick(const Vec2& InCursorPos) {
         return false;
     }
 
-    struct Item {
-        String Category;
-        String Title;
-        Class NodeClass;
-    };
-    Array<Item> items;
-    for (const Class& nodeClass : Class::GetSubclassesOf(GraphNode::StaticClass())) {
-        if (nodeClass == GraphNode::StaticClass() || !m_Graph->AllowsNodeClass(nodeClass) || !nodeClass.IsDefaultConstructable()) {
-            continue;
-        }
-        GraphNode* node = Cast<GraphNode>(Object::Create(nodeClass));
-        if (node && node->IsUserCreatable()) {
-            items.Add({ node->GetCategory(), node->GetTitle(), nodeClass });
-        }
-        delete node;
-    }
-    items.Sort([](const Item& InA, const Item& InB) {
+    Array<GraphNodeTemplate> items;
+    m_Graph->CollectNodeTemplates(items, PaletteContext.Get());
+    items.Sort([](const GraphNodeTemplate& InA, const GraphNodeTemplate& InB) {
         return InA.Category == InB.Category ? InA.Title < InB.Title : InA.Category < InB.Category;
     });
 
@@ -563,24 +557,23 @@ bool GraphEditorView::OnSecondaryClick(const Vec2& InCursorPos) {
     const Vec2 spawnPos = SnapToGrid(ScreenToGraph(InCursorPos));
 
     UIMenuModel menu;
-    menu.Searchable("Search nodes").MinWidth(GraphEditorStyle::MenuWidth);
-    String lastCategory;
-    for (const Item& item : items) {
-        if (item.Category != lastCategory) {
-            menu.Section(item.Category);
-            lastCategory = item.Category;
-        }
-        menu.Item(item.Title, [view, spawnPos, nodeClass = item.NodeClass] {
+    menu.Title("All Actions for this Graph").Searchable("Search").MinWidth(GraphEditorStyle::MenuWidth);
+    for (const GraphNodeTemplate& item : items) {
+        auto& entry = menu.Item(item.Title, [view, spawnPos, nodeClass = item.NodeClass, configure = item.Configure] {
             GraphEditorView* graphView = view.Get();
             if (!graphView || !graphView->m_Graph) {
                 return;
             }
             graphView->RecordEdit("Add Node");
-            if (GraphNode* node = graphView->m_Graph->CreateNode(nodeClass, spawnPos)) {
+            if (GraphNode* node = graphView->m_Graph->CreateNode(nodeClass, spawnPos, configure)) {
                 graphView->SelectOnly(node->NodeId);
                 graphView->NotifyGraphChanged();
             }
         });
+        entry.Category(item.Category.empty() ? String("Other") : item.Category);
+        if (!item.Tooltip.empty()) {
+            entry.Tooltip(item.Tooltip);
+        }
     }
 
     UIContextMenu::OpenAt(*this, InCursorPos, menu);
@@ -754,21 +747,53 @@ void GraphEditorView::PaintNode(UIDrawList& OutDrawList, GraphNode& InNode) cons
             color = glm::mix(color, Vec4(1.0f), 0.35f);
         }
         const float radius = GraphEditorStyle::PinRadius * m_Zoom * (hovered ? 1.3f : 1.0f);
-        if (m_Graph->IsPinConnected(InNode, *slot.Pin)) {
+        const bool connected = m_Graph->IsPinConnected(InNode, *slot.Pin);
+        if (slot.Pin->TypeName == GraphEditorStyle::ExecPinType) {
+            PaintIcon(OutDrawList, connected ? EditorIcons::ExecPinConnected() : EditorIcons::ExecPin(), center, radius * 3.6f, color);
+        } else if (connected) {
             OutDrawList.AddCircle(center, radius, color, 16, m_WorldMatrix);
         } else {
             OutDrawList.AddRing(center, radius, std::max(1.0f, 1.5f * m_Zoom), color, 16, m_WorldMatrix);
         }
 
         if (paintText) {
+            const String label = InNode.GetPinLabel(*slot.Pin);
             const float labelSize = GraphEditorStyle::PinFontSize * m_Zoom;
-            const Vec2 labelExtent = font->MeasureText(slot.Pin->Name, labelSize);
+            const Vec2 labelExtent = font->MeasureText(label, labelSize);
             const float labelY = center.y - labelExtent.y * 0.5f;
             const float gap = GraphEditorStyle::PinLabelGap * m_Zoom;
             const float labelX = slot.Pin->IsInput() ? center.x + gap : center.x - gap - labelExtent.x;
-            OutDrawList.AddText(font, slot.Pin->Name, Vec2(labelX, labelY), labelSize, GraphEditorStyle::PinLabelColor, m_WorldMatrix);
+            OutDrawList.AddText(font, label, Vec2(labelX, labelY), labelSize, GraphEditorStyle::PinLabelColor, m_WorldMatrix);
+            const String value = GetInputValueText(InNode, *slot.Pin);
+            if (!value.empty()) {
+                OutDrawList.AddText(font, value, Vec2(labelX + labelExtent.x + gap, labelY), labelSize, GraphEditorStyle::PinValueColor, m_WorldMatrix);
+            }
         }
     }
+}
+
+void GraphEditorView::PaintIcon(UIDrawList& OutDrawList, VectorImage* InImage, const Vec2& InCenter, float InSize,
+                                const Vec4& InTint) const {
+    if (!InImage || !InImage->IsLoaded() || InImage->GetSize().x <= 0.0f) {
+        return;
+    }
+    CachedIcon* cached = nullptr;
+    for (CachedIcon& icon : m_IconCache) {
+        cached = icon.Image == InImage ? &icon : cached;
+    }
+    if (!cached) {
+        m_IconCache.Add(CachedIcon{ InImage, SvgMesh() });
+        cached = &m_IconCache[m_IconCache.Last()];
+        InImage->Tessellate(4.0f, cached->Mesh);
+    }
+    if (cached->Mesh.Indices.IsEmpty()) {
+        return;
+    }
+    const Vec2 documentSize = InImage->GetSize();
+    const float scale = InSize / std::max(documentSize.x, documentSize.y);
+    const Vec2 topLeft = InCenter - documentSize * scale * 0.5f;
+    OutDrawList.AddTriangles(&cached->Mesh.Positions[0], &cached->Mesh.Colors[0], cached->Mesh.Positions.Size(),
+                             &cached->Mesh.Indices[0], cached->Mesh.Indices.Size(), InTint, topLeft, Vec2(scale), m_WorldMatrix);
 }
 
 void GraphEditorView::PaintMarquee(UIDrawList& OutDrawList) const {

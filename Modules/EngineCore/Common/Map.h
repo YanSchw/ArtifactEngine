@@ -15,6 +15,15 @@ public:
         m_Map.erase(key);
     }
 
+    V* Find(const K& key) {
+        auto it = m_Map.find(key);
+        return it != m_Map.end() ? &it->second : nullptr;
+    }
+    const V* Find(const K& key) const {
+        auto it = m_Map.find(key);
+        return it != m_Map.end() ? &it->second : nullptr;
+    }
+
     V& operator[](const K& key) {
         return m_Map[key];
     }
@@ -35,8 +44,12 @@ public:
         m_Map.clear();
     }
 
-    size_t Size() {
+    size_t Size() const {
         return m_Map.size();
+    }
+
+    bool IsEmpty() const {
+        return m_Map.empty();
     }
 
     void Reserve(size_t capacity) {

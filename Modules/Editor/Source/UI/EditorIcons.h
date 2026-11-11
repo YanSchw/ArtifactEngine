@@ -50,6 +50,8 @@ public:
     static VectorImage* Loop()          { return Get("64ce3236-65ee-4ee9-89d4-27bcb4e46089"); }
     static VectorImage* Eject()         { return Get("b96bbcd6-154c-4705-a371-db1c7d229b3d"); }
     static VectorImage* Possess()       { return Get("d273a65f-36fb-4737-b30e-85549591eec9"); }
+    static VectorImage* ExecPin()          { return Get("04feca8d-6c99-4b34-a0b1-657dc5d2ea24"); }
+    static VectorImage* ExecPinConnected() { return Get("60cf91bc-5e8b-4ea2-8e35-50a80b28050e"); }
     static VectorImage* Material()      { return Get("64a96b51-290f-4883-a5fd-b1e7707b4fd8"); }
     static VectorImage* BoxShape()      { return Get("8b08ff80-2548-494d-b6dd-ef63ae979485"); }
     static VectorImage* SphereShape()   { return Get("09560261-b21c-45b0-952a-6c80331d2fe4"); }

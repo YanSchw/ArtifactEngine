@@ -47,6 +47,15 @@ void DetailsRow::SetLabel(const String& InLabel) {
     m_NameLabel->Text = InLabel;
 }
 
+UINode* DetailsRow::AddLabelHost() {
+    if (!m_LabelHost) {
+        m_LabelHost = Add<UINode>();
+        m_LabelHost->Anchor = m_LabelHost->Pivot = Vec2(0.0f, 0.5f);
+        m_NameLabel->SetEnabled(false);
+    }
+    return m_LabelHost;
+}
+
 float DetailsRow::MeasureHeight(const String& InFilter) const {
     return DetailsTab::MatchesFilter(m_Label, InFilter) ? Height : 0.0f;
 }
@@ -62,6 +71,10 @@ void DetailsRow::OnBind() {
 
     m_NameLabel->Position = Vec2(indent, 0.0f);
     m_NameLabel->Size = { UIValue(split, -(indent + 8.0f)), Height };
+    if (m_LabelHost) {
+        m_LabelHost->Position = Vec2(indent - 2.0f, 0.0f);
+        m_LabelHost->Size = { UIValue(split, -(indent + 4.0f)), Height - 4.0f };
+    }
 
     m_ValueHost->Position = { UIValue(split, 5.0f), 0.0f };
     m_ValueHost->Size = { UIValue(1.0f - split, -(5.0f + 3.0f + ResetColumnWidth)), Height - 4.0f };

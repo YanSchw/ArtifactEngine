@@ -40,6 +40,11 @@ struct Class {
     const static Class None;
 };
 
+template<>
+struct std::hash<Class> {
+    size_t operator()(const Class& InClass) const noexcept { return std::hash<std::string>()(InClass.Name); }
+};
+
 template <class To, class From> static To* Cast(From* Src);
 
 class Object {
@@ -108,3 +113,5 @@ static To* Cast(From* Src) {
 }
 
 #include "Property.h"
+#include "Function.h"
+#include "Pointer.h"

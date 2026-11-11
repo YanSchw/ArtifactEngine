@@ -1,4 +1,6 @@
 #include "SceneEditorTab.h"
+#include "EventGraphTab.h"
+#include "UI/UIDockNode.h"
 #include "OutlinerTab.h"
 #include "DetailsTab.h"
 #include "ViewportTab.h"
@@ -35,7 +37,9 @@ SceneEditorTab::~SceneEditorTab() {
 
 void SceneEditorTab::BuildLayout() {
     UIDockArea* area = GetDockArea();
-    area->DockNew<ViewportTab>(UIDockSlot::Center);
+    ViewportTab* viewport = area->DockNew<ViewportTab>(UIDockSlot::Center);
+    area->DockNew<EventGraphTab>(UIDockSlot::Center, viewport->GetDockNode());
+    viewport->GetDockNode()->SetActiveTab(viewport);
     OutlinerTab* outliner = area->DockNew<OutlinerTab>(UIDockSlot::Left, nullptr, 0.24f);
     area->DockNew<DetailsTab>(UIDockSlot::Bottom, outliner->GetDockNode(), 0.45f);
 }

@@ -107,6 +107,10 @@ float DetailsCategory::MeasureHeight(const String& InFilter) const {
     return HeaderHeight + ((open && bodyHeight > 0.0f) ? bodyHeight + padding : 0.0f);
 }
 
+UIRectF DetailsCategory::GetTooltipAnchor() const {
+    return UIRectF(m_Geometry.Position, Vec2(m_Geometry.Size.x, HeaderHeight));
+}
+
 void DetailsCategory::OnBind() {
     UINode::OnBind();
 

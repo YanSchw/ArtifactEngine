@@ -18,19 +18,27 @@ public:
 
     Node3D* GetTransform() override;
 
+    FUNCTION(Pure)
     Vec3 GetPosition() const;
+    FUNCTION(Pure)
     Vec3 GetLocalPosition() const;
+    FUNCTION()
     void SetPosition(const Vec3& InWorldPosition);
+    FUNCTION()
     void SetLocalPosition(const Vec3& InLocalPosition);
+    FUNCTION()
     void AddWorldOffset(const Vec3& InWorldOffset);
+    FUNCTION()
     void AddLocalOffset(const Vec3& InLocalOffset);
 
     Quat GetRotation() const;
     Quat GetLocalRotation() const;
+    FUNCTION(Pure)
     Vec3 GetEulerRotation() const;
     Vec3 GetLocalEulerRotation() const;
     void SetRotation(const Quat& InWorldRotation);
     void SetLocalRotation(const Quat& InLocalRotation);
+    FUNCTION()
     void SetEulerRotation(const Vec3& InWorldEulerAngles);
     void SetLocalEulerRotation(const Vec3& InLocalEulerAngles);
     void Rotate(const Quat& InDeltaRotation);

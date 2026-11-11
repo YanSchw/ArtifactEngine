@@ -273,10 +273,19 @@ void World::ResolveAllBeginPlayIssues() {
         if (!node->WasBeginPlayCalled()) {
             node->m_WasBeginPlayCalled = true;
             node->BeginPlay();
+            for (const SharedObjectPtr<WorldSubsystem>& subsystem : m_Subsystems) {
+                subsystem->OnNodeBeginPlay(*node);
+            }
         }
 
         // Push UpdateFlags
         ReregisterNode(node);
+    }
+}
+
+void World::NotifyEndPlay(Node& InNode) {
+    for (const SharedObjectPtr<WorldSubsystem>& subsystem : m_Subsystems) {
+        subsystem->OnNodeEndPlay(InNode);
     }
 }
 

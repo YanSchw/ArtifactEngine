@@ -4,6 +4,7 @@ import sys
 from HeaderTool.Class import Class
 from HeaderTool.Struct import Struct
 from HeaderTool.Enum import Enum
+from HeaderTool.Properties import HeaderToolError
 from SDK.Util import get_module_name_from_path, smart_open
 from BuildTool.Module import ArtifactModule
 
@@ -72,6 +73,7 @@ class HeaderTool:
         self.visited_header = set()  # set of absolute header file paths to avoid processing the same header multiple times
         self.module_output_root = {}  # dict[module_name: str, owning_root_dir: str]
         self.header_output_root = {}  # dict[header_name: str, owning_root_dir: str]
+        self.header_paths = {}
         self.skipped_dirs = set()  # absolute dirs belonging to another target platform
 
     def _skips(self, dirpath: str) -> bool:
@@ -124,13 +126,18 @@ class HeaderTool:
                             print(f"Error: Duplicate header name {filename} found at {header_path}. This will cause issues with generated code. Consider renaming one of the headers to have a unique name.")
                             sys.exit(1)
                         self.types_per_header[header_name] = results
+                        self.header_paths[header_name] = header_path
                         self.header_output_root[header_name] = output_root
 
 
     def generate(self):
         self.reflect_classes()
         for header, types in self.types_per_header.items():
-            self.generate_reflection_code(header, types)
+            try:
+                self.generate_reflection_code(header, types)
+            except HeaderToolError as error:
+                print(f"{self.header_paths.get(header, header)}: error: {error}")
+                sys.exit(1)
         self.generate_module_registration_code()
 
     @staticmethod

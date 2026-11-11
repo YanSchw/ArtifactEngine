@@ -27,8 +27,12 @@ public:
 
     static float HeightFor(const UIMenuEntry& InEntry);
 
-    void SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, float InRightInset);
+    void SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, float InRightInset, float InIndent = 0.0f);
+    void SetGroup(const String& InPath, const String& InLabel, float InIndent, bool InExpanded);
     const UIMenuEntry& GetEntry() const { return m_Entry; }
+    const String& GetGroupPath() const { return m_GroupPath; }
+    bool IsGroup() const { return !m_GroupPath.empty(); }
+    bool IsSelectable() const;
     bool IsHighlighted() const;
 
     virtual void Paint(UIDrawList& OutDrawList) override;
@@ -40,6 +44,8 @@ private:
     void PaintToggleBox(UIDrawList& OutDrawList, bool InChecked) const;
 
     UIMenuEntry m_Entry;
+    String m_GroupPath;
+    UISvg* m_Disclosure = nullptr;
     UISvg* m_Icon = nullptr;
     UILabel* m_Label = nullptr;
     UILabel* m_Shortcut = nullptr;
@@ -68,6 +74,11 @@ public:
     UIMenuPanel* GetParentPanel() const { return m_ParentPanel.Get(); }
     UIMenuPanel* GetSubmenu() const { return m_Submenu.Get(); }
     int32_t GetHighlight() const { return m_Highlight; }
+    const String& GetHighlightGroup() const { return m_HighlightGroup; }
+
+    void ToggleGroup(const String& InPath);
+    bool IsGroupExpanded(const String& InPath) const;
+    bool CollapseHighlighted();
 
     void ActivateRow(int32_t InIndex);
     void OpenSubmenu(int32_t InIndex);
@@ -83,6 +94,11 @@ public:
 
 private:
     void RebuildRows();
+    void RebuildTreeRows();
+    void FinishRows(float InContentWidth, float InContentHeight, bool InFixedHeight);
+    void Highlight(UIMenuRow* InRow);
+    void ScrollToHighlight();
+    UIMenuRow* FindHighlightedRow() const;
     Array<UIMenuRow*> GetRows() const;
     UIMenuRow* FindRow(int32_t InIndex) const;
     UIRectF GetCanvasRect() const;
@@ -97,6 +113,8 @@ private:
 
     Vec2 m_DesiredTopLeft = Vec2(0.0f);
     int32_t m_Highlight = -1;
+    String m_HighlightGroup;
+    Array<String> m_Expanded;
     int32_t m_HoverRow = -1;
     int32_t m_OpenRow = -1;
     float m_HoverSeconds = 0.0f;

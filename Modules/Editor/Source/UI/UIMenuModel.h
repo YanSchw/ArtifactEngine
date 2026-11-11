@@ -13,6 +13,7 @@ struct UIMenuEntry {
     String Label;
     String Shortcut;
     String Tooltip;
+    String Category;
     VectorImage* Icon = nullptr;
     bool Enabled = true;
     bool Checked = false;
@@ -81,6 +82,7 @@ public:
     UIMenuModel& Icon(VectorImage* InIcon) { if (UIMenuEntry* e = Last()) e->Icon = InIcon; return *this; }
     UIMenuModel& Shortcut(const String& InText) { if (UIMenuEntry* e = Last()) e->Shortcut = InText; return *this; }
     UIMenuModel& Tooltip(const String& InText) { if (UIMenuEntry* e = Last()) e->Tooltip = InText; return *this; }
+    UIMenuModel& Category(const String& InPath) { if (UIMenuEntry* e = Last()) e->Category = InPath; return *this; }
     UIMenuModel& Enabled(bool InEnabled) { if (UIMenuEntry* e = Last()) e->Enabled = InEnabled; return *this; }
     UIMenuModel& Checked(bool InChecked) { if (UIMenuEntry* e = Last()) e->Checked = InChecked; return *this; }
 
@@ -91,11 +93,22 @@ public:
         return *this;
     }
     UIMenuModel& MinWidth(float InPixels) { m_MinWidth = InPixels; return *this; }
+    UIMenuModel& Title(const String& InTitle) { m_Title = InTitle; return *this; }
 
     const Array<UIMenuEntry>& GetEntries() const { return m_Entries; }
     bool IsSearchable() const { return m_Searchable; }
     const String& GetSearchPlaceholder() const { return m_SearchPlaceholder; }
     float GetMinWidth() const { return m_MinWidth; }
+    const String& GetTitle() const { return m_Title; }
+
+    bool HasCategories() const {
+        for (const UIMenuEntry& entry : m_Entries) {
+            if (!entry.Category.empty()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     bool IsEmpty() const {
         for (const UIMenuEntry& entry : m_Entries) {
@@ -112,5 +125,6 @@ private:
     Array<UIMenuEntry> m_Entries;
     bool m_Searchable = false;
     String m_SearchPlaceholder;
+    String m_Title;
     float m_MinWidth = 0.0f;
 };

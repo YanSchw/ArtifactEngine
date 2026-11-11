@@ -6,9 +6,14 @@
 #include "Core/Assert.h"
 #include "Object/Enum.h"
 
+#include <algorithm>
 #include <cstring>
 
 using json = nlohmann::json;
+
+static bool UsesObjectForm(const MapProperty& InMap) {
+    return Cast<StringProperty>(InMap.KeyProperty) || Cast<EnumProperty>(InMap.KeyProperty);
+}
 
 String JsonSerializer::SerializeObject(const Object* InObject) {
     json j = json::object();
@@ -73,7 +78,9 @@ json JsonSerializer::SerializeType(void* instance, const String& typeName) {
     auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        j[prop->Name] = SerializeProperty(prop, prop->GetValuePtr(instance));
+        if (!prop->IsTransient()) {
+            j[prop->Name] = SerializeProperty(prop, prop->GetValuePtr(instance));
+        }
     }
 
     return j;
@@ -82,7 +89,7 @@ void JsonSerializer::DeserializeType(void* instance, const String& typeName, con
     auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        if (!j.contains(prop->Name))
+        if (prop->IsTransient() || !j.contains(prop->Name))
             continue;
 
         DeserializeProperty(prop, prop->GetValuePtr(instance), j[prop->Name]);
@@ -142,6 +149,28 @@ json JsonSerializer::SerializeProperty(Property* property, void* valuePtr) {
         }
 
         return arr;
+    } else if (auto p = Cast<MapProperty>(property)) {
+        Array<MapProperty::Entry> entries;
+        p->GetEntries(valuePtr, entries);
+        if (UsesObjectForm(*p)) {
+            json object = json::object();
+            for (const MapProperty::Entry& entry : entries) {
+                object[SerializeProperty(p->KeyProperty, (void*)entry.Key).get<String>()] = SerializeProperty(p->ValueProperty, entry.Value);
+            }
+            return object;
+        }
+        json pairs = json::array();
+        for (const MapProperty::Entry& entry : entries) {
+            pairs.push_back({ { "Key", SerializeProperty(p->KeyProperty, (void*)entry.Key) },
+                              { "Value", SerializeProperty(p->ValueProperty, entry.Value) } });
+        }
+        std::sort(pairs.begin(), pairs.end(), [](const json& InA, const json& InB) { return InA["Key"] < InB["Key"]; });
+        return pairs;
+    } else if (auto p = Cast<SubclassOfProperty>(property)) {
+        const Class& value = p->Read(valuePtr);
+        return value == Class::None ? json(nullptr) : json(value.Name);
+    } else if (auto p = Cast<DelegateProperty>(property)) {
+        return nullptr;
     } else if (auto p = Cast<EnumProperty>(property)) {
         int64_t value = 0;
         std::memcpy(&value, valuePtr, p->ByteSize);
@@ -217,6 +246,31 @@ void JsonSerializer::DeserializeProperty(Property* property, void* valuePtr, con
 
             DeserializeProperty(p->InnerProperty, elemPtr, elemJson);
         }
+    } else if (auto p = Cast<MapProperty>(property)) {
+        p->Clear(valuePtr);
+        const std::shared_ptr<void> key = p->MakeKey();
+        const auto add = [&](const json& InKey, const json& InValue) {
+            DeserializeProperty(p->KeyProperty, key.get(), InKey);
+            DeserializeProperty(p->ValueProperty, p->FindOrAdd(valuePtr, key.get()), InValue);
+        };
+        if (j.is_object()) {
+            for (const auto& [name, value] : j.items()) {
+                add(json(name), value);
+            }
+        } else if (j.is_array()) {
+            for (const json& pair : j) {
+                if (pair.is_object() && pair.contains("Key") && pair.contains("Value")) {
+                    add(pair["Key"], pair["Value"]);
+                }
+            }
+        }
+    } else if (auto p = Cast<SubclassOfProperty>(property)) {
+        const Class value = j.is_string() ? Class(j.get<String>()) : Class::None;
+        if (!p->Write(valuePtr, value)) {
+            AE_WARN("'{0}' is not a subclass of '{1}'; '{2}' was reset to None", value.Name, p->BaseClass.Name, p->Name);
+        }
+    } else if (Cast<DelegateProperty>(property)) {
+        return;
     } else if (auto p = Cast<EnumProperty>(property)) {
         int64_t value = Enum(p->InnerEnumTypename).ConvertStringToValue(j.get<String>());
         std::memcpy(valuePtr, &value, p->ByteSize);

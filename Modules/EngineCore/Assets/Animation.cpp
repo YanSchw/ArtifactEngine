@@ -132,7 +132,7 @@ bool Animation::MakePath(Node& InRoot, Node& InTarget, Array<int32_t>& OutPath) 
 }
 
 bool Animation::IsAnimatable(Property* InProperty) {
-    return InProperty && !Cast<SharedObjectPtrProperty>(InProperty);
+    return InProperty && !Cast<SharedObjectPtrProperty>(InProperty) && !InProperty->IsTransient();
 }
 
 float Animation::GetDuration() const {

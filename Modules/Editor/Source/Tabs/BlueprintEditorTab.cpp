@@ -1,4 +1,6 @@
 #include "BlueprintEditorTab.h"
+#include "EventGraphTab.h"
+#include "UI/UIDockNode.h"
 #include "OutlinerTab.h"
 #include "DetailsTab.h"
 #include "ViewportTab.h"
@@ -21,6 +23,8 @@ BlueprintEditorTab::BlueprintEditorTab() {
 
     UIDockArea* area = GetDockArea();
     m_Viewport = area->DockNew<ViewportTab>(UIDockSlot::Center);
+    area->DockNew<EventGraphTab>(UIDockSlot::Center, m_Viewport->GetDockNode());
+    m_Viewport->GetDockNode()->SetActiveTab(m_Viewport);
     OutlinerTab* outliner = area->DockNew<OutlinerTab>(UIDockSlot::Left, nullptr, 0.24f);
     area->DockNew<DetailsTab>(UIDockSlot::Bottom, outliner->GetDockNode(), 0.45f);
 }

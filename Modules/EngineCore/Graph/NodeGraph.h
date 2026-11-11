@@ -1,7 +1,16 @@
 #pragma once
 #include "GraphNode.h"
 #include "GraphConnection.h"
+#include <functional>
 #include "NodeGraph.gen.h"
+
+struct GraphNodeTemplate {
+    String Category;
+    String Title;
+    String Tooltip;
+    Class NodeClass;
+    std::function<void(GraphNode&)> Configure;
+};
 
 /** A serializable document of GraphNodes wired together by GraphConnections. */
 class NodeGraph : public Object {
@@ -20,7 +29,7 @@ public:
     PROPERTY()
     Array<SharedObjectPtr<GraphConnection>> Connections;
 
-    GraphNode* CreateNode(const Class& InNodeClass, const Vec2& InPosition);
+    GraphNode* CreateNode(const Class& InNodeClass, const Vec2& InPosition, const std::function<void(GraphNode&)>& InConfigure = nullptr);
     template<typename T>
     T* CreateNode(const Vec2& InPosition) {
         return Cast<T>(CreateNode(T::StaticClass(), InPosition));
@@ -36,6 +45,8 @@ public:
         return InOutputType == InInputType;
     }
     virtual bool AllowsNodeClass(const Class& InNodeClass) const { (void)InNodeClass; return true; }
+    virtual bool AllowsMultipleConnections(const GraphPin& InPin) const { return InPin.IsOutput(); }
+    virtual void CollectNodeTemplates(Array<GraphNodeTemplate>& OutTemplates, Object* InContext) const;
 
     /** Wires two pins (either order); an input pin's existing connection is replaced, as inputs
      *  accept a single wire. Returns null with a log entry when CanConnect rejects the pair. */

@@ -1,6 +1,9 @@
 #pragma once
 #include "GameFramework/UINode.h"
 #include "Graph/NodeGraph.h"
+#include "Serialization/Assets/SvgTessellator.h"
+
+class VectorImage;
 #include "GraphEditorView.gen.h"
 
 /** The interactive canvas of the graph editor. */
@@ -24,6 +27,8 @@ public:
 
     /** Invoked when the set of selected nodes changes. */
     std::function<void()> OnSelectionChanged;
+
+    WeakObjectPtr<Object> PaletteContext;
 
     Array<GraphNode*> GetSelectedNodes() const;
 
@@ -67,6 +72,7 @@ private:
     static Vec2 SnapToGrid(const Vec2& InGraphPos);
 
     NodeLayout ComputeNodeLayout(GraphNode& InNode) const;
+    String GetInputValueText(GraphNode& InNode, const GraphPin& InPin) const;
     GraphNode* FindNodeAt(const Vec2& InGraphPos) const;
     bool FindPinAt(const Vec2& InScreenPos, PinRef& OutPin) const;
     bool ResolvePin(const PinRef& InRef, GraphNode*& OutNode, GraphPin*& OutPin) const;
@@ -94,6 +100,7 @@ private:
     void PaintNode(UIDrawList& OutDrawList, GraphNode& InNode) const;
     void PaintPendingWire(UIDrawList& OutDrawList) const;
     void PaintMarquee(UIDrawList& OutDrawList) const;
+    void PaintIcon(UIDrawList& OutDrawList, VectorImage* InImage, const Vec2& InCenter, float InSize, const Vec4& InTint) const;
     void PaintWire(UIDrawList& OutDrawList, const Vec2& InFromScreen, const Vec2& InToScreen, Vec4 InColorA, Vec4 InColorB) const;
 
     SharedObjectPtr<NodeGraph> m_Graph;
@@ -123,4 +130,10 @@ private:
     Vec2 m_LastPanCursor = Vec2(0.0f);
 
     bool m_PendingFrameContent = true;
+
+    struct CachedIcon {
+        VectorImage* Image = nullptr;
+        SvgMesh Mesh;
+    };
+    mutable Array<CachedIcon> m_IconCache;
 };

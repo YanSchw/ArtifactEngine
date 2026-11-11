@@ -1,6 +1,16 @@
 #include "DetailsItem.h"
 #include "UI/EditorStyle.h"
+#include "UI/UITooltip.h"
 #include "Rendering/UIDrawList.h"
+
+void DetailsItem::SetTooltip(const String& InText) {
+    if (InText.empty()) {
+        return;
+    }
+    UITooltip* tooltip = Add<UITooltip>();
+    tooltip->Text = InText;
+    tooltip->GetAnchor = [this] { return GetTooltipAnchor(); };
+}
 
 void DetailsItem::PaintIndentGutter(UIDrawList& OutDrawList, int32_t InLevels, const UIRectF& InRect) const {
     if (InLevels <= 0) {

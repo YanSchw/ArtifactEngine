@@ -2,20 +2,13 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+from HeaderTool.Properties import (PROPERTY_PATTERN, HeaderToolError, blank_comments, extract_comment, normalize_type,
+                                   parse_range, parse_specifiers)
+from HeaderTool.Functions import FUNCTION_PATTERN
 
 CLASS_PATTERN = re.compile(r'(?:class|struct)\s+(\w+)\s*(?:final\s*)?:\s*public\s+(\w+)\s*\{', re.MULTILINE)
 STRUCT_PATTERN = re.compile(r'struct\s+(\w+)\s*\{', re.MULTILINE)
 ENUM_PATTERN = re.compile(r'enum\s+(class\s+)?(\w+)(?:\s*:\s*([\w:]+))?\s*\{', re.MULTILINE)
-
-PROPERTY_PATTERN = re.compile(
-    r'PROPERTY\s*\(\s*\)\s*'
-    r'([\w:<> ,]+?)'
-    r'\s+'
-    r'(\w+)'
-    r'(?:\s*=\s*([^;]+))?'
-    r'\s*;',
-    re.MULTILINE
-)
 
 
 def _leading_comment(lines: list[str], decl_line_index: int) -> str:
@@ -51,22 +44,47 @@ def _find_body_end(code: str, start: int) -> int:
     return end if end != -1 else len(code)
 
 
-def _parse_properties(body: str, body_lines: list[str]) -> list[dict]:
+def _parse_properties(body: str) -> list[dict]:
     properties = []
-    for match in PROPERTY_PATTERN.finditer(body):
-        line_index = body[:match.start()].count('\n')
+    for match in PROPERTY_PATTERN.finditer(blank_comments(body)):
         prop = {
-            'type': match.group(1).strip(),
-            'name': match.group(2).strip(),
+            'type': normalize_type(match.group('type')).replace(',', ', '),
+            'name': match.group('name').strip(),
         }
-        default = match.group(3)
+        default = match.group('default')
         if default:
             prop['default'] = default.strip()
-        description = _leading_comment(body_lines, line_index)
+        description = extract_comment(body, match.start(), match.end())
         if description:
             prop['description'] = description
+        try:
+            specifiers = parse_specifiers(match.group('specifiers'), prop['name'])
+            if 'Range' in specifiers:
+                prop['range'] = list(parse_range(specifiers['Range'], prop['name']))
+        except HeaderToolError:
+            pass
         properties.append(prop)
     return properties
+
+
+def _parse_functions(body: str) -> list[dict]:
+    functions = []
+    for match in FUNCTION_PATTERN.finditer(blank_comments(body)):
+        prefix = ' '.join(match.group('prefix').split())
+        params = ' '.join(match.group('params').split())
+        entry = {
+            'name': match.group('name'),
+            'signature': f"{prefix + ' ' if prefix else ''}{normalize_type(match.group('ret'))} {match.group('name')}({params})"
+                         + (" const" if 'const' in match.group('qualifiers').split() else ""),
+        }
+        specifiers = ' '.join(match.group('specifiers').split())
+        if specifiers:
+            entry['specifiers'] = specifiers
+        description = extract_comment(body, match.start(), match.end())
+        if description:
+            entry['description'] = description
+        functions.append(entry)
+    return functions
 
 
 def _parse_enum_values(body: str) -> list[dict]:
@@ -108,7 +126,6 @@ def _collect_types_from_header(header_path: str, module: str, repo_root: str) ->
         if not re.search(r'\bARTIFACT_CLASS\(\);', body):
             continue
         decl_line = code[:match.start()].count('\n')
-        body_lines = body.splitlines()
         entry = {
             'kind': 'class',
             'name': match.group(1),
@@ -119,9 +136,12 @@ def _collect_types_from_header(header_path: str, module: str, repo_root: str) ->
         description = _leading_comment(lines, decl_line)
         if description:
             entry['description'] = description
-        properties = _parse_properties(body, body_lines)
+        properties = _parse_properties(body)
         if properties:
             entry['properties'] = properties
+        functions = _parse_functions(body)
+        if functions:
+            entry['functions'] = functions
         types.append(entry)
 
     class_names = {t['name'] for t in types}
@@ -141,7 +161,7 @@ def _collect_types_from_header(header_path: str, module: str, repo_root: str) ->
         description = _leading_comment(lines, decl_line)
         if description:
             entry['description'] = description
-        properties = _parse_properties(body, body.splitlines())
+        properties = _parse_properties(body)
         if properties:
             entry['properties'] = properties
         types.append(entry)

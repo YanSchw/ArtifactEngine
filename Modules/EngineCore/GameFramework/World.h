@@ -57,6 +57,7 @@ private:
     void ReregisterNode(Node* node);
 
     void ResolveAllBeginPlayIssues();
+    void NotifyEndPlay(Node& InNode);
 
     void WorldUpdate(float deltaTime);
     void HalfWorldUpdate(float InDeltaTime);

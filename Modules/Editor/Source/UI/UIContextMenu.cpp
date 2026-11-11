@@ -10,6 +10,7 @@
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/KeyCodes.h"
 #include "Assets/Font.h"
+#include "Common/Map.h"
 #include "Rendering/UIDrawList.h"
 #include <algorithm>
 #include <cctype>
@@ -28,6 +29,10 @@ static constexpr float s_MaxPanelWidth = 440.0f;
 static constexpr float s_ScreenMargin = 4.0f;
 static constexpr float s_SubmenuDelay = 0.16f;
 static constexpr float s_TooltipDelay = 0.6f;
+static constexpr float s_TitleHeight = 28.0f;
+static constexpr float s_TreeIndent = 14.0f;
+static constexpr float s_TreeWidth = 360.0f;
+static constexpr float s_TreeHeight = 480.0f;
 
 static const Vec4 s_DisabledText = HexColor(0x5C5C5C);
 static const Vec4 s_SeparatorLine = Vec4(1.0f, 1.0f, 1.0f, 0.09f);
@@ -49,10 +54,36 @@ static String ToLower(const String& InText) {
     return lowered;
 }
 
+static Array<String> SplitCategory(const String& InPath) {
+    Array<String> segments;
+    size_t start = 0;
+    while (start <= InPath.size()) {
+        const size_t end = std::min(InPath.find('|', start), InPath.size());
+        String segment = InPath.substr(start, end - start);
+        segment.erase(0, segment.find_first_not_of(' '));
+        segment.erase(segment.find_last_not_of(' ') + 1);
+        if (!segment.empty()) {
+            segments.Add(segment);
+        }
+        start = end + 1;
+    }
+    return segments;
+}
+
+static Map<String, Array<String>>& GetExpandedGroups() {
+    static Map<String, Array<String>> s_Expanded;
+    return s_Expanded;
+}
+
 /* ---------------------------------- UIMenuRow ---------------------------------- */
 
 UIMenuRow::UIMenuRow() {
     Size = { 1.0_rel, UIValue(ActionHeight) };
+
+    m_Disclosure = Add<UISvg>();
+    m_Disclosure->Anchor = m_Disclosure->Pivot = Vec2(0.0f, 0.5f);
+    m_Disclosure->Size = Vec2(10.0f);
+    m_Disclosure->SetEnabled(false);
 
     m_Icon = Add<UISvg>();
     m_Icon->Anchor = m_Icon->Pivot = Vec2(0.0f, 0.5f);
@@ -89,8 +120,12 @@ float UIMenuRow::HeightFor(const UIMenuEntry& InEntry) {
     }
 }
 
-void UIMenuRow::SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, float InRightInset) {
+void UIMenuRow::SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, float InRightInset, float InIndent) {
     m_Entry = InEntry;
+    m_GroupPath.clear();
+    m_Disclosure->SetEnabled(false);
+    InLabelLeft += InIndent;
+    m_Icon->Position = Vec2(s_SidePadding + InIndent, 0.0f);
     const bool action = (m_Entry.Type == UIMenuEntry::Kind::Action);
 
     Size = { 1.0_rel, UIValue(HeightFor(m_Entry)) };
@@ -115,12 +150,53 @@ void UIMenuRow::SetEntry(const UIMenuEntry& InEntry, float InLabelLeft, float In
     ApplyColors(false);
 }
 
+void UIMenuRow::SetGroup(const String& InPath, const String& InLabel, float InIndent, bool InExpanded) {
+    m_Entry = UIMenuEntry();
+    m_Entry.Label = InLabel;
+    m_GroupPath = InPath;
+    Index = -1;
+
+    Size = { 1.0_rel, UIValue(ActionHeight) };
+    Interactable = true;
+    Cursor = CursorIcon::Hand;
+
+    m_Disclosure->SetEnabled(true);
+    m_Disclosure->Image = InExpanded ? EditorIcons::ArrowDown() : EditorIcons::ArrowRight();
+    m_Disclosure->Position = Vec2(s_SidePadding + InIndent, 0.0f);
+
+    m_Icon->SetEnabled(false);
+    m_Shortcut->SetEnabled(false);
+    m_Arrow->SetEnabled(false);
+    m_Label->SetEnabled(true);
+    m_Label->Text = InLabel;
+    m_Label->FontSize = EditorStyle::FontSize;
+    m_Label->Position = Vec2(s_SidePadding + InIndent + 16.0f, 0.0f);
+    m_Label->Size = { 1.0_rel - UIValue::Px(s_SidePadding * 2.0f + InIndent + 16.0f), 1.0_rel };
+
+    ApplyColors(false);
+}
+
+bool UIMenuRow::IsSelectable() const {
+    return IsGroup() || (m_Entry.Type == UIMenuEntry::Kind::Action && m_Entry.Enabled);
+}
+
 bool UIMenuRow::IsHighlighted() const {
-    return Owner && Owner->GetHighlight() == Index
+    if (!Owner) {
+        return false;
+    }
+    if (IsGroup()) {
+        return Owner->GetHighlightGroup() == m_GroupPath;
+    }
+    return Owner->GetHighlightGroup().empty() && Owner->GetHighlight() == Index
         && m_Entry.Type == UIMenuEntry::Kind::Action && m_Entry.Enabled;
 }
 
 void UIMenuRow::ApplyColors(bool InHighlighted) {
+    if (IsGroup()) {
+        m_Label->Color = EditorStyle::TextBright;
+        m_Disclosure->Tint = InHighlighted ? EditorStyle::TextBright : EditorStyle::TextDim;
+        return;
+    }
     Vec4 text = EditorStyle::Text;
     if (m_Entry.Type != UIMenuEntry::Kind::Action) {
         text = EditorStyle::TextDim;
@@ -190,7 +266,11 @@ void UIMenuRow::PaintToggleBox(UIDrawList& OutDrawList, bool InChecked) const {
 
 void UIMenuRow::OnClick() {
     if (UIMenuPanel* owner = Owner) {
-        owner->ActivateRow(Index);  // may destroy this row
+        if (IsGroup()) {
+            owner->ToggleGroup(m_GroupPath);
+        } else {
+            owner->ActivateRow(Index);  // may destroy this row
+        }
     }
 }
 
@@ -222,10 +302,25 @@ void UIMenuPanel::Build(UIContextMenu& InMenu, UIMenuPanel* InParentPanel, const
     m_Menu = &InMenu;
     m_ParentPanel = InParentPanel;
     m_Model = InModel;
+    if (const Array<String>* expanded = GetExpandedGroups().Find(m_Model.GetTitle())) {
+        m_Expanded = *expanded;
+    }
 
     UIVStack* column = Add<UIVStack>();
     column->Fill();
     column->Padding = UIPadding(1.0f, s_PanelPadding + 1.0f);
+
+    if (!m_Model.GetTitle().empty()) {
+        UINode* titleRow = column->Add<UINode>();
+        titleRow->Size = { 1.0_rel, UIValue(s_TitleHeight) };
+        UILabel* title = titleRow->Add<UILabel>();
+        title->Fill();
+        title->Position = Vec2(s_SidePadding, 0.0f);
+        title->FontSize = EditorStyle::FontSize + 1.0f;
+        title->Color = EditorStyle::TextBright;
+        title->VAlign = UIVAlign::Middle;
+        title->Text = m_Model.GetTitle();
+    }
 
     if (m_Model.IsSearchable()) {
         UINode* searchRow = column->Add<UINode>();
@@ -292,6 +387,12 @@ void UIMenuPanel::RebuildRows() {
     m_Highlight = -1;
     m_HoverRow = -1;
 
+    if (m_Model.HasCategories()) {
+        RebuildTreeRows();
+        return;
+    }
+    m_HighlightGroup.clear();
+
     const Array<UIMenuEntry>& entries = m_Model.GetEntries();
     Array<int32_t> visible;
     for (int32_t i = 0; i < entries.Size(); i++) {
@@ -335,10 +436,170 @@ void UIMenuPanel::RebuildRows() {
         row->SetEntry(entries[index], labelLeft, rightInset);
     }
 
-    const float chrome = 2.0f + 2.0f * s_PanelPadding + (m_Search ? s_SearchHeight : 0.0f);
+    FinishRows(width, height, false);
+}
+
+void UIMenuPanel::RebuildTreeRows() {
+    struct TreeRow {
+        int32_t Index = -1;
+        String Group;
+        String Label;
+        int32_t Depth = 0;
+    };
+
+    const Array<UIMenuEntry>& entries = m_Model.GetEntries();
+    const bool filtering = !m_Filter.empty();
+    Array<TreeRow> rows;
+    Array<String> emitted;
+    for (int32_t i = 0; i < entries.Size(); i++) {
+        const UIMenuEntry& entry = entries[i];
+        if (entry.Type != UIMenuEntry::Kind::Action) {
+            if (!filtering && entry.Category.empty() && entry.Type == UIMenuEntry::Kind::Separator) {
+                rows.Add({ i, String(), String(), 0 });
+            }
+            continue;
+        }
+        if (filtering && ToLower(entry.Label).find(m_Filter) == String::npos && ToLower(entry.Category).find(m_Filter) == String::npos) {
+            continue;
+        }
+        const Array<String> segments = SplitCategory(entry.Category);
+        String path;
+        bool visible = true;
+        for (int32_t depth = 0; depth < segments.Size() && visible; depth++) {
+            path = depth == 0 ? segments[0] : path + "|" + segments[depth];
+            if (!emitted.Contains(path)) {
+                emitted.Add(path);
+                rows.Add({ -1, path, segments[depth], depth });
+            }
+            visible = filtering || m_Expanded.Contains(path);
+        }
+        if (visible) {
+            rows.Add({ i, String(), entry.Label, segments.Size() });
+        }
+    }
+
+    float width = std::max(m_Model.GetMinWidth(), s_TreeWidth);
+    float height = 0.0f;
+    for (const TreeRow& row : rows) {
+        const float indent = (float)row.Depth * s_TreeIndent;
+        width = std::max(width, s_SidePadding * 2.0f + indent + 16.0f + MeasureText(row.Label, EditorStyle::FontSize));
+        height += row.Index >= 0 ? UIMenuRow::HeightFor(entries[row.Index]) : UIMenuRow::ActionHeight;
+    }
+
+    bool highlightValid = false;
+    for (const TreeRow& row : rows) {
+        UIMenuRow* menuRow = m_List->Add<UIMenuRow>();
+        menuRow->Owner = this;
+        const float indent = (float)row.Depth * s_TreeIndent;
+        if (row.Index >= 0) {
+            menuRow->Index = row.Index;
+            menuRow->SetEntry(entries[row.Index], s_SidePadding + 16.0f, s_SidePadding, indent);
+            if (filtering && m_Highlight < 0 && m_HighlightGroup.empty() && menuRow->IsSelectable()) {
+                m_Highlight = row.Index;
+            }
+        } else {
+            menuRow->SetGroup(row.Group, row.Label, indent, filtering || m_Expanded.Contains(row.Group));
+            highlightValid = highlightValid || row.Group == m_HighlightGroup;
+        }
+    }
+    if (!highlightValid) {
+        m_HighlightGroup.clear();
+    }
+
+    FinishRows(width, height, true);
+}
+
+void UIMenuPanel::FinishRows(float InContentWidth, float InContentHeight, bool InFixedHeight) {
+    const float chrome = 2.0f + 2.0f * s_PanelPadding + (m_Search ? s_SearchHeight : 0.0f)
+                       + (m_Model.GetTitle().empty() ? 0.0f : s_TitleHeight);
     const float maxHeight = std::max(120.0f, GetCanvasRect().Size.y - 2.0f * s_ScreenMargin);
-    Size = Vec2(std::min(width, s_MaxPanelWidth), std::min(height + chrome, maxHeight));
+    const float height = InFixedHeight ? s_TreeHeight : InContentHeight + chrome;
+    Size = Vec2(std::min(InContentWidth, s_MaxPanelWidth), std::min(height, maxHeight));
     PlaceAt(m_DesiredTopLeft);
+}
+
+void UIMenuPanel::ToggleGroup(const String& InPath) {
+    if (m_Expanded.Contains(InPath)) {
+        m_Expanded.Remove(InPath);
+    } else {
+        m_Expanded.Add(InPath);
+    }
+    GetExpandedGroups()[m_Model.GetTitle()] = m_Expanded;
+    m_HighlightGroup = InPath;
+    m_Highlight = -1;
+    m_RowsDirty = true;
+}
+
+bool UIMenuPanel::IsGroupExpanded(const String& InPath) const {
+    return !m_Filter.empty() || m_Expanded.Contains(InPath);
+}
+
+bool UIMenuPanel::CollapseHighlighted() {
+    if (!m_Filter.empty()) {
+        return false;
+    }
+    if (!m_HighlightGroup.empty()) {
+        if (m_Expanded.Contains(m_HighlightGroup)) {
+            ToggleGroup(m_HighlightGroup);
+            return true;
+        }
+        const size_t parent = m_HighlightGroup.rfind('|');
+        if (parent != String::npos) {
+            m_HighlightGroup = m_HighlightGroup.substr(0, parent);
+            return true;
+        }
+        return false;
+    }
+    if (m_Highlight >= 0 && m_Highlight < m_Model.GetEntries().Size()) {
+        const Array<String> segments = SplitCategory(m_Model.GetEntries()[m_Highlight].Category);
+        if (!segments.IsEmpty()) {
+            String path = segments[0];
+            for (int32_t i = 1; i < segments.Size(); i++) {
+                path += "|" + segments[i];
+            }
+            m_HighlightGroup = path;
+            m_Highlight = -1;
+            return true;
+        }
+    }
+    return false;
+}
+
+UIMenuRow* UIMenuPanel::FindHighlightedRow() const {
+    for (UIMenuRow* row : GetRows()) {
+        if (row->IsHighlighted()) {
+            return row;
+        }
+    }
+    return nullptr;
+}
+
+void UIMenuPanel::Highlight(UIMenuRow* InRow) {
+    if (!InRow) {
+        return;
+    }
+    m_HighlightGroup = InRow->GetGroupPath();
+    m_Highlight = InRow->IsGroup() ? -1 : InRow->Index;
+}
+
+void UIMenuPanel::ScrollToHighlight() {
+    if (!m_Scroll) {
+        return;
+    }
+    float top = 0.0f;
+    for (UIMenuRow* row : GetRows()) {
+        const float height = row->IsGroup() ? UIMenuRow::ActionHeight : UIMenuRow::HeightFor(row->GetEntry());
+        if (row->IsHighlighted()) {
+            const float view = m_Scroll->GetGeometry().Size.y;
+            if (top < m_Scroll->ScrollOffset.y) {
+                m_Scroll->ScrollOffset.y = top;
+            } else if (view > 0.0f && top + height > m_Scroll->ScrollOffset.y + view) {
+                m_Scroll->ScrollOffset.y = top + height - view;
+            }
+            return;
+        }
+        top += height;
+    }
 }
 
 void UIMenuPanel::PlaceAt(const Vec2& InTopLeft) {
@@ -451,28 +712,38 @@ void UIMenuPanel::CloseSubmenu() {
 }
 
 void UIMenuPanel::MoveHighlight(int32_t InDelta) {
-    Array<int32_t> selectable;
+    Array<UIMenuRow*> selectable;
     for (UIMenuRow* row : GetRows()) {
-        const UIMenuEntry& entry = row->GetEntry();
-        if (entry.Type == UIMenuEntry::Kind::Action && entry.Enabled) {
-            selectable.Add(row->Index);
+        if (row->IsSelectable()) {
+            selectable.Add(row);
         }
     }
     if (selectable.IsEmpty()) {
         return;
     }
-    const int32_t current = selectable.IndexOf(m_Highlight);
+    const int32_t current = selectable.IndexOf(FindHighlightedRow());
     const int32_t next = (current < 0) ? (InDelta > 0 ? 0 : selectable.Size() - 1)
                                        : (current + InDelta + selectable.Size()) % selectable.Size();
     CloseSubmenu();
-    m_Highlight = selectable[next];
+    Highlight(selectable[next]);
+    ScrollToHighlight();
 }
 
 void UIMenuPanel::ActivateHighlight() {
+    if (!m_HighlightGroup.empty()) {
+        ToggleGroup(m_HighlightGroup);
+        return;
+    }
     ActivateRow(m_Highlight);
 }
 
 void UIMenuPanel::OpenHighlightedSubmenu() {
+    if (!m_HighlightGroup.empty()) {
+        if (!IsGroupExpanded(m_HighlightGroup)) {
+            ToggleGroup(m_HighlightGroup);
+        }
+        return;
+    }
     OpenSubmenu(m_Highlight);
     if (UIMenuPanel* submenu = m_Submenu.Get()) {
         submenu->MoveHighlight(1);
@@ -493,6 +764,7 @@ void UIMenuPanel::OnBind() {
         const String filter = ToLower(m_Search->Text);
         if (filter != m_Filter) {
             m_Filter = filter;
+            m_HighlightGroup.clear();
             m_RowsDirty = true;
         }
     }
@@ -505,6 +777,11 @@ void UIMenuPanel::OnBind() {
 void UIMenuPanel::OnUIUpdate(const UIFrameContext& InContext) {
     int32_t hovered = -1;
     for (UIMenuRow* row : GetRows()) {
+        if (row->IsHovered() && row->IsGroup()) {
+            Highlight(row);
+            m_HoverRow = -1;
+            return;
+        }
         if (row->IsHovered()) {
             hovered = row->Index;
             break;
@@ -522,6 +799,7 @@ void UIMenuPanel::OnUIUpdate(const UIFrameContext& InContext) {
         return;
     }
     m_Highlight = hovered;
+    m_HighlightGroup.clear();
     if (m_HoverSeconds < s_SubmenuDelay || hovered == m_OpenRow) {
         return;
     }
@@ -679,6 +957,8 @@ void UIContextMenu::HandleKeys() {
     if (keyboard->IsDown(KeyCode::Left)) {
         if (UIMenuPanel* parent = panel->GetParentPanel()) {
             parent->CloseSubmenu();
+        } else {
+            panel->CollapseHighlighted();
         }
     }
 }

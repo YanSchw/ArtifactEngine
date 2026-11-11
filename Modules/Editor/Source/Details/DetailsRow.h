@@ -21,6 +21,7 @@ public:
     void SetLabel(const String& InLabel);
     const String& GetLabel() const { return m_Label; }
     UINode* GetValueHost() const { return m_ValueHost; }
+    UINode* AddLabelHost();
 
     std::function<void()> ResetAction;
     std::function<bool()> IsOverridden;
@@ -40,5 +41,6 @@ private:
     UILabel* m_NameLabel = nullptr;
     UIButton* m_ResetButton = nullptr;
     UINode* m_ValueHost = nullptr;
+    UINode* m_LabelHost = nullptr;
     bool m_DraggingSplit = false;
 };

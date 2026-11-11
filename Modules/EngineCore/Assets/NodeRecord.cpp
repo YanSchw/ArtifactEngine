@@ -21,10 +21,34 @@ static void CollectPropertyAssets(Property* InProperty, const json& InValue, Arr
         return;
     }
 
+    if (Cast<SubclassOfProperty>(InProperty)) {
+        const UUID id = InValue.is_string() ? Class(InValue.get<String>()).GetBlueprintId() : UUID::INVALID;
+        if (id.IsValid() && !OutIds.Contains(id)) {
+            OutIds.Add(id);
+        }
+        return;
+    }
+
     if (ArrayProperty* array = Cast<ArrayProperty>(InProperty)) {
         if (InValue.is_array()) {
             for (const json& element : InValue) {
                 CollectPropertyAssets(array->InnerProperty, element, OutIds);
+            }
+        }
+        return;
+    }
+
+    if (MapProperty* map = Cast<MapProperty>(InProperty)) {
+        if (InValue.is_object()) {
+            for (const json& value : InValue) {
+                CollectPropertyAssets(map->ValueProperty, value, OutIds);
+            }
+        } else if (InValue.is_array()) {
+            for (const json& pair : InValue) {
+                if (pair.is_object() && pair.contains("Key") && pair.contains("Value")) {
+                    CollectPropertyAssets(map->KeyProperty, pair["Key"], OutIds);
+                    CollectPropertyAssets(map->ValueProperty, pair["Value"], OutIds);
+                }
             }
         }
         return;

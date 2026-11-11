@@ -34,7 +34,9 @@ public:
     Node();
     virtual ~Node();
 
+    FUNCTION(Pure)
     const String& GetName() const;
+    FUNCTION()
     void SetName(const String& InName);
 
     uint32_t GetNodeId() const { return m_NodeId; }
@@ -67,14 +69,17 @@ public:
     bool IsUpdateFlagSet(UpdateFlag InFlag) const;
 
     bool IsInitialized() const;
+    FUNCTION(Pure)
     bool IsEnabled() const;
     /** This node's own enabled flag, ignoring disabled ancestors (IsEnabled() reflects those). */
     bool IsSelfEnabled() const;
+    FUNCTION()
     void SetEnabled(bool InEnabled);
     bool WasBeginPlayCalled() const;
     bool IsPendingKill() const;
 
     World* GetWorld() const;
+    FUNCTION()
     void Destroy();
 
     Node* CreateChild(const Class& InChildClass);
@@ -89,6 +94,7 @@ public:
     uint32_t GetChildCount() const;
     bool HasChildren() const;
 
+    FUNCTION(Pure)
     Node* GetParent() const;
     virtual void SetParent(Node* InParent, bool InKeepWorldTransform = true);
     bool IsChildOf(Node* InOther) const;

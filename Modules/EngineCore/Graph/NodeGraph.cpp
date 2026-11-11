@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-GraphNode* NodeGraph::CreateNode(const Class& InNodeClass, const Vec2& InPosition) {
+GraphNode* NodeGraph::CreateNode(const Class& InNodeClass, const Vec2& InPosition, const std::function<void(GraphNode&)>& InConfigure) {
     GraphNode* node = Cast<GraphNode>(Object::Create(InNodeClass));
     if (!node) {
         AE_WARN("NodeGraph: '{0}' is not a creatable GraphNode class", InNodeClass.Name);
@@ -19,6 +19,9 @@ GraphNode* NodeGraph::CreateNode(const Class& InNodeClass, const Vec2& InPositio
     }
     node->NodeId = NextNodeId++;
     node->SetPosition(InPosition);
+    if (InConfigure) {
+        InConfigure(*node);
+    }
     node->ConstructPins();
     Nodes.Add(SharedObjectPtr<GraphNode>(node));
     return node;
@@ -89,7 +92,12 @@ GraphConnection* NodeGraph::Connect(GraphNode& InNodeA, GraphPin& InPinA, GraphN
     GraphNode& toNode = aIsOutput ? InNodeB : InNodeA;
     GraphPin& toPin = aIsOutput ? InPinB : InPinA;
 
-    BreakPinConnections(toNode, toPin);
+    if (!AllowsMultipleConnections(fromPin)) {
+        BreakPinConnections(fromNode, fromPin);
+    }
+    if (!AllowsMultipleConnections(toPin)) {
+        BreakPinConnections(toNode, toPin);
+    }
 
     GraphConnection* connection = Object::Create<GraphConnection>();
     connection->FromNodeId = fromNode.NodeId;
@@ -142,6 +150,20 @@ bool NodeGraph::IsPinConnected(const GraphNode& InNode, const GraphPin& InPin) c
         }
     }
     return false;
+}
+
+void NodeGraph::CollectNodeTemplates(Array<GraphNodeTemplate>& OutTemplates, Object* InContext) const {
+    (void)InContext;
+    for (const Class& nodeClass : Class::GetSubclassesOf(GraphNode::StaticClass())) {
+        if (nodeClass == GraphNode::StaticClass() || !AllowsNodeClass(nodeClass) || !nodeClass.IsDefaultConstructable()) {
+            continue;
+        }
+        GraphNode* node = Cast<GraphNode>(Object::Create(nodeClass));
+        if (node && node->IsUserCreatable()) {
+            OutTemplates.Add({ node->GetCategory(), node->GetTitle(), String(), nodeClass, nullptr });
+        }
+        delete node;
+    }
 }
 
 bool NodeGraph::SaveToFile(const String& InFilePath) const {

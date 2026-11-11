@@ -2,6 +2,7 @@
 #include "GameFramework/UINode.h"
 #include "Object/Pointer.h"
 #include "Common/String.h"
+#include <functional>
 #include "UITooltip.gen.h"
 
 /** One per canvas, created on demand. */
@@ -30,6 +31,7 @@ public:
     UITooltip();
 
     String Text;
+    std::function<UIRectF()> GetAnchor;
 
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
 

@@ -44,7 +44,9 @@ void BinarySerializer::SerializeType(ChunkWriter& writer, void* instance, const 
     auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        SerializeProperty(writer, prop, prop->GetValuePtr(instance));
+        if (!prop->IsTransient()) {
+            SerializeProperty(writer, prop, prop->GetValuePtr(instance));
+        }
     }
 }
 
@@ -52,8 +54,10 @@ void BinarySerializer::DeserializeType(ChunkReader& reader, void* instance, cons
     auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        DeserializeProperty(reader, prop, prop->GetValuePtr(instance));
-        prop->NotifyChanged(instance);
+        if (!prop->IsTransient()) {
+            DeserializeProperty(reader, prop, prop->GetValuePtr(instance));
+            prop->NotifyChanged(instance);
+        }
     }
 }
 
@@ -110,6 +114,18 @@ void BinarySerializer::SerializeProperty(ChunkWriter& writer, Property* property
             void* elem = p->GetElementPtr(valuePtr, i);
             SerializeProperty(writer, p->InnerProperty, elem);
         }
+    } else if (auto p = Cast<MapProperty>(property)) {
+        Array<MapProperty::Entry> entries;
+        p->GetEntries(valuePtr, entries);
+        writer << (uint64_t)entries.Size();
+        for (const MapProperty::Entry& entry : entries) {
+            SerializeProperty(writer, p->KeyProperty, (void*)entry.Key);
+            SerializeProperty(writer, p->ValueProperty, entry.Value);
+        }
+    } else if (auto p = Cast<SubclassOfProperty>(property)) {
+        writer << p->Read(valuePtr).Name;
+    } else if (Cast<DelegateProperty>(property)) {
+        return;
     } else if (auto p = Cast<EnumProperty>(property)) {
         int64_t value = 0;
         std::memcpy(&value, valuePtr, p->ByteSize);
@@ -201,6 +217,24 @@ void BinarySerializer::DeserializeProperty(ChunkReader& reader, Property* proper
 
             DeserializeProperty(reader, p->InnerProperty, elemPtr);
         }
+    } else if (auto p = Cast<MapProperty>(property)) {
+        uint64_t count;
+        reader >> count;
+
+        p->Clear(valuePtr);
+        const std::shared_ptr<void> key = p->MakeKey();
+        for (uint64_t i = 0; i < count; ++i) {
+            DeserializeProperty(reader, p->KeyProperty, key.get());
+            DeserializeProperty(reader, p->ValueProperty, p->FindOrAdd(valuePtr, key.get()));
+        }
+    } else if (auto p = Cast<SubclassOfProperty>(property)) {
+        String name;
+        reader >> name;
+        if (!p->Write(valuePtr, Class(name))) {
+            AE_WARN("'{0}' is not a subclass of '{1}'; '{2}' was reset to None", name, p->BaseClass.Name, p->Name);
+        }
+    } else if (Cast<DelegateProperty>(property)) {
+        return;
     } else if (auto p = Cast<EnumProperty>(property)) {
         String name;
         reader >> name;

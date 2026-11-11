@@ -5,6 +5,14 @@ export interface ApiProperty {
   name: string;
   default?: string;
   description?: string;
+  range?: [number, number];
+}
+
+export interface ApiFunction {
+  name: string;
+  signature: string;
+  specifiers?: string;
+  description?: string;
 }
 
 export interface ApiEnumValue {
@@ -21,6 +29,7 @@ export interface ApiType {
   parent?: string;
   description?: string;
   properties?: ApiProperty[];
+  functions?: ApiFunction[];
   isEnumClass?: boolean;
   underlyingType?: string;
   values?: ApiEnumValue[];

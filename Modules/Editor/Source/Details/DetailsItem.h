@@ -19,6 +19,9 @@ public:
     bool Inactive = false;
 
     virtual float MeasureHeight(const String& InFilter) const { (void)InFilter; return 0.0f; }
+    virtual UIRectF GetTooltipAnchor() const { return m_Geometry; }
+
+    void SetTooltip(const String& InText);
 
 protected:
     /** One darker band per nesting level along the left of InRect, so depth reads down the column. */

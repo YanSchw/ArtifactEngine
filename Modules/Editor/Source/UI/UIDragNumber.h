@@ -20,6 +20,7 @@ public:
     double Sensitivity = 0.05;
     double MinValue = std::numeric_limits<double>::lowest();
     double MaxValue = std::numeric_limits<double>::max();
+    bool Slider = false;
     String Prefix;
     Vec4 PrefixColor = Vec4(0.0f);
     std::function<void()> PrefixClicked;

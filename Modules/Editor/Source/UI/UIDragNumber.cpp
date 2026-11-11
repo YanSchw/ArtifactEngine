@@ -68,6 +68,11 @@ void UIDragNumber::Paint(UIDrawList& OutDrawList) {
     const Vec4 border = m_Editing ? EditorStyle::Accent
                                   : (IsHovered() ? EditorStyle::FieldBorder : Vec4(0.0f));
     OutDrawList.AddRoundedRect(m_Geometry, EditorStyle::PanelDark, 2.0f, m_WorldMatrix);
+    if (Slider && Get && MaxValue > MinValue) {
+        const float fraction = (float)std::clamp((Get() - MinValue) / (MaxValue - MinValue), 0.0, 1.0);
+        const UIRectF fill(m_Geometry.Position, Vec2(m_Geometry.Size.x * fraction, m_Geometry.Size.y));
+        OutDrawList.AddRoundedRect(fill, Vec4(Vec3(EditorStyle::Accent), 0.35f), 2.0f, m_WorldMatrix);
+    }
     if (border.a > 0.0f) {
         const UIRectF top(m_Geometry.Min(), Vec2(m_Geometry.Size.x, 1.0f));
         const UIRectF bottom(m_Geometry.Min() + Vec2(0.0f, m_Geometry.Size.y - 1.0f), Vec2(m_Geometry.Size.x, 1.0f));
@@ -114,7 +119,8 @@ void UIDragNumber::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
         return;
     }
     m_Dragging = true;
-    m_DragValue += (double)InDelta.x * Sensitivity;
+    const double step = Slider && m_Geometry.Size.x > 0.0f ? (MaxValue - MinValue) / (double)m_Geometry.Size.x : Sensitivity;
+    m_DragValue = std::clamp(m_DragValue + (double)InDelta.x * step, MinValue, MaxValue);
     WriteValue(m_DragValue);
 }
 

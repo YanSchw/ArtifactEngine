@@ -65,15 +65,19 @@ void JoltContactListener::Dispatch(PhysicsWorld& InWorld) {
             if (firstIsTrigger) {
                 if (event.Added) {
                     firstBody->OnTriggerEnter(second);
+                    firstBody->OnTriggerEntered.Broadcast(second);
                 } else {
                     firstBody->OnTriggerExit(second);
+                    firstBody->OnTriggerExited.Broadcast(second);
                 }
             }
             if (secondIsTrigger) {
                 if (event.Added) {
                     secondBody->OnTriggerEnter(first);
+                    secondBody->OnTriggerEntered.Broadcast(first);
                 } else {
                     secondBody->OnTriggerExit(first);
+                    secondBody->OnTriggerExited.Broadcast(first);
                 }
             }
             continue;
@@ -85,9 +89,13 @@ void JoltContactListener::Dispatch(PhysicsWorld& InWorld) {
         if (event.Added) {
             firstBody->OnCollisionEnter(secondBody);
             secondBody->OnCollisionEnter(firstBody);
+            firstBody->OnCollisionEntered.Broadcast(secondBody);
+            secondBody->OnCollisionEntered.Broadcast(firstBody);
         } else {
             firstBody->OnCollisionExit(secondBody);
             secondBody->OnCollisionExit(firstBody);
+            firstBody->OnCollisionExited.Broadcast(secondBody);
+            secondBody->OnCollisionExited.Broadcast(firstBody);
         }
     }
 }

@@ -1,4 +1,5 @@
 from HeaderTool.Properties import generate_properties_registration_code
+from HeaderTool.Functions import generate_functions_registration_code
 
 CLASS_CODE = """
 using Super = {PARENT_CLASS_NAME};
@@ -17,6 +18,7 @@ private:
     inline static Class::RegisterParentChildClassRelationship _ClassParentChildRelationship_{CLASS_NAME} = {{ "{CLASS_NAME}", "{PARENT_CLASS_NAME}", "{MODULE_NAME}" }};
     inline static Object::RegisterArtifactClass<{CLASS_NAME}> _ClassAllocator_{CLASS_NAME};
     {PROPERTIES_REGISTRATION_CODE}
+    {FUNCTIONS_REGISTRATION_CODE}
 }}/* No ; is appended after this struct, since the macro itself is supposed to have a ; */
 """
 
@@ -50,11 +52,14 @@ class Class:
             self.Body
         )
 
+        functions_code = "" if self.is_a("Property") else generate_functions_registration_code(self.Name, self.Body)
+
         class_code = CLASS_CODE.format(
             CLASS_NAME=self.Name,
             PARENT_CLASS_NAME=self.ParentClassName,
             MODULE_NAME=self.ModuleName,
             PROPERTIES_REGISTRATION_CODE=properties_code,
+            FUNCTIONS_REGISTRATION_CODE=functions_code,
         )
 
         escaped_class_code = class_code.replace('\n', '\\\n')

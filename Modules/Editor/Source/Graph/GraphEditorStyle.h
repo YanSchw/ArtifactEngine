@@ -23,6 +23,8 @@ public:
     inline static const Vec4& TitleColor = EditorStyle::TextBright;
     inline static const Vec4 TitleShadow = HexColor(0x000000, 0.55f);
     inline static const Vec4& PinLabelColor = EditorStyle::Text;
+    inline static const Vec4& PinValueColor = EditorStyle::TextDim;
+    inline static const String ExecPinType = "Exec";
 
     // Wires
     inline static const Vec4 WireUnderlay = HexColor(0x000000, 0.32f);
@@ -56,7 +58,9 @@ public:
 
     static Vec4 PinColor(const String& InTypeName) {
         static Map<String, Vec4> s_Colors = BuildPinColors();
-        return s_Colors.GetOrDefault(InTypeName, HexColor(0xB8B8B8));
+        const size_t colon = InTypeName.find(':');
+        const String key = colon == String::npos ? InTypeName : InTypeName.substr(0, colon + 1);
+        return s_Colors.GetOrDefault(key, HexColor(0xB8B8B8));
     }
 
 private:
@@ -71,6 +75,11 @@ private:
         colors["Vec4"] = HexColor(0xF2C94C);
         colors["Color"] = HexColor(0x3F8FFF);
         colors["String"] = HexColor(0xD75DD7);
+        colors["Double"] = HexColor(0x9BE64A);
+        colors["Object:"] = HexColor(0x00A9F4);
+        colors["Class:"] = HexColor(0x6A3FD7);
+        colors["Enum:"] = HexColor(0x0A6E5A);
+        colors["Struct:"] = HexColor(0x1F5FB0);
         colors["float"] = HexColor(0x9BE64A);
         colors["vec2"] = HexColor(0x6FE0C0);
         colors["vec3"] = HexColor(0xF2C94C);

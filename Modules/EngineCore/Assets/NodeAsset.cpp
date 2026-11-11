@@ -2,6 +2,7 @@
 #include "NodeRecord.h"
 #include "AssetManager.h"
 #include "GameFramework/Node.h"
+#include "Scripting/EventGraph.h"
 #include "Serialization/ChunkedBinary.h"
 #include "Serialization/Json.h"
 #include "Core/EngineConfig.h"
@@ -26,6 +27,21 @@ void NodeAsset::CaptureFrom(Node& InNode) {
 
 Class NodeAsset::GetRootClass() const {
     return m_Root.Get() ? Class(m_Root->ClassName) : Class::None;
+}
+
+EventGraph* NodeAsset::GetEventGraph() const {
+    return m_EventGraph.Get();
+}
+
+EventGraph* NodeAsset::GetOrCreateEventGraph() {
+    if (!m_EventGraph.Get()) {
+        m_EventGraph = Object::Create<EventGraph>();
+    }
+    return m_EventGraph.Get();
+}
+
+void NodeAsset::SetEventGraph(EventGraph* InGraph) {
+    m_EventGraph = InGraph;
 }
 
 String NodeAsset::SerializeToJson() const {

@@ -31,6 +31,7 @@ public:
     std::function<bool()> IsOverridden;
 
     virtual float MeasureHeight(const String& InFilter) const override;
+    virtual UIRectF GetTooltipAnchor() const override;
     virtual void OnBind() override;
     virtual void Paint(UIDrawList& OutDrawList) override;
     virtual void OnPressed(const Vec2& InCursorPos) override;

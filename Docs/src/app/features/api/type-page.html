@@ -111,7 +111,43 @@
                 </td>
                 <td class="px-4 py-2.5 font-mono text-mist-100">{{ property.name }}</td>
                 <td class="px-4 py-2.5 font-mono text-xs text-mist-400">{{ property.default ?? '—' }}</td>
-                <td class="hidden px-4 py-2.5 text-mist-400 md:table-cell">{{ property.description ?? '' }}</td>
+                <td class="hidden px-4 py-2.5 text-mist-400 md:table-cell">
+                  {{ property.description ?? '' }}
+                  @if (property.range; as range) {
+                    <span class="block font-mono text-xs text-mist-500">Range {{ range[0] }} to {{ range[1] }}</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (t.functions && t.functions.length > 0) {
+      <h2 class="mt-12 mb-4 text-2xl font-bold text-white">Functions</h2>
+      <p class="mb-4 text-sm text-mist-400">
+        Reflected <code class="rounded bg-ink-700 px-1.5 py-0.5 font-mono text-xs text-accent-300">FUNCTION()</code>
+        members — callable from event graphs.
+      </p>
+      <div class="overflow-x-auto rounded-lg border border-line">
+        <table class="w-full border-collapse text-sm">
+          <thead>
+            <tr class="bg-ink-800 text-left">
+              <th class="px-4 py-2.5 font-semibold text-mist-100">Signature</th>
+              <th class="hidden px-4 py-2.5 font-semibold text-mist-100 md:table-cell">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (fn of t.functions; track fn.name) {
+              <tr class="border-t border-line/60 hover:bg-ink-800/60">
+                <td class="px-4 py-2.5 font-mono text-xs text-mist-100">
+                  {{ fn.signature }}
+                  @if (fn.specifiers) {
+                    <span class="block text-mist-500">{{ fn.specifiers }}</span>
+                  }
+                </td>
+                <td class="hidden px-4 py-2.5 text-mist-400 md:table-cell">{{ fn.description ?? '' }}</td>
               </tr>
             }
           </tbody>

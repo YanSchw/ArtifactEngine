@@ -161,6 +161,9 @@ void Node::Destroy() {
 
     if (WasBeginPlayCalled()) {
         EndPlay();
+        if (m_World) {
+            m_World->NotifyEndPlay(*this);
+        }
     }
 
     Array<Node*> ChildrenToKill = m_Children;

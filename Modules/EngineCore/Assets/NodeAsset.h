@@ -5,6 +5,7 @@
 
 class Node;
 class NodeRecord;
+class EventGraph;
 
 class NodeAsset : public Asset {
 public:
@@ -16,6 +17,9 @@ public:
     void CaptureFrom(Node& InNode);
 
     Class GetRootClass() const;
+    EventGraph* GetEventGraph() const;
+    EventGraph* GetOrCreateEventGraph();
+    void SetEventGraph(EventGraph* InGraph);
     Array<AssetStreamHandle> GetReferencedAssetHandles() const { return m_ReferencedAssets; }
 
     virtual String SerializeToJson() const override;
@@ -30,6 +34,10 @@ protected:
     void AcquireReferencedAssets();
 
     SharedObjectPtr<NodeRecord> m_Root;
+
+    PROPERTY()
+    SharedObjectPtr<EventGraph> m_EventGraph;
+
     Array<AssetStreamHandle> m_ReferencedAssets;
     bool m_Loaded = false;
 };

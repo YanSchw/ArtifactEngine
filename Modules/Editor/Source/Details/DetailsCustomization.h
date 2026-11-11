@@ -45,6 +45,7 @@ public:
     /** Builds the widget one property is edited with into InHost. False for types that have none. */
     static bool BuildValueEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
                                  Property* InProperty, const DetailsEditHandler& InOnEdited, const String& InTitle = String());
+    static uint64_t MakeExternalOffset(const String& InKey, std::function<void*(Object*)> InResolve);
     /** Marks the override and tells the owning MajorTab. Every row that writes a property itself,
      *  instead of going through MakeEditHandler, has to end with this. InPropertyName may be a path. */
     static void NotifyPropertyEdited(DetailsTab* InTab, Object* InObject, const String& InPropertyName);
@@ -66,11 +67,17 @@ protected:
                                const String& InParentPath = String());
     static DetailsCategory& AddStructCategory(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
                                               uint64_t InOffset, const Array<Property*>& InMembers, int32_t InDepth,
-                                              Property* InRootProperty, const String& InLabel, const String& InPath);
-    static void AddArrayRows(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                             ArrayProperty* InArray, int32_t InDepth, Property* InRootProperty,
-                             const String& InLabel, const String& InPath);
+                                              Property* InRootProperty, const String& InLabel, const String& InPath,
+                                              const std::function<void(DetailsCategory&)>& InBeforeMembers = nullptr);
+    static DetailsCategory& AddArrayRows(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                                         ArrayProperty* InArray, int32_t InDepth, Property* InRootProperty,
+                                         const String& InLabel, const String& InPath);
     static void AddArrayElement(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InArrayOffset,
                                 ArrayProperty* InArray, int32_t InIndex, int32_t InDepth, Property* InRootProperty,
                                 const String& InArrayPath);
+    static DetailsCategory& AddMapRows(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                                       MapProperty* InMap, int32_t InDepth, Property* InRootProperty,
+                                       const String& InLabel, const String& InPath);
+    static void AddMapEntry(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InEntryOffset,
+                            MapProperty* InMap, int32_t InDepth, Property* InRootProperty, const String& InMapPath);
 };

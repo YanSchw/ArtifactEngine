@@ -28,6 +28,8 @@ public:
     virtual String GetCategory() const { return "Common"; }
     virtual Vec4 GetAccentColor() const;
     virtual bool IsUserCreatable() const { return true; }
+    virtual String GetPinLabel(const GraphPin& InPin) const { return InPin.Name; }
+    virtual String GetPinValueText(const GraphPin& InPin) const { (void)InPin; return String(); }
 
     Vec2 GetPosition() const { return Vec2(PositionX, PositionY); }
     void SetPosition(const Vec2& InPosition) { PositionX = InPosition.x; PositionY = InPosition.y; }
