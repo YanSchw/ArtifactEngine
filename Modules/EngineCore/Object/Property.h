@@ -47,6 +47,8 @@ struct Property : public Object {
     void CopyRawValue(void* OutValue, const void* InValue) const;
 
     static void RegisterTypeProperties(const String& InTypename, const Array<Property*>& InProperties);
+    static void ReplaceTypeProperties(const String& InTypename, const Array<Property*>& InProperties);
+    static uint64_t GetRegistryVersion();
     static Array<Property*> GetTypeProperties(const String& InTypeName);
     static Array<Property*> GetAllTypeProperties(const Class& InClass);
     static Property* FindTypeProperty(const Class& InClass, const String& InName);

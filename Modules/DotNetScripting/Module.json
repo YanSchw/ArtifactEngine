@@ -1,0 +1,17 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "IncludePaths": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore"
+    ],
+    "IsNonPackageOnly": true,
+    "TargetPlatforms": [
+        "Win64",
+        "Linux",
+        "MacOS"
+    ]
+}

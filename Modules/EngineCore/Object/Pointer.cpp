@@ -14,6 +14,23 @@ void InternalPtr::Nullify(Object* InObject) {
     s_RefCounts.erase(InObject);
 }
 
+void InternalPtr::Retain(Object* InObject) {
+    if (InObject) {
+        s_RefCounts[InObject]++;
+    }
+}
+
+void InternalPtr::Release(Object* InObject) {
+    auto it = s_RefCounts.find(InObject);
+    if (it == s_RefCounts.end() || it->second == 0) {
+        return;
+    }
+    if (--it->second == 0) {
+        Nullify(InObject);
+        delete InObject;
+    }
+}
+
 InternalPtr::InternalPtr()
     : m_Value(nullptr), m_RefCounting(false)
 {

@@ -13,6 +13,17 @@ void Property::RegisterTypeProperties(const String& InTypename, const Array<Prop
     GetTypePropertyMap()[InTypename] += InProperties;
 }
 
+static uint64_t s_RegistryVersion = 0;
+
+void Property::ReplaceTypeProperties(const String& InTypename, const Array<Property*>& InProperties) {
+    GetTypePropertyMap()[InTypename] = InProperties;
+    s_RegistryVersion++;
+}
+
+uint64_t Property::GetRegistryVersion() {
+    return s_RegistryVersion;
+}
+
 Array<Property*> Property::GetTypeProperties(const String& InTypeName) {
     Map<String, Array<Property*>>& map = GetTypePropertyMap();
     if (!map.ContainsKey(InTypeName)) {

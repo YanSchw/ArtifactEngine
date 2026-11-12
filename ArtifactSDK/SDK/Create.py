@@ -129,20 +129,23 @@ def create_reflected_type(kind: str, name: str, parent: str | None, module_name:
 
     print(f"{Fore.CYAN}Run 'artifact build' to generate reflection code for {name}.{Style.RESET_ALL}")
 
-def create_module(name: str, import_modules: list[str] | None = None):
+def create_module(name: str, import_modules: list[str] | None = None, module_type: str = "Native"):
     project_path = get_project_path()
     module_dir = f"{project_path}/Modules/{name}"
     if os.path.exists(module_dir):
         _fail(f"Module '{name}' already exists at {module_dir}")
 
-    module = ArtifactModule(
-        name=name,
-        path=module_dir,
-        ImportModules=import_modules if import_modules is not None else ["EngineCore"],
-        SourceDirectories=["Source"],
-        IncludePaths=["Source"],
-        ExportIncludePaths=["Source"],
-    )
+    if module_type == "Scripting":
+        module = ArtifactModule(name=name, path=module_dir, ImportModules=import_modules, SourceDirectories=["Source"], Type="Scripting")
+    else:
+        module = ArtifactModule(
+            name=name,
+            path=module_dir,
+            ImportModules=import_modules if import_modules is not None else ["EngineCore"],
+            SourceDirectories=["Source"],
+            IncludePaths=["Source"],
+            ExportIncludePaths=["Source"],
+        )
     os.makedirs(f"{module_dir}/Source", exist_ok=True)
     module.write_to_json()
     _created(f"{module_dir}/Module.json")

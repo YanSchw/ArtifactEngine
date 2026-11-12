@@ -112,9 +112,10 @@ void DetailsTab::Refresh() {
     DetailsCustomization* customization = sole ? DetailsCustomization::FindFor(sole->GetClass()) : nullptr;
     Object* inspected = customization ? sole : nullptr;
 
-    if (inspected != m_Inspected.Get() || m_RebuildPending) {
+    if (inspected != m_Inspected.Get() || m_RebuildPending || m_PropertyRegistryVersion != Property::GetRegistryVersion()) {
         const bool sameObject = inspected == m_Inspected.Get();
         m_RebuildPending = false;
+        m_PropertyRegistryVersion = Property::GetRegistryVersion();
         RebuildInspector(inspected, customization);
         if (!sameObject) {
             m_Scroll->ScrollOffset = Vec2(0.0f);

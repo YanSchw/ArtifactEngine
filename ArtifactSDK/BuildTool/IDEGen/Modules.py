@@ -103,7 +103,7 @@ def collect_ide_modules(engine_path: str, project_path: str, target_platform: st
                 continue
             module_dir = f"{modules_dir}/{name}"
             artifact_module = ArtifactModule.load_from_json(module_dir)
-            if not artifact_module.supports_platform(target_platform):
+            if artifact_module.IsScripting or not artifact_module.supports_platform(target_platform):
                 continue
             seen_names.add(name)
             modules.append(IDEModule(name=name, path=module_dir, category=category, module=artifact_module))

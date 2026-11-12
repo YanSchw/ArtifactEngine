@@ -14,7 +14,8 @@ def discover_modules(engine_path: str, project_path: str, target_platform: str, 
     Returns a list of (name, module_dir, ArtifactModule, owning_root). Engine modules come
     first; a project module with the same name as an engine one is not overridden (engine-first).
     `owning_root` is the engine or project directory the module lives under. A packaged build
-    leaves out the modules marked IsNonPackageOnly."""
+    leaves out the modules marked IsNonPackageOnly. Scripting modules are never native modules;
+    a packaged build gets their IL2CPP translation instead."""
     engine_path = engine_path.replace("\\", "/").rstrip("/")
     project_path = project_path.replace("\\", "/").rstrip("/")
     same_repo = os.path.normcase(os.path.normpath(engine_path)) == os.path.normcase(os.path.normpath(project_path))
@@ -34,7 +35,7 @@ def discover_modules(engine_path: str, project_path: str, target_platform: str, 
             module = ArtifactModule.load_from_json(module_dir)
             if not module.supports_platform(target_platform):
                 continue
-            if is_packaged and module.IsNonPackageOnly:
+            if module.IsScripting or (is_packaged and module.IsNonPackageOnly):
                 continue
             seen.add(name)
             modules.append((name, module_dir, module, owning_root))
@@ -42,6 +43,8 @@ def discover_modules(engine_path: str, project_path: str, target_platform: str, 
     add(f"{engine_path}/Modules", engine_path)
     if not same_repo:
         add(f"{project_path}/Modules", project_path)
+    if is_packaged:
+        add(f"{project_path}/Build/Intermediate/IL2CPP/Modules", project_path)
 
     return modules
 

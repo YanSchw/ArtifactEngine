@@ -1,6 +1,7 @@
 #include "Engine.h"
 
 #include "EngineConfig.h"
+#include "EngineSubsystem.h"
 #include "Audio/AudioEngine.h"
 #include "GameFramework/DebugDraw.h"
 #include "Platform/PlatformHooks.h"
@@ -34,6 +35,9 @@ bool Engine::Tick() {
 
     // Refresh input before gameplay reads it this frame.
     TickInput(m_DeltaTime);
+    for (const SharedObjectPtr<EngineSubsystem>& subsystem : m_Subsystems) {
+        subsystem->Tick(m_DeltaTime);
+    }
     const bool keepRunning = MainTick(m_DeltaTime);
     if (AudioEngine::IsAvailable()) {
         AudioEngine::Get().Update();
@@ -44,6 +48,34 @@ bool Engine::Tick() {
 void Engine::MainLoop() {
     m_PreviousTime = std::chrono::steady_clock::now();
     PlatformHooks::Get().RunMainLoop([this] { return Tick(); });
+}
+
+EngineSubsystem* Engine::GetSubsystem(const Class& InClass) const {
+    for (const SharedObjectPtr<EngineSubsystem>& subsystem : m_Subsystems) {
+        if (subsystem->IsA(InClass)) {
+            return subsystem.Get();
+        }
+    }
+    return nullptr;
+}
+
+void Engine::InitializeSubsystems() {
+    for (const Class& subsystemClass : Class::GetSubclassesOf(EngineSubsystem::StaticClass())) {
+        if (subsystemClass == EngineSubsystem::StaticClass()) {
+            continue;
+        }
+        if (EngineSubsystem* subsystem = Cast<EngineSubsystem>(Object::Create(subsystemClass))) {
+            m_Subsystems.Add(SharedObjectPtr<EngineSubsystem>(subsystem));
+            subsystem->Initialize();
+        }
+    }
+}
+
+void Engine::ShutdownSubsystems() {
+    for (int32_t i = m_Subsystems.Last(); i >= 0; i--) {
+        m_Subsystems[i]->Shutdown();
+    }
+    m_Subsystems.Clear();
 }
 
 Engine& Engine::Get() {

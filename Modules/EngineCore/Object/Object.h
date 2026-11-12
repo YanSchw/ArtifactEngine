@@ -33,6 +33,9 @@ struct Class {
     inline bool operator==(const Class& InOther) const { return Name == InOther.Name; }
     inline bool operator!=(const Class& InOther) const { return !operator==(InOther); }
 
+    static void RegisterRuntimeClass(const String& InName, const Class& InParent, const String& InModule,
+                                     std::function<class Object*()> InAllocator);
+
     struct RegisterParentChildClassRelationship {
         RegisterParentChildClassRelationship(const String& InChild, const String& InParent, const String& InModule);
     };
@@ -73,6 +76,8 @@ public:
     }
 
     static Object* Create(const Class& type);
+    static void Retain(Object* InObject);
+    static void Release(Object* InObject);
 
     template<typename T>
     bool GetPropertyValue(const String& InName, T& OutValue);
@@ -97,7 +102,7 @@ private:
         return (Object*) new T();
     }
 
-    inline static std::unordered_map<std::string, Object*(*)(void)> s_ObjectAllocators;
+    inline static std::unordered_map<std::string, std::function<Object*()>> s_ObjectAllocators;
     template<typename T> friend struct RegisterArtifactClass;
     friend struct Class;
 };

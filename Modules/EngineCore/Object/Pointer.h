@@ -10,6 +10,8 @@ class Object;
 
 struct InternalPtr {
     static void Nullify(Object* InObject);
+    static void Retain(Object* InObject);
+    static void Release(Object* InObject);
 
     InternalPtr();
     InternalPtr(const InternalPtr& InOther);

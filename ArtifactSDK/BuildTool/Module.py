@@ -3,6 +3,8 @@ import os
 import json
 from typing import List, Optional, Set
 
+MODULE_TYPES = ("Native", "Scripting")
+
 class ArtifactModule:
     """
     Represents an Artifact Engine module with metadata from Module.json.
@@ -23,6 +25,7 @@ class ArtifactModule:
         PlatformSourceDirectories: Optional[dict] = None,
         MountContentDir: Optional[str] = None,
         IsNonPackageOnly: bool = False,
+        Type: str = "Native",
     ):
         """
         Initialize an ArtifactModule with metadata.
@@ -42,7 +45,10 @@ class ArtifactModule:
                 recursively for every platform.
             MountContentDir: Module-local content directory to mount at runtime (relative to the module)
             IsNonPackageOnly: Strip the module (and its content) from packaged builds
+            Type: "Native" (C++, built by CMake) or "Scripting" (C#, built as a .csproj)
         """
+        if Type not in MODULE_TYPES:
+            raise ValueError(f"Module '{name}' has unknown Type '{Type}', expected one of {', '.join(MODULE_TYPES)}")
         self.name = name
         self.path = path
         self.ImportModules = ImportModules if ImportModules is not None else []
@@ -55,6 +61,7 @@ class ArtifactModule:
         self.PlatformSourceDirectories = PlatformSourceDirectories if PlatformSourceDirectories is not None else {}
         self.MountContentDir = MountContentDir
         self.IsNonPackageOnly = IsNonPackageOnly
+        self.Type = Type
 
     @classmethod
     def load_from_json(cls, module_path: str) -> "ArtifactModule":
@@ -95,7 +102,12 @@ class ArtifactModule:
             PlatformSourceDirectories=data.get("PlatformSourceDirectories", None),
             MountContentDir=data.get("MountContentDir", None),
             IsNonPackageOnly=data.get("IsNonPackageOnly", False),
+            Type=data.get("Type", "Native"),
         )
+
+    @property
+    def IsScripting(self) -> bool:
+        return self.Type == "Scripting"
 
     def supports_platform(self, platform: str) -> bool:
         """Check if this module supports a specific platform."""
@@ -129,6 +141,7 @@ class ArtifactModule:
             "PlatformSourceDirectories": self.PlatformSourceDirectories or None,
             "MountContentDir": self.MountContentDir,
             "IsNonPackageOnly": self.IsNonPackageOnly or None,
+            "Type": self.Type if self.IsScripting else None,
         }
     
     def write_to_json(self):

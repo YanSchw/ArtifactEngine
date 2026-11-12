@@ -74,6 +74,7 @@ class HeaderTool:
         self.module_output_root = {}  # dict[module_name: str, owning_root_dir: str]
         self.header_output_root = {}  # dict[header_name: str, owning_root_dir: str]
         self.header_paths = {}
+        self.editor_only_modules = set()
         self.skipped_dirs = set()  # absolute dirs belonging to another target platform
 
     def _skips(self, dirpath: str) -> bool:
@@ -96,6 +97,11 @@ class HeaderTool:
 
             if os.path.exists(f"{module_dir}/Module.json"):
                 metadata = ArtifactModule.load_from_json(module_dir)
+                if metadata.IsScripting:
+                    self.skipped_dirs.add(os.path.normpath(module_dir))
+                    continue
+                if metadata.IsNonPackageOnly:
+                    self.editor_only_modules.add(module)
                 if not metadata.supports_platform(self.target_platform):
                     self.skipped_dirs.add(os.path.normpath(module_dir))
                     continue

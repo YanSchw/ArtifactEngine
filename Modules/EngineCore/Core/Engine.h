@@ -6,6 +6,7 @@
 #include "Engine.gen.h"
 
 class GameInstance;
+class EngineSubsystem;
 
 class Engine : public Object {
 public:
@@ -18,6 +19,12 @@ public:
     class RenderPipeline* GetRenderPipeline() const { return m_RenderPipeline.Get(); }
 
     virtual void RequestExit(bool InForce);
+
+    EngineSubsystem* GetSubsystem(const Class& InClass) const;
+    template<typename T>
+    T* GetSubsystem() const {
+        return Cast<T>(GetSubsystem(T::StaticClass()));
+    }
 
 protected:
     virtual void Initialize() = 0;
@@ -32,12 +39,15 @@ protected:
     /** One frame; false once the engine wants to stop. */
     bool Tick();
     void MainLoop();
+    void InitializeSubsystems();
+    void ShutdownSubsystems();
 
 protected:
     std::chrono::steady_clock::time_point m_PreviousTime;
     double m_DeltaTime = 0.0;
     SharedObjectPtr<class RenderPipeline> m_RenderPipeline;
     SharedObjectPtr<class GameInstance> m_GameInstance;
+    Array<SharedObjectPtr<EngineSubsystem>> m_Subsystems;
 
     inline static bool s_IsRunning = true;
 

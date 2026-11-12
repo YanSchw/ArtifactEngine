@@ -112,6 +112,16 @@ Class::RegisterParentChildClassRelationship::RegisterParentChildClassRelationshi
     (*GetListOfAllClasses()).Add(Class(InChild));
 }
 
+void Class::RegisterRuntimeClass(const String& InName, const Class& InParent, const String& InModule,
+                                 std::function<Object*()> InAllocator) {
+    (*GetChildToParentClassnames())[InName] = InParent.Name;
+    (*GetClassnameToModuleNames())[InName] = InModule;
+    if (!GetListOfAllClasses()->Contains(Class(InName))) {
+        GetListOfAllClasses()->Add(Class(InName));
+    }
+    Object::s_ObjectAllocators[InName] = std::move(InAllocator);
+}
+
 bool Class::IsDefaultConstructable() const {
     if (IsBlueprint()) {
         return FindBlueprint(*this) != nullptr;
@@ -126,6 +136,14 @@ Object* Object::Create(const Class& type) {
     }
     auto allocator = s_ObjectAllocators.find(type.Name);
     return allocator != s_ObjectAllocators.end() ? allocator->second() : nullptr;
+}
+
+void Object::Retain(Object* InObject) {
+    InternalPtr::Retain(InObject);
+}
+
+void Object::Release(Object* InObject) {
+    InternalPtr::Release(InObject);
 }
 
 Object::~Object() {

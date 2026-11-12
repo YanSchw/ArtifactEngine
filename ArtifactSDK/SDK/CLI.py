@@ -3,6 +3,9 @@ import argparse
 from colorama import Fore, Style
 
 from HeaderTool.HeaderTool import HeaderTool
+from HeaderTool.CSharpBindings import generate_csharp_bindings
+from BuildTool import DotNet
+from IL2CPP.IL2CPP import transpile
 from BuildTool.Generate import generate_cmake
 from BuildTool.Build import build_cmake
 from BuildTool.IDEGen import generate_ide_project
@@ -28,12 +31,20 @@ def _generate(args):
             shutil.rmtree(build_dir)
 
     with Job("Generating project files"):
-        generate_cmake(project_path, args)
-
-        # Generate reflection code for classes in Modules
         header_tool = HeaderTool(args.target)
         header_tool.collect_headers(f"{engine_path}/Modules", engine_path)
         header_tool.collect_headers(f"{project_path}/Modules", project_path)
+
+        transpiled_modules = f"{project_path}/Build/Intermediate/IL2CPP/Modules"
+        shutil.rmtree(transpiled_modules, ignore_errors=True)
+        if DotNet.is_enabled(engine_path, project_path):
+            generate_csharp_bindings(header_tool, DotNet.intermediate_dir(project_path))
+            DotNet.generate_projects(engine_path, project_path)
+            if getattr(args, "packaged", False):
+                transpile(DotNet.build_for_package(engine_path, project_path), f"{DotNet.intermediate_dir(project_path)}/Reflection.json", transpiled_modules)
+                header_tool.collect_headers(transpiled_modules, project_path)
+
+        generate_cmake(project_path, args)
         header_tool.generate()
 
         png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
@@ -67,6 +78,10 @@ def cmd_build(args):
 
         with Job("Building", dump_on_error=False) as job:
             build_cmake(job, args.target)
+
+        if not getattr(args, "packaged", False) and DotNet.is_enabled(get_engine_path(), get_project_path()):
+            with Job("Building scripting modules"):
+                DotNet.build_for_editor(get_engine_path(), get_project_path())
 
         if get_platform(args.target) == PlatformType.MacOS == get_current_platform():
             from Package.MacOS import create_dev_bundle
@@ -234,7 +249,7 @@ def cmd_create_project(args):
 
 def cmd_create_module(args):
     from SDK.Create import create_module
-    create_module(args.name)
+    create_module(args.name, module_type=args.type)
 
 def cmd_create_type(args):
     from SDK.Create import create_reflected_type
@@ -304,6 +319,7 @@ def main():
 
     create_module_parser = create_subparsers.add_parser("module", help="Create a new module in the current engine/project")
     create_module_parser.add_argument("name", help="Module name")
+    create_module_parser.add_argument("--type", choices=["Native", "Scripting"], default="Native", help="Native (C++) or Scripting (C#) module")
     create_module_parser.set_defaults(func=cmd_create_module)
 
     for kind in ("class", "struct", "node", "component"):

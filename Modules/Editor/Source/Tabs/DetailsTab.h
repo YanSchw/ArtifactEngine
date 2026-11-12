@@ -60,4 +60,5 @@ private:
     Array<String> m_CollapsedKeys;
     Array<String> m_ExpandedKeys;
     bool m_RebuildPending = false;
+    uint64_t m_PropertyRegistryVersion = 0;
 };

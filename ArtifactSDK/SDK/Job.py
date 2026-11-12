@@ -323,6 +323,9 @@ class Job:
             self._flush_persisted()
         else:
             label = "cancelled" if exc_type is KeyboardInterrupt else "failed"
+            message = str(exc_value) if isinstance(exc_value, JobError) else ""
+            if message and message not in self._persist:
+                self._persist.append(message.rstrip("\n"))
             self._print_summary(f"{Fore.RED}✖{Style.RESET_ALL} {self.title} {label}  "
                                 f"{Style.DIM}{elapsed}{Style.RESET_ALL}")
             self._flush_persisted()

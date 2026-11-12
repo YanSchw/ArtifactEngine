@@ -37,9 +37,11 @@ int ArtifactMain(const Array<String>& InArgs) {
     // itself leaves ArtifactMain before the engine is finished with.
     static SharedObjectPtr<Engine> engine = Object::Create<Engine>(EngineConfig::EngineClass());
     AE_ASSERT(engine, "Failed to create engine instance!");
+    engine->InitializeSubsystems();
     engine->Initialize();
     engine->MainLoop();
     engine->Shutdown();
+    engine->ShutdownSubsystems();
 
     return 0;
 }
