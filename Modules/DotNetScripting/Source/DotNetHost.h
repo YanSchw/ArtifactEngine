@@ -5,7 +5,7 @@ class DotNetHost {
 public:
     ~DotNetHost();
 
-    bool Start(const String& InRuntimeConfigPath);
+    bool Start(const String& InRuntimeConfigPath, const String& InDotNetRoot);
     bool LoadAssembly(const String& InAssemblyPath);
     void* GetFunction(const String& InTypeName, const String& InMethodName) const;
 

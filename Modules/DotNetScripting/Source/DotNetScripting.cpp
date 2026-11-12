@@ -214,11 +214,11 @@ void DotNetScripting::Initialize() {
     for (const nlohmann::json& watch : manifest.value("Watch", nlohmann::json::array())) {
         m_WatchDirectories.Add(watch.get<std::string>());
     }
-    m_BuildCommand = "\"" + manifest.value("DotNet", std::string("dotnet")) + "\" build \"" + manifest.value("Solution", std::string())
-                   + "\" -c Debug --nologo -v q -clp:ErrorsOnly";
+    const std::filesystem::path dotnet = manifest.value("DotNet", std::string("dotnet"));
+    m_BuildCommand = "\"" + dotnet.string() + "\" build \"" + manifest.value("Solution", std::string()) + "\" -c Debug --nologo -v q -clp:ErrorsOnly";
 
     s_Host = std::make_unique<DotNetHost>();
-    if (!s_Host->Start((directory / "Artifact.runtimeconfig.json").string()) || !s_Host->LoadAssembly((directory / "Artifact.dll").string())) {
+    if (!s_Host->Start((directory / "Artifact.runtimeconfig.json").string(), dotnet.parent_path().string()) || !s_Host->LoadAssembly((directory / "Artifact.dll").string())) {
         s_Host.reset();
         return;
     }

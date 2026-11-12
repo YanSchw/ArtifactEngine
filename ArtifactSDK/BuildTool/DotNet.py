@@ -1,10 +1,10 @@
 import json
 import os
-import shutil
 import subprocess
 from BuildTool.Module import ArtifactModule
 from SDK.Util import smart_open
 from SDK.Job import JobError
+from SetupTool.DotNetSDK import find_dotnet
 
 PROJECT = """<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -84,9 +84,16 @@ def is_enabled(engine_path: str, project_path: str) -> bool:
     names = ", ".join(module.name for module in modules)
     if not find_host_module(engine_path, project_path):
         raise JobError(f"The scripting modules {names} need the {HOST_MODULE} module")
-    if shutil.which("dotnet") is None:
-        raise JobError(f"The .NET SDK (dotnet) is needed to build the scripting modules {names}")
+    if find_dotnet() is None:
+        raise JobError(f"The .NET SDK is needed to build the scripting modules {names}. Run `artifact setup dotnet` to install it.")
     return True
+
+
+def _dotnet() -> str:
+    dotnet = find_dotnet()
+    if dotnet is None:
+        raise JobError("No .NET SDK found. Run `artifact setup dotnet` to install it.")
+    return str(dotnet)
 
 
 def intermediate_dir(project_path: str) -> str:
@@ -106,7 +113,7 @@ def solution_path(project_path: str) -> str:
 
 
 def _framework() -> str:
-    version = subprocess.run(["dotnet", "--version"], capture_output=True, text=True).stdout.strip()
+    version = subprocess.run([_dotnet(), "--version"], capture_output=True, text=True).stdout.strip()
     return f"net{version.split('.')[0]}.0"
 
 
@@ -143,7 +150,7 @@ def generate_projects(engine_path: str, project_path: str):
 
 
 def _build(project_path: str, configuration: str):
-    command = ["dotnet", "build", solution_path(project_path), "-c", configuration, "--nologo", "-v", "q", "-clp:ErrorsOnly"]
+    command = [_dotnet(), "build", solution_path(project_path), "-c", configuration, "--nologo", "-v", "q", "-clp:ErrorsOnly"]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0:
         raise JobError(f"Building the scripting modules failed:\n{result.stdout}{result.stderr}")
@@ -153,7 +160,7 @@ def build_for_editor(engine_path: str, project_path: str):
     modules = find_scripting_modules(engine_path, project_path)
     _build(project_path, "Debug")
     manifest = {
-        "DotNet": shutil.which("dotnet"),
+        "DotNet": _dotnet(),
         "Solution": solution_path(project_path),
         "Assemblies": [module.name for module in modules],
         "Watch": [source for module in modules for source in _source_dirs(module)],

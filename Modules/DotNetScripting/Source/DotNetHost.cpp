@@ -7,6 +7,7 @@
 
 #if defined(_WIN32)
     #include <windows.h>
+    #undef ERROR
     #define DOTNET_CALLTYPE __cdecl
     static constexpr const char* s_HostFxrName = "hostfxr.dll";
 #else
@@ -46,8 +47,11 @@ static void* FindSymbol(void* InLibrary, const char* InName) {
 #endif
 }
 
-static std::vector<std::filesystem::path> CandidateDotNetRoots() {
+static std::vector<std::filesystem::path> CandidateDotNetRoots(const String& InPreferredRoot) {
     std::vector<std::filesystem::path> roots;
+    if (!InPreferredRoot.empty()) {
+        roots.emplace_back(InPreferredRoot);
+    }
     if (const char* root = std::getenv("DOTNET_ROOT")) {
         roots.emplace_back(root);
     }
@@ -65,8 +69,8 @@ static std::vector<std::filesystem::path> CandidateDotNetRoots() {
     return roots;
 }
 
-static std::filesystem::path FindHostFxr() {
-    for (const std::filesystem::path& root : CandidateDotNetRoots()) {
+static std::filesystem::path FindHostFxr(const String& InPreferredRoot) {
+    for (const std::filesystem::path& root : CandidateDotNetRoots(InPreferredRoot)) {
         std::error_code error;
         const std::filesystem::path fxr = root / "host" / "fxr";
         if (!std::filesystem::is_directory(fxr, error)) {
@@ -92,11 +96,11 @@ DotNetHost::~DotNetHost() {
     }
 }
 
-bool DotNetHost::Start(const String& InRuntimeConfigPath) {
-    const std::filesystem::path hostFxr = FindHostFxr();
+bool DotNetHost::Start(const String& InRuntimeConfigPath, const String& InDotNetRoot) {
+    const std::filesystem::path hostFxr = FindHostFxr(InDotNetRoot);
     m_Library = hostFxr.empty() ? nullptr : LoadLibraryAt(hostFxr);
     if (!m_Library) {
-        AE_WARN("No .NET runtime found; set DOTNET_ROOT to enable C# scripting");
+        AE_WARN("No .NET runtime found; run `artifact setup dotnet` or set DOTNET_ROOT to enable C# scripting");
         return false;
     }
 
