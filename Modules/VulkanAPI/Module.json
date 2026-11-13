@@ -2,12 +2,30 @@
     "SourceDirectories": [
         "Source"
     ],
+    "PlatformSourceDirectories": {
+        "Win64": [
+            "Desktop"
+        ],
+        "Linux": [
+            "Desktop"
+        ],
+        "MacOS": [
+            "Desktop"
+        ],
+        "iOS": [
+            "iOS"
+        ]
+    },
+    "IncludePaths": [
+        "Source"
+    ],
     "ExportIncludePaths": [
         "Source"
     ],
     "ImportModules": [
         "EngineCore",
-        "GLFW_Surfaces"
+        "GLFW_Surfaces",
+        "PlatformIOS"
     ],
     "AddAdditionalCMakeProjects": [
         "ThirdParty/VulkanSDK"
@@ -15,6 +33,7 @@
     "TargetPlatforms": [
         "Win64",
         "Linux",
-        "MacOS"
+        "MacOS",
+        "iOS"
     ]
 }

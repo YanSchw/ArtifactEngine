@@ -10,13 +10,11 @@
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
-#define GLFW_INCLUDE_NONE
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 #include "Core/Log.h"
 #include "Core/EngineConfig.h"
 #include "Platform/Platform.h"
-#include "Window.h"
+#include "Rendering/Surface.h"
+#include "VulkanPresentation.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -417,12 +415,9 @@ static VulkanSwapchainData* GetOrCreateSwapchainData(Surface* InTarget) {
         return existing;
     }
 
-    Window* window = InTarget->As<Window>();
-    AE_ASSERT(window, "surface render targets must be windows");
-
     VulkanSwapchainData* data = new VulkanSwapchainData();
     data->Target = InTarget;
-    if (glfwCreateWindowSurface(instance, window->GetNativeWindow(), NULL, &data->WindowSurface) != VK_SUCCESS) {
+    if (CreatePresentationSurface(instance, InTarget, &data->WindowSurface) != VK_SUCCESS) {
         AE_ERROR("failed to create window surface!");
         exit(1);
     }
@@ -570,7 +565,7 @@ void VulkanAPI::DestroySurfaceResources(Surface* InSurface) {
 // (see Package/MacOS.py). The Vulkan loader does not search app bundles, so point it at the
 // bundled manifest before the first ICD enumeration. Only set what the user hasn't overridden.
 static void PointLoaderAtBundledDrivers() {
-#if defined(__APPLE__)
+#if defined(AE_PLATFORM_MACOS)
     if (!EngineConfig::IsPackagedBuild()) {
         return;
     }
@@ -601,17 +596,9 @@ void VulkanAPI::CreateInstance() {
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_3;
 
-    // Get instance extensions required by GLFW to draw to window
-    unsigned int glfwExtensionCount;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    std::vector<const char*> extensions = GetPresentationInstanceExtensions();
 
-    std::vector<const char*> extensions;
-    for (size_t i = 0; i < glfwExtensionCount; i++) {
-        extensions.push_back(glfwExtensions[i]);
-    }
-
-#if defined(__APPLE__)
+#if defined(AE_PLATFORM_MACOS)
     extensions.push_back("VK_KHR_portability_enumeration");
 #endif
 
@@ -642,7 +629,7 @@ void VulkanAPI::CreateInstance() {
     createInfo.pApplicationInfo = &appInfo;
     createInfo.enabledExtensionCount = (uint32_t)extensions.size();
     createInfo.ppEnabledExtensionNames = extensions.data();
-#if defined(__APPLE__)
+#if defined(AE_PLATFORM_MACOS)
     createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #endif
 
@@ -663,8 +650,8 @@ void VulkanAPI::CreateInstance() {
 
 void VulkanAPI::CreateWindowSurface() {
     VulkanSwapchainData* data = new VulkanSwapchainData();
-    data->Target = Window::GetInstance();
-    if (glfwCreateWindowSurface(instance, Window::GetGLFWwindow(), NULL, &data->WindowSurface) != VK_SUCCESS) {
+    data->Target = Surface::GetMain();
+    if (CreatePresentationSurface(instance, Surface::GetMain(), &data->WindowSurface) != VK_SUCCESS) {
         AE_ERROR("failed to create window surface!");
         exit(1);
     }

@@ -118,6 +118,16 @@ def get_emscripten_link_options(project_path: str, target_configuration: str, is
     return "target_link_options(Artifact PRIVATE\n    " + "\n    ".join(options) + "\n)\n"
 
 
+def get_ios_setup() -> str:
+    return """enable_language(OBJCXX)
+add_compile_options($<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+"""
+
+
+def get_ios_link_options() -> str:
+    return 'target_link_options(Artifact PRIVATE "-Wl,-rpath,@executable_path/Frameworks")\n'
+
+
 def generate_cmake(project_path: str, args):
     target_platform = args.target
     target_configuration = args.configuration
@@ -162,10 +172,10 @@ endif()
 
 add_compile_definitions({" ".join(global_definitions)})
 
-{get_emscripten_setup(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}
+{get_emscripten_setup(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}{get_ios_setup() if get_platform(target_platform) == PlatformType.iOS else ""}
 add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp)
 
-{get_emscripten_link_options(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}
+{get_emscripten_link_options(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}{get_ios_link_options() if get_platform(target_platform) == PlatformType.iOS else ""}
 if (WIN32)
     set(APP_ICON_RESOURCE "{project_path}/Build/Intermediate/Resources/Win64IconResource.rc")
     target_sources(Artifact PRIVATE ${{APP_ICON_RESOURCE}})

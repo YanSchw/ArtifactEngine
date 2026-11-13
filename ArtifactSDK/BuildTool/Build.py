@@ -99,8 +99,11 @@ def build_environment(target=None):
     return env
 
 
-def get_toolchain_file(target):
+def get_toolchain_file(target, simulator: bool = False):
     """The CMake toolchain a cross-compiled target needs, or None to build for the host."""
+    if target is not None and get_platform(target) == PlatformType.iOS:
+        from BuildTool.iOS import write_toolchain
+        return write_toolchain(os.getcwd().replace("\\", "/"), simulator)
     if target is None or get_platform(target) != PlatformType.Web:
         return None
     from SetupTool.Emscripten import get_emsdk_root, get_toolchain_file as get_emscripten_toolchain
@@ -110,7 +113,7 @@ def get_toolchain_file(target):
     return str(get_emscripten_toolchain(root)).replace("\\", "/")
 
 
-def build_cmake(job=None, target=None):
+def build_cmake(job=None, target=None, simulator: bool = False):
     """Configure and build via CMake + Ninja.
 
     When a ``job`` is supplied, subprocess output is streamed into the job's
@@ -122,7 +125,7 @@ def build_cmake(job=None, target=None):
         shutil.rmtree("Binaries")
 
     env = build_environment(target)
-    toolchain = get_toolchain_file(target)
+    toolchain = get_toolchain_file(target, simulator)
     _clear_stale_cache(toolchain)
 
     configure_cmd = ["cmake", "-S", ".", "-G", CMAKE_GENERATOR, "-B", "Build"]

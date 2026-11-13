@@ -10,7 +10,7 @@ from BuildTool.Generate import generate_cmake
 from BuildTool.Build import build_cmake
 from BuildTool.IDEGen import generate_ide_project
 from SDK.Paths import get_engine_path, get_project_path
-from SDK.Platforms import get_current_platform, get_platform, get_platform_names, PlatformType
+from SDK.Platforms import get_current_platform, get_platform, get_platform_names, is_cross_compiled, PlatformType
 from SDK.Util import png_to_ico
 from SDK.Job import Job, JobError
 from Lint.Lint import lint_files
@@ -77,7 +77,7 @@ def cmd_build(args):
         _generate(args)
 
         with Job("Building", dump_on_error=False) as job:
-            build_cmake(job, args.target)
+            build_cmake(job, args.target, getattr(args, "simulator", False))
 
         if not getattr(args, "packaged", False) and DotNet.is_enabled(get_engine_path(), get_project_path()):
             with Job("Building scripting modules"):
@@ -150,6 +150,7 @@ PACKAGERS = {
     PlatformType.Win64: ("Package.Win64", "package_for_win64"),
     PlatformType.Linux: ("Package.Linux", "package_for_linux"),
     PlatformType.Web: ("Package.Web", "package_for_web"),
+    PlatformType.iOS: ("Package.iOS", "package_for_ios"),
 }
 
 def cmd_package(args):
@@ -158,13 +159,19 @@ def cmd_package(args):
     if target not in PACKAGERS:
         print(f"Packaging for {target.name} is not implemented yet")
         sys.exit(1)
-    if target != PlatformType.Web and target != get_current_platform():
-        print(f"Packaging for {target.name} has to run on {target.name}; only the Web target cross-compiles.")
+    if target != get_current_platform() and not is_cross_compiled(target):
+        print(f"Packaging for {target.name} has to run on {target.name}; only Web (any host) and iOS (macOS host) cross-compile.")
         sys.exit(1)
 
+    module_name, function_name = PACKAGERS[target]
+    packager = __import__(module_name, fromlist=[function_name])
     try:
+        if hasattr(packager, "prepare_package"):
+            with Job("Preparing signing"):
+                packager.prepare_package(project_path, args)
         _cook(args, target.name)  # Ensure assets are cooked before packaging
     except JobError as e:
+        print(f"{Fore.RED}{e}{Style.RESET_ALL}")
         sys.exit(e.returncode)
 
     # copy cooked assets to Content directory so they get included in the package
@@ -182,8 +189,7 @@ def cmd_package(args):
 
     os.makedirs(f"{project_path}/Dist", exist_ok=True)
 
-    module_name, function_name = PACKAGERS[target]
-    package = getattr(__import__(module_name, fromlist=[function_name]), function_name)
+    package = getattr(packager, function_name)
     try:
         with Job("Packaging"):
             package(project_path, args)
@@ -270,6 +276,7 @@ def main():
     generate_args_parser.add_argument("--configuration", choices=["Debug", "Dev", "Dist"], default="Dev", help="Build configuration")
     generate_args_parser.add_argument("--packaged", action="store_true", default=False, help="Whether to build a packaged version (binary may be embedded into an application bundle)")
     generate_args_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before generating/building")
+    generate_args_parser.add_argument("--simulator", action="store_true", default=False, help="iOS: build for the iOS Simulator instead of a device")
     generate_args_parser.add_argument("--skip-ide-project", action="store_true", default=False, help="Skip regenerating the native IDE project (used by IDE-triggered builds so the project file isn't rewritten mid-build)")
 
     generate_parser = subparsers.add_parser("generate", parents=[generate_args_parser], help="Generate project files (CMake + native IDE project) without building")
@@ -287,7 +294,11 @@ def main():
 
     package_parser = subparsers.add_parser("package", parents=[generate_args_parser], help="Package project")
     package_parser.add_argument("--sign", action="store_true", default=False, help="Sign the package (Linux: embeds a GPG signature in the AppImage)")
-    package_parser.add_argument("--sign-key", default=None, metavar="KEY", help="Key to sign with; implies --sign and defaults to the default GPG key")
+    package_parser.add_argument("--sign-key", default=None, metavar="KEY", help="Key to sign with; implies --sign and defaults to the default GPG key (iOS: the codesigning identity, defaults to your Apple Development certificate)")
+    package_parser.add_argument("--bundle-id", default=None, metavar="ID", help="iOS: bundle identifier; defaults to com.artifact.<team id>")
+    package_parser.add_argument("--team", default=None, metavar="TEAM_ID", help="iOS: development team; defaults to the team of the Apple ID signed in to Xcode")
+    package_parser.add_argument("--provisioning-profile", default=None, metavar="PATH", help="iOS: .mobileprovision to embed instead of creating one through Xcode")
+    package_parser.add_argument("--install", action="store_true", default=False, help="iOS: install and launch the package on the connected iPhone (or the booted simulator with --simulator)")
     package_parser.set_defaults(func=cmd_package)
 
     docs_parser = subparsers.add_parser("docs", help="Dump reflection data (classes, structs, enums, modules) as JSON for the Docs frontend")

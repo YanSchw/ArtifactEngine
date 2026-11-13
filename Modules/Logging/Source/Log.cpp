@@ -35,8 +35,7 @@ static constexpr bool IsPackagedBuild() {
 }
 
 static constexpr bool ShouldLogToConsole() {
-#if defined(AE_PLATFORM_WEB)
-    // A log file inside the browser's virtual filesystem is unreachable; its console is the log.
+#if defined(AE_PLATFORM_WEB) || defined(AE_PLATFORM_IOS)
     return true;
 #else
     return !IsPackagedBuild();
@@ -50,7 +49,7 @@ static std::filesystem::path GetPackagedBuildLogFileDirectory() {
     if (const char* localAppData = std::getenv("LOCALAPPDATA"); localAppData != nullptr && localAppData[0] != '\0') {
         return std::filesystem::path(localAppData) / "ArtifactEngine" / "Logs";
     }
-#elif defined(AE_PLATFORM_MACOS)
+#elif defined(AE_PLATFORM_MACOS) || defined(AE_PLATFORM_IOS)
     if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
         return std::filesystem::path(home) / "Library" / "Logs" / "ArtifactEngine";
     }

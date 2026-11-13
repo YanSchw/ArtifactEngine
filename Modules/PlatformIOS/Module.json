@@ -1,0 +1,27 @@
+{
+    "SourceDirectories": [
+        "Source"
+    ],
+    "IncludePaths": [
+        "Source"
+    ],
+    "ExportIncludePaths": [
+        "Source"
+    ],
+    "ImportModules": [
+        "EngineCore",
+        "InputSystem"
+    ],
+    "LinkLibraries": [
+        "-framework UIKit",
+        "-framework QuartzCore",
+        "-framework Metal",
+        "-framework AudioToolbox",
+        "-framework CoreFoundation",
+        "-framework Foundation",
+        "-lobjc"
+    ],
+    "TargetPlatforms": [
+        "iOS"
+    ]
+}

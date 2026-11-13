@@ -54,19 +54,22 @@ bool InputSystem::ReadPath(const String& InPath, InputValue& OutValue) {
     }
     String device = InPath.substr(0, slash);
     String control = InPath.substr(slash + 1);
+    bool found = false;
     for (int32_t i = 0; i < m_Devices.Size(); i++) {
         const SharedObjectPtr<InputDevice>& it = m_Devices[i];
-        if (it->GetDeviceName() == device) {
-            if (!it->ReadControl(control, OutValue)) {
-                return false;
-            }
-            // Stamp the source so callbacks can tell which device fired.
-            OutValue.Device = it;
-            OutValue.DeviceIndex = i;
-            return true;
+        InputValue value;
+        if (it->GetDeviceName() != device || !it->ReadControl(control, value)) {
+            continue;
         }
+        if (found && value.Magnitude() <= OutValue.Magnitude()) {
+            continue;
+        }
+        value.Device = it;
+        value.DeviceIndex = i;
+        OutValue = value;
+        found = true;
     }
-    return false;
+    return found;
 }
 
 WeakObjectPtr<InputDevice> InputSystem::GetLastActiveDevice() const {
@@ -82,7 +85,7 @@ Array<String> InputSystem::GetControlPaths(InputValueType InFilter) {
     for (const auto& device : m_Devices) {
         const String prefix = device->GetDeviceName() + "/";
         for (const InputControl& control : device->GetControls()) {
-            if (control.Type == InFilter) {
+            if (control.Type == InFilter && !paths.Contains(prefix + control.Name)) {
                 paths.Add(prefix + control.Name);
             }
         }

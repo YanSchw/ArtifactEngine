@@ -76,6 +76,17 @@ def _macos_sdk_root():
     return _newest([root for root in (Path.home() / "VulkanSDK").glob("*/macOS") if _is_macos_sdk(root)])
 
 
+def _is_ios_sdk(root: Path) -> bool:
+    return (root / "lib/MoltenVK.xcframework").exists() and (root / "include/vulkan/vulkan.h").exists()
+
+
+def ios_sdk_root():
+    environment_root = os.environ.get("VULKAN_SDK")
+    if environment_root and _is_ios_sdk(Path(environment_root).parent / "iOS"):
+        return Path(environment_root).parent / "iOS"
+    return _newest([root for root in (Path.home() / "VulkanSDK").glob("*/iOS") if _is_ios_sdk(root)])
+
+
 def _find_macos_installer(extracted: Path) -> Path:
     for pattern in ("*.app", "*/*.app"):
         for application in sorted(extracted.glob(pattern)):

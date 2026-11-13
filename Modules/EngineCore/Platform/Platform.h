@@ -9,6 +9,7 @@ enum class PlatformType : uint32_t {
     MacOS,
     Linux,
     Web,
+    iOS,
 };
 
 class Platform {

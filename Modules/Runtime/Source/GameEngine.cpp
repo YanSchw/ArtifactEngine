@@ -6,6 +6,7 @@
 #include "InputSystem/InputSystem.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/MouseDevice.h"
+#include "InputSystem/MultiTouchDevice.h"
 #include "GameFramework/UINode.h"
 #include "GameFramework/UIWorld.h"
 #include "Assets/Font.h"
@@ -87,6 +88,12 @@ UIFrameContext GameEngine::ReadUIInput(double InDeltaTime) const {
         context.SecondaryPressedThisFrame = mouse->IsDown(MouseCode::Right);
         context.SecondaryReleasedThisFrame = mouse->IsUp(MouseCode::Right);
         context.ScrollDelta = mouse->GetScrollDelta();
+    } else if (MultiTouchDevice* touchscreen = MultiTouchDevice::Instance()) {
+        const TouchPoint* touch = touchscreen->GetPrimaryTouch();
+        context.CursorPosition = touch ? touch->Position : Vec2(-1.0e6f);
+        context.CursorDown = touch && touch->IsActive();
+        context.CursorPressedThisFrame = touch && touch->BeganThisFrame;
+        context.CursorReleasedThisFrame = touch && !touch->IsActive();
     }
     if (KeyboardDevice* keyboard = KeyboardDevice::Instance()) {
         context.NavUp = keyboard->IsDown(KeyCode::Up);

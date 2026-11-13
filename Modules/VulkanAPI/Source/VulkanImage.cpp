@@ -95,6 +95,18 @@ static VkImageAspectFlags ImageAspectToVkImageAspect(ImageAspect aspect) {
     }
 }
 
+static constexpr VkImageUsageFlags s_AttachmentUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                                       | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+
+static uint32_t GetMaxFramebufferLayers(VulkanAPI& InVulkanAPI) {
+    static const uint32_t s_MaxLayers = [&InVulkanAPI] {
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceProperties(InVulkanAPI.GetPhysicalDevice(), &properties);
+        return properties.limits.maxFramebufferLayers;
+    }();
+    return s_MaxLayers;
+}
+
 VulkanImageView::VulkanImageView(const ImageViewDesc& InImageViewDesc, VulkanAPI& InVulkanAPI) {
     s_ImageViews.Add(this);
     m_Desc = InImageViewDesc;
@@ -110,6 +122,13 @@ VulkanImageView::VulkanImageView(const ImageViewDesc& InImageViewDesc, VulkanAPI
     viewInfo.subresourceRange.levelCount = InImageViewDesc.MipCount;
     viewInfo.subresourceRange.baseArrayLayer = InImageViewDesc.BaseLayer;
     viewInfo.subresourceRange.layerCount = InImageViewDesc.LayerCount;
+
+    VkImageViewUsageCreateInfo usageInfo{};
+    usageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO;
+    usageInfo.usage = VulkanHelpers::ImageUsageToVkImageUsage(InImageViewDesc.ImagePtr->GetDesc().Usage) & ~s_AttachmentUsage;
+    if (InImageViewDesc.LayerCount > GetMaxFramebufferLayers(*m_VulkanAPI) && usageInfo.usage != 0) {
+        viewInfo.pNext = &usageInfo;
+    }
 
     if (vkCreateImageView(m_VulkanAPI->GetDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS) {
         throw std::runtime_error("failed to create image view!");

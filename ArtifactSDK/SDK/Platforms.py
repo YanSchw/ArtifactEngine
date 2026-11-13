@@ -6,6 +6,7 @@ class PlatformType(Enum):
     MacOS = auto()
     Linux = auto()
     Web = auto()
+    iOS = auto()
 
 def get_current_platform() -> PlatformType:
     if sys.platform.startswith("win"):
@@ -35,4 +36,11 @@ def get_cpp_platform_macro(platform) -> str:
         PlatformType.MacOS: "AE_PLATFORM_MACOS",
         PlatformType.Linux: "AE_PLATFORM_LINUX",
         PlatformType.Web: "AE_PLATFORM_WEB",
+        PlatformType.iOS: "AE_PLATFORM_IOS",
     }[get_platform(platform)]
+
+
+def is_cross_compiled(target, host=None) -> bool:
+    target = get_platform(target)
+    host = host or get_current_platform()
+    return target != host and (target == PlatformType.Web or (target == PlatformType.iOS and host == PlatformType.MacOS))

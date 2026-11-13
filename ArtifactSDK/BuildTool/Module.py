@@ -120,13 +120,20 @@ class ArtifactModule:
 
     def get_foreign_source_directories(self, platform: str) -> List[str]:
         """Source directories belonging to a target platform other than the given one."""
+        own = set(self.PlatformSourceDirectories.get(platform, []))
         return [directory
                 for target, directories in self.PlatformSourceDirectories.items() if target != platform
-                for directory in directories]
+                for directory in directories if directory not in own]
+
+    def get_source_extensions(self, platform: str) -> List[str]:
+        """Source file extensions compiled for the given target platform."""
+        return ["cpp", "mm"] if platform == "iOS" else ["cpp"]
 
     def get_source_files_pattern(self, platform: str) -> List[str]:
         """Get glob patterns for source files."""
-        return [f"{sd}/*.cpp" for sd in self.get_source_directories(platform)]
+        return [f"{sd}/*.{extension}"
+                for sd in self.get_source_directories(platform)
+                for extension in self.get_source_extensions(platform)]
 
     def to_dict(self) -> dict:
         """Convert module to dictionary representation."""

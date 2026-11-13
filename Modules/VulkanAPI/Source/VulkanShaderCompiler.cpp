@@ -76,7 +76,8 @@ static String RemapDiagnostics(const String& InOutput, const String& InTempPath,
 bool VulkanShaderCompiler::SupportsPlatform(PlatformType InPlatform) const {
     return InPlatform == PlatformType::Win64
         || InPlatform == PlatformType::MacOS
-        || InPlatform == PlatformType::Linux;
+        || InPlatform == PlatformType::Linux
+        || InPlatform == PlatformType::iOS;
 }
 
 bool VulkanShaderCompiler::Compile(const ShaderSource& InSource, CompiledShader& OutCompiled, String& OutError) {

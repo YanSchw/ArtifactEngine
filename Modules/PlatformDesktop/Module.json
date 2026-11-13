@@ -8,6 +8,7 @@
     "TargetPlatforms": [
         "Win64",
         "Linux",
-        "MacOS"
+        "MacOS",
+        "iOS"
     ]
 }

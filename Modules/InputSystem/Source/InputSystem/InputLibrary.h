@@ -27,6 +27,15 @@ public:
     FUNCTION(Pure, Category = "Input|Mouse")
     static Vec2 GetMouseDelta();
 
+    FUNCTION(Pure, Category = "Input|Touch")
+    static bool IsTouching();
+    FUNCTION(Pure, Category = "Input|Touch")
+    static int32_t GetTouchCount();
+    FUNCTION(Pure, Category = "Input|Touch")
+    static Vec2 GetTouchPosition(int32_t InIndex);
+    FUNCTION(Pure, Category = "Input|Touch")
+    static Vec2 GetTouchDelta(int32_t InIndex);
+
     FUNCTION(Pure, Category = "Input|Actions")
     static InputAction* FindAction(const String& InName);
     FUNCTION(Pure, Category = "Input|Actions")
