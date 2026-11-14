@@ -622,6 +622,11 @@ void EditorWindow::HandleShortcuts() {
         ToggleHeroTool(m_ConsoleTool);
     } else if (ctrl && keyboard->IsDown(KeyCode::Comma)) {
         OpenEditorSettings();
+#if defined(AE_PLATFORM_MACOS)
+    } else if (m_ActiveTab && keyboard->IsDown(KeyCode::W)
+               && (keyboard->IsPressed(KeyCode::LeftSuper) || keyboard->IsPressed(KeyCode::RightSuper))) {
+        CloseTab(m_ActiveTab);
+#endif
     } else if (keyboard->IsDown(KeyCode::Escape) && m_ActiveHeroTool) {
         CloseHeroTool();
     } else {
