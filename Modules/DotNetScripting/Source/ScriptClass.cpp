@@ -12,6 +12,8 @@ struct ScriptBase {
     Object* (*Allocate)(std::shared_ptr<const ScriptClassInfo>);
 };
 
+static_assert(sizeof(Class) == sizeof(String) && offsetof(Class, Name) == 0);
+
 static Map<String, std::shared_ptr<const ScriptClassInfo>> s_Classes;
 static std::unordered_map<Object*, ScriptInstance*> s_Instances;
 
@@ -48,6 +50,7 @@ static uint32_t SizeOf(ScriptFieldKind InKind) {
         case ScriptFieldKind::Vec3: return sizeof(Vec3);
         case ScriptFieldKind::Vec4: return sizeof(Vec4);
         case ScriptFieldKind::Color: return sizeof(Color);
+        case ScriptFieldKind::Class: return sizeof(Class);
     }
     return 0;
 }
@@ -57,6 +60,7 @@ static uint32_t AlignOf(ScriptFieldKind InKind) {
         case ScriptFieldKind::Double: return alignof(double);
         case ScriptFieldKind::Bool: return alignof(bool);
         case ScriptFieldKind::String: return alignof(String);
+        case ScriptFieldKind::Class: return alignof(Class);
         default: return alignof(float);
     }
 }
@@ -72,6 +76,7 @@ static Property* MakeProperty(const String& InName, ScriptFieldKind InKind, uint
         case ScriptFieldKind::Vec3: return new StructProperty(InName, InOffset, "Vec3");
         case ScriptFieldKind::Vec4: return new StructProperty(InName, InOffset, "Vec4");
         case ScriptFieldKind::Color: return new StructProperty(InName, InOffset, "Color");
+        case ScriptFieldKind::Class: return new SubclassOfProperty(InName, InOffset, Object::StaticClass());
     }
     return nullptr;
 }
@@ -79,6 +84,8 @@ static Property* MakeProperty(const String& InName, ScriptFieldKind InKind, uint
 static void CopyField(ScriptFieldKind InKind, char* OutValue, const char* InValue) {
     if (InKind == ScriptFieldKind::String) {
         *reinterpret_cast<String*>(OutValue) = *reinterpret_cast<const String*>(InValue);
+    } else if (InKind == ScriptFieldKind::Class) {
+        *reinterpret_cast<Class*>(OutValue) = *reinterpret_cast<const Class*>(InValue);
     } else {
         std::memcpy(OutValue, InValue, SizeOf(InKind));
     }
@@ -93,6 +100,8 @@ void ScriptClassInfo::ConstructStorage(char* InStorage) const {
     for (const ScriptField& field : Fields) {
         if (field.Kind == ScriptFieldKind::String) {
             ::new (InStorage + field.Offset) String();
+        } else if (field.Kind == ScriptFieldKind::Class) {
+            ::new (InStorage + field.Offset) Class();
         }
     }
 }
@@ -101,6 +110,8 @@ void ScriptClassInfo::DestructStorage(char* InStorage) const {
     for (const ScriptField& field : Fields) {
         if (field.Kind == ScriptFieldKind::String) {
             reinterpret_cast<String*>(InStorage + field.Offset)->~String();
+        } else if (field.Kind == ScriptFieldKind::Class) {
+            reinterpret_cast<Class*>(InStorage + field.Offset)->~Class();
         }
     }
 }

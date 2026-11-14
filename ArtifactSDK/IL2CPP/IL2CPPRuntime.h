@@ -20,6 +20,18 @@ inline String ToString(const String& InValue) {
     return InValue;
 }
 
+inline String ToString(const Class& InValue) {
+    return InValue.Name;
+}
+
+inline Class ClassOf(const Object* InObject) {
+    return InObject ? InObject->GetClass() : Class::None;
+}
+
+inline bool IsSubclassOf(const Class& InClass, const Class& InBaseClass) {
+    return InBaseClass != Class::None && InClass.IsSubclassOf(InBaseClass);
+}
+
 inline String ToString(bool InValue) {
     return InValue ? "True" : "False";
 }

@@ -12,6 +12,7 @@ public:
 
     UIToggle();
 
+    PROPERTY()
     bool IsOn = false;
     WeakObjectPtr<UINode> Graphic;
     std::function<void(bool)> Changed;

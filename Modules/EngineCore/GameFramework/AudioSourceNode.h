@@ -43,7 +43,9 @@ public:
     FUNCTION()
     void SetClip(AudioClip* InClip);
 
+    FUNCTION(Pure)
     bool GetAutoPlay() const { return m_AutoPlay; }
+    FUNCTION()
     void SetAutoPlay(bool InAutoPlay) { m_AutoPlay = InAutoPlay; }
     FUNCTION(Pure)
     bool IsLooping() const { return m_Loop; }
@@ -65,7 +67,9 @@ public:
     bool IsSpatial() const { return m_Spatial; }
     FUNCTION()
     void SetSpatial(bool InSpatial) { m_Spatial = InSpatial; }
+    FUNCTION(Pure)
     const AudioAttenuation& GetAttenuation() const { return m_Attenuation; }
+    FUNCTION()
     void SetAttenuation(const AudioAttenuation& InAttenuation) { m_Attenuation = InAttenuation; }
     FUNCTION(Pure)
     const String& GetBus() const { return m_Bus; }
@@ -85,10 +89,10 @@ private:
     PROPERTY()
     bool m_Loop = false;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float m_Volume = 1.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0.01, 4))
     float m_Pitch = 1.0f;
 
     PROPERTY(Range = (-1, 1))

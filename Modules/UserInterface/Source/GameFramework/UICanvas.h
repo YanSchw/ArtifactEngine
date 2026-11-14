@@ -1,6 +1,7 @@
 #pragma once
 #include "UINode.h"
 #include "Object/Pointer.h"
+#include "Object/Enum.h"
 #include "UICanvas.gen.h"
 
 class CameraNode;
@@ -11,12 +12,14 @@ class UIDrawList;
  *  World   — the canvas is a plane placed in the 3D world (WorldPosition/WorldRotation, sized
  *            CanvasSize / PixelsPerUnit units) and projected through Camera. It is still drawn
  *            in the UI pass, so scene geometry does not occlude it. */
+ARTIFACT_ENUM();
 enum class UICanvasRenderMode : uint8_t { Overlay = 0, World = 1 };
 
 /** How an Overlay canvas maps its pixels to the viewport.
  *  ConstantPixelSize   — one canvas pixel is one screen pixel, times ScaleFactor.
  *  ScaleWithScreenSize — the canvas is scaled relative to ReferenceResolution, blending between
  *                        width- and height-relative scale via MatchWidthHeight (Unity-style). */
+ARTIFACT_ENUM();
 enum class UICanvasScaleMode : uint8_t { ConstantPixelSize = 0, ScaleWithScreenSize = 1 };
 
 /** The root of a UI tree: every UINode you want rendered lives under a canvas, and the canvas
@@ -27,34 +30,49 @@ public:
 
     UICanvas();
 
+    PROPERTY()
     UICanvasRenderMode RenderMode = UICanvasRenderMode::Overlay;
 
     // Scaling (Overlay mode).
+    PROPERTY()
     UICanvasScaleMode ScaleMode = UICanvasScaleMode::ConstantPixelSize;
+    PROPERTY()
     float ScaleFactor = 1.0f;                          // ConstantPixelSize multiplier
+    PROPERTY()
     Vec2 ReferenceResolution = Vec2(1920.0f, 1080.0f); // ScaleWithScreenSize design resolution
+    PROPERTY(Range = (0, 1))
     float MatchWidthHeight = 0.5f;                     // 0 = match width, 1 = match height
 
     // Placement (World mode).
+    PROPERTY()
     Vec2 CanvasSize = Vec2(1920.0f, 1080.0f); // canvas rect in canvas pixels
+    PROPERTY()
     float PixelsPerUnit = 100.0f;             // canvas pixels per world unit
+    PROPERTY()
     Vec3 WorldPosition = Vec3(0.0f);          // canvas centre, world units
+    PROPERTY()
     Vec3 WorldRotation = Vec3(0.0f);          // degrees, euler (same order as UINode::Rotation)
     CameraNode* Camera = nullptr;             // camera to project through; identity view when null
 
     // Perspective distance in canvas units for tilted nodes (Overlay mode). Larger = flatter.
+    PROPERTY()
     float Perspective = 1000.0f;
 
+    PROPERTY()
     UIInputMode InputMode = UIInputMode::Cursor;
 
+    FUNCTION(Pure)
     UINode* GetFocusedNode() const { return m_FocusedNode.Get(); }
+    FUNCTION(Pure)
     UINode* GetHoveredNode() const { return m_HoveredNode.Get(); }
+    FUNCTION()
     void SetFocus(UINode* InNode);
 
     /** Pointer shape requested by the topmost hit (or captured) node this frame. */
     CursorIcon GetDesiredCursor() const { return m_DesiredCursor; }
 
     /** Disables InNode now and deletes it at the start of the next frame. */
+    FUNCTION()
     void DestroyDeferred(UINode* InNode);
 
     /** Runs one UI frame — UpdateFrame, then PaintFrame. */

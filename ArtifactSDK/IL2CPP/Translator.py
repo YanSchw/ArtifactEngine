@@ -138,6 +138,7 @@ INT64 = CType("int", "int64_t")
 FLOAT = CType("float", "float")
 DOUBLE = CType("float", "double")
 STRING = CType("string", "String")
+CLASS = CType("classref", "Class")
 NULL = CType("null")
 STRING_ARRAY = CType("strarray")
 
@@ -210,6 +211,10 @@ class Program:
                 return CType("struct", VALUE_STRUCTS[sig.Name])
             if sig.Name == HANDLER:
                 return STRING
+            if sig.Name == "Artifact.Class":
+                return CLASS
+            if sig.Name == "System.Type":
+                raise TranspileError("System.Type values are not supported; use Artifact.Class")
             if sig.Name.startswith("Artifact.") and sig.Name[9:] in self.Enums:
                 self.Seen.add(("enum", sig.Name[9:]))
                 return CType("enum", sig.Name[9:])
@@ -481,6 +486,13 @@ class MethodTranslator:
             self._statement(f"l{index} = {self.coerce(value, self.Locals[index])};")
         elif name == "ldnull":
             self._push("nullptr", NULL, const=True)
+        elif name == "ldtoken":
+            full_name = self.Program.type_token_name(self.Assembly, operand)
+            class_name = self.Program.class_name(full_name)
+            if class_name is None:
+                raise TranspileError(f"typeof({full_name}) is not supported")
+            self.Program.Seen.add(("class", class_name))
+            self._push(class_name, CType("typetoken", class_name), const=True)
         elif name.startswith("ldc.i4"):
             number = -1 if name == "ldc.i4.m1" else (operand if operand is not None else int(name[-1]))
             self._push("(-2147483647 - 1)" if number == -2147483648 else str(number), INT32, const=True)
@@ -629,6 +641,8 @@ class MethodTranslator:
         target = self._pop() if op in ("ldfld", "ldflda", "stfld") else None
         if owner in VALUE_STRUCTS:
             expr, type_ = f"{target.Expr}.{STRUCT_MEMBERS[name]}", FLOAT
+        elif owner == "Artifact.Class" and name == "None" and op in ("ldsfld", "ldsflda"):
+            expr, type_ = "Class::None", CLASS
         elif owner in self.Program.Scripts:
             type_ = self.Program.ctype(sig)
             member = identifier(name)
@@ -666,6 +680,12 @@ class MethodTranslator:
         args = [self._pop() for _ in sig.Params][::-1]
         target = self._pop() if sig.HasThis else None
         constrained, self.Constrained = self.Constrained, None
+        if declaring == "System.Type" and name == "GetTypeFromHandle" and args and args[0].Type.Kind == "typetoken":
+            self._push(args[0].Expr, CType("type", args[0].Expr), const=True)
+            return
+        if declaring == "Artifact.Class" or (constrained == "Artifact.Class" and name == "ToString"):
+            self._class_call(name, target, args, generic)
+            return
         returns = self.Program.ctype(sig.Return)
         on_this = target is not None and target.Expr == "this"
 
@@ -768,8 +788,44 @@ class MethodTranslator:
         else:
             raise TranspileError(f"{declaring}.{name} is not supported")
 
+    def _class_of(self, value: Value) -> str:
+        if value.Type.Kind == "type":
+            return f"{value.Type.Cpp}::StaticClass()"
+        if value.Type.Kind == "null":
+            return "Class::None"
+        raise TranspileError("only typeof(...) converts to Artifact.Class")
+
+    def _class_call(self, name: str, target: Value, args: list, generic: list):
+        if name == ".ctor":
+            self._statement(f"{target.Expr} = Class({self.coerce(args[0], STRING)});")
+        elif name == "Of" and generic:
+            type_ = self.Program.ctype(generic[0])
+            if type_ is None or type_.Kind != "object":
+                raise TranspileError("Class.Of<T>() needs an Artifact.Object type")
+            self._push(f"{type_.Cpp}::StaticClass()", CLASS)
+        elif name in ("Of", "op_Implicit"):
+            self._push(self._class_of(args[0]), CLASS)
+        elif name == "get_Name" or name == "ToString":
+            self._push(f"{target.Expr}.Name", STRING)
+        elif name == "get_IsValid":
+            self._push(f"({target.Expr} != Class::None)", BOOL)
+        elif name == "get_Parent":
+            self._push(f"{target.Expr}.GetParentClass()", CLASS)
+        elif name == "IsSubclassOf":
+            self._push(f"IL2CPP::IsSubclassOf({target.Expr}, {args[0].Expr})", BOOL)
+        elif name in ("op_Equality", "op_Inequality"):
+            self._push(f"({args[0].Expr} {'==' if name == 'op_Equality' else '!='} {args[1].Expr})", BOOL)
+        elif name == "Equals" and args and args[0].Type.Kind == "classref":
+            self._push(f"({target.Expr} == {args[0].Expr})", BOOL)
+        else:
+            raise TranspileError(f"Artifact.Class.{name} is not available in packaged builds")
+
     def _object_call(self, name: str, target: Value):
-        if name == "get_IsValid":
+        if name == "StaticClass":
+            self._push("Object::StaticClass()", CLASS)
+        elif name == "GetClass":
+            self._push(f"IL2CPP::ClassOf({self.raw(target)})", CLASS)
+        elif name == "get_IsValid":
             self._push(f"({self.raw(target)} != nullptr)", BOOL)
         elif name in ("Retain", "Release"):
             self._call_result(f"Object::{name}({self.raw(target)})", None)

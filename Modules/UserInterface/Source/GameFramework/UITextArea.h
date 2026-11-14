@@ -19,19 +19,31 @@ public:
 
     UITextArea();
 
+    PROPERTY()
     String Text;
     /** One-line field: Enter submits instead of inserting a line break. */
+    PROPERTY()
     bool SingleLine = false;
     /** Drawn dim while Text is empty and the field is not focused. */
+    PROPERTY()
     String Placeholder;
-    Font* FontAsset = nullptr;  // falls back to UINode::GetDefaultFont()
+    PROPERTY()
+    WeakObjectPtr<Font> FontAsset;  // falls back to UINode::GetDefaultFont()
+    PROPERTY()
     float FontSize = 18.0f;
-    Vec4 TextColor = Vec4(1.0f);
-    Vec4 PlaceholderColor = Vec4(1.0f, 1.0f, 1.0f, 0.3f);
-    Vec4 CaretColor = Vec4(1.0f);
-    Vec4 SelectionColor = Vec4(0.15f, 0.4f, 0.8f, 0.5f);
-    Vec4 BackgroundColor = Vec4(0.0f, 0.0f, 0.0f, 0.35f);
-    Vec4 FocusedBorderColor = Vec4(0.15f, 0.55f, 1.0f, 1.0f);
+    PROPERTY()
+    Color TextColor = Color(1.0f);
+    PROPERTY()
+    Color PlaceholderColor = Color(1.0f, 1.0f, 1.0f, 0.3f);
+    PROPERTY()
+    Color CaretColor = Color(1.0f);
+    PROPERTY()
+    Color SelectionColor = Color(0.15f, 0.4f, 0.8f, 0.5f);
+    PROPERTY()
+    Color BackgroundColor = Color(0.0f, 0.0f, 0.0f, 0.35f);
+    PROPERTY()
+    Color FocusedBorderColor = Color(0.15f, 0.55f, 1.0f, 1.0f);
+    PROPERTY()
     float CornerRadius = 3.0f;
 
     std::function<void(const String&)> TextChanged;  // after every edit
@@ -54,14 +66,20 @@ public:
     void SetText(const String& InText) { Text = InText; }
 
     /** Places the caret (clamped to [0, Text length]) and collapses any selection. */
+    FUNCTION()
     void SetCaret(int32_t InIndex);
+    FUNCTION(Pure)
     int32_t GetCaret() const { return m_Caret; }
 
     /** Selects [InStart, InEnd) and puts the caret at InEnd. */
+    FUNCTION()
     void SetSelection(int32_t InStart, int32_t InEnd);
+    FUNCTION()
     void SelectAll() { SetSelection(0, (int32_t)Text.size()); }
+    FUNCTION(Pure)
     bool HasSelection() const { return m_SelectionAnchor >= 0 && m_SelectionAnchor != m_Caret; }
     /** Ordered selection range; false when nothing is selected. */
+    FUNCTION(Pure)
     bool GetSelection(int32_t& OutStart, int32_t& OutEnd) const;
 
     virtual void Paint(UIDrawList& OutDrawList) override;

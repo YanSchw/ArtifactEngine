@@ -3,9 +3,12 @@
 #include "Object/Pointer.h"
 #include <functional>
 #include <optional>
+#include "Object/Enum.h"
+#include "ParticleHandle.gen.h"
 
 class ParticleSystemInstance;
 
+ARTIFACT_ENUM();
 enum class ParticleStopBehavior : uint8_t {
     StopEmitting = 0,
     StopEmittingAndClear = 1

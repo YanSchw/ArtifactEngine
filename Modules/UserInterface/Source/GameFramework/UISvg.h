@@ -9,8 +9,11 @@ class UISvg : public UINode {
 public:
     ARTIFACT_CLASS();
 
+    PROPERTY()
     WeakObjectPtr<VectorImage> Image;
+    PROPERTY()
     Color Tint = Color(1.0f);
+    PROPERTY()
     bool PreserveAspect = true;
 
     virtual void Paint(UIDrawList& OutDrawList) override;

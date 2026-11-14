@@ -39,6 +39,7 @@ public:
     FUNCTION()
     void SetName(const String& InName);
 
+    FUNCTION(Pure)
     uint32_t GetNodeId() const { return m_NodeId; }
     static Node* FindById(uint32_t InNodeId);
 
@@ -65,9 +66,12 @@ public:
      *  UpdateFlag::LocalUpdate needs to be set first */
     virtual void LocalUpdate(float InDeltatime) { (void)InDeltatime; }
 
+    FUNCTION()
     void SetUpdateFlag(UpdateFlag InFlag);
+    FUNCTION(Pure)
     bool IsUpdateFlagSet(UpdateFlag InFlag) const;
 
+    FUNCTION(Pure)
     bool IsInitialized() const;
     FUNCTION(Pure)
     bool IsEnabled() const;
@@ -76,20 +80,28 @@ public:
     bool IsSelfEnabled() const;
     FUNCTION()
     void SetEnabled(bool InEnabled);
+    FUNCTION(Pure)
     bool WasBeginPlayCalled() const;
+    FUNCTION(Pure)
     bool IsPendingKill() const;
 
+    FUNCTION(Pure)
     World* GetWorld() const;
     FUNCTION()
     void Destroy();
 
+    FUNCTION()
     Node* CreateChild(const Class& InChildClass);
+    FUNCTION()
     Node* AttachChild(const Class& InChildClass);
 
-    Node* GetChild(int InIndex) const;
+    FUNCTION(Pure)
+    Node* GetChild(int32_t InIndex) const;
+    FUNCTION(Pure)
     Node* GetDirectChildByName(const String& InName) const;
     FUNCTION(Pure)
     Node* GetChildByName(const String& InName, bool InIncludeSelf = false);
+    FUNCTION(Pure)
     Node* GetChildByClass(const Class& InClass, bool InIncludeSelf = false);
     FUNCTION(Pure)
     int32_t GetSiblingIndex() const;
@@ -109,7 +121,9 @@ public:
     FUNCTION(Pure)
     Node* GetRootNode();
 
+    FUNCTION(Pure)
     virtual Node3D* GetTransform();
+    FUNCTION(Pure)
     virtual Node3D* GetParentTransform();
 
     void SetMarkedAsInherited(bool InIsInherited);
@@ -127,6 +141,7 @@ public:
     void ResetPropertyToDefault(const String& InPropertyName);
 
     UUID GetBlueprintId() const { return m_BlueprintId; }
+    FUNCTION(Pure)
     Class GetSerializedClass() const;
 
 protected:

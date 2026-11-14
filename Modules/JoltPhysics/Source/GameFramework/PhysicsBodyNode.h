@@ -103,12 +103,17 @@ public:
     FUNCTION()
     void Deactivate();
 
+    FUNCTION(Pure)
     bool GetAllowSleeping() const { return m_AllowSleeping; }
+    FUNCTION()
     void SetAllowSleeping(bool InAllowSleeping);
 
+    FUNCTION(Pure)
     bool GetUseContinuousCollision() const { return m_UseContinuousCollision; }
+    FUNCTION()
     void SetUseContinuousCollision(bool InUseContinuousCollision);
 
+    FUNCTION(Pure)
     bool HasBody() const { return m_BodyId != InvalidBodyId; }
     uint32_t GetBodyId() const { return m_BodyId; }
 
@@ -141,16 +146,16 @@ private:
     PROPERTY()
     float m_Mass = 0.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float m_Friction = 0.2f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float m_Restitution = 0.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float m_LinearDamping = 0.05f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float m_AngularDamping = 0.05f;
 
     PROPERTY()

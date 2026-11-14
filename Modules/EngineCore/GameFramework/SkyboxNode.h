@@ -33,7 +33,8 @@ struct SkyHdriParams {
     PROPERTY()
     WeakObjectPtr<Texture2D> Texture;
 
-    PROPERTY()
+    /** Degrees around the world's up axis. */
+    PROPERTY(Range = (0, 360))
     float Rotation = 0.0f;
 };
 

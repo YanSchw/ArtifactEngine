@@ -277,6 +277,8 @@ namespace PropertyTypes {
             return Cast<ArrayProperty>(InProperty) != nullptr;
         } else if constexpr (IsMap<T>::value) {
             return Cast<MapProperty>(InProperty) != nullptr;
+        } else if constexpr (std::is_same_v<T, Class>) {
+            return Cast<SubclassOfProperty>(InProperty) != nullptr;
         } else if constexpr (IsSubclassOf<T>::value) {
             SubclassOfProperty* property = Cast<SubclassOfProperty>(InProperty);
             return property && property->BaseClass.IsSubclassOf(T::GetBaseClass());

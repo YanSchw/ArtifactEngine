@@ -43,13 +43,18 @@ public:
     const Array<SubMesh>& GetSubMeshes() const { return m_SubMeshes; }
 
     /** The slot's material, or the default material when nothing is assigned to it. */
+    FUNCTION(Pure)
     Material* GetMaterial(int32_t InSlot = 0) const;
+    FUNCTION(Pure)
     Material* GetAssignedMaterial(int32_t InSlot) const;
     void SetMaterial(int32_t InSlot, Material* InMaterial);
 
+    FUNCTION(Pure)
     Vec3 GetBoundsCenter() const { return m_BoundsCenter; }
+    FUNCTION(Pure)
     float GetBoundsRadius() const { return m_BoundsRadius; }
     /** Half the size of the axis-aligned bounding box around GetBoundsCenter(). */
+    FUNCTION(Pure)
     Vec3 GetBoundsExtents() const { return m_BoundsExtents; }
 
     void SetImportSettings(const Vec3& InScale, const Vec3& InOffset, MeshNormalMode InNormalMode);

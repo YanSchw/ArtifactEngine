@@ -342,6 +342,7 @@ namespace Artifact
             if (type == typeof(Vec3)) return FieldKind.Vec3;
             if (type == typeof(Vec4)) return FieldKind.Vec4;
             if (type == typeof(Color)) return FieldKind.Color;
+            if (type == typeof(Class)) return FieldKind.Class;
             throw new NotSupportedException($"[Property] {field.DeclaringType.Name}.{field.Name} has unsupported type {type.Name}");
         }
 
@@ -359,6 +360,7 @@ namespace Artifact
                 FieldKind.Vec3 => *(Vec3*)data,
                 FieldKind.Vec4 => *(Vec4*)data,
                 FieldKind.Color => *(Color*)data,
+                FieldKind.Class => new Class(Native.ReadString((IntPtr)Native.Api.GetString((IntPtr)data))),
                 _ => null,
             };
         }
@@ -379,6 +381,9 @@ namespace Artifact
                 case FieldKind.Vec3: *(Vec3*)data = (Vec3)value; break;
                 case FieldKind.Vec4: *(Vec4*)data = (Vec4)value; break;
                 case FieldKind.Color: *(Color*)data = (Color)value; break;
+                case FieldKind.Class:
+                    using (Utf8 utf8 = new Utf8(((Class)value).Name)) { Native.Api.SetString((IntPtr)data, utf8.Bytes); }
+                    break;
             }
         }
 

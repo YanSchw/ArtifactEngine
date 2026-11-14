@@ -113,6 +113,9 @@ static void ReadArgument(Property& InProperty, void* OutValue, void* InArgument)
     if (Cast<StringProperty>(&InProperty)) {
         const char* text = *(const char**)InArgument;
         *(String*)OutValue = text ? text : "";
+    } else if (SubclassOfProperty* subclass = Cast<SubclassOfProperty>(&InProperty)) {
+        const char* name = *(const char**)InArgument;
+        subclass->Write(OutValue, Class(name ? name : ""));
     } else if (Cast<WeakObjectPtrProperty>(&InProperty) || Cast<SharedObjectPtrProperty>(&InProperty)) {
         *(WeakObjectPtr<Object>*)OutValue = *(Object**)InArgument;
     } else if (Cast<BoolProperty>(&InProperty)) {
@@ -125,6 +128,9 @@ static void ReadArgument(Property& InProperty, void* OutValue, void* InArgument)
 static void WriteResult(Property& InProperty, void* InValue, void* OutResult, Array<String>& OutStrings) {
     if (Cast<StringProperty>(&InProperty)) {
         OutStrings.Add(*(String*)InValue);
+        *(const char**)OutResult = OutStrings.LastItem().c_str();
+    } else if (SubclassOfProperty* subclass = Cast<SubclassOfProperty>(&InProperty)) {
+        OutStrings.Add(subclass->Read(InValue).Name);
         *(const char**)OutResult = OutStrings.LastItem().c_str();
     } else if (Cast<WeakObjectPtrProperty>(&InProperty) || Cast<SharedObjectPtrProperty>(&InProperty)) {
         *(Object**)OutResult = ((WeakObjectPtr<Object>*)InValue)->Get();

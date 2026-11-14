@@ -35,6 +35,10 @@ namespace Artifact
 
         public bool IsValid => Handle != IntPtr.Zero && Native.Api.IsAlive(m_Weak) != 0;
 
+        public static Class StaticClass() => new Class("Object");
+
+        public Class GetClass() => IsValid ? new Class(Native.GetClassName(Handle)) : Class.None;
+
         public void Retain() => Native.Api.Retain(Handle);
 
         public void Release() => Native.Api.Release(Handle);

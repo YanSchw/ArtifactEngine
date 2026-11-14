@@ -2,7 +2,7 @@
 #include "Object/Object.h"
 #include <memory>
 
-enum class ScriptFieldKind : int32_t { Float, Double, Int32, Bool, String, Vec2, Vec3, Vec4, Color };
+enum class ScriptFieldKind : int32_t { Float, Double, Int32, Bool, String, Vec2, Vec3, Vec4, Color, Class };
 
 struct ScriptField {
     String Name;

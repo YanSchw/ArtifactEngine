@@ -25,10 +25,12 @@ public:
     /** The engine's default shader graph, drawn wherever no material is assigned. */
     static Material* GetDefault();
 
+    FUNCTION(Pure)
     virtual ShaderGraph* GetBaseGraph() const;
     void SetBaseGraph(ShaderGraph* InShaderGraph);
 
     /** The material whose values are inherited where this one holds no override. */
+    FUNCTION(Pure)
     Material* GetParentMaterial() const;
 
     Shader* GetShader() const;
@@ -39,13 +41,19 @@ public:
 
     const Array<ShaderGraphProperty>& GetInputs() const;
 
+    FUNCTION(Pure)
     Vec4 GetInputValue(const String& InName) const;
+    FUNCTION()
     void SetInputValue(const String& InName, const Vec4& InValue);
 
+    FUNCTION(Pure)
     Texture2D* GetInputTexture(const String& InName) const;
+    FUNCTION()
     void SetInputTexture(const String& InName, Texture2D* InTexture);
 
+    FUNCTION(Pure)
     bool IsInputOverridden(const String& InName) const;
+    FUNCTION()
     void ClearInputOverride(const String& InName);
 
     void RefreshPropertyBuffer();

@@ -10,6 +10,7 @@ class SceneRootNode : public Node {
 public:
     ARTIFACT_CLASS();
 
+    FUNCTION(Pure)
     Scene* GetScene() const;
     void BindScene(Scene* InScene);
 

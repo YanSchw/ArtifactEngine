@@ -6,7 +6,7 @@ namespace Artifact
 {
     public enum FieldKind
     {
-        Float, Double, Int32, Bool, String, Vec2, Vec3, Vec4, Color
+        Float, Double, Int32, Bool, String, Vec2, Vec3, Vec4, Color, Class
     }
 
     [StructLayout(LayoutKind.Sequential)]

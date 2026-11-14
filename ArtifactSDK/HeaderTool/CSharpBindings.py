@@ -13,7 +13,7 @@ INT_TYPES = {
     "int32": "int", "uint32": "uint", "int64": "long", "uint64": "ulong",
 }
 BLITTABLE = {"float": "float", "double": "double", "Vec2": "Vec2", "Vec3": "Vec3", "Vec4": "Vec4", "Color": "Color", "Quat": "Quat"}
-RESERVED_MEMBERS = {"Retain", "Release", "IsValid", "Handle", "Equals", "GetType", "ToString", "GetHashCode", "FromHandle"}
+RESERVED_MEMBERS = {"Retain", "Release", "IsValid", "Handle", "Equals", "GetType", "GetClass", "StaticClass", "ToString", "GetHashCode", "FromHandle"}
 CSHARP_KEYWORDS = {
     "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked", "class", "const", "continue",
     "decimal", "default", "delegate", "do", "double", "else", "enum", "event", "explicit", "extern", "false", "finally",
@@ -32,11 +32,12 @@ def _identifier(name: str) -> str:
 
 
 class _Marshal:
-    def __init__(self, csharp: str, slot: str, to_slot: str, from_slot: str):
+    def __init__(self, csharp: str, slot: str, to_slot: str, from_slot: str, utf8: str = None):
         self.CSharp = csharp
         self.Slot = slot
         self.ToSlot = to_slot
         self.FromSlot = from_slot
+        self.Utf8 = utf8
 
 
 def _marshal(storage: str, classes: set, enums: set) -> _Marshal:
@@ -49,7 +50,9 @@ def _marshal(storage: str, classes: set, enums: set) -> _Marshal:
     if storage == "bool":
         return _Marshal("bool", "byte", "(byte)({0} ? 1 : 0)", "{0} != 0")
     if storage == "String":
-        return _Marshal("string", "IntPtr", "{0}", "Native.ReadString({0})")
+        return _Marshal("string", "IntPtr", "{0}", "Native.ReadString({0})", "{0}")
+    if storage == "Class" or _is_template(storage, "SubclassOf"):
+        return _Marshal("Class", "IntPtr", "{0}", "new Class(Native.ReadString({0}))", "{0}.Name")
     for template in ("WeakObjectPtr", "SharedObjectPtr"):
         if _is_template(storage, template):
             target = _template_argument(storage, template)
@@ -86,8 +89,8 @@ def _method(cls: Class, match, body: str, classes: set, enums: set, index: int) 
     for slot, (parameter, marshal) in enumerate(ordered):
         if parameter.IsOutput:
             lines.append(f"            {marshal.Slot} a{slot} = default;")
-        elif marshal.CSharp == "string":
-            lines.append(f"            using Utf8 u{slot} = new Utf8({_identifier(parameter.Name)});")
+        elif marshal.Utf8:
+            lines.append(f"            using Utf8 u{slot} = new Utf8({marshal.Utf8.format(_identifier(parameter.Name))});")
             lines.append(f"            IntPtr a{slot} = u{slot}.Pointer;")
         else:
             lines.append(f"            {marshal.Slot} a{slot} = {marshal.ToSlot.format(_identifier(parameter.Name))};")
@@ -146,6 +149,7 @@ def generate_csharp_bindings(header_tool, output_dir: str):
     for cls in sorted(bound.values(), key=lambda c: c.Name):
         lines.append(f"    public unsafe partial class {cls.Name} : {cls.ParentClassName}")
         lines.append("    {")
+        lines.append(f'        public static new Class StaticClass() => new Class("{cls.Name}");')
         for match in find_functions(cls.Body, cls.Name):
             method = _method(cls, match, cls.Body, class_names, enum_names, function_index)
             if method:

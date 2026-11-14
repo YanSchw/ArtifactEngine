@@ -21,6 +21,7 @@ public:
 
     void Update(double InDeltatime);
 
+    FUNCTION(Pure)
     WorldSubsystem* GetSubsystem(const Class& InClass) const;
     template<typename T>
     T* GetSubsystem() const {
@@ -32,9 +33,12 @@ public:
     /** Every Node registered in this World */
     const Array<Node*>& GetAllNodes() const;
 
+    FUNCTION(Pure)
     CameraNode* GetMainCamera() const;
+    FUNCTION()
     void SetMainCamera(CameraNode* InCamera);
 
+    FUNCTION()
     Node* Spawn(const Class& InClass);
     template<typename T>
     T* Spawn() {

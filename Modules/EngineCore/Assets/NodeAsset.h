@@ -16,6 +16,7 @@ public:
     void SetRoot(const SharedObjectPtr<NodeRecord>& InRoot);
     void CaptureFrom(Node& InNode);
 
+    FUNCTION(Pure)
     Class GetRootClass() const;
     EventGraph* GetEventGraph() const;
     EventGraph* GetOrCreateEventGraph();

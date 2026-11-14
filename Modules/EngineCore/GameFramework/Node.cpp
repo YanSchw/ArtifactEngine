@@ -221,7 +221,7 @@ Node* Node::AttachChild(const Class& InChildClass) {
     return node;
 }
 
-Node* Node::GetChild(int InIndex) const {
+Node* Node::GetChild(int32_t InIndex) const {
     if (InIndex < 0 || InIndex >= m_Children.Size())
         return nullptr;
     return m_Children[InIndex];

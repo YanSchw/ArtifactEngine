@@ -21,11 +21,11 @@ struct AntiAliasingParams {
     AntiAliasingMode Mode = AntiAliasingMode::FXAA;
 
     /** Contrast an edge needs, relative to the brightest pixel around it. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float FxaaEdgeThreshold = 0.166f;
 
     /** Absolute contrast below which dark areas are never treated as edges. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float FxaaEdgeThresholdMin = 0.0833f;
 
     /** How much sub-pixel aliasing is smoothed away, 0 to 1. */
@@ -33,7 +33,7 @@ struct AntiAliasingParams {
     float FxaaSubpixelBlend = 0.75f;
 
     /** Share of the reprojected history kept each frame; higher is smoother but ghosts more. */
-    PROPERTY(Range = (0, 1))
+    PROPERTY(Range = (0, 0.98))
     float TaaFeedback = 0.9f;
 };
 
@@ -45,19 +45,19 @@ struct AmbientOcclusionParams {
     bool Enabled = false;
 
     /** How strongly occlusion darkens the image; 0 turns the effect off. */
-    PROPERTY()
+    PROPERTY(Range = (0, 4))
     float Intensity = 1.0f;
 
     /** World-space distance around a point that is searched for occluders. */
-    PROPERTY()
+    PROPERTY(Range = (0.001, 10))
     float Radius = 0.5f;
 
     /** World-space offset that keeps flat and gently curved surfaces from occluding themselves. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Bias = 0.025f;
 
     /** Exponent applied to the occlusion; above 1 deepens creases and lightens open areas. */
-    PROPERTY()
+    PROPERTY(Range = (0.01, 8))
     float Power = 1.5f;
 
     /** Colour fully occluded areas are pulled towards. */
@@ -90,7 +90,7 @@ struct AmbientOcclusionParams {
     bool Blur = true;
 
     /** How strongly the blur respects depth edges; higher keeps edges crisper but leaves more noise. */
-    PROPERTY()
+    PROPERTY(Range = (0, 32))
     float BlurSharpness = 8.0f;
 };
 
@@ -102,11 +102,11 @@ struct BloomParams {
     bool Enabled = false;
 
     /** How much bloom is added onto the image; 0 turns the effect off. */
-    PROPERTY()
+    PROPERTY(Range = (0, 10))
     float Intensity = 0.5f;
 
     /** Brightness at which pixels start to bloom. The scene is HDR, so 1 is the brightest a display shows. */
-    PROPERTY()
+    PROPERTY(Range = (0, 10))
     float Threshold = 1.0f;
 
     /** Width of the transition around Threshold, 0 (hard cut) to 1 (very gradual). */
@@ -138,7 +138,7 @@ struct ChromaticAberrationParams {
 
     /** Strength of the fringes; 1 splits the outermost colours by 1% of the screen at the corners,
      *  0 turns the effect off. */
-    PROPERTY()
+    PROPERTY(Range = (0, 10))
     float Intensity = 0.5f;
 
     /** Distance from the centre where the fringes begin, 0 (centre) to 1 (corners). */
@@ -146,7 +146,7 @@ struct ChromaticAberrationParams {
     float StartRadius = 0.2f;
 
     /** Shapes the growth from StartRadius to the corners; above 1 keeps the fringes to the edges. */
-    PROPERTY()
+    PROPERTY(Range = (0.01, 8))
     float Falloff = 1.5f;
 
     /** Taps across the spectrum, 3 to 16. 3 is a plain red/green/blue split, more blend into a rainbow. */
@@ -162,7 +162,7 @@ struct VignetteParams {
     bool Enabled = false;
 
     /** How far the darkening reaches in; 0 turns the effect off. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Intensity = 0.1f;
 
     /** Softness of the falloff, 0.01 (hard) to 1 (soft). */
@@ -190,11 +190,11 @@ struct FilmGrainParams {
     bool Enabled = false;
 
     /** How visible the grain is; 0 turns the effect off. */
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Intensity = 0.1f;
 
     /** Size of a grain in pixels at 1080p; it scales with the resolution. */
-    PROPERTY()
+    PROPERTY(Range = (0.1, 10))
     float Size = 1.6f;
 
     /** How much the grain fades out in bright areas, 0 (even everywhere) to 1 (only in shadows). */
@@ -206,7 +206,7 @@ struct FilmGrainParams {
     float Colorfulness = 0.0f;
 
     /** New grain this many times per second; 0 renews it every frame. */
-    PROPERTY()
+    PROPERTY(Range = (0, 120))
     float FramesPerSecond = 0.0f;
 
     /** Animates the grain; when off, the same pattern stays on screen. */
@@ -234,10 +234,10 @@ struct TonemappingParams {
     PROPERTY()
     TonemappingMode Mode = TonemappingMode::ACES;
 
-    PROPERTY()
+    PROPERTY(Range = (-10, 10))
     float Exposure = 0.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0.1, 32))
     float WhitePoint = 4.0f;
 };
 

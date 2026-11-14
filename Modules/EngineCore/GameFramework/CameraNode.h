@@ -1,11 +1,15 @@
 #pragma once
 #include "Node3D.h"
+#include "Object/Enum.h"
 #include "CameraNode.gen.h"
+
+ARTIFACT_ENUM();
+enum class CameraProjectionType : uint8_t { Perspective = 0, Orthographic = 1 };
 
 class CameraNode : public Node3D {
 public:
     ARTIFACT_CLASS();
-    enum class ProjectionType { Perspective = 0, Orthographic = 1 };
+    using ProjectionType = CameraProjectionType;
 
 public:
     CameraNode();
@@ -36,12 +40,19 @@ public:
     float GetOrthographicSize() const { return m_OrthographicSize; }
     FUNCTION()
     void SetOrthographicSize(float size) { m_OrthographicSize = size; RecalculateProjection(); }
+    FUNCTION(Pure)
     float GetOrthographicNearClip() const { return m_OrthographicNear; }
+    FUNCTION()
     void SetOrthographicNearClip(float nearClip) { m_OrthographicNear = nearClip; RecalculateProjection(); }
+    FUNCTION(Pure)
     float GetOrthographicFarClip() const { return m_OrthographicFar; }
+    FUNCTION()
     void SetOrthographicFarClip(float farClip) { m_OrthographicFar = farClip; RecalculateProjection(); }
-    ProjectionType GetProjectionType() const { return m_ProjectionType; }
-    void SetProjectionType(ProjectionType type) { m_ProjectionType = type; RecalculateProjection(); }
+    FUNCTION(Pure)
+    CameraProjectionType GetProjectionType() const { return m_ProjectionType; }
+    FUNCTION()
+    void SetProjectionType(CameraProjectionType type) { m_ProjectionType = type; RecalculateProjection(); }
+    FUNCTION(Pure)
     Vec3 ScreenPosToWorldDirection(const Vec2& InScreenPos, float InWindowWidth, float InWindowHeight) const;
 
     public:
@@ -49,9 +60,9 @@ public:
     const Mat4& GetProjectionMatrix() const { return m_Projection; }
     const Mat4& GetViewProjectionMatrix() const { return m_ViewProjection; }
     FUNCTION()
-    void SetClearColor(Vec4 color) { m_ClearColor = color; }
+    void SetClearColor(const Color& color) { m_ClearColor = color; }
     FUNCTION(Pure)
-    Vec4 GetClearColor() const { return m_ClearColor; }
+    Color GetClearColor() const { return m_ClearColor; }
     FUNCTION(Pure)
     bool IsPostProcessingEnabled() const { return m_EnablePostProcessing; }
     FUNCTION()
@@ -65,11 +76,31 @@ protected:
     bool m_EnablePostProcessing = true;
 
 private:
-    ProjectionType m_ProjectionType = ProjectionType::Perspective;
+    PROPERTY()
+    CameraProjectionType m_ProjectionType = CameraProjectionType::Perspective;
+
+    /** Vertical field of view in degrees. */
+    PROPERTY(Range = (1, 179))
     float m_PerspectiveFOV = 65.0f;
-    float m_PerspectiveNear = 0.01f, m_PerspectiveFar = 1000.0f;
+
+    PROPERTY()
+    float m_PerspectiveNear = 0.01f;
+
+    PROPERTY()
+    float m_PerspectiveFar = 1000.0f;
+
+    /** Height of the view in world units. */
+    PROPERTY()
     float m_OrthographicSize = 10.0f;
-    float m_OrthographicNear = -1.0f, m_OrthographicFar = 1.0f;
+
+    PROPERTY()
+    float m_OrthographicNear = -1.0f;
+
+    PROPERTY()
+    float m_OrthographicFar = 1.0f;
+
     float m_AspectRatio = 1.0f;
-    Vec4 m_ClearColor = Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+    PROPERTY()
+    Color m_ClearColor = Color(0.0f, 0.0f, 0.0f, 1.0f);
 };

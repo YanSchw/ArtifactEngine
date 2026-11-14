@@ -437,6 +437,9 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
         inner_type = _template_argument(full_typename, "SubclassOf")
         return simple("SubclassOf", "SubclassOfProperty", f', Class("{inner_type}")')
 
+    if full_typename == "Class":
+        return simple("SubclassOf", "SubclassOfProperty", ', Class("Object")')
+
     if _is_template(full_typename, "Delegate"):
         argument_types = split_top_level(_template_argument(full_typename, "Delegate"))
         names = delegate_params if delegate_params is not None else [None] * len(argument_types)
@@ -476,7 +479,7 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
         key = generate_property_type(key_type, prop_name + "_MapKeyProperty", class_or_struct_typename, False, context,
                                      var_name=f"{var}_MapKeyProperty")
         if key.Kind not in MAP_KEY_KINDS:
-            raise HeaderToolError(f"{context}: '{key_type}' cannot be a Map key; use String, an integer, bool, an enum, UUID or SubclassOf<T>")
+            raise HeaderToolError(f"{context}: '{key_type}' cannot be a Map key; use String, an integer, bool, an enum, UUID, Class or SubclassOf<T>")
         value = generate_property_type(value_type, prop_name + "_MapValueProperty", class_or_struct_typename, False, context,
                                        var_name=f"{var}_MapValueProperty")
         lambdas = MAP_LAMBDAS.format(MAP_TYPE=full_typename, KEY_TYPE=key_type, VALUE_TYPE=value_type)

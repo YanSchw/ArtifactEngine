@@ -21,6 +21,7 @@ public:
     virtual void SetSourcePath(const String& InPath) override { m_AudioPath = InPath; }
 
     const SharedAudioSamples& GetSamples() const { return m_Samples; }
+    FUNCTION(Pure)
     double GetDuration() const;
 
     void Reimport();
@@ -36,12 +37,13 @@ private:
     PROPERTY()
     AudioSampleFormat m_SampleFormat = AudioSampleFormat::Int16;
 
-    PROPERTY()
+    /** 0 keeps the source rate. */
+    PROPERTY(Range = (0, 192000))
     uint32_t m_MaxSampleRate = 48000;
 
     PROPERTY()
     bool m_ForceMono = false;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 4))
     float m_Volume = 1.0f;
 };

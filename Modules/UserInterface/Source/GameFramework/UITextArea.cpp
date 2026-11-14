@@ -19,7 +19,7 @@ UITextArea::UITextArea() {
 }
 
 Font* UITextArea::ResolveFont() const {
-    return FontAsset ? FontAsset : GetDefaultFont();
+    return FontAsset.Get() ? FontAsset.Get() : GetDefaultFont();
 }
 
 float UITextArea::LineHeight(Font* InFont) const {

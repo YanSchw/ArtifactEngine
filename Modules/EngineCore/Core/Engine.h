@@ -20,6 +20,7 @@ public:
 
     virtual void RequestExit(bool InForce);
 
+    FUNCTION(Pure)
     EngineSubsystem* GetSubsystem(const Class& InClass) const;
     template<typename T>
     T* GetSubsystem() const {

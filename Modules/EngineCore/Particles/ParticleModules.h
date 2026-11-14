@@ -128,7 +128,7 @@ struct ParticleCurveKey {
     ParticleCurveKey() = default;
     ParticleCurveKey(float InTime, float InValue) : Time(InTime), Value(InValue) {}
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Time = 0.0f;
 
     PROPERTY()
@@ -157,7 +157,7 @@ struct ParticleGradientKey {
     ParticleGradientKey() = default;
     ParticleGradientKey(float InTime, const Color& InValue) : Time(InTime), Value(InValue) {}
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Time = 0.0f;
 
     PROPERTY()
@@ -251,7 +251,7 @@ struct ParticleBurst {
     PROPERTY()
     float Interval = 0.01f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Probability = 1.0f;
 };
 
@@ -286,13 +286,13 @@ struct ParticleShapeModule {
     PROPERTY()
     float Radius = 1.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float RadiusThickness = 1.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 90))
     float Angle = 25.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 360))
     float Arc = 360.0f;
 
     PROPERTY()
@@ -304,7 +304,7 @@ struct ParticleShapeModule {
     PROPERTY()
     Vec3 Rotation = Vec3(0.0f);
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float RandomizeDirection = 0.0f;
 };
 
@@ -388,7 +388,7 @@ struct ParticleNoiseModule {
     PROPERTY()
     float ScrollSpeed = 0.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (1, 8))
     int32_t Octaves = 1;
 };
 
@@ -415,13 +415,13 @@ struct ParticleCollisionModule {
     PROPERTY()
     Array<ParticleCollisionPlane> Planes;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Bounce = 0.5f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Dampen = 0.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float LifetimeLoss = 0.0f;
 
     PROPERTY()
@@ -518,7 +518,7 @@ struct ParticleSubEmitter {
     PROPERTY()
     ParticleFloatRange Count = ParticleFloatRange(10.0f);
 
-    PROPERTY()
+    PROPERTY(Range = (0, 1))
     float Probability = 1.0f;
 
     PROPERTY()
@@ -537,10 +537,10 @@ struct ParticleTextureSheetModule {
     PROPERTY()
     bool Enabled = false;
 
-    PROPERTY()
+    PROPERTY(Range = (1, 64))
     int32_t TilesX = 1;
 
-    PROPERTY()
+    PROPERTY(Range = (1, 64))
     int32_t TilesY = 1;
 
     /** 0 uses every tile. */

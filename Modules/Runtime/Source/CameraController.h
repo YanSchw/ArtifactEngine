@@ -21,6 +21,8 @@ private:
     float m_Yaw = 0.0f;    // degrees, around world up
     float m_Pitch = 0.0f;  // degrees, clamped to avoid gimbal flip
 
+    PROPERTY()
     float m_MoveSpeed = 5.0f;         // units / second
+    PROPERTY()
     float m_LookSensitivity = 0.1f;   // degrees per unit of look input
 };

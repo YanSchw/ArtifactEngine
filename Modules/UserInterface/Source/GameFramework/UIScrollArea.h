@@ -9,12 +9,17 @@ public:
     UIScrollArea();
 
     Vec2 ScrollOffset = Vec2(0.0f);
+    PROPERTY()
     float ScrollSpeed = 40.0f;
-    Vec4 ScrollbarColor = Vec4(1.0f, 1.0f, 1.0f, 0.25f);
+    PROPERTY()
+    Color ScrollbarColor = Color(1.0f, 1.0f, 1.0f, 0.25f);
+    PROPERTY()
     float ScrollbarWidth = 4.0f;
     /** While scrolled to the bottom, stay there as the content grows. */
+    PROPERTY()
     bool StickToBottom = false;
 
+    FUNCTION(Pure)
     const Vec2& GetContentSize() const { return m_ContentSize; }
 
     virtual bool OnScroll(const Vec2& InDelta) override;

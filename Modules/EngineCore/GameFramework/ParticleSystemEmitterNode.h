@@ -24,6 +24,7 @@ public:
 
     FUNCTION()
     void Play();
+    FUNCTION()
     void Stop(ParticleStopBehavior InBehavior = ParticleStopBehavior::StopEmitting);
     FUNCTION()
     void Pause() { SetPaused(true); }
@@ -43,6 +44,7 @@ public:
     bool IsEmitting() const { return m_Instance.IsEmitting(); }
     FUNCTION(Pure)
     bool IsAlive() const { return m_Instance.IsAlive(); }
+    FUNCTION(Pure)
     int32_t GetParticleCount() const { return m_Instance.GetParticleCount(); }
     const ParticleHandle& GetInstance() const { return m_Instance; }
 
@@ -51,7 +53,9 @@ public:
     FUNCTION()
     void SetSystem(ParticleSystemAsset* InSystem);
 
+    FUNCTION(Pure)
     bool GetAutoPlay() const { return m_AutoPlay; }
+    FUNCTION()
     void SetAutoPlay(bool InAutoPlay) { m_AutoPlay = InAutoPlay; }
     FUNCTION(Pure)
     float GetSimulationSpeed() const { return m_SimulationSpeed; }
@@ -61,7 +65,9 @@ public:
     ParticleStopAction GetStopAction() const { return m_StopAction; }
     FUNCTION()
     void SetStopAction(ParticleStopAction InAction) { m_StopAction = InAction; }
+    FUNCTION(Pure)
     bool GetDetachOnDestroy() const { return m_DetachOnDestroy; }
+    FUNCTION()
     void SetDetachOnDestroy(bool InDetach) { m_DetachOnDestroy = InDetach; }
 
     std::function<void()> OnFinished;

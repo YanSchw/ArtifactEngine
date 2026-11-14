@@ -1,9 +1,12 @@
 #pragma once
 #include "Common/Types.h"
 #include "Common/String.h"
+#include "Object/Enum.h"
+#include "UIInput.gen.h"
 
 /** Cursor: drives a pointer over Interactable nodes
  *  Focus: keeps one node focused and moves it with Nav* inputs. */
+ARTIFACT_ENUM();
 enum class UIInputMode : uint8_t { Cursor = 0, Focus = 1 };
 
 enum class UINavDirection : uint8_t { Up = 0, Down = 1, Left = 2, Right = 3 };

@@ -53,13 +53,18 @@ public:
     void ApplyTo(Node* InRootNode, float InTime);
     void ApplyAtFrame(Node* InRootNode, float InFrame);
 
+    FUNCTION(Pure)
     float GetFrameRate() const { return m_FrameRate; }
     void SetFrameRate(float InFrameRate);
+    FUNCTION(Pure)
     int32_t GetFrameCount() const { return m_FrameCount; }
     void SetFrameCount(int32_t InFrameCount);
+    FUNCTION(Pure)
     float GetDuration() const;
 
+    FUNCTION(Pure)
     bool IsLooping() const { return m_Loop; }
+    FUNCTION()
     void SetLooping(bool InLooping) { m_Loop = InLooping; }
 
     const Array<AnimationKey>& GetKeys() const { return m_Keys; }
@@ -91,10 +96,10 @@ protected:
     virtual void Load() override;
     virtual void Cook(class ChunkedBinary& OutChunkedBinary) override;
 
-    PROPERTY()
+    PROPERTY(Range = (1, 240))
     float m_FrameRate = 30.0f;
 
-    PROPERTY()
+    PROPERTY(Range = (1, 100000))
     int32_t m_FrameCount = 60;
 
     PROPERTY()

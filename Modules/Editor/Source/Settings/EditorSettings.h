@@ -27,23 +27,23 @@ struct EditorAppearanceSettings {
     PROPERTY()
     EditorTheme Theme = EditorTheme::Dark;
 
-    PROPERTY()
+    PROPERTY(Range = (0.5, 3))
     float InterfaceScale = 1.0f;
 
     PROPERTY()
     UUID InterfaceFont = UUID::FromString("3e50e8a9-df79-4e81-89be-189a15ca838b");
 
-    PROPERTY()
+    PROPERTY(Range = (10, 18))
     float FontSize = 13.0f;
 };
 
 struct EditorViewportSettings {
     ARTIFACT_STRUCT();
 
-    PROPERTY()
+    PROPERTY(Range = (0.01, 5))
     float LookSensitivity = 0.35f;
 
-    PROPERTY()
+    PROPERTY(Range = (0.25, 100))
     float DefaultFlySpeed = 5.0f;
 };
 

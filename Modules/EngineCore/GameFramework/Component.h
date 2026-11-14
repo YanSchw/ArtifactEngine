@@ -19,6 +19,7 @@ public:
     virtual void SetParent(Node* InParent, bool InKeepWorldTransform = true) override;
 
     void SetRequiredParentClass(const Class& InParentClass);
+    FUNCTION(Pure)
     Class GetRequiredParentClass() const;
 private:
     Class m_ParentBaseclass = Node::StaticClass();

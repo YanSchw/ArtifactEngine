@@ -8,6 +8,7 @@ public:
     ARTIFACT_CLASS();
 
     /* RGBA 0..1; painted only when alpha > 0. */
+    PROPERTY()
     Vec4 Color = Vec4(1.0f);
 
     virtual void Paint(UIDrawList& OutDrawList) override;

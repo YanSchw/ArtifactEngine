@@ -42,6 +42,7 @@ public:
 
     static DirectionalLightNode* FindSun(World* InWorld);
 
+    FUNCTION(Pure)
     Vec3 GetDirection() const { return GetForwardVector(); }
 
     FUNCTION(Pure)
@@ -90,7 +91,7 @@ private:
     PROPERTY()
     bool m_CastShadows = true;
 
-    PROPERTY()
+    PROPERTY(Range = (128, 8192))
     uint32_t m_ShadowMapResolution = 2048;
 
     /** How far from the camera the last cascade reaches. */
@@ -102,14 +103,14 @@ private:
     float m_CascadeDistribution = 0.9f;
 
     /** Spacing between the filter taps, in shadow texels. Raise it for softer edges. */
-    PROPERTY()
+    PROPERTY(Range = (0, 8))
     float m_Softness = 1.5f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 0.1))
     float m_DepthBias = 0.0016f;
 
     /** Offset along the surface normal before the lookup, in shadow texels. */
-    PROPERTY()
+    PROPERTY(Range = (0, 10))
     float m_NormalBias = 2.0f;
 
     /** How far behind a cascade its light frustum starts, so casters outside the view still

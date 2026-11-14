@@ -80,7 +80,7 @@ private:
     PROPERTY()
     float m_Height = 1.8f;
 
-    PROPERTY()
+    PROPERTY(Range = (0, 90))
     float m_MaxSlopeAngle = 45.0f;
 
     PROPERTY()

@@ -60,14 +60,20 @@ protected:
     SharedObjectPtr<class ChunkedBinary> GetChunkedBinary() const;
     static String DisplayNameFromPath(const String& InPath);
 public:
+    FUNCTION(Pure)
     virtual bool IsLoaded() const;
+    FUNCTION(Pure)
     bool IsMissing() const;
     AssetStreamHandle GetStreamHandle() const;
+    FUNCTION(Pure)
     UUID GetId() const { return m_Id; }
+    FUNCTION(Pure)
     virtual String GetDisplayName() const;
 
     /** The asset this one lives inside of, saved and deleted together with it. */
+    FUNCTION(Pure)
     Asset* GetOwner() const { return m_Owner.Get(); }
+    FUNCTION(Pure)
     bool IsSubAsset() const { return m_Owner.Get() != nullptr; }
 
     /** The content path of the file an imported asset is built from. */
