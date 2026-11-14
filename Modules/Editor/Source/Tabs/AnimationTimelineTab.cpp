@@ -41,6 +41,10 @@ AnimationTimelineTab::AnimationTimelineTab() {
     ruler->Owner = this;
     ruler->Size = { 1.0_rel, UIValue(RulerHeight) };
 
+    m_Events = layout->Add<AnimationTimelineEvents>();
+    m_Events->Owner = this;
+    m_Events->Size = { 1.0_rel, UIValue(EventsHeight) };
+
     AnimationTimelineSummary* summary = layout->Add<AnimationTimelineSummary>();
     summary->Owner = this;
     summary->Size = { 1.0_rel, UIValue(SummaryHeight) };
@@ -60,6 +64,9 @@ AnimationTimelineTab::AnimationTimelineTab() {
     scrollBar->Size = { 1.0_rel, UIValue(ScrollBarHeight) };
 
     BuildFooter(*layout);
+
+    AnimationTimelineSplitter* splitter = Add<AnimationTimelineSplitter>();
+    splitter->Owner = this;
 }
 
 void AnimationTimelineTab::OnUIUpdate(const UIFrameContext& InContext) {
@@ -73,6 +80,9 @@ void AnimationTimelineTab::OnUIUpdate(const UIFrameContext& InContext) {
     Animation* animation = GetAnimation();
     if (animation && m_SelectedKey >= animation->GetKeys().Size()) {
         m_SelectedKey = -1;
+    }
+    if (animation && m_SelectedEvent >= animation->GetEvents().Size()) {
+        m_SelectedEvent = -1;
     }
     HandleShortcuts();
 }
@@ -88,7 +98,11 @@ void AnimationTimelineTab::HandleShortcuts() {
         editor->SetPlaying(!editor->IsPlaying());
     }
     if (keyboard->IsDown(KeyCode::Delete) || keyboard->IsDown(KeyCode::Backspace)) {
-        DeleteSelectedKey();
+        if (m_SelectedEvent >= 0) {
+            DeleteSelectedEvent();
+        } else {
+            DeleteSelectedKey();
+        }
     }
     if (keyboard->IsDown(KeyCode::F)) {
         FrameAll();
@@ -118,10 +132,15 @@ Animation* AnimationTimelineTab::GetAnimation() const {
     return editor ? editor->GetAnimation() : nullptr;
 }
 
-UIRectF AnimationTimelineTab::StripOf(const UIRectF& InRow) {
-    const float width = InRow.Size.x - LabelColumnWidth;
-    return UIRectF(InRow.Position + Vec2(LabelColumnWidth, 0.0f),
+UIRectF AnimationTimelineTab::StripOf(const UIRectF& InRow) const {
+    const float width = InRow.Size.x - m_LabelWidth;
+    return UIRectF(InRow.Position + Vec2(m_LabelWidth, 0.0f),
                    Vec2(width > 1.0f ? width : 1.0f, InRow.Size.y));
+}
+
+void AnimationTimelineTab::SetLabelWidth(float InWidth) {
+    const float widest = m_Geometry.Size.x - MinStripWidth;
+    m_LabelWidth = Clamped(InWidth, MinLabelWidth, widest > MinLabelWidth ? widest : MinLabelWidth);
 }
 
 static float UsableWidth(const UIRectF& InStrip) {
@@ -460,6 +479,41 @@ void AnimationTimelineTab::ScrubTo(const UIRectF& InStrip, float InX) {
     }
 }
 
+void AnimationTimelineTab::SelectKey(int32_t InKey) {
+    m_SelectedKey = InKey;
+    if (InKey >= 0) {
+        m_SelectedEvent = -1;
+    }
+}
+
+void AnimationTimelineTab::SelectEvent(int32_t InEvent) {
+    m_SelectedEvent = InEvent;
+    if (InEvent >= 0) {
+        m_SelectedKey = -1;
+    }
+}
+
+void AnimationTimelineTab::AddEventAt(int32_t InFrame) {
+    Animation* animation = GetAnimation();
+    if (!animation) {
+        return;
+    }
+    const int32_t frame = InFrame < 0 ? 0 : InFrame;
+    const int32_t existing = animation->FindEvent(frame);
+    SelectEvent(existing >= 0 ? existing : animation->AddEvent(frame, "Event"));
+    if (existing < 0) {
+        m_Events->BeginRename();
+    }
+}
+
+void AnimationTimelineTab::DeleteSelectedEvent() {
+    Animation* animation = GetAnimation();
+    if (animation && m_SelectedEvent >= 0) {
+        animation->RemoveEvent(m_SelectedEvent);
+        m_SelectedEvent = -1;
+    }
+}
+
 void AnimationTimelineTab::DeleteSelectedKey() {
     Animation* animation = GetAnimation();
     if (animation && m_SelectedKey >= 0) {
@@ -529,7 +583,7 @@ void AnimationTimelineTab::OpenAddPropertyMenu(UINode& InAnchor) {
 
 void AnimationTimelineTab::BuildTransport(UINode& InParent) {
     UIQuad* bar = InParent.Add<UIQuad>();
-    bar->Size = { 1.0_rel, 30.0_px };
+    bar->Size = { 1.0_rel, UIValue(TransportHeight) };
     bar->Color = EditorStyle::ToolBar;
     bar->Bind = [this, bar] {
         AnimationEditorTab* editor = GetEditor();
@@ -670,7 +724,7 @@ void AnimationTimelineTab::BuildFooter(UINode& InParent) {
     UIButton* add = footer->Add<UIButton>();
     add->Anchor = add->Pivot = Vec2(0.0f, 0.5f);
     add->Position = Vec2(8.0f, 0.0f);
-    add->Size = Vec2(LabelColumnWidth - 16.0f, 20.0f);
+    add->Bind = [this, add] { add->Size = Vec2(m_LabelWidth - 16.0f, 20.0f); };
     add->SetCaption("Add Property");
     EditorStyle::ApplyButtonStyle(*add, EditorStyle::FontSize - 1.0f);
     add->Clicked = [this, add] { OpenAddPropertyMenu(*add); };

@@ -8,6 +8,7 @@
 
 class EventGraph;
 class EventGraphNode;
+class DelegateEventNode;
 class GraphNode;
 class Node;
 
@@ -30,7 +31,7 @@ public:
 
     void* GetFrame(const EventGraphNode& InNode);
     void RunEvent(const EventGraphNode& InEvent);
-    void BindDelegate(const EventGraphNode& InEvent, DelegateProperty& InDelegate, Object& InTarget);
+    void BindDelegate(const DelegateEventNode& InEvent, DelegateProperty& InDelegate, Object& InTarget);
     void ReportError(const GraphNode& InNode, const String& InMessage) const;
 
 private:

@@ -26,6 +26,7 @@
 #include "Assets/CollectionAsset.h"
 #include "Assets/AudioClip.h"
 #include "Assets/ParticleSystemAsset.h"
+#include "Assets/AnimationGraph.h"
 #include "Audio/AudioPreview.h"
 #include "UI/UIAudioWaveform.h"
 #include "Import/CollectionSettingsWindow.h"
@@ -38,6 +39,7 @@
 #include "Tabs/SceneEditorTab.h"
 #include "Tabs/BlueprintEditorTab.h"
 #include "Tabs/AnimationEditorTab.h"
+#include "Tabs/AnimationGraphEditorTab.h"
 #include "UI/UIContextMenu.h"
 #include "UI/UIMenuModel.h"
 #include "Rendering/Texture.h"
@@ -327,9 +329,11 @@ void ContentDrawer::BuildDrawer(UINode& InBody) {
                 blueprintTab->Save();
             } else if (AnimationEditorTab* animationTab = tab->As<AnimationEditorTab>()) {
                 animationTab->Save();
+            } else if (AnimationGraphEditorTab* graphTab = tab->As<AnimationGraphEditorTab>()) {
+                graphTab->Save();
             }
         }
-    }).Add<UITooltip>()->Text = "Save every open scene, blueprint and animation";
+    }).Add<UITooltip>()->Text = "Save every open scene, blueprint, animation and animation graph";
 
     arrowButton(*toolbarRow, EditorIcons::ArrowRight(), 180.0f, [this] { GoBack(); });
     arrowButton(*toolbarRow, EditorIcons::ArrowRight(), 0.0f, [this] { GoForward(); });
@@ -557,6 +561,11 @@ void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu) {
     OutMenu.Item("Animation...", [this] { BeginCreateAnimation(); })
            .Icon(EditorIcons::Animation())
            .Tooltip("Pick the placeholder root to author against; it is stripped from packaged builds");
+    OutMenu.Item("Animation Graph", [this] {
+        BeginCreateAsset(AnimationGraph::StaticClass(), "NewAnimationGraph", [](const String& InDir, const String& InName) {
+            return (Asset*)AnimationGraph::CreateEmpty(InDir, InName);
+        });
+    }).Icon(EditorIcons::AnimationGraph());
     OutMenu.Item("Shader Graph", [this] {
         BeginCreateAsset(ShaderGraph::StaticClass(), "NewShaderGraph", [](const String& InDir, const String& InName) {
             return (Asset*)ShaderGraph::CreateEmpty(InDir, InName);

@@ -44,6 +44,7 @@ public:
     inline static constexpr float TitleFontSize = 13.0f;
     inline static constexpr float PinFontSize = 12.0f;
     inline static constexpr float WireThickness = 2.25f;
+    inline static constexpr float WireHitDistance = 6.0f;
 
     inline static constexpr float GridSize = 16.0f;
     inline static constexpr int GridMajorEvery = 8;

@@ -53,12 +53,28 @@ public:
 
     DelegateProperty* FindDelegate() const;
 
+    virtual bool Accepts(const void* InParams) const { (void)InParams; return true; }
+
     virtual void ConstructPins() override;
     virtual String GetTitle() const override;
     virtual bool IsResolved() const override { return FindDelegate() != nullptr; }
     virtual std::shared_ptr<void> MakeFrame() const override;
     virtual EventGraphPinValue GetPinValue(void* InFrame, const String& InPinName) const override;
     virtual void Start(EventGraphInstance& InInstance) const override;
+};
+
+class AnimationEventNode : public DelegateEventNode {
+public:
+    ARTIFACT_CLASS();
+
+    AnimationEventNode();
+
+    PROPERTY()
+    String EventName;
+
+    virtual bool Accepts(const void* InParams) const override;
+    virtual void ConstructPins() override;
+    virtual String GetTitle() const override;
 };
 
 class CallFunctionNode : public EventGraphNode {

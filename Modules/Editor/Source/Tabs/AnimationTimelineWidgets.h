@@ -5,8 +5,10 @@
 
 class AnimationTimelineTab;
 class Node;
+class UIButton;
 class UILabel;
 class UISvg;
+class UITextArea;
 struct Property;
 
 /** Shared by every part of the timeline that maps frames to pixels. */
@@ -45,7 +47,30 @@ public:
     virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
 };
 
-/** Every key of every track on one line. */
+class AnimationTimelineEvents : public AnimationTimelineStrip {
+public:
+    ARTIFACT_CLASS();
+
+    AnimationTimelineEvents();
+
+    void BeginRename();
+
+    virtual void Paint(UIDrawList& OutDrawList) override;
+    virtual void OnPressed(const Vec2& InCursorPos) override;
+    virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
+    virtual void OnReleased(bool InInside) override;
+    virtual bool OnSecondaryClick(const Vec2& InCursorPos) override;
+
+private:
+    int32_t EventAt(const Vec2& InCursorPos) const;
+    int32_t FrameAt(const Vec2& InCursorPos) const;
+
+    UITextArea* m_Name = nullptr;
+    UIButton* m_Add = nullptr;
+    int32_t m_DraggedEvent = -1;
+};
+
+/** Every key of every track on one line; dragging a diamond moves its whole column. */
 class AnimationTimelineSummary : public AnimationTimelineStrip {
 public:
     ARTIFACT_CLASS();
@@ -55,6 +80,13 @@ public:
     virtual void Paint(UIDrawList& OutDrawList) override;
     virtual void OnPressed(const Vec2& InCursorPos) override;
     virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
+    virtual void OnReleased(bool InInside) override;
+
+private:
+    int32_t ColumnAt(const Vec2& InCursorPos) const;
+
+    Array<int32_t> m_DraggedKeys;
+    int32_t m_DraggedFrame = -1;
 };
 
 /** One animated property. */
@@ -86,6 +118,19 @@ private:
     Property* m_EditorLeaf = nullptr;
     int32_t m_DraggedKey = -1;
     bool m_PressedOnLabel = false;
+};
+
+/** The border between the track list and the keys. */
+class AnimationTimelineSplitter : public UINode {
+public:
+    ARTIFACT_CLASS();
+
+    AnimationTimelineSplitter();
+
+    AnimationTimelineTab* Owner = nullptr;
+
+    virtual void Paint(UIDrawList& OutDrawList) override;
+    virtual void OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) override;
 };
 
 /** The horizontal view window over the whole animation. */

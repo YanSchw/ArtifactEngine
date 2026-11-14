@@ -2,12 +2,16 @@
 #include "AnimationTimelineTab.h"
 #include "AnimationEditorTab.h"
 #include "MajorTab.h"
+#include "Details/DetailsCustomization.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIContextMenu.h"
 #include "UI/UIMenuModel.h"
+#include "GameFramework/UIButton.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UISvg.h"
+#include "GameFramework/UITextArea.h"
+#include "UI/UITooltip.h"
 #include "GameFramework/Node.h"
 #include "Assets/Animation.h"
 #include "Assets/Font.h"
@@ -28,6 +32,7 @@ static const Vec4 s_ScrollThumb = HexColor(0x4A4A4A);
 static const Vec4 s_ScrollThumbHover = HexColor(0x6A6A6A);
 static const Vec4 s_OutOfRange = Vec4(0.0f, 0.0f, 0.0f, 0.35f);
 static const Vec4 s_OutOfRangeText = HexColor(0x585858);
+static const Vec4 s_EventColor = HexColor(0xE8E8E8);
 
 static constexpr float s_KeyRadius = 5.0f;
 static constexpr float s_MinThumbWidth = 16.0f;
@@ -60,11 +65,11 @@ AnimationTimelineStrip::AnimationTimelineStrip() {
 }
 
 UIRectF AnimationTimelineStrip::Strip() const {
-    return AnimationTimelineTab::StripOf(m_Geometry);
+    return Owner ? Owner->StripOf(m_Geometry) : m_Geometry;
 }
 
 bool AnimationTimelineStrip::IsOverLabelColumn(const Vec2& InCursorPos) const {
-    return InCursorPos.x < m_Geometry.Min().x + AnimationTimelineTab::LabelColumnWidth;
+    return Owner && InCursorPos.x < m_Geometry.Min().x + Owner->GetLabelWidth();
 }
 
 void AnimationTimelineStrip::OnUIUpdate(const UIFrameContext& InContext) {
@@ -192,11 +197,216 @@ void AnimationTimelineRuler::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta
     }
 }
 
+/* -------------------------------- Events -------------------------------- */
+
+AnimationTimelineEvents::AnimationTimelineEvents() {
+    Cursor = CursorIcon::ResizeH;
+    ClipChildren = true;
+
+    UILabel* caption = Add<UILabel>();
+    caption->Anchor = caption->Pivot = Vec2(0.0f, 0.5f);
+    caption->Position = Vec2(10.0f, 0.0f);
+    caption->Size = Vec2(52.0f, AnimationTimelineTab::EventsHeight);
+    caption->FontSize = EditorStyle::FontSize - 1.0f;
+    caption->Color = EditorStyle::TextDim;
+    caption->VAlign = UIVAlign::Middle;
+    caption->Text = "Events";
+
+    m_Name = Add<UITextArea>();
+    m_Name->Anchor = m_Name->Pivot = Vec2(0.0f, 0.5f);
+    m_Name->Position = Vec2(64.0f, 0.0f);
+    m_Name->SingleLine = true;
+    m_Name->FontSize = EditorStyle::FontSize - 1.0f;
+    m_Name->TextColor = EditorStyle::TextBright;
+    m_Name->CaretColor = EditorStyle::TextBright;
+    m_Name->BackgroundColor = EditorStyle::PanelDark;
+    m_Name->FocusedBorderColor = EditorStyle::Accent;
+    m_Name->Padding = UIPadding(5.0f, 0.0f);
+    m_Name->Placeholder = "Event name";
+    m_Name->TextChanged = [this](const String& InText) {
+        Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+        if (animation) {
+            animation->SetEventName(Owner->GetSelectedEvent(), InText);
+        }
+    };
+
+    m_Add = Add<UIButton>();
+    m_Add->Anchor = m_Add->Pivot = Vec2(0.0f, 0.5f);
+    m_Add->Size = Vec2(20.0f, 18.0f);
+    EditorStyle::StyleButton(*m_Add);
+    UISvg* addIcon = m_Add->Add<UISvg>();
+    addIcon->Center(Vec2(10.0f, 10.0f));
+    addIcon->Image = EditorIcons::Add();
+    addIcon->Tint = EditorStyle::Text;
+    m_Add->Add<UITooltip>()->Text = "Add an event at the playhead";
+    m_Add->Clicked = [this] {
+        AnimationEditorTab* editor = Owner ? Owner->GetEditor() : nullptr;
+        if (editor) {
+            Owner->AddEventAt(editor->GetFrame());
+        }
+    };
+
+    Bind = [this] {
+        const float labelWidth = Owner ? Owner->GetLabelWidth() : AnimationTimelineTab::DefaultLabelWidth;
+        m_Name->Size = Vec2(labelWidth - 100.0f, AnimationTimelineTab::EventsHeight - 4.0f);
+        m_Add->Position = Vec2(labelWidth - 30.0f, 0.0f);
+
+        Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+        const int32_t selected = Owner ? Owner->GetSelectedEvent() : -1;
+        const bool editing = animation && selected >= 0 && selected < animation->GetEvents().Size();
+        m_Name->SetEnabled(editing);
+        if (editing && !m_Name->IsFocused()) {
+            m_Name->Text = animation->GetEvents()[selected].Name;
+        }
+    };
+}
+
+void AnimationTimelineEvents::BeginRename() {
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    const int32_t selected = Owner ? Owner->GetSelectedEvent() : -1;
+    if (!animation || selected < 0 || selected >= animation->GetEvents().Size()) {
+        return;
+    }
+    m_Name->Text = animation->GetEvents()[selected].Name;
+    m_Name->SetEnabled(true);
+    m_Name->RequestFocus();
+    m_Name->SelectAll();
+}
+
+int32_t AnimationTimelineEvents::EventAt(const Vec2& InCursorPos) const {
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    if (!animation) {
+        return -1;
+    }
+    const UIRectF strip = Strip();
+    for (int32_t i = animation->GetEvents().Size() - 1; i >= 0; i--) {
+        if (std::abs(Owner->FrameToX(strip, (float)animation->GetEvents()[i].Frame) - InCursorPos.x) <= s_KeyRadius + 1.0f) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int32_t AnimationTimelineEvents::FrameAt(const Vec2& InCursorPos) const {
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    const int32_t frame = (int32_t)std::lround(Owner->XToFrame(Strip(), InCursorPos.x));
+    return std::clamp(frame, 0, animation ? animation->GetFrameCount() : 0);
+}
+
+void AnimationTimelineEvents::Paint(UIDrawList& OutDrawList) {
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    OutDrawList.AddRect(m_Geometry, EditorStyle::TabBar, m_WorldMatrix);
+    if (!animation) {
+        return;
+    }
+
+    PaintOutOfRange(OutDrawList);
+    PaintGrid(OutDrawList, s_Grid);
+    PaintPlayHead(OutDrawList);
+
+    const UIRectF strip = Strip();
+    Font* font = UINode::GetDefaultFont();
+    const float top = m_Geometry.Min().y + 3.0f;
+    const float height = m_Geometry.Size.y - 6.0f;
+    for (int32_t i = 0; i < animation->GetEvents().Size(); i++) {
+        const AnimationEvent& event = animation->GetEvents()[i];
+        const float x = Owner->FrameToX(strip, (float)event.Frame);
+        if (x < strip.Min().x || x > strip.Max().x) {
+            continue;
+        }
+        const bool selected = i == Owner->GetSelectedEvent();
+        const Vec4 color = selected ? EditorStyle::AccentBright : s_EventColor;
+        OutDrawList.AddRoundedRect(UIRectF(Vec2(x - 3.0f, top), Vec2(6.0f, height)), color, 2.0f, m_WorldMatrix);
+        if (font && !event.Name.empty()) {
+            OutDrawList.AddText(font, event.Name, Vec2(x + 6.0f, top + 1.0f), EditorStyle::FontSize - 3.0f,
+                                selected ? EditorStyle::TextBright : EditorStyle::TextDim, m_WorldMatrix);
+        }
+    }
+}
+
+void AnimationTimelineEvents::OnPressed(const Vec2& InCursorPos) {
+    m_DraggedEvent = -1;
+    if (!Owner || IsOverLabelColumn(InCursorPos)) {
+        return;
+    }
+    m_DraggedEvent = EventAt(InCursorPos);
+    Owner->SelectEvent(m_DraggedEvent);
+    if (m_DraggedEvent < 0) {
+        Owner->ScrubTo(Strip(), InCursorPos.x);
+    }
+}
+
+void AnimationTimelineEvents::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
+    (void)InDelta;
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    if (!animation) {
+        return;
+    }
+    if (m_DraggedEvent < 0) {
+        Owner->ScrubTo(Strip(), InCursorPos.x);
+        return;
+    }
+    animation->SetEventFrame(m_DraggedEvent, FrameAt(InCursorPos));
+}
+
+void AnimationTimelineEvents::OnReleased(bool InInside) {
+    (void)InInside;
+    m_DraggedEvent = -1;
+}
+
+bool AnimationTimelineEvents::OnSecondaryClick(const Vec2& InCursorPos) {
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    if (!animation || IsOverLabelColumn(InCursorPos)) {
+        return false;
+    }
+
+    const WeakObjectPtr<AnimationTimelineEvents> self = this;
+    const int32_t hovered = EventAt(InCursorPos);
+    UIMenuModel menu;
+    if (hovered >= 0) {
+        Owner->SelectEvent(hovered);
+        menu.Section(animation->GetEvents()[hovered].Name);
+        menu.Item("Rename", [self] {
+            if (self.Get()) {
+                self.Get()->BeginRename();
+            }
+        });
+        menu.Item("Delete Event", [self] {
+            if (self.Get() && self.Get()->Owner) {
+                self.Get()->Owner->DeleteSelectedEvent();
+            }
+        }).Icon(EditorIcons::Delete()).Shortcut("Del");
+    } else {
+        const int32_t frame = FrameAt(InCursorPos);
+        menu.Item("Add Event Here", [self, frame] {
+            if (self.Get() && self.Get()->Owner) {
+                self.Get()->Owner->AddEventAt(frame);
+            }
+        }).Icon(EditorIcons::Add()).Enabled(animation->FindEvent(frame) < 0);
+    }
+    UIContextMenu::OpenAt(*this, InCursorPos, menu);
+    return true;
+}
+
 /* -------------------------------- Summary -------------------------------- */
 
 AnimationTimelineSummary::AnimationTimelineSummary() {
     Cursor = CursorIcon::ResizeH;
     ClipChildren = true;
+}
+
+int32_t AnimationTimelineSummary::ColumnAt(const Vec2& InCursorPos) const {
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    if (!animation || IsOverLabelColumn(InCursorPos)) {
+        return -1;
+    }
+    const UIRectF strip = Strip();
+    for (const AnimationKey& key : animation->GetKeys()) {
+        if (std::abs(Owner->FrameToX(strip, (float)key.Frame) - InCursorPos.x) <= s_KeyRadius + 1.0f) {
+            return key.Frame;
+        }
+    }
+    return -1;
 }
 
 void AnimationTimelineSummary::Paint(UIDrawList& OutDrawList) {
@@ -221,23 +431,59 @@ void AnimationTimelineSummary::Paint(UIDrawList& OutDrawList) {
         }
         painted.Add(key.Frame);
         const float x = Owner->FrameToX(strip, (float)key.Frame);
-        if (x >= strip.Min().x && x <= strip.Max().x) {
-            PaintDiamond(OutDrawList, Vec2(x, centerY), s_KeyRadius - 1.0f, s_KeyColor, m_WorldMatrix);
+        if (x < strip.Min().x || x > strip.Max().x) {
+            continue;
         }
+        if (key.Frame == m_DraggedFrame) {
+            PaintDiamond(OutDrawList, Vec2(x, centerY), s_KeyRadius + 1.0f, EditorStyle::AccentBright, m_WorldMatrix);
+        }
+        PaintDiamond(OutDrawList, Vec2(x, centerY), s_KeyRadius - 1.0f, s_KeyColor, m_WorldMatrix);
     }
 }
 
 void AnimationTimelineSummary::OnPressed(const Vec2& InCursorPos) {
-    if (Owner && !IsOverLabelColumn(InCursorPos)) {
-        Owner->ScrubTo(Strip(), InCursorPos.x);
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    m_DraggedKeys.Clear();
+    m_DraggedFrame = ColumnAt(InCursorPos);
+    if (!animation || IsOverLabelColumn(InCursorPos)) {
+        return;
     }
+    if (m_DraggedFrame < 0) {
+        Owner->ScrubTo(Strip(), InCursorPos.x);
+        return;
+    }
+    for (int32_t i = 0; i < animation->GetKeys().Size(); i++) {
+        if (animation->GetKeys()[i].Frame == m_DraggedFrame) {
+            m_DraggedKeys.Add(i);
+        }
+    }
+    Owner->SelectKey(-1);
+    Owner->SelectEvent(-1);
 }
 
 void AnimationTimelineSummary::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
     (void)InDelta;
-    if (Owner) {
-        Owner->ScrubTo(Strip(), InCursorPos.x);
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    if (!animation) {
+        return;
     }
+    if (m_DraggedKeys.IsEmpty()) {
+        Owner->ScrubTo(Strip(), InCursorPos.x);
+        return;
+    }
+    const int32_t frame = (int32_t)std::lround(Owner->XToFrame(Strip(), InCursorPos.x));
+    m_DraggedFrame = std::clamp(frame, 0, animation->GetFrameCount());
+    animation->MoveKeys(m_DraggedKeys, m_DraggedFrame);
+}
+
+void AnimationTimelineSummary::OnReleased(bool InInside) {
+    (void)InInside;
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    if (animation && !m_DraggedKeys.IsEmpty()) {
+        animation->MergeKeys(m_DraggedKeys);
+    }
+    m_DraggedKeys.Clear();
+    m_DraggedFrame = -1;
 }
 
 /* -------------------------------- Row -------------------------------- */
@@ -263,8 +509,7 @@ AnimationTimelineRow::AnimationTimelineRow() {
 
     m_ValueHost = Add<UINode>();
     m_ValueHost->Anchor = m_ValueHost->Pivot = Vec2(0.0f, 0.5f);
-    m_ValueHost->Position = Vec2(AnimationTimelineTab::LabelColumnWidth - AnimationTimelineTab::ValueColumnWidth - 6.0f, 0.0f);
-    m_ValueHost->Size = Vec2(AnimationTimelineTab::ValueColumnWidth, AnimationTimelineTab::RowHeight - 5.0f);
+    m_ValueHost->ClipChildren = true;
 
     Bind = [this] { Refresh(); };
 }
@@ -305,14 +550,21 @@ void AnimationTimelineRow::Refresh() {
     m_Icon->Image = icon;
     m_Icon->Position = Vec2(indent + 13.0f, 0.0f);
 
+    const TimelineValueRef ref = Owner->ResolveRow(RowIndex);
+    const float labelWidth = Owner->GetLabelWidth();
     const float textLeft = indent + 30.0f;
+    const float available = labelWidth - textLeft - 16.0f;
+    const int32_t components = DetailsCustomization::GetInnerProperties(ref.Leaf).Size();
+    const float wanted = components > 1 ? (float)components * AnimationTimelineTab::ComponentWidth : AnimationTimelineTab::ValueColumnWidth;
+    const float valueWidth = std::min(std::max(wanted, available * 0.45f), std::max(available * 0.7f, AnimationTimelineTab::ValueColumnWidth));
+
     m_Label->Position = Vec2(textLeft, 0.0f);
-    m_Label->Size = { AnimationTimelineTab::LabelColumnWidth - AnimationTimelineTab::ValueColumnWidth - textLeft - 10.0f,
-                      AnimationTimelineTab::RowHeight };
+    m_Label->Size = { available - valueWidth, AnimationTimelineTab::RowHeight };
     m_Label->Text = row->Label;
     m_Label->Color = Owner->GetTrackNode(*track) ? EditorStyle::Text : EditorStyle::TextDim;
 
-    const TimelineValueRef ref = Owner->ResolveRow(RowIndex);
+    m_ValueHost->Position = Vec2(labelWidth - valueWidth - 6.0f, 0.0f);
+    m_ValueHost->Size = Vec2(valueWidth, AnimationTimelineTab::RowHeight - 5.0f);
     SetEditor(ref.Target, ref.Leaf);
 }
 
@@ -402,14 +654,15 @@ void AnimationTimelineRow::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) 
         return;
     }
 
-    const float frame = Owner->XToFrame(Strip(), InCursorPos.x);
-    const int32_t clamped = (int32_t)std::lround(frame < 0.0f ? 0.0f : frame);
-    m_DraggedKey = animation->SetKeyFrame(m_DraggedKey, clamped > animation->GetFrameCount() ? animation->GetFrameCount() : clamped);
-    Owner->SelectKey(m_DraggedKey);
+    animation->MoveKeys({ m_DraggedKey }, (int32_t)std::lround(Owner->XToFrame(Strip(), InCursorPos.x)));
 }
 
 void AnimationTimelineRow::OnReleased(bool InInside) {
     (void)InInside;
+    Animation* animation = Owner ? Owner->GetAnimation() : nullptr;
+    if (animation && m_DraggedKey >= 0) {
+        Owner->SelectKey(animation->MergeKeys({ m_DraggedKey })[0]);
+    }
     m_DraggedKey = -1;
     m_PressedOnLabel = false;
 }
@@ -453,6 +706,11 @@ bool AnimationTimelineRow::OnSecondaryClick(const Vec2& InCursorPos) {
         mode("Ease Out", AnimationInterpolation::EaseOut);
         mode("Ease In Out", AnimationInterpolation::EaseInOut);
         menu.Separator();
+        menu.Item("Add Event Here", [owner, keyFrame] {
+            if (AnimationTimelineTab* timeline = owner.Get()) {
+                timeline->AddEventAt(keyFrame);
+            }
+        }).Icon(EditorIcons::Add()).Enabled(animation->FindEvent(keyFrame) < 0);
         menu.Item("Delete Key", [owner, findKey] {
             Animation* open = owner.Get() ? owner.Get()->GetAnimation() : nullptr;
             if (open) {
@@ -489,6 +747,32 @@ bool AnimationTimelineRow::OnSecondaryClick(const Vec2& InCursorPos) {
     return true;
 }
 
+/* -------------------------------- Splitter -------------------------------- */
+
+AnimationTimelineSplitter::AnimationTimelineSplitter() {
+    Interactable = true;
+    Cursor = CursorIcon::ResizeH;
+    Anchor = Pivot = Vec2(0.0f);
+    Size = { 7.0_px, 1.0_rel - UIValue::Px(AnimationTimelineTab::TransportHeight) };
+    Bind = [this] {
+        Position = Vec2((Owner ? Owner->GetLabelWidth() : AnimationTimelineTab::DefaultLabelWidth) - 3.0f,
+                        AnimationTimelineTab::TransportHeight);
+    };
+}
+
+void AnimationTimelineSplitter::Paint(UIDrawList& OutDrawList) {
+    const bool active = IsHovered() || IsPressed();
+    OutDrawList.AddRect(UIRectF(Vec2(m_Geometry.Min().x + 3.0f, m_Geometry.Min().y), Vec2(1.0f, m_Geometry.Size.y)),
+                        active ? EditorStyle::Accent : EditorStyle::Border, m_WorldMatrix);
+}
+
+void AnimationTimelineSplitter::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
+    (void)InDelta;
+    if (Owner) {
+        Owner->SetLabelWidth(InCursorPos.x - Owner->GetGeometry().Min().x);
+    }
+}
+
 /* -------------------------------- Scroll bar -------------------------------- */
 
 AnimationTimelineScrollBar::AnimationTimelineScrollBar() {
@@ -497,7 +781,7 @@ AnimationTimelineScrollBar::AnimationTimelineScrollBar() {
 }
 
 UIRectF AnimationTimelineScrollBar::ThumbRect() const {
-    const UIRectF track = AnimationTimelineTab::StripOf(m_Geometry);
+    const UIRectF track = Owner->StripOf(m_Geometry);
     float domainStart = 0.0f;
     float domainEnd = 1.0f;
     Owner->GetScrollDomain(domainStart, domainEnd);
@@ -518,7 +802,7 @@ void AnimationTimelineScrollBar::Paint(UIDrawList& OutDrawList) {
     }
     OutDrawList.AddRect(m_Geometry, EditorStyle::BottomBar, m_WorldMatrix);
 
-    const UIRectF track = AnimationTimelineTab::StripOf(m_Geometry);
+    const UIRectF track = Owner->StripOf(m_Geometry);
     OutDrawList.AddRoundedRect(UIRectF(Vec2(track.Min().x, track.Min().y + 3.0f), Vec2(track.Size.x, track.Size.y - 6.0f)),
                                s_ScrollTrack, 2.0f, m_WorldMatrix);
     OutDrawList.AddRoundedRect(ThumbRect(), IsHovered() ? s_ScrollThumbHover : s_ScrollThumb, 3.0f, m_WorldMatrix);
@@ -533,10 +817,10 @@ void AnimationTimelineScrollBar::OnPressed(const Vec2& InCursorPos) {
 
 void AnimationTimelineScrollBar::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
     (void)InDelta;
-    const UIRectF track = AnimationTimelineTab::StripOf(m_Geometry);
-    if (!Owner || track.Size.x <= 0.0f) {
+    if (!Owner) {
         return;
     }
+    const UIRectF track = Owner->StripOf(m_Geometry);
     float domainStart = 0.0f;
     float domainEnd = 1.0f;
     Owner->GetScrollDomain(domainStart, domainEnd);

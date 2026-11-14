@@ -1,6 +1,7 @@
 #include "EventGraph.h"
 #include "EventGraphNodes.h"
 #include "GameFramework/Node.h"
+#include "GameFramework/AnimatorNode.h"
 #include <cctype>
 
 static const char* s_BuiltinPinStructs[] = { "Vec2", "Vec3", "Vec4", "Color", "Quat" };
@@ -182,6 +183,18 @@ void EventGraph::CollectNodeTemplates(Array<GraphNodeTemplate>& OutTemplates, Ob
                 reference->NodeName = name;
                 reference->NodeClass = nodeClass;
             });
+        }
+        if (AnimatorNode* animator = Cast<AnimatorNode>(sceneNode)) {
+            Array<String> eventNames;
+            animator->CollectEventNames(eventNames);
+            for (const String& eventName : eventNames) {
+                const String title = "Animation Event '" + eventName + "'" + (isSelf ? String() : " (" + name + ")");
+                add(isSelf ? String("Events") : "Events|" + name, title, AnimationEventNode::StaticClass(), [name, eventName](GraphNode& OutNode) {
+                    AnimationEventNode* event = Cast<AnimationEventNode>(&OutNode);
+                    event->NodeName = name;
+                    event->EventName = eventName;
+                });
+            }
         }
         for (Property* property : Property::GetAllTypeProperties(sceneNode->GetClass())) {
             if (!Cast<DelegateProperty>(property)) {

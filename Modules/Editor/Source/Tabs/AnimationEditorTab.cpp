@@ -167,7 +167,7 @@ void AnimationEditorTab::CapturePose() {
         Node* node = pending.LastItem();
         pending.RemoveLastItem();
 
-        AnimationPose pose;
+        AnimationPreviewPose pose;
         pose.Target = node;
         pose.Values = JsonSerializer::SerializeObject(node);
         m_PreviewPose.Add(pose);
@@ -179,7 +179,7 @@ void AnimationEditorTab::CapturePose() {
 }
 
 void AnimationEditorTab::RestorePose() {
-    for (const AnimationPose& pose : m_PreviewPose) {
+    for (const AnimationPreviewPose& pose : m_PreviewPose) {
         if (Node* node = pose.Target.Get()) {
             JsonSerializer::DeserializeObject(node, pose.Values);
         }
@@ -234,7 +234,7 @@ void AnimationEditorTab::SeedTrackStart(Node& InNode, const String& InPropertyNa
         return;
     }
 
-    for (const AnimationPose& pose : m_PreviewPose) {
+    for (const AnimationPreviewPose& pose : m_PreviewPose) {
         if (pose.Target.Get() != &InNode) {
             continue;
         }

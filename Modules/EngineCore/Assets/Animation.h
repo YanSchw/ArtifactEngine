@@ -4,6 +4,7 @@
 #include "Animation.gen.h"
 
 class Node;
+class AnimationPose;
 struct Property;
 
 ARTIFACT_ENUM();
@@ -35,6 +36,16 @@ struct AnimationKey {
     String Value;
 };
 
+struct AnimationEvent {
+    ARTIFACT_STRUCT();
+
+    PROPERTY()
+    int32_t Frame = 0;
+
+    PROPERTY()
+    String Name;
+};
+
 /** Every key of one property in frame order. */
 struct AnimationTrack {
     Array<int32_t> Path;
@@ -52,6 +63,8 @@ public:
 
     void ApplyTo(Node* InRootNode, float InTime);
     void ApplyAtFrame(Node* InRootNode, float InFrame);
+    void Sample(Node& InRootNode, float InFrame, AnimationPose& OutPose);
+    float FrameAtTime(float InTime) const;
 
     FUNCTION(Pure)
     float GetFrameRate() const { return m_FrameRate; }
@@ -67,14 +80,24 @@ public:
     FUNCTION()
     void SetLooping(bool InLooping) { m_Loop = InLooping; }
 
+    const Array<AnimationEvent>& GetEvents() const { return m_Events; }
+    int32_t FindEvent(int32_t InFrame) const;
+    int32_t AddEvent(int32_t InFrame, const String& InName);
+    void SetEventFrame(int32_t InEvent, int32_t InFrame);
+    void SetEventName(int32_t InEvent, const String& InName);
+    void RemoveEvent(int32_t InEvent);
+    void CollectEventsBetween(float InFromFrame, float InToFrame, Array<String>& OutNames) const;
+
     const Array<AnimationKey>& GetKeys() const { return m_Keys; }
     const Array<AnimationTrack>& GetTracks() const { return m_Tracks; }
 
     int32_t FindKey(const Array<int32_t>& InPath, const String& InPropertyName, int32_t InFrame) const;
     int32_t FindTrack(const Array<int32_t>& InPath, const String& InPropertyName) const;
     void SetKey(const Array<int32_t>& InPath, const String& InPropertyName, int32_t InFrame, const String& InValue);
-    /** Returns where the key ended up; moving onto an occupied frame merges the two. */
-    int32_t SetKeyFrame(int32_t InKey, int32_t InFrame);
+    /** Keys may share a frame with others of their track until MergeKeys settles the move. */
+    void MoveKeys(const Array<int32_t>& InKeys, int32_t InFrame);
+    /** InKeys win over every other key of their track on the same frame; returns their new indices. */
+    Array<int32_t> MergeKeys(const Array<int32_t>& InKeys);
     void SetKeyInterpolation(int32_t InKey, AnimationInterpolation InInterpolation);
     void RemoveKey(int32_t InKey);
     void RemoveTrack(const Array<int32_t>& InPath, const String& InPropertyName);
@@ -108,10 +131,12 @@ protected:
     PROPERTY()
     Array<AnimationKey> m_Keys;
 
+    PROPERTY()
+    Array<AnimationEvent> m_Events;
+
 private:
     void RebuildTracks();
-    void ApplyTrack(AnimationTrack& OutTrack, Node& InRoot, float InFrame);
-    float FrameAtTime(float InTime) const;
+    void SampleTrack(AnimationTrack& OutTrack, Node& InRoot, float InFrame, AnimationPose& OutPose);
 
     Array<AnimationTrack> m_Tracks;
     Array<int32_t> m_RootPath;

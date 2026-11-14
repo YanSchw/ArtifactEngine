@@ -4,6 +4,7 @@
 
 class Animation;
 class AnimationEditorTab;
+class AnimationTimelineEvents;
 class Node;
 class UIVStack;
 class UITextArea;
@@ -35,12 +36,17 @@ class AnimationTimelineTab : public MinorTab {
 public:
     ARTIFACT_CLASS();
 
-    static constexpr float LabelColumnWidth = 300.0f;
+    static constexpr float DefaultLabelWidth = 360.0f;
+    static constexpr float MinLabelWidth = 180.0f;
+    static constexpr float MinStripWidth = 160.0f;
     static constexpr float ValueColumnWidth = 92.0f;
+    static constexpr float ComponentWidth = 64.0f;
+    static constexpr float TransportHeight = 30.0f;
     static constexpr float IndentStep = 11.0f;
     static constexpr float RowHeight = 22.0f;
     static constexpr float RulerHeight = 24.0f;
     static constexpr float SummaryHeight = 18.0f;
+    static constexpr float EventsHeight = 22.0f;
     static constexpr float ScrollBarHeight = 10.0f;
     static constexpr float StripMargin = 10.0f;
     static constexpr float MinVisibleFrames = 2.0f;
@@ -59,7 +65,9 @@ public:
     float FrameToX(const UIRectF& InStrip, float InFrame) const;
     float XToFrame(const UIRectF& InStrip, float InX) const;
     int32_t LabelledFrameStep(const UIRectF& InStrip) const;
-    static UIRectF StripOf(const UIRectF& InRow);
+    UIRectF StripOf(const UIRectF& InRow) const;
+    float GetLabelWidth() const { return m_LabelWidth; }
+    void SetLabelWidth(float InWidth);
 
     float GetViewStart() const { return m_ViewStart; }
     float GetViewEnd() const { return m_ViewEnd; }
@@ -88,8 +96,13 @@ public:
     float GetOutOfRangeEndX(const UIRectF& InStrip) const;
 
     int32_t GetSelectedKey() const { return m_SelectedKey; }
-    void SelectKey(int32_t InKey) { m_SelectedKey = InKey; }
+    void SelectKey(int32_t InKey);
     void DeleteSelectedKey();
+
+    int32_t GetSelectedEvent() const { return m_SelectedEvent; }
+    void SelectEvent(int32_t InEvent);
+    void AddEventAt(int32_t InFrame);
+    void DeleteSelectedEvent();
 
     void ScrubTo(const UIRectF& InStrip, float InX);
     void StepToAdjacentKey(int32_t InDirection);
@@ -113,7 +126,10 @@ private:
     Array<String> m_ExpandedTracks;
     UIVStack* m_Rows = nullptr;
     UITextArea* m_FrameField = nullptr;
+    AnimationTimelineEvents* m_Events = nullptr;
     int32_t m_SelectedKey = -1;
+    int32_t m_SelectedEvent = -1;
     float m_ViewStart = 0.0f;
     float m_ViewEnd = 0.0f;
+    float m_LabelWidth = DefaultLabelWidth;
 };

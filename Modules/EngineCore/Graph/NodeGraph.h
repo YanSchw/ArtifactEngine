@@ -46,6 +46,7 @@ public:
     }
     virtual bool AllowsNodeClass(const Class& InNodeClass) const { (void)InNodeClass; return true; }
     virtual bool AllowsMultipleConnections(const GraphPin& InPin) const { return InPin.IsOutput(); }
+    virtual GraphConnection* MakeConnection(const GraphNode& InFrom, const GraphNode& InTo) const;
     virtual void CollectNodeTemplates(Array<GraphNodeTemplate>& OutTemplates, Object* InContext) const;
 
     /** Wires two pins (either order); an input pin's existing connection is replaced, as inputs

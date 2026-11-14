@@ -2,6 +2,7 @@
 #include "EventGraph.h"
 #include "EventGraphInstance.h"
 #include "GameFramework/Node.h"
+#include "GameFramework/AnimatorNode.h"
 
 struct EventTickFrame {
     float DeltaSeconds = 0.0f;
@@ -103,6 +104,26 @@ void DelegateEventNode::Start(EventGraphInstance& InInstance) const {
         return;
     }
     InInstance.BindDelegate(*this, *delegate, *target);
+}
+
+AnimationEventNode::AnimationEventNode() {
+    DelegateName = "OnAnimationEvent";
+    OwnerClass = AnimatorNode::StaticClass().Name;
+}
+
+bool AnimationEventNode::Accepts(const void* InParams) const {
+    DelegateProperty* delegate = FindDelegate();
+    Property* name = delegate ? delegate->SignatureFunction->FindOutput("EventName") : nullptr;
+    return name && *(const String*)name->GetValuePtr(const_cast<void*>(InParams)) == EventName;
+}
+
+void AnimationEventNode::ConstructPins() {
+    AddExecOutput();
+}
+
+String AnimationEventNode::GetTitle() const {
+    const String title = "Animation Event '" + EventName + "'";
+    return NodeName.empty() ? title : title + " (" + NodeName + ")";
 }
 
 Function* CallFunctionNode::FindFunction() const {

@@ -11,6 +11,7 @@
 UIDragNumber::UIDragNumber() {
     Size = { 1.0_rel, 20.0f };
     Interactable = true;
+    ClipChildren = true;
     Cursor = CursorIcon::ResizeH;
 
     m_PrefixLabel = Add<UILabel>();

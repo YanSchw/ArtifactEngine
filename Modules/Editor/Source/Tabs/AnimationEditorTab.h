@@ -12,7 +12,7 @@ class VectorImage;
 
 /** A node's property values as they were before previewing, so leaving preview puts the
  *  placeholder back the way the user built it. */
-struct AnimationPose {
+struct AnimationPreviewPose {
     WeakObjectPtr<Node> Target;
     String Values;
 };
@@ -78,7 +78,7 @@ private:
     ViewportTab* m_Viewport = nullptr;
     AnimationTimelineTab* m_Timeline = nullptr;
 
-    Array<AnimationPose> m_PreviewPose;
+    Array<AnimationPreviewPose> m_PreviewPose;
     float m_FramePosition = 0.0f;
     bool m_Previewing = false;
     bool m_Recording = false;

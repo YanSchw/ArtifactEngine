@@ -60,6 +60,7 @@ public:
     static VectorImage* RigidBody()     { return Get("d06d74b9-dfa5-4126-981a-4b9872ab540a"); }
     static VectorImage* Character()     { return Get("37661651-475f-4abb-9aab-8d05e8da1fc0"); }
     static VectorImage* Animation()     { return Get("3f0e57a2-1c4b-4d90-9d0e-7a1b2c3d4e5f"); }
+    static VectorImage* AnimationGraph() { return Get("3c3ba6d9-872b-4e98-9f2a-c24b2171c4f2"); }
     static VectorImage* InputMapping()  { return Get("3c00f557-6c65-4ca3-b35d-6bfa9c50fd2f"); }
     static VectorImage* Audio()         { return Get("87b011c9-7a52-4b36-880b-f817fdaaa9ca"); }
     static VectorImage* Particles()     { return Get("e189f678-8272-4319-862f-1b80e116b2ce"); }

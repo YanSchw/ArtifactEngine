@@ -10,6 +10,9 @@
 #include "GameFramework/StaticMeshNode.h"
 #include "GameFramework/ParticleSystemEmitterNode.h"
 #include "Assets/ParticleSystemAsset.h"
+#include "Assets/Animation.h"
+#include "Assets/AnimationGraph.h"
+#include "GameFramework/AnimatorNode.h"
 #include "Particles/ParticlePreview.h"
 
 static constexpr float s_TransactionTimeout = 0.35f;
@@ -72,7 +75,8 @@ void MajorTab::BroadcastAssetSaved(Asset* InAsset, MajorTab* InSource) {
 
 bool MajorTab::IsSpawnableAsset(Asset* InAsset) {
     return InAsset && (InAsset->IsA(Mesh::StaticClass()) || InAsset->IsA(Blueprint::StaticClass())
-                       || InAsset->IsA(ParticleSystemAsset::StaticClass()));
+                       || InAsset->IsA(ParticleSystemAsset::StaticClass()) || InAsset->IsA(Animation::StaticClass())
+                       || InAsset->IsA(AnimationGraph::StaticClass()));
 }
 
 Node* MajorTab::SpawnFromAsset(Asset* InAsset, Node& InParent) {
@@ -92,6 +96,22 @@ Node* MajorTab::SpawnFromAsset(Asset* InAsset, Node& InParent) {
             node->MarkPropertyOverridden("m_System");
             node->SetName(system->GetDisplayName());
         }
+        return node;
+    }
+    if (Cast<Animation>(InAsset) || Cast<AnimationGraph>(InAsset)) {
+        AnimatorNode* node = Cast<AnimatorNode>(InParent.AttachChild(AnimatorNode::StaticClass()));
+        if (!node) {
+            return nullptr;
+        }
+        if (Animation* animation = Cast<Animation>(InAsset)) {
+            node->SetAnimation(animation);
+            node->MarkPropertyOverridden("m_Animation");
+        } else {
+            node->SetAnimationGraph(Cast<AnimationGraph>(InAsset));
+            node->MarkPropertyOverridden("m_Source");
+            node->MarkPropertyOverridden("m_AnimationGraph");
+        }
+        node->SetName("Animator");
         return node;
     }
     if (Blueprint* blueprint = Cast<Blueprint>(InAsset)) {

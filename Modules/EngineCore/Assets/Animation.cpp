@@ -1,5 +1,6 @@
 #include "Animation.h"
 #include "AssetManager.h"
+#include "Animation/AnimationPose.h"
 #include "NodeRecord.h"
 #include "GameFramework/Node.h"
 #include "Object/Property.h"
@@ -7,11 +8,10 @@
 #include "Serialization/Json.h"
 #include "Serialization/ThirdParty/nlohmann/json.hpp"
 #include "Core/Log.h"
+#include <algorithm>
 #include <cmath>
 
 using json = nlohmann::json;
-
-static const char* s_RotationAxes[] = { "X", "Y", "Z", "W" };
 
 static String PathToString(const Array<int32_t>& InPath) {
     if (InPath.IsEmpty()) {
@@ -31,68 +31,6 @@ static float Ease(AnimationInterpolation InInterpolation, float InAlpha) {
         case AnimationInterpolation::EaseInOut: return InAlpha * InAlpha * (3.0f - 2.0f * InAlpha);
         default:                                return InAlpha;
     }
-}
-
-/** Numbers blend, everything else holds the earlier value until the next key takes over. */
-static json Blend(const json& InA, const json& InB, float InAlpha) {
-    if (InA.is_number() && InB.is_number()) {
-        const double blended = InA.get<double>() + (InB.get<double>() - InA.get<double>()) * (double)InAlpha;
-        if (InA.is_number_float() || InB.is_number_float()) {
-            return blended;
-        }
-        return (int64_t)std::llround(blended);
-    }
-    if (InA.is_object() && InB.is_object()) {
-        json result = InA;
-        for (const auto& [name, value] : InA.items()) {
-            if (InB.contains(name)) {
-                result[name] = Blend(value, InB[name], InAlpha);
-            }
-        }
-        return result;
-    }
-    if (InA.is_array() && InB.is_array() && InA.size() == InB.size()) {
-        json result = InA;
-        for (size_t i = 0; i < InA.size(); i++) {
-            result[i] = Blend(InA[i], InB[i], InAlpha);
-        }
-        return result;
-    }
-    return InA;
-}
-
-static json BlendRotation(const json& InA, const json& InB, float InAlpha) {
-    double from[4], to[4], dot = 0.0;
-    for (int32_t i = 0; i < 4; i++) {
-        if (!InA[s_RotationAxes[i]].is_number() || !InB[s_RotationAxes[i]].is_number()) {
-            return Blend(InA, InB, InAlpha);
-        }
-        from[i] = InA[s_RotationAxes[i]].get<double>();
-        to[i] = InB[s_RotationAxes[i]].get<double>();
-        dot += from[i] * to[i];
-    }
-
-    const double shortest = dot < 0.0 ? -1.0 : 1.0;
-    double blended[4], length = 0.0;
-    for (int32_t i = 0; i < 4; i++) {
-        blended[i] = from[i] + (to[i] * shortest - from[i]) * (double)InAlpha;
-        length += blended[i] * blended[i];
-    }
-    length = std::sqrt(length);
-    if (length <= 0.0) {
-        return InA;
-    }
-
-    json result = InA;
-    for (int32_t i = 0; i < 4; i++) {
-        result[s_RotationAxes[i]] = blended[i] / length;
-    }
-    return result;
-}
-
-static bool IsRotation(Property* InProperty) {
-    StructProperty* structProperty = Cast<StructProperty>(InProperty);
-    return structProperty && structProperty->InnerStructTypename == "Quat";
 }
 
 Animation* Animation::CreateEmpty(const String& InDirectory, const String& InName, const Class& InPlaceholderRoot) {
@@ -191,21 +129,44 @@ void Animation::SetKey(const Array<int32_t>& InPath, const String& InPropertyNam
     RebuildTracks();
 }
 
-int32_t Animation::SetKeyFrame(int32_t InKey, int32_t InFrame) {
-    if (InKey < 0 || InKey >= m_Keys.Size() || m_Keys[InKey].Frame == InFrame) {
-        return InKey;
+void Animation::MoveKeys(const Array<int32_t>& InKeys, int32_t InFrame) {
+    for (int32_t key : InKeys) {
+        if (key >= 0 && key < m_Keys.Size()) {
+            m_Keys[key].Frame = std::clamp(InFrame, 0, m_FrameCount);
+        }
     }
-
-    const int32_t occupied = FindKey(m_Keys[InKey].Path, m_Keys[InKey].PropertyName, InFrame);
-    m_Keys[InKey].Frame = InFrame;
-    if (occupied < 0) {
-        RebuildTracks();
-        return InKey;
-    }
-
-    m_Keys.RemoveAt(occupied);
     RebuildTracks();
-    return occupied < InKey ? InKey - 1 : InKey;
+}
+
+Array<int32_t> Animation::MergeKeys(const Array<int32_t>& InKeys) {
+    const auto covered = [this, &InKeys](const AnimationKey& InKey) {
+        for (int32_t winner : InKeys) {
+            const AnimationKey& other = m_Keys[winner];
+            if (other.Frame == InKey.Frame && other.PropertyName == InKey.PropertyName && other.Path == InKey.Path) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    Array<int32_t> remapped;
+    for (int32_t i = 0; i < InKeys.Size(); i++) {
+        remapped.Add(-1);
+    }
+    Array<AnimationKey> kept;
+    for (int32_t i = 0; i < m_Keys.Size(); i++) {
+        const int32_t moved = InKeys.IndexOf(i);
+        if (moved < 0 && covered(m_Keys[i])) {
+            continue;
+        }
+        if (moved >= 0) {
+            remapped[moved] = kept.Size();
+        }
+        kept.Add(m_Keys[i]);
+    }
+    m_Keys = kept;
+    RebuildTracks();
+    return remapped;
 }
 
 void Animation::SetKeyInterpolation(int32_t InKey, AnimationInterpolation InInterpolation) {
@@ -283,14 +244,19 @@ void Animation::ApplyAtFrame(Node* InRootNode, float InFrame) {
     if (!InRootNode) {
         return;
     }
-    const float last = (float)m_FrameCount;
-    const float frame = InFrame < 0.0f ? 0.0f : (InFrame > last ? last : InFrame);
+    AnimationPose pose;
+    Sample(*InRootNode, InFrame, pose);
+    pose.Apply();
+}
+
+void Animation::Sample(Node& InRootNode, float InFrame, AnimationPose& OutPose) {
+    const float frame = std::clamp(InFrame, 0.0f, (float)m_FrameCount);
     for (AnimationTrack& track : m_Tracks) {
-        ApplyTrack(track, *InRootNode, frame);
+        SampleTrack(track, InRootNode, frame, OutPose);
     }
 }
 
-void Animation::ApplyTrack(AnimationTrack& OutTrack, Node& InRoot, float InFrame) {
+void Animation::SampleTrack(AnimationTrack& OutTrack, Node& InRoot, float InFrame, AnimationPose& OutPose) {
     // A hierarchy that no longer matches is reported once, not once per frame.
     const auto warn = [this, &OutTrack](const String& InReason) {
         if (!OutTrack.Warned) {
@@ -338,22 +304,78 @@ void Animation::ApplyTrack(AnimationTrack& OutTrack, Node& InRoot, float InFrame
         const json to = json::parse(next->Value, nullptr, false);
         const float span = (float)(next->Frame - previous->Frame);
         const float alpha = Ease(previous->Interpolation, span > 0.0f ? (InFrame - (float)previous->Frame) / span : 1.0f);
-        value = (IsRotation(property) && from.is_object() && to.is_object()) ? BlendRotation(from, to, alpha)
-                                                                            : Blend(from, to, alpha);
+        value = AnimationPose::Blend(*property, from, to, alpha);
     }
 
     if (value.is_discarded()) {
         warn("the stored value is not valid JSON");
         return;
     }
+    OutPose.Set(*node, *property, std::move(value));
+}
 
-    try {
-        JsonSerializer::DeserializeProperty(property, property->GetValuePtr(node), value);
-    } catch (const std::exception&) {
-        warn("the stored value does not fit the property's type");
+int32_t Animation::FindEvent(int32_t InFrame) const {
+    for (int32_t i = 0; i < m_Events.Size(); i++) {
+        if (m_Events[i].Frame == InFrame) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int32_t Animation::AddEvent(int32_t InFrame, const String& InName) {
+    const int32_t existing = FindEvent(InFrame);
+    if (existing >= 0) {
+        return existing;
+    }
+    AnimationEvent event;
+    event.Frame = InFrame;
+    event.Name = InName;
+    m_Events.Add(event);
+    return m_Events.Last();
+}
+
+void Animation::SetEventFrame(int32_t InEvent, int32_t InFrame) {
+    const int32_t frame = std::clamp(InFrame, 0, m_FrameCount);
+    if (InEvent >= 0 && InEvent < m_Events.Size() && FindEvent(frame) < 0) {
+        m_Events[InEvent].Frame = frame;
+    }
+}
+
+void Animation::SetEventName(int32_t InEvent, const String& InName) {
+    if (InEvent >= 0 && InEvent < m_Events.Size()) {
+        m_Events[InEvent].Name = InName;
+    }
+}
+
+void Animation::RemoveEvent(int32_t InEvent) {
+    if (InEvent >= 0 && InEvent < m_Events.Size()) {
+        m_Events.RemoveAt(InEvent);
+    }
+}
+
+void Animation::CollectEventsBetween(float InFromFrame, float InToFrame, Array<String>& OutNames) const {
+    if (InToFrame <= InFromFrame) {
         return;
     }
-    property->NotifyChanged(node);
+    const float length = (float)m_FrameCount;
+    const float from = m_Loop ? std::max(InFromFrame, InToFrame - length) : InFromFrame;
+    const int64_t firstCycle = m_Loop ? std::max<int64_t>(0, (int64_t)std::floor(from / length)) : 0;
+    const int64_t lastCycle = m_Loop ? (int64_t)std::floor(InToFrame / length) : 0;
+
+    Array<std::pair<float, String>> passed;
+    for (int64_t cycle = firstCycle; cycle <= lastCycle; cycle++) {
+        for (const AnimationEvent& event : m_Events) {
+            const float position = (float)cycle * length + (float)event.Frame;
+            if (position > from && position <= InToFrame) {
+                passed.Add({ position, event.Name });
+            }
+        }
+    }
+    passed.Sort([](const auto& InA, const auto& InB) { return InA.first < InB.first; });
+    for (const auto& [position, name] : passed) {
+        OutNames.Add(name);
+    }
 }
 
 String Animation::SerializeToJson() const {

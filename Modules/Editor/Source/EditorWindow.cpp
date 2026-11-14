@@ -7,9 +7,11 @@
 #include "Tabs/MeshEditorTab.h"
 #include "Tabs/AudioClipEditorTab.h"
 #include "Tabs/AnimationEditorTab.h"
+#include "Tabs/AnimationGraphEditorTab.h"
 #include "Tabs/InputMappingEditorTab.h"
 #include "Tabs/ParticleSystemEditorTab.h"
 #include "Assets/ParticleSystemAsset.h"
+#include "Assets/AnimationGraph.h"
 #include "Tabs/EditorSettingsTab.h"
 #include "Settings/EditorSettings.h"
 #include "Assets/Scene.h"
@@ -339,6 +341,11 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     if (Animation* animation = Cast<Animation>(InAsset)) {
         AnimationEditorTab* tab = OpenTab<AnimationEditorTab>();
         tab->OpenAnimation(animation);
+        return tab;
+    }
+    if (AnimationGraph* graph = Cast<AnimationGraph>(InAsset)) {
+        AnimationGraphEditorTab* tab = OpenTab<AnimationGraphEditorTab>();
+        tab->OpenGraph(graph);
         return tab;
     }
     if (ParticleSystemAsset* system = Cast<ParticleSystemAsset>(InAsset)) {

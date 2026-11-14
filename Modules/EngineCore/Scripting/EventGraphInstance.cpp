@@ -93,11 +93,11 @@ void* EventGraphInstance::GetFrame(const EventGraphNode& InNode) {
     return frame.get();
 }
 
-void EventGraphInstance::BindDelegate(const EventGraphNode& InEvent, DelegateProperty& InDelegate, Object& InTarget) {
+void EventGraphInstance::BindDelegate(const DelegateEventNode& InEvent, DelegateProperty& InDelegate, Object& InTarget) {
     const uint64_t eventId = InEvent.NodeId;
     const DelegateHandle handle = InDelegate.Bind(InDelegate.GetValuePtr(&InTarget), this, [this, eventId, &InDelegate](void* InParams) {
-        const EventGraphNode* event = m_Running && m_Graph ? Cast<EventGraphNode>(m_Graph->FindNode(eventId)) : nullptr;
-        if (!event) {
+        const DelegateEventNode* event = m_Running && m_Graph ? Cast<DelegateEventNode>(m_Graph->FindNode(eventId)) : nullptr;
+        if (!event || !event->Accepts(InParams)) {
             return;
         }
         InDelegate.SignatureFunction->CopyParams(GetFrame(*event), InParams);

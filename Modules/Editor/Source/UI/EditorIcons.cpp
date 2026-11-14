@@ -29,6 +29,7 @@ VectorImage* EditorIcons::GetNodeIcon(const Class& InClass) {
         s_NodeIcons["RigidBodyNode"] = RigidBody();
         s_NodeIcons["CharacterNode"] = Character();
         s_NodeIcons["AudioSourceNode"] = Audio();
+        s_NodeIcons["AnimatorNode"] = Animation();
         s_NodeIcons["AudioListenerNode"] = AudioListener();
         s_NodeIcons["ParticleSystemEmitterNode"] = Particles();
         s_NodeIcons["PostProcessVolumeNode"] = PostProcessVolume();
@@ -71,6 +72,7 @@ VectorImage* EditorIcons::GetAssetIcon(const Class& InClass) {
         s_AssetIcons["Material"] = Material();
         s_AssetIcons["ShaderGraph"] = GraphEditor();
         s_AssetIcons["Animation"] = Animation();
+        s_AssetIcons["AnimationGraph"] = AnimationGraph();
         s_AssetIcons["InputActionMapping"] = InputMapping();
         s_AssetIcons["AudioClip"] = Audio();
         s_AssetIcons["ParticleSystemAsset"] = Particles();
@@ -94,6 +96,7 @@ Vec4 EditorIcons::GetAssetColor(const Class& InClass) {
         s_AssetColors["Material"] = HexColor(0xC98BE0);
         s_AssetColors["ShaderGraph"] = HexColor(0xD86BA9);
         s_AssetColors["Animation"] = HexColor(0x6FD84A);
+        s_AssetColors["AnimationGraph"] = HexColor(0xE0822F);
         s_AssetColors["InputActionMapping"] = HexColor(0xE05A6E);
         s_AssetColors["AudioClip"] = HexColor(0x7A7CE0);
         s_AssetColors["ParticleSystemAsset"] = HexColor(0xFFC94A);

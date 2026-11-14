@@ -13,7 +13,7 @@ public:
 
     GraphEditorView();
 
-    void SetGraph(const SharedObjectPtr<NodeGraph>& InGraph);
+    void SetGraph(const SharedObjectPtr<NodeGraph>& InGraph, bool InFrameContent = true);
     NodeGraph* GetGraph() const { return m_Graph.Get(); }
 
     /** Centers the view on the selection, or on the whole graph when nothing is selected. */
@@ -32,6 +32,12 @@ public:
     WeakObjectPtr<Object> PaletteContext;
 
     Array<GraphNode*> GetSelectedNodes() const;
+    GraphConnection* GetSelectedConnection() const { return m_SelectedConnection.Get(); }
+
+    Vec2 GraphToScreen(const Vec2& InGraphPos) const;
+    Vec2 ScreenToGraph(const Vec2& InScreenPos) const;
+    static Vec2 SnapToGrid(const Vec2& InGraphPos);
+    static float DistanceToSegment(const Vec2& InPoint, const Vec2& InA, const Vec2& InB);
 
     virtual void Paint(UIDrawList& OutDrawList) override;
     virtual void OnUIUpdate(const UIFrameContext& InContext) override;
@@ -41,7 +47,7 @@ public:
     virtual void OnReleased(bool InInside) override;
     virtual bool OnScroll(const Vec2& InDelta) override;
 
-private:
+protected:
     enum class DragMode : uint8_t { None, MoveNodes, Connect, Marquee };
 
     struct PinRef {
@@ -68,24 +74,30 @@ private:
         Array<PinSlot> Slots;
     };
 
-    Vec2 GraphToScreen(const Vec2& InGraphPos) const;
-    Vec2 ScreenToGraph(const Vec2& InScreenPos) const;
-    static Vec2 SnapToGrid(const Vec2& InGraphPos);
+    virtual NodeLayout ComputeNodeLayout(GraphNode& InNode) const;
+    virtual bool FindPinAt(const Vec2& InScreenPos, PinRef& OutPin) const;
+    virtual float DistanceToConnection(const GraphConnection& InConnection, const Vec2& InScreenPos) const;
+    virtual void PaintConnection(UIDrawList& OutDrawList, const GraphConnection& InConnection) const;
+    virtual void PaintNode(UIDrawList& OutDrawList, GraphNode& InNode) const;
+    virtual void PaintPendingWire(UIDrawList& OutDrawList) const;
 
-    NodeLayout ComputeNodeLayout(GraphNode& InNode) const;
     String GetInputValueText(GraphNode& InNode, const GraphPin& InPin) const;
     GraphNode* FindNodeAt(const Vec2& InGraphPos) const;
-    bool FindPinAt(const Vec2& InScreenPos, PinRef& OutPin) const;
+    GraphConnection* FindConnectionAt(const Vec2& InScreenPos) const;
     bool ResolvePin(const PinRef& InRef, GraphNode*& OutNode, GraphPin*& OutPin) const;
     bool GetPinCenter(GraphNode& InNode, const GraphPin& InPin, Vec2& OutGraphCenter) const;
     Array<PinRef> CollectConnectedEnds(const GraphNode& InNode, const GraphPin& InPin) const;
     void BreakConnectionsAt(const Vec2& InScreenPos);
 
     bool IsSelected(uint64_t InNodeId) const;
+    bool IsConnecting() const { return m_DragMode == DragMode::Connect; }
+    void BeginConnect(const PinRef& InSource);
+    void CancelConnect();
     void RecordEdit(const String& InTitle);
     void NotifyGraphChanged();
     void NotifySelectionChanged();
     void SelectOnly(uint64_t InNodeId);
+    void SelectConnection(GraphConnection* InConnection);
     void ToggleSelection(uint64_t InNodeId);
     void DeleteSelection();
     void BeginMoveDrag();
@@ -97,18 +109,18 @@ private:
     void UpdateShortcuts();
 
     void PaintGrid(UIDrawList& OutDrawList) const;
-    void PaintConnections(UIDrawList& OutDrawList) const;
-    void PaintNode(UIDrawList& OutDrawList, GraphNode& InNode) const;
-    void PaintPendingWire(UIDrawList& OutDrawList) const;
     void PaintMarquee(UIDrawList& OutDrawList) const;
     void PaintIcon(UIDrawList& OutDrawList, VectorImage* InImage, const Vec2& InCenter, float InSize, const Vec4& InTint) const;
     void PaintWire(UIDrawList& OutDrawList, const Vec2& InFromScreen, const Vec2& InToScreen, Vec4 InColorA, Vec4 InColorB) const;
+    void GetWireControls(const Vec2& InFromScreen, const Vec2& InToScreen, Vec2& OutControlA, Vec2& OutControlB) const;
 
     SharedObjectPtr<NodeGraph> m_Graph;
     Vec2 m_ViewOrigin = Vec2(0.0f);  // graph coords under the widget's top-left corner
     float m_Zoom = 1.0f;
 
     Array<uint64_t> m_Selection;
+    WeakObjectPtr<GraphConnection> m_SelectedConnection;
+    bool m_ConnectOnClick = false;
 
     DragMode m_DragMode = DragMode::None;
     Vec2 m_PressScreen = Vec2(0.0f);

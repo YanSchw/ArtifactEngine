@@ -28,6 +28,7 @@ public:
     virtual String GetCategory() const { return "Common"; }
     virtual Vec4 GetAccentColor() const;
     virtual bool IsUserCreatable() const { return true; }
+    virtual bool IsUserDeletable() const { return true; }
     virtual String GetPinLabel(const GraphPin& InPin) const { return InPin.Name; }
     virtual String GetPinValueText(const GraphPin& InPin) const { (void)InPin; return String(); }
 

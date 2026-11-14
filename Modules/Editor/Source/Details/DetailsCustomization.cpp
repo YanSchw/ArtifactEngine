@@ -30,6 +30,7 @@
 #include "Assets/AssetManager.h"
 #include "Assets/Asset.h"
 #include "GameFramework/Node.h"
+#include "GameFramework/NodeReference.h"
 #include "Common/Map.h"
 #include "Particles/ParticleModules.h"
 #include "Serialization/Json.h"
@@ -537,6 +538,71 @@ static void BuildClassEditor(UINode& InHost, const WeakObjectPtr<Object>& InObje
     };
 }
 
+static void CollectNodeTree(Node& InNode, Array<Node*>& OutNodes) {
+    OutNodes.Add(&InNode);
+    for (uint32_t i = 0; i < InNode.GetChildCount(); i++) {
+        CollectNodeTree(*InNode.GetChild((int32_t)i), OutNodes);
+    }
+}
+
+static void BuildNodeReferenceEditor(UINode& InHost, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
+                                     const DetailsEditHandler& InOnEdited) {
+    const auto candidates = [InObject]() {
+        Array<Node*> nodes;
+        if (Node* owner = Cast<Node>(InObject.Get())) {
+            CollectNodeTree(*owner->GetRootNode(), nodes);
+        }
+        return nodes;
+    };
+    const auto reference = [InObject, InOffset]() -> NodeReference* {
+        return (NodeReference*)ResolveBase(InObject, InOffset);
+    };
+    const auto resolve = [InObject, reference]() -> Node* {
+        Node* owner = Cast<Node>(InObject.Get());
+        NodeReference* current = reference();
+        return owner && current ? current->Resolve(*owner) : nullptr;
+    };
+
+    UIDropdown* dropdown = InHost.Add<UIDropdown>();
+    dropdown->Fill();
+    dropdown->SearchPlaceholder = "Search nodes";
+    dropdown->GetSelectedLabel = [reference, resolve]() -> String {
+        NodeReference* current = reference();
+        Node* target = resolve();
+        return target ? target->GetName() : !current || !current->IsSet() ? String("None") : "Missing: " + current->Path;
+    };
+    dropdown->GetSelectedIcon = [resolve]() -> VectorImage* {
+        Node* target = resolve();
+        return target ? EditorIcons::GetNodeIcon(target->GetClass()) : nullptr;
+    };
+    dropdown->GetOptions = [candidates] {
+        Array<UIDropdownOption> options;
+        options.Add(UIDropdownOption("None"));
+        for (Node* node : candidates()) {
+            UIDropdownOption option(node->GetName());
+            option.Icon = EditorIcons::GetNodeIcon(node->GetClass());
+            option.IconTint = EditorStyle::Text;
+            options.Add(option);
+        }
+        return options;
+    };
+    dropdown->GetSelectedIndex = [candidates, resolve]() -> int32_t {
+        Node* target = resolve();
+        return target ? candidates().IndexOf(target) + 1 : 0;
+    };
+    dropdown->SelectionChanged = [InObject, reference, candidates, InOnEdited](int32_t InIndex) {
+        Node* owner = Cast<Node>(InObject.Get());
+        NodeReference* current = reference();
+        const Array<Node*> nodes = candidates();
+        if (!owner || !current || InIndex < 0 || InIndex > nodes.Size()) {
+            return;
+        }
+        InOnEdited.Record();
+        *current = InIndex == 0 ? NodeReference() : NodeReference::Between(*owner, *nodes[InIndex - 1]);
+        InOnEdited();
+    };
+}
+
 static void BuildAssetSlot(UINode& InHost, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
                            const Class& InAssetClass, bool InIsWeak, const DetailsEditHandler& InOnEdited) {
     UIAssetSlot* slot = InHost.Add<UIAssetSlot>();
@@ -833,7 +899,7 @@ static void MoveArrayElement(ArrayProperty& InArray, char* InData, int32_t InFro
 
 Array<Property*> DetailsCustomization::GetInnerProperties(Property* InProperty) {
     StructProperty* structProperty = Cast<StructProperty>(InProperty);
-    if (!structProperty || structProperty->InnerStructTypename == "Color"
+    if (!structProperty || structProperty->InnerStructTypename == "Color" || structProperty->InnerStructTypename == "NodeReference"
         || VectorComponentCount(structProperty->InnerStructTypename) > 0 || IsInlinePair(structProperty->InnerStructTypename)) {
         return Array<Property*>();
     }
@@ -857,6 +923,8 @@ bool DetailsCustomization::BuildValueEditor(UINode& InHost, const WeakObjectPtr<
             BuildVectorEditor(InHost, InObject, InOffset, components, InOnEdited);
         } else if (structProperty->InnerStructTypename == "Color") {
             BuildColorEditor(InHost, InObject, InOffset, InTitle, InOnEdited);
+        } else if (structProperty->InnerStructTypename == "NodeReference") {
+            BuildNodeReferenceEditor(InHost, InObject, InOffset, InOnEdited);
         } else if (IsInlinePair(structProperty->InnerStructTypename)) {
             BuildInlinePairEditor(InHost, InObject, InOffset, structProperty->InnerStructTypename, InTitle, InOnEdited);
         } else {

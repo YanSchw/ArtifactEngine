@@ -99,13 +99,19 @@ GraphConnection* NodeGraph::Connect(GraphNode& InNodeA, GraphPin& InPinA, GraphN
         BreakPinConnections(toNode, toPin);
     }
 
-    GraphConnection* connection = Object::Create<GraphConnection>();
+    GraphConnection* connection = MakeConnection(fromNode, toNode);
     connection->FromNodeId = fromNode.NodeId;
     connection->FromPinName = fromPin.Name;
     connection->ToNodeId = toNode.NodeId;
     connection->ToPinName = toPin.Name;
     Connections.Add(SharedObjectPtr<GraphConnection>(connection));
     return connection;
+}
+
+GraphConnection* NodeGraph::MakeConnection(const GraphNode& InFrom, const GraphNode& InTo) const {
+    (void)InFrom;
+    (void)InTo;
+    return Object::Create<GraphConnection>();
 }
 
 void NodeGraph::BreakPinConnections(const GraphNode& InNode, const GraphPin& InPin) {

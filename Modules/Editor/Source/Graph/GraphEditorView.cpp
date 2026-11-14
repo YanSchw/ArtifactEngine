@@ -13,6 +13,7 @@
 #include "InputSystem/MouseCodes.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 static bool IsAnyKeyHeld(KeyCode InLeft, KeyCode InRight) {
@@ -27,13 +28,13 @@ GraphEditorView::GraphEditorView() {
     ClipChildren = true;
 }
 
-void GraphEditorView::SetGraph(const SharedObjectPtr<NodeGraph>& InGraph) {
+void GraphEditorView::SetGraph(const SharedObjectPtr<NodeGraph>& InGraph, bool InFrameContent) {
     m_Graph = InGraph;
     m_Selection.Clear();
-    m_DragMode = DragMode::None;
-    m_ConnectSources.Clear();
+    m_SelectedConnection = nullptr;
+    CancelConnect();
     UIContextMenu::CloseAll(*this);
-    m_PendingFrameContent = true;
+    m_PendingFrameContent = m_PendingFrameContent || InFrameContent;
 }
 
 Vec2 GraphEditorView::GraphToScreen(const Vec2& InGraphPos) const {
@@ -188,6 +189,58 @@ Array<GraphEditorView::PinRef> GraphEditorView::CollectConnectedEnds(const Graph
     return ends;
 }
 
+GraphConnection* GraphEditorView::FindConnectionAt(const Vec2& InScreenPos) const {
+    if (!m_Graph) {
+        return nullptr;
+    }
+    GraphConnection* closest = nullptr;
+    float closestDistance = GraphEditorStyle::WireHitDistance;
+    for (const SharedObjectPtr<GraphConnection>& connection : m_Graph->Connections) {
+        const float distance = connection ? DistanceToConnection(*connection, InScreenPos) : closestDistance;
+        if (distance < closestDistance) {
+            closest = connection.Get();
+            closestDistance = distance;
+        }
+    }
+    return closest;
+}
+
+float GraphEditorView::DistanceToSegment(const Vec2& InPoint, const Vec2& InA, const Vec2& InB) {
+    const Vec2 segment = InB - InA;
+    const float lengthSquared = glm::dot(segment, segment);
+    const float t = lengthSquared > 0.0f ? std::clamp(glm::dot(InPoint - InA, segment) / lengthSquared, 0.0f, 1.0f) : 0.0f;
+    return glm::length(InPoint - (InA + segment * t));
+}
+
+float GraphEditorView::DistanceToConnection(const GraphConnection& InConnection, const Vec2& InScreenPos) const {
+    GraphNode* fromNode = m_Graph->FindNode(InConnection.FromNodeId);
+    GraphNode* toNode = m_Graph->FindNode(InConnection.ToNodeId);
+    GraphPin* fromPin = fromNode ? fromNode->FindPin(InConnection.FromPinName, GraphPinDirection::Output) : nullptr;
+    GraphPin* toPin = toNode ? toNode->FindPin(InConnection.ToPinName, GraphPinDirection::Input) : nullptr;
+    Vec2 fromCenter, toCenter;
+    if (!fromPin || !toPin || !GetPinCenter(*fromNode, *fromPin, fromCenter) || !GetPinCenter(*toNode, *toPin, toCenter)) {
+        return FLT_MAX;
+    }
+
+    const Vec2 from = GraphToScreen(fromCenter);
+    const Vec2 to = GraphToScreen(toCenter);
+    Vec2 controlA, controlB;
+    GetWireControls(from, to, controlA, controlB);
+    const auto bezier = [&](float InT) {
+        const float u = 1.0f - InT;
+        return u * u * u * from + 3.0f * u * u * InT * controlA + 3.0f * u * InT * InT * controlB + InT * InT * InT * to;
+    };
+
+    float distance = FLT_MAX;
+    Vec2 previous = from;
+    for (int32_t step = 1; step <= 24; step++) {
+        const Vec2 point = bezier((float)step / 24.0f);
+        distance = std::min(distance, DistanceToSegment(InScreenPos, previous, point));
+        previous = point;
+    }
+    return distance;
+}
+
 void GraphEditorView::BreakConnectionsAt(const Vec2& InScreenPos) {
     PinRef ref;
     GraphNode* node = nullptr;
@@ -212,10 +265,18 @@ bool GraphEditorView::IsSelected(uint64_t InNodeId) const {
 void GraphEditorView::SelectOnly(uint64_t InNodeId) {
     m_Selection.Clear();
     m_Selection.Add(InNodeId);
+    m_SelectedConnection = nullptr;
+    NotifySelectionChanged();
+}
+
+void GraphEditorView::SelectConnection(GraphConnection* InConnection) {
+    m_Selection.Clear();
+    m_SelectedConnection = InConnection;
     NotifySelectionChanged();
 }
 
 void GraphEditorView::ToggleSelection(uint64_t InNodeId) {
+    m_SelectedConnection = nullptr;
     if (IsSelected(InNodeId)) {
         m_Selection.Remove(InNodeId);
     } else {
@@ -225,16 +286,35 @@ void GraphEditorView::ToggleSelection(uint64_t InNodeId) {
 }
 
 void GraphEditorView::DeleteSelection() {
-    if (!m_Graph || m_Selection.IsEmpty()) {
+    GraphConnection* connection = m_SelectedConnection.Get();
+    if (!m_Graph || (m_Selection.IsEmpty() && !connection)) {
         return;
     }
-    RecordEdit("Delete Nodes");
+    RecordEdit(connection ? "Delete Connection" : "Delete Nodes");
+    m_Graph->Connections.Filter([connection](const SharedObjectPtr<GraphConnection>& InConnection) { return InConnection.Get() != connection; });
     for (uint64_t nodeId : m_Selection) {
-        m_Graph->RemoveNode(nodeId);
+        GraphNode* node = m_Graph->FindNode(nodeId);
+        if (node && node->IsUserDeletable()) {
+            m_Graph->RemoveNode(nodeId);
+        }
     }
     m_Selection.Clear();
+    m_SelectedConnection = nullptr;
     NotifySelectionChanged();
     NotifyGraphChanged();
+}
+
+void GraphEditorView::BeginConnect(const PinRef& InSource) {
+    m_ConnectSources.Clear();
+    m_ConnectSources.Add(InSource);
+    m_DragMode = DragMode::Connect;
+    m_ConnectOnClick = true;
+}
+
+void GraphEditorView::CancelConnect() {
+    m_DragMode = DragMode::None;
+    m_ConnectSources.Clear();
+    m_ConnectOnClick = false;
 }
 
 void GraphEditorView::FocusNode(uint64_t InNodeId) {
@@ -289,6 +369,12 @@ void GraphEditorView::OnPressed(const Vec2& InCursorPos) {
         return;
     }
 
+    if (m_ConnectOnClick) {
+        FinishConnectDrag();
+        CancelConnect();
+        return;
+    }
+
     // Pins first: they sit on node edges and take priority over the node body.
     PinRef pin;
     if (FindPinAt(InCursorPos, pin)) {
@@ -332,8 +418,14 @@ void GraphEditorView::OnPressed(const Vec2& InCursorPos) {
         return;
     }
 
+    if (GraphConnection* connection = FindConnectionAt(InCursorPos)) {
+        SelectConnection(connection);
+        return;
+    }
+
     if (!IsShiftHeld()) {
         m_Selection.Clear();
+        m_SelectedConnection = nullptr;
         NotifySelectionChanged();
     }
     m_DragMode = DragMode::Marquee;
@@ -369,6 +461,9 @@ void GraphEditorView::OnDrag(const Vec2& InCursorPos, const Vec2& InDelta) {
 
 void GraphEditorView::OnReleased(bool InInside) {
     (void)InInside;
+    if (m_ConnectOnClick) {
+        return;
+    }
     switch (m_DragMode) {
         case DragMode::MoveNodes:
             // A plain click on an already-selected node collapses the selection to it.
@@ -539,7 +634,7 @@ void GraphEditorView::UpdateShortcuts() {
         FrameContent();
     }
     if (keyboard->IsDown(KeyCode::Escape)) {
-        m_DragMode = DragMode::None;
+        CancelConnect();
     }
 
     const bool commandHeld = IsAnyKeyHeld(KeyCode::LeftControl, KeyCode::RightControl)
@@ -601,7 +696,11 @@ void GraphEditorView::Paint(UIDrawList& OutDrawList) {
     OutDrawList.AddRect(m_Geometry, GraphEditorStyle::Background, m_WorldMatrix);
     PaintGrid(OutDrawList);
     if (m_Graph) {
-        PaintConnections(OutDrawList);
+        for (const SharedObjectPtr<GraphConnection>& connection : m_Graph->Connections) {
+            if (connection) {
+                PaintConnection(OutDrawList, *connection);
+            }
+        }
         for (const SharedObjectPtr<GraphNode>& node : m_Graph->Nodes) {
             if (node) {
                 PaintNode(OutDrawList, *node);
@@ -644,10 +743,15 @@ void GraphEditorView::PaintGrid(UIDrawList& OutDrawList) const {
     paintAxis(1);
 }
 
-void GraphEditorView::PaintWire(UIDrawList& OutDrawList, const Vec2& InFromScreen, const Vec2& InToScreen, Vec4 InColorA, Vec4 InColorB) const {
+void GraphEditorView::GetWireControls(const Vec2& InFromScreen, const Vec2& InToScreen, Vec2& OutControlA, Vec2& OutControlB) const {
     const float tangent = std::clamp(std::abs(InToScreen.x - InFromScreen.x) * 0.5f, 28.0f * m_Zoom, 240.0f * m_Zoom);
-    const Vec2 controlA = InFromScreen + Vec2(tangent, 0.0f);
-    const Vec2 controlB = InToScreen - Vec2(tangent, 0.0f);
+    OutControlA = InFromScreen + Vec2(tangent, 0.0f);
+    OutControlB = InToScreen - Vec2(tangent, 0.0f);
+}
+
+void GraphEditorView::PaintWire(UIDrawList& OutDrawList, const Vec2& InFromScreen, const Vec2& InToScreen, Vec4 InColorA, Vec4 InColorB) const {
+    Vec2 controlA, controlB;
+    GetWireControls(InFromScreen, InToScreen, controlA, controlB);
     const float thickness = std::max(1.0f, GraphEditorStyle::WireThickness * m_Zoom);
     // A darker, slightly wider pass underneath keeps crossing wires readable against each other.
     OutDrawList.AddCubicBezier(InFromScreen, controlA, controlB, InToScreen,
@@ -656,28 +760,25 @@ void GraphEditorView::PaintWire(UIDrawList& OutDrawList, const Vec2& InFromScree
                                thickness, InColorA, InColorB, 0, m_WorldMatrix);
 }
 
-void GraphEditorView::PaintConnections(UIDrawList& OutDrawList) const {
-    for (const SharedObjectPtr<GraphConnection>& connection : m_Graph->Connections) {
-        if (!connection) {
-            continue;
-        }
-        GraphNode* fromNode = m_Graph->FindNode(connection->FromNodeId);
-        GraphNode* toNode = m_Graph->FindNode(connection->ToNodeId);
-        if (!fromNode || !toNode) {
-            continue;
-        }
-        GraphPin* fromPin = fromNode->FindPin(connection->FromPinName, GraphPinDirection::Output);
-        GraphPin* toPin = toNode->FindPin(connection->ToPinName, GraphPinDirection::Input);
-        if (!fromPin || !toPin) {
-            continue;
-        }
-        Vec2 fromCenter, toCenter;
-        if (!GetPinCenter(*fromNode, *fromPin, fromCenter) || !GetPinCenter(*toNode, *toPin, toCenter)) {
-            continue;
-        }
-        PaintWire(OutDrawList, GraphToScreen(fromCenter), GraphToScreen(toCenter),
-                  GraphEditorStyle::PinColor(fromPin->TypeName), GraphEditorStyle::PinColor(toPin->TypeName));
+void GraphEditorView::PaintConnection(UIDrawList& OutDrawList, const GraphConnection& InConnection) const {
+    GraphNode* fromNode = m_Graph->FindNode(InConnection.FromNodeId);
+    GraphNode* toNode = m_Graph->FindNode(InConnection.ToNodeId);
+    if (!fromNode || !toNode) {
+        return;
     }
+    GraphPin* fromPin = fromNode->FindPin(InConnection.FromPinName, GraphPinDirection::Output);
+    GraphPin* toPin = toNode->FindPin(InConnection.ToPinName, GraphPinDirection::Input);
+    if (!fromPin || !toPin) {
+        return;
+    }
+    Vec2 fromCenter, toCenter;
+    if (!GetPinCenter(*fromNode, *fromPin, fromCenter) || !GetPinCenter(*toNode, *toPin, toCenter)) {
+        return;
+    }
+    const bool selected = m_SelectedConnection.Get() == &InConnection;
+    PaintWire(OutDrawList, GraphToScreen(fromCenter), GraphToScreen(toCenter),
+              selected ? GraphEditorStyle::NodeBorderSelected : GraphEditorStyle::PinColor(fromPin->TypeName),
+              selected ? GraphEditorStyle::NodeBorderSelected : GraphEditorStyle::PinColor(toPin->TypeName));
 }
 
 void GraphEditorView::PaintPendingWire(UIDrawList& OutDrawList) const {
