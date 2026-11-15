@@ -161,7 +161,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${{CMAKE_SOURCE_DIR}}/Binaries")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${{CMAKE_SOURCE_DIR}}/Binaries")
                 
 if (MSVC)
-    add_compile_options(/utf-8)
+    add_compile_options(/utf-8 /bigobj)
     add_compile_definitions(
         _UNICODE
         UNICODE
