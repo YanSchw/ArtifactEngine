@@ -6,7 +6,7 @@ namespace Artifact
 {
     public enum FieldKind
     {
-        Float, Double, Int32, Bool, String, Vec2, Vec3, Vec4, Color, Class
+        Float, Double, Int32, Bool, String, Vec2, Vec3, Vec4, Color, Class, Object
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -15,6 +15,7 @@ namespace Artifact
         public byte* Name;
         public int Kind;
         public uint Offset;
+        public byte* ObjectClass;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -45,6 +46,8 @@ namespace Artifact
         public delegate* unmanaged<IntPtr, byte*, void> SetString;
         public delegate* unmanaged<IntPtr, byte*> GetString;
         public delegate* unmanaged<int, byte*, void> Log;
+        public delegate* unmanaged<IntPtr, IntPtr> ReadObject;
+        public delegate* unmanaged<IntPtr, IntPtr, void> WriteObject;
     }
 
     public unsafe readonly struct Utf8 : IDisposable

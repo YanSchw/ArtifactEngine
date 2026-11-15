@@ -2,8 +2,10 @@
 #include "ScriptProxy.h"
 #include "Core/Log.h"
 #include "GameFramework/Node3D.h"
+#include "Object/Pointer.h"
 #include "Object/Property.h"
 #include <cstring>
+#include <memory>
 #include <unordered_map>
 
 struct ScriptBase {
@@ -22,6 +24,7 @@ static const Array<ScriptBase>& GetScriptBases() {
         { Object::StaticClass(), sizeof(ScriptObjectProxy), &AllocateScriptProxy<ScriptObjectProxy> },
         { Node::StaticClass(), sizeof(ScriptNodeProxy<Node>), &AllocateScriptProxy<ScriptNodeProxy<Node>> },
         { Node3D::StaticClass(), sizeof(ScriptNodeProxy<Node3D>), &AllocateScriptProxy<ScriptNodeProxy<Node3D>> },
+        { DataAsset::StaticClass(), sizeof(ScriptDataAssetProxy), &AllocateScriptProxy<ScriptDataAssetProxy> },
     };
     return s_Bases;
 }
@@ -51,6 +54,7 @@ static uint32_t SizeOf(ScriptFieldKind InKind) {
         case ScriptFieldKind::Vec4: return sizeof(Vec4);
         case ScriptFieldKind::Color: return sizeof(Color);
         case ScriptFieldKind::Class: return sizeof(Class);
+        case ScriptFieldKind::Object: return sizeof(WeakObjectPtr<Object>);
     }
     return 0;
 }
@@ -61,11 +65,16 @@ static uint32_t AlignOf(ScriptFieldKind InKind) {
         case ScriptFieldKind::Bool: return alignof(bool);
         case ScriptFieldKind::String: return alignof(String);
         case ScriptFieldKind::Class: return alignof(Class);
+        case ScriptFieldKind::Object: return alignof(WeakObjectPtr<Object>);
         default: return alignof(float);
     }
 }
 
-static Property* MakeProperty(const String& InName, ScriptFieldKind InKind, uint64_t InOffset) {
+static void SyncChanged(void* InInstance) {
+    ScriptBridge::Call(*static_cast<Object*>(InInstance), ScriptCall::Sync);
+}
+
+static Property* MakeProperty(const String& InName, ScriptFieldKind InKind, const Class& InObjectClass, uint64_t InOffset) {
     switch (InKind) {
         case ScriptFieldKind::Float: return new FloatProperty(InName, InOffset, false);
         case ScriptFieldKind::Double: return new FloatProperty(InName, InOffset, true);
@@ -77,6 +86,7 @@ static Property* MakeProperty(const String& InName, ScriptFieldKind InKind, uint
         case ScriptFieldKind::Vec4: return new StructProperty(InName, InOffset, "Vec4");
         case ScriptFieldKind::Color: return new StructProperty(InName, InOffset, "Color");
         case ScriptFieldKind::Class: return new SubclassOfProperty(InName, InOffset, Object::StaticClass());
+        case ScriptFieldKind::Object: return new WeakObjectPtrProperty(InName, InOffset, InObjectClass);
     }
     return nullptr;
 }
@@ -86,6 +96,8 @@ static void CopyField(ScriptFieldKind InKind, char* OutValue, const char* InValu
         *reinterpret_cast<String*>(OutValue) = *reinterpret_cast<const String*>(InValue);
     } else if (InKind == ScriptFieldKind::Class) {
         *reinterpret_cast<Class*>(OutValue) = *reinterpret_cast<const Class*>(InValue);
+    } else if (InKind == ScriptFieldKind::Object) {
+        *reinterpret_cast<WeakObjectPtr<Object>*>(OutValue) = *reinterpret_cast<const WeakObjectPtr<Object>*>(InValue);
     } else {
         std::memcpy(OutValue, InValue, SizeOf(InKind));
     }
@@ -102,6 +114,8 @@ void ScriptClassInfo::ConstructStorage(char* InStorage) const {
             ::new (InStorage + field.Offset) String();
         } else if (field.Kind == ScriptFieldKind::Class) {
             ::new (InStorage + field.Offset) Class();
+        } else if (field.Kind == ScriptFieldKind::Object) {
+            ::new (InStorage + field.Offset) WeakObjectPtr<Object>();
         }
     }
 }
@@ -112,6 +126,8 @@ void ScriptClassInfo::DestructStorage(char* InStorage) const {
             reinterpret_cast<String*>(InStorage + field.Offset)->~String();
         } else if (field.Kind == ScriptFieldKind::Class) {
             reinterpret_cast<Class*>(InStorage + field.Offset)->~Class();
+        } else if (field.Kind == ScriptFieldKind::Object) {
+            std::destroy_at(reinterpret_cast<WeakObjectPtr<Object>*>(InStorage + field.Offset));
         }
     }
 }
@@ -166,8 +182,8 @@ const ScriptClassInfo* ScriptRegistry::Register(const String& InName, const Stri
     for (const FieldDesc& desc : InFields) {
         const uint32_t offset = AlignUp(info->StorageSize, AlignOf(desc.Kind));
         info->StorageSize = offset + SizeOf(desc.Kind);
-        info->Fields.Add({ desc.Name, desc.Kind, offset });
-        properties.Add(MakeProperty(desc.Name, desc.Kind, info->StorageOffset + offset));
+        info->Fields.Add({ desc.Name, desc.Kind, offset, desc.ObjectClass });
+        properties.Add(MakeProperty(desc.Name, desc.Kind, desc.ObjectClass, info->StorageOffset + offset)->Changed(&SyncChanged));
     }
     info->StorageSize = AlignUp(std::max(info->StorageSize, 1u), 16);
 
@@ -183,7 +199,7 @@ const ScriptClassInfo* ScriptRegistry::Register(const String& InName, const Stri
 
 static const ScriptField* FindField(const ScriptClassInfo& InInfo, const ScriptField& InLike) {
     for (const ScriptField& field : InInfo.Fields) {
-        if (field.Name == InLike.Name && field.Kind == InLike.Kind) {
+        if (field.Name == InLike.Name && field.Kind == InLike.Kind && field.ObjectClass == InLike.ObjectClass) {
             return &field;
         }
     }

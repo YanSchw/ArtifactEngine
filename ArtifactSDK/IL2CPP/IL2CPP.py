@@ -94,8 +94,8 @@ class ClassEmitter:
             type_ = self._ctype(assembly.field_sig(field.Signature), field.Name)
             is_static = field.Flags & FIELD_STATIC
             is_property = "Artifact.PropertyAttribute" in assembly.custom_attributes("Field", field.Index)
-            if is_property and (is_static or (type_.Kind, type_.Cpp) not in PROPERTY_KINDS):
-                self._error(f"[Property] {field.Name} must be an instance float, double, int, bool, string, Vec2, Vec3, Vec4, Color or Class")
+            if is_property and (is_static or (type_.Kind != "object" and (type_.Kind, type_.Cpp) not in PROPERTY_KINDS)):
+                self._error(f"[Property] {field.Name} must be an instance float, double, int, bool, string, Vec2, Vec3, Vec4, Color, Class or object reference")
             zero = type_.zero(True)
             declaration = f"{'static inline ' if is_static else ''}{type_.decl(True)} {identifier(field.Name)}{f' = {zero}' if zero else ''};"
             members.append(("    PROPERTY()\n" if is_property else "") + f"    {declaration}")

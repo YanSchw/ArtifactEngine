@@ -59,7 +59,7 @@ namespace Artifact
             }
         }
 
-        enum LifecycleCall { BeginPlay, EndPlay, WorldUpdate }
+        enum LifecycleCall { BeginPlay, EndPlay, WorldUpdate, Sync }
 
         static readonly Dictionary<string, ScriptType> s_Types = new Dictionary<string, ScriptType>();
         static readonly Dictionary<IntPtr, ScriptState> s_States = new Dictionary<IntPtr, ScriptState>();
@@ -142,11 +142,15 @@ namespace Artifact
         {
             Guard(() =>
             {
-                if (!s_States.TryGetValue(handle, out ScriptState state) || state.Instance is not Node node)
+                if (!s_States.TryGetValue(handle, out ScriptState state))
                 {
                     return;
                 }
                 SyncIn(state);
+                if (state.Instance is not Node node)
+                {
+                    return;
+                }
                 switch ((LifecycleCall)call)
                 {
                     case LifecycleCall.BeginPlay: node.BeginPlay(); break;
@@ -286,10 +290,11 @@ namespace Artifact
             List<FieldInfo> fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
                 .Where(field => field.GetCustomAttribute<PropertyAttribute>() != null).ToList();
             List<Utf8> names = fields.Select(field => new Utf8(field.Name)).ToList();
+            List<Utf8> classes = fields.Select(field => new Utf8(KindOf(field) == FieldKind.Object ? field.FieldType.Name : null)).ToList();
             ScriptFieldDesc* descs = stackalloc ScriptFieldDesc[Math.Max(1, fields.Count)];
             for (int i = 0; i < fields.Count; i++)
             {
-                descs[i] = new ScriptFieldDesc { Name = names[i].Bytes, Kind = (int)KindOf(fields[i]) };
+                descs[i] = new ScriptFieldDesc { Name = names[i].Bytes, Kind = (int)KindOf(fields[i]), ObjectClass = classes[i].Bytes };
             }
 
             using Utf8 name = new Utf8(type.Name);
@@ -306,6 +311,7 @@ namespace Artifact
             };
             bool registered = Native.Api.RegisterScriptClass(&desc) != 0;
             names.ForEach(utf8 => utf8.Dispose());
+            classes.ForEach(utf8 => utf8.Dispose());
             if (!registered)
             {
                 Native.Log($"Script class {type.Name} could not be registered", 3);
@@ -343,6 +349,7 @@ namespace Artifact
             if (type == typeof(Vec4)) return FieldKind.Vec4;
             if (type == typeof(Color)) return FieldKind.Color;
             if (type == typeof(Class)) return FieldKind.Class;
+            if (typeof(Object).IsAssignableFrom(type)) return FieldKind.Object;
             throw new NotSupportedException($"[Property] {field.DeclaringType.Name}.{field.Name} has unsupported type {type.Name}");
         }
 
@@ -361,6 +368,7 @@ namespace Artifact
                 FieldKind.Vec4 => *(Vec4*)data,
                 FieldKind.Color => *(Color*)data,
                 FieldKind.Class => new Class(Native.ReadString((IntPtr)Native.Api.GetString((IntPtr)data))),
+                FieldKind.Object => ReadObject(field, (IntPtr)data),
                 _ => null,
             };
         }
@@ -384,7 +392,14 @@ namespace Artifact
                 case FieldKind.Class:
                     using (Utf8 utf8 = new Utf8(((Class)value).Name)) { Native.Api.SetString((IntPtr)data, utf8.Bytes); }
                     break;
+                case FieldKind.Object: Native.Api.WriteObject((IntPtr)data, value is Object reference && reference.IsValid ? reference.Handle : IntPtr.Zero); break;
             }
+        }
+
+        static Object ReadObject(ScriptField field, IntPtr data)
+        {
+            Object value = Object.FromHandle<Object>(Native.Api.ReadObject(data));
+            return field.Field.FieldType.IsInstanceOfType(value) ? value : null;
         }
 
         static void SyncIn(ScriptState state)

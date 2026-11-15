@@ -36,6 +36,7 @@
 #include "EditorWindow.h"
 #include "NewAnimationWindow.h"
 #include "NewBlueprintWindow.h"
+#include "NewDataAssetWindow.h"
 #include "Tabs/SceneEditorTab.h"
 #include "Tabs/BlueprintEditorTab.h"
 #include "Tabs/AnimationEditorTab.h"
@@ -587,6 +588,9 @@ void ContentDrawer::BuildAddMenu(UIMenuModel& OutMenu) {
             return (Asset*)InputActionMapping::CreateEmpty(InDir, InName);
         });
     }).Icon(EditorIcons::InputMapping());
+    OutMenu.Item("Data Asset...", [this] { BeginCreateDataAsset(); })
+           .Icon(EditorIcons::DataAsset())
+           .Tooltip("Pick a DataAsset subclass, from C++ or C#, to make an instance of");
 }
 
 void ContentDrawer::BuildItemMenu(UIMenuModel& OutMenu, const Item& InItem) {
@@ -1200,6 +1204,16 @@ void ContentDrawer::BeginCreateAnimation() {
     const String dir = DirFor(m_Mount, m_RelPath);
     WeakObjectPtr<ContentDrawer> self = this;
     NewAnimationWindow::Open(dir, MakeUniqueName(dir, "NewAnimation", false), [self](Asset* InAsset) {
+        if (ContentDrawer* drawer = self.Get()) {
+            drawer->OnAssetCreated(InAsset);
+        }
+    });
+}
+
+void ContentDrawer::BeginCreateDataAsset() {
+    const String dir = DirFor(m_Mount, m_RelPath);
+    WeakObjectPtr<ContentDrawer> self = this;
+    NewDataAssetWindow::Open(dir, MakeUniqueName(dir, "NewDataAsset", false), [self](Asset* InAsset) {
         if (ContentDrawer* drawer = self.Get()) {
             drawer->OnAssetCreated(InAsset);
         }

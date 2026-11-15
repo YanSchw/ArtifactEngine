@@ -2,12 +2,13 @@
 #include "Object/Object.h"
 #include <memory>
 
-enum class ScriptFieldKind : int32_t { Float, Double, Int32, Bool, String, Vec2, Vec3, Vec4, Color, Class };
+enum class ScriptFieldKind : int32_t { Float, Double, Int32, Bool, String, Vec2, Vec3, Vec4, Color, Class, Object };
 
 struct ScriptField {
     String Name;
     ScriptFieldKind Kind;
     uint32_t Offset;
+    Class ObjectClass;
 };
 
 struct ScriptClassInfo {
@@ -30,7 +31,7 @@ struct ScriptInstance {
 
 inline constexpr uint32_t ScriptStorageReserve = 1024;
 
-enum class ScriptCall { BeginPlay, EndPlay, WorldUpdate };
+enum class ScriptCall { BeginPlay, EndPlay, WorldUpdate, Sync };
 
 namespace ScriptBridge {
     void Construct(Object& InObject, ScriptInstance& InInstance);
@@ -46,6 +47,7 @@ namespace ScriptRegistry {
     struct FieldDesc {
         String Name;
         ScriptFieldKind Kind;
+        Class ObjectClass;
     };
 
     struct MigrationResult {

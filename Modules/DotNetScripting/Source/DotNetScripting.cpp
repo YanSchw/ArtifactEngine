@@ -17,6 +17,7 @@ struct ScriptFieldDesc {
     const char* Name;
     int32_t Kind;
     uint32_t Offset;
+    const char* ObjectClass;
 };
 
 struct ScriptClassDesc {
@@ -43,6 +44,8 @@ struct NativeApi {
     void (*SetString)(String*, const char*);
     const char* (*GetString)(String*);
     void (*Log)(int32_t, const char*);
+    Object* (*ReadObject)(WeakObjectPtr<Object>*);
+    void (*WriteObject)(WeakObjectPtr<Object>*, Object*);
 };
 
 struct ManagedApi {
@@ -79,7 +82,8 @@ void ScriptBridge::Call(Object& InObject, ScriptCall InCall, float InDeltaTime) 
 static uint8_t RegisterScriptClass(ScriptClassDesc* InDesc) {
     Array<ScriptRegistry::FieldDesc> fields;
     for (int32_t i = 0; i < InDesc->FieldCount; i++) {
-        fields.Add({ InDesc->Fields[i].Name, (ScriptFieldKind)InDesc->Fields[i].Kind });
+        const char* objectClass = InDesc->Fields[i].ObjectClass;
+        fields.Add({ InDesc->Fields[i].Name, (ScriptFieldKind)InDesc->Fields[i].Kind, Class(objectClass ? objectClass : "") });
     }
     const ScriptClassInfo* info = ScriptRegistry::Register(InDesc->Name, InDesc->Parent, InDesc->Module, InDesc->Ticks != 0, fields);
     if (!info) {
@@ -199,6 +203,8 @@ static NativeApi MakeNativeApi() {
             AE_INFO("{0}", InText);
         }
     };
+    api.ReadObject = [](WeakObjectPtr<Object>* InWeak) { return InWeak->Get(); };
+    api.WriteObject = [](WeakObjectPtr<Object>* OutWeak, Object* InObject) { *OutWeak = InObject; };
     return api;
 }
 

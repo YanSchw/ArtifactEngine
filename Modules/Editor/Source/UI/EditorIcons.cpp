@@ -76,6 +76,7 @@ VectorImage* EditorIcons::GetAssetIcon(const Class& InClass) {
         s_AssetIcons["InputActionMapping"] = InputMapping();
         s_AssetIcons["AudioClip"] = Audio();
         s_AssetIcons["ParticleSystemAsset"] = Particles();
+        s_AssetIcons["DataAsset"] = DataAsset();
     }
 
     VectorImage* icon = nullptr;
@@ -100,6 +101,7 @@ Vec4 EditorIcons::GetAssetColor(const Class& InClass) {
         s_AssetColors["InputActionMapping"] = HexColor(0xE05A6E);
         s_AssetColors["AudioClip"] = HexColor(0x7A7CE0);
         s_AssetColors["ParticleSystemAsset"] = HexColor(0xFFC94A);
+        s_AssetColors["DataAsset"] = HexColor(0x8FB3C9);
     }
 
     Vec4 color(0.0f);

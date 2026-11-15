@@ -1,6 +1,7 @@
 #pragma once
 #include "ScriptClass.h"
 #include "GameFramework/Node.h"
+#include "Assets/DataAsset.h"
 #include <algorithm>
 #include <new>
 
@@ -18,6 +19,25 @@ public:
     }
 
     ~ScriptObjectProxy() override {
+        ScriptBridge::Destruct(*this, m_Script);
+    }
+
+    static void operator delete(void* InMemory) { ::operator delete(InMemory); }
+
+    virtual Class GetClass() const override { return ScriptBridge::ClassOf(m_Script); }
+    virtual bool IsObjectOfClass(const Class& InType) const override { return GetClass().IsSubclassOf(InType); }
+
+private:
+    ScriptInstance m_Script;
+};
+
+class ScriptDataAssetProxy final : public DataAsset {
+public:
+    explicit ScriptDataAssetProxy(ScriptInstance InScript) : m_Script(std::move(InScript)) {
+        ScriptBridge::Construct(*this, m_Script);
+    }
+
+    ~ScriptDataAssetProxy() override {
         ScriptBridge::Destruct(*this, m_Script);
     }
 

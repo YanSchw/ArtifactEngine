@@ -143,8 +143,11 @@ void AssetManager::HotLoadAssets() {
                 continue;
             }
 
-            Asset* asset = Object::Create(Class(assetClassName))->As<Asset>();
-            AE_ASSERT(asset, "Failed to create asset instance");
+            Asset* asset = Cast<Asset>(Object::Create(Class(assetClassName)));
+            if (!asset) {
+                AE_ERROR("'{0}' is an asset of unknown class '{1}' and is being skipped", filePath, assetClassName);
+                continue;
+            }
             asset->m_Id = assetId;
             jsonStrings[asset] = jsonString;
             m_Assets[asset->GetId()] = asset;

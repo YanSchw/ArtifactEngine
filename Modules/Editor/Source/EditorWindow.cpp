@@ -9,6 +9,7 @@
 #include "Tabs/AnimationEditorTab.h"
 #include "Tabs/AnimationGraphEditorTab.h"
 #include "Tabs/InputMappingEditorTab.h"
+#include "Tabs/DataAssetEditorTab.h"
 #include "Tabs/ParticleSystemEditorTab.h"
 #include "Assets/ParticleSystemAsset.h"
 #include "Assets/AnimationGraph.h"
@@ -21,6 +22,7 @@
 #include "Assets/Mesh.h"
 #include "Assets/Animation.h"
 #include "Assets/AudioClip.h"
+#include "Assets/DataAsset.h"
 #include "InputSystem/InputActionMapping.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
@@ -356,6 +358,11 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     if (InputActionMapping* mapping = Cast<InputActionMapping>(InAsset)) {
         InputMappingEditorTab* tab = OpenTab<InputMappingEditorTab>();
         tab->OpenMapping(mapping);
+        return tab;
+    }
+    if (DataAsset* data = Cast<DataAsset>(InAsset)) {
+        DataAssetEditorTab* tab = OpenTab<DataAssetEditorTab>();
+        tab->OpenDataAsset(data);
         return tab;
     }
 

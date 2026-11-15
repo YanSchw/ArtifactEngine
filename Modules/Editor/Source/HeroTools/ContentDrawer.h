@@ -88,6 +88,7 @@ private:
     void CancelEdit();
     void BeginCreateBlueprint();
     void BeginCreateAnimation();
+    void BeginCreateDataAsset();
     /** Selects an asset a creation window just wrote and opens its editor. */
     void OnAssetCreated(Asset* InAsset);
 
