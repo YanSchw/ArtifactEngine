@@ -274,6 +274,10 @@ bool AssetManager::SaveAsset(Asset* InAsset) {
         AE_ERROR("Failed to write asset to {0}", path);
         return false;
     }
+    if (!InAsset->SaveExternalFiles(path)) {
+        AE_ERROR("Failed to write the external files of {0}", path);
+        return false;
+    }
 
     AE_INFO("Saved asset {0}", path);
     return true;
@@ -292,17 +296,29 @@ bool AssetManager::MoveAsset(const UUID& InId, const String& InNewPath) {
     if (oldPath == InNewPath) {
         return true;
     }
-    if (FileIO::FileExists(InNewPath)) {
+    const String oldExternal = Asset::GetExternalDirectory(oldPath);
+    const String newExternal = Asset::GetExternalDirectory(InNewPath);
+    std::error_code error;
+    const bool hasExternal = std::filesystem::exists(oldExternal, error);
+    if (FileIO::FileExists(InNewPath) || (hasExternal && std::filesystem::exists(newExternal, error))) {
         AE_ERROR("Cannot move '{0}' to '{1}': the target already exists", oldPath, InNewPath);
         return false;
     }
 
-    std::error_code error;
     std::filesystem::create_directories(std::filesystem::path(InNewPath).parent_path(), error);
     std::filesystem::rename(oldPath, InNewPath, error);
     if (error) {
         AE_ERROR("Failed to move '{0}' to '{1}': {2}", oldPath, InNewPath, error.message());
         return false;
+    }
+    if (hasExternal) {
+        std::filesystem::rename(oldExternal, newExternal, error);
+        if (error) {
+            AE_ERROR("Failed to move '{0}' to '{1}': {2}", oldExternal, newExternal, error.message());
+            std::error_code rollback;
+            std::filesystem::rename(InNewPath, oldPath, rollback);
+            return false;
+        }
     }
 
     m_AssetPaths[InId] = InNewPath;
@@ -323,6 +339,10 @@ bool AssetManager::DeleteAsset(Asset* InAsset) {
         if (error) {
             AE_ERROR("Failed to delete '{0}': {1}", path, error.message());
             return false;
+        }
+        std::filesystem::remove_all(Asset::GetExternalDirectory(path), error);
+        if (error) {
+            AE_WARN("Deleted '{0}' but not its folder: {1}", path, error.message());
         }
         UnregisterAssetsUnder(path);
     }

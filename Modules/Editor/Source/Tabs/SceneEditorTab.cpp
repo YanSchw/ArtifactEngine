@@ -291,11 +291,16 @@ void SceneEditorTab::BuildPlayControls(UINode& InToolBar) {
     AddPlaySegment(*group, playing ? EditorIcons::Eject() : EditorIcons::Possess(), EditorStyle::AccentBright,
                    playing ? "Eject (F7)" : "Possess (F7)", false, true,
                    [this, playing] { SetPlayState(playing ? PlayState::Simulating : PlayState::Playing); });
-    AddPlayStatus(InToolBar, playing ? "Playing" : "Simulating", playing ? EditorStyle::TransformY : EditorStyle::AccentBright);
 }
 
 void SceneEditorTab::BuildToolBar(UINode& InToolBar) {
     EditorStyle::ToolButton(InToolBar, EditorIcons::Save(), "Save", [this] { Save(); });
 
     BuildPlayControls(InToolBar);
+    EditorStyle::ToolButton(InToolBar, EditorIcons::Settings(), "Scene Settings", [this] { SetSelection(m_Scene.Get()); });
+
+    if (m_PlayState != PlayState::Editor) {
+        const bool playing = m_PlayState == PlayState::Playing;
+        AddPlayStatus(InToolBar, playing ? "Playing" : "Simulating", playing ? EditorStyle::TransformY : EditorStyle::AccentBright);
+    }
 }

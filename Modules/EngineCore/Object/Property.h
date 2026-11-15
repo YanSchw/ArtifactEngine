@@ -27,6 +27,7 @@ struct Property : public Object {
     bool HasRange = false;
     double RangeMin = 0.0;
     double RangeMax = 0.0;
+    bool EditorOnly = false;
 
     Property(const std::string& name, uint64_t offset)
         : Name(name), Offset(offset) {}
@@ -37,6 +38,7 @@ struct Property : public Object {
     Property* Changed(ChangedFn InChanged) { OnChanged = InChanged; return this; }
     Property* SetComment(const String& InComment) { Comment = InComment; return this; }
     Property* SetRange(double InMin, double InMax) { HasRange = true; RangeMin = InMin; RangeMax = InMax; return this; }
+    Property* SetEditorOnly() { EditorOnly = true; return this; }
     double ClampToRange(double InValue) const {
         return !HasRange ? InValue : InValue < RangeMin ? RangeMin : InValue > RangeMax ? RangeMax : InValue;
     }

@@ -117,6 +117,11 @@ void Asset::DeserializeFromJson(const String& InJson) {
     JsonSerializer::DeserializeObject(this, InJson);
 }
 
+String Asset::GetExternalDirectory(const String& InAssetPath) {
+    const std::filesystem::path path(InAssetPath);
+    return path.parent_path().string() + "/." + path.stem().string();
+}
+
 String Asset::DisplayNameFromPath(const String& InPath) {
     return std::filesystem::path(InPath).stem().string();
 }

@@ -12,5 +12,13 @@ public:
 
     SceneRootNode* Populate(World& OutWorld);
 
+    virtual String SerializeToJson() const override;
+    virtual void DeserializeFromJson(const String& InJson) override;
+    virtual bool SaveExternalFiles(const String& InAssetPath) const override;
+
     static Scene* CreateEmpty(const String& InDirectory, const String& InName);
+
+protected:
+    PROPERTY(EditorOnly)
+    bool m_OneFilePerNode = false;
 };

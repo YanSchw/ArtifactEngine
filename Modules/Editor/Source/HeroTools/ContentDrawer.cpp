@@ -104,8 +104,9 @@ static Array<String> ListSubfolders(const String& InDir) {
     std::error_code ec;
     if (fs::exists(InDir, ec) && fs::is_directory(InDir, ec)) {
         for (const fs::directory_entry& entry : fs::directory_iterator(InDir, ec)) {
-            if (entry.is_directory(ec)) {
-                folders.Add(entry.path().filename().string());
+            const String name = entry.path().filename().string();
+            if (entry.is_directory(ec) && !name.starts_with(".")) {
+                folders.Add(name);
             }
         }
     }

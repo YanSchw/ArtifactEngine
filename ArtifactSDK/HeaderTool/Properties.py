@@ -11,7 +11,7 @@ PROPERTY_PATTERN = re.compile(
         re.MULTILINE
     )
 
-KNOWN_SPECIFIERS = ["Range", "Params"]
+KNOWN_SPECIFIERS = ["Range", "Params", "EditorOnly"]
 
 SIMPLE_PROPERTY = """static {PROPERTY_TYPE} {VAR} = {PROPERTY_TYPE}("{PROPERTY_NAME}", {OFFSET}{INITIALIZER});"""
 
@@ -519,6 +519,10 @@ def _apply_specifiers(generated: GeneratedProperty, specifiers: dict, context: s
         if target.IsUnsigned and low < 0:
             raise HeaderToolError(f"{context}: Range of an unsigned property cannot go below 0")
         statements.append(f"{target.Var}.SetRange({_cpp_double(low)}, {_cpp_double(high)});")
+    if "EditorOnly" in specifiers:
+        if specifiers["EditorOnly"] is not None:
+            raise HeaderToolError(f"{context}: EditorOnly takes no value")
+        statements.append(f"{generated.Var}.SetEditorOnly();")
     return statements
 
 

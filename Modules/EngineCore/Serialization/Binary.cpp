@@ -44,7 +44,7 @@ void BinarySerializer::SerializeType(ChunkWriter& writer, void* instance, const 
     auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        if (!prop->IsTransient()) {
+        if (!prop->IsTransient() && !prop->EditorOnly) {
             SerializeProperty(writer, prop, prop->GetValuePtr(instance));
         }
     }
@@ -54,7 +54,7 @@ void BinarySerializer::DeserializeType(ChunkReader& reader, void* instance, cons
     auto props = Property::GetAllTypeProperties(Class(typeName));
 
     for (Property* prop : props) {
-        if (!prop->IsTransient()) {
+        if (!prop->IsTransient() && !prop->EditorOnly) {
             DeserializeProperty(reader, prop, prop->GetValuePtr(instance));
             prop->NotifyChanged(instance);
         }

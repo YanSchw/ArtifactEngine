@@ -82,6 +82,8 @@ public:
 
     virtual String SerializeToJson() const;
     virtual void DeserializeFromJson(const String& InJson);
+    virtual bool SaveExternalFiles(const String& InAssetPath) const { (void)InAssetPath; return true; }
+    static String GetExternalDirectory(const String& InAssetPath);
 
 protected:
     PROPERTY()
