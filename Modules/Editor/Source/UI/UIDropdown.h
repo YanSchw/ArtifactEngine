@@ -38,6 +38,9 @@ public:
     std::function<Array<UIDropdownOption>()> GetOptions;
     std::function<int32_t()> GetSelectedIndex;
     std::function<void(int32_t)> SelectionChanged;
+    /** Set to fill the popup with custom content of PopupSize instead of the option list. */
+    std::function<void(UINode& InPanel)> BuildPopup;
+    Vec2 PopupSize = Vec2(280.0f, 320.0f);
 
     virtual void Paint(UIDrawList& OutDrawList) override;
     virtual void OnBind() override;
@@ -84,4 +87,5 @@ private:
     bool m_HasThumbnails = false;
     bool m_HasIcons = false;
     bool m_CloseRequested = false;
+    bool m_Custom = false;
 };

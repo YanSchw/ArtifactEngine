@@ -154,6 +154,12 @@ void UIDropdownPopup::Build(UIDropdown* InOwner, const Array<UIDropdownOption>& 
     background->CornerRadius = Vec4(EditorStyle::ButtonRadius - 1.0f);
     background->Padding = UIPadding(3.0f);
 
+    if (InOwner->BuildPopup) {
+        m_Custom = true;
+        InOwner->BuildPopup(*background);
+        return;
+    }
+
     UIVStack* column = background->Add<UIVStack>();
     column->Fill();
 
@@ -294,8 +300,8 @@ void UIDropdownPopup::OnBind() {
 
     const UIRectF field = owner->GetGeometry();
     const float chrome = 8.0f + (m_Search ? s_SearchHeight : 0.0f);
-    const float minWidth = m_HasThumbnails ? s_MinThumbnailPopupWidth : s_MinPopupWidth;
-    float height = std::min(m_ListHeight + chrome, s_MaxPopupHeight);
+    const float minWidth = m_Custom ? owner->PopupSize.x : (m_HasThumbnails ? s_MinThumbnailPopupWidth : s_MinPopupWidth);
+    float height = m_Custom ? owner->PopupSize.y : std::min(m_ListHeight + chrome, s_MaxPopupHeight);
 
     const float width = std::max(field.Size.x, minWidth);
     float x = field.Min().x;

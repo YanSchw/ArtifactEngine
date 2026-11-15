@@ -76,7 +76,13 @@ void UIClassPicker::FocusSearch() {
 
 void UIClassPicker::CollectHierarchy() {
     m_HierarchyBuilt = true;
-    for (const Class& candidate : Class::GetSubclassesOf(RootClass)) {
+    Array<Class> candidates = Class::GetSubclassesOf(RootClass);
+    for (const Class& extra : ExtraClasses) {
+        if (extra.IsSubclassOf(RootClass) && !candidates.Contains(extra)) {
+            candidates.Add(extra);
+        }
+    }
+    for (const Class& candidate : candidates) {
         if (Filter && !Filter(candidate)) {
             continue;
         }
@@ -86,7 +92,7 @@ void UIClassPicker::CollectHierarchy() {
         }
     }
     for (auto& [parent, children] : m_Children) {
-        std::sort(children.begin(), children.end(), [](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
+        std::sort(children.begin(), children.end(), [](const Class& InA, const Class& InB) { return InA.GetDisplayName() < InB.GetDisplayName(); });
     }
 
     for (Class current = Selected; current != Class::None && current != RootClass; current = current.GetParentClass()) {
@@ -100,7 +106,7 @@ bool UIClassPicker::IsVisible(const Class& InClass) const {
     if (!m_Pickable.ContainsKey(InClass.Name)) {
         return false;
     }
-    if (m_Pickable.At(InClass.Name) && (m_Filter.empty() || Lowered(InClass.Name).find(m_Filter) != String::npos)) {
+    if (m_Pickable.At(InClass.Name) && (m_Filter.empty() || Lowered(InClass.GetDisplayName()).find(m_Filter) != String::npos)) {
         return true;
     }
     if (m_Children.ContainsKey(InClass.Name)) {
@@ -144,7 +150,7 @@ void UIClassPicker::AddRow(const Class& InClass, int32_t InDepth) {
     }
     const bool pickable = m_Pickable.At(InClass.Name);
     const bool expanded = !m_Filter.empty() || m_Expanded.Contains(InClass.Name);
-    const bool matches = !m_Filter.empty() && Lowered(InClass.Name).find(m_Filter) != String::npos;
+    const bool matches = !m_Filter.empty() && Lowered(InClass.GetDisplayName()).find(m_Filter) != String::npos;
     const float indent = 4.0f + (float)InDepth * s_IndentWidth;
 
     UIButton* row = m_Rows->Add<UIButton>();
@@ -220,7 +226,11 @@ void UIClassPicker::OnRowClicked(const Class& InClass) {
     const bool doubleClick = m_LastClicked == InClass && now - m_LastClickTime < s_DoubleClickSeconds;
     m_LastClicked = InClass;
     m_LastClickTime = now;
+    const bool changed = Selected != InClass;
     Selected = InClass;
+    if (changed && SelectionChanged) {
+        SelectionChanged(InClass);
+    }
     if (doubleClick && Confirmed) {
         Confirmed(InClass);
     }

@@ -7,11 +7,11 @@
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIDropdown.h"
+#include "UI/UIClassPicker.h"
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/Node.h"
-#include "GameFramework/Component.h"
 #include "Assets/Animation.h"
 #include "Assets/AssetManager.h"
 #include "Assets/NodeRecord.h"
@@ -19,7 +19,6 @@
 #include "Serialization/ThirdParty/nlohmann/json.hpp"
 #include "Core/Log.h"
 #include <cmath>
-#include <memory>
 
 static const Vec4 s_RecordColor = HexColor(0xC42B1C);
 
@@ -98,20 +97,6 @@ Class AnimationEditorTab::GetPlaceholderClass() const {
     }
     Animation* animation = m_Animation.Get();
     return animation ? animation->GetRootClass() : Class::None;
-}
-
-Array<Class> AnimationEditorTab::GetSelectablePlaceholderClasses() const {
-    Array<Class> classes = Class::GetSubclassesOf(Node::StaticClass());
-    classes.Sort([](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
-
-    Array<Class> spawnable;
-    for (const Class& nodeClass : classes) {
-        if (nodeClass.IsSubclassOf(Component::StaticClass()) || !nodeClass.IsDefaultConstructable()) {
-            continue;
-        }
-        spawnable.Add(nodeClass);
-    }
-    return spawnable;
 }
 
 void AnimationEditorTab::SetPlaceholderClass(const Class& InClass) {
@@ -368,27 +353,21 @@ void AnimationEditorTab::BuildToolBar(UINode& InToolBar) {
     caption->VAlign = UIVAlign::Middle;
     caption->Text = "Placeholder";
 
-    auto options = std::make_shared<Array<Class>>();
     UIDropdown* placeholder = InToolBar.Add<UIDropdown>();
     placeholder->Size = { 200.0_px, 1.0_rel };
-    placeholder->SearchPlaceholder = "Search classes";
+    placeholder->PopupSize = Vec2(300.0f, 380.0f);
     placeholder->GetSelectedLabel = [this] { return GetPlaceholderClass().GetDisplayName(); };
-    placeholder->GetOptions = [this, options] {
-        *options = GetSelectablePlaceholderClasses();
-        Array<UIDropdownOption> labels;
-        for (const Class& nodeClass : *options) {
-            UIDropdownOption option(nodeClass.GetDisplayName());
-            option.Icon = EditorIcons::GetNodeIcon(nodeClass);
-            option.IconTint = EditorStyle::Text;
-            labels.Add(option);
-        }
-        return labels;
-    };
-    placeholder->GetSelectedIndex = [this, options] { return options->IndexOf(GetPlaceholderClass()); };
-    placeholder->SelectionChanged = [this, options](int32_t InIndex) {
-        if (InIndex >= 0 && InIndex < options->Size()) {
-            SetPlaceholderClass((*options)[InIndex]);
-        }
+    placeholder->GetSelectedIcon = [this] { return EditorIcons::GetNodeIcon(GetPlaceholderClass()); };
+    placeholder->BuildPopup = [this, placeholder](UINode& InPanel) {
+        UIClassPicker* picker = InPanel.Add<UIClassPicker>();
+        picker->Fill();
+        picker->Selected = GetPlaceholderClass();
+        picker->Filter = &UIClassPicker::IsPlaceableNodeClass;
+        picker->SelectionChanged = [this, placeholder](const Class& InClass) {
+            SetPlaceholderClass(InClass);
+            placeholder->ClosePopup();
+        };
+        picker->FocusSearch();
     };
 
     UIQuad* divider = InToolBar.Add<UIQuad>();

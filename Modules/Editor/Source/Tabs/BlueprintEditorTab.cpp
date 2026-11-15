@@ -8,6 +8,7 @@
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIDropdown.h"
+#include "UI/UIClassPicker.h"
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/UILabel.h"
 #include "GameFramework/Node.h"
@@ -16,7 +17,6 @@
 #include "Assets/Blueprint.h"
 #include "Assets/NodeRecord.h"
 #include "Core/Log.h"
-#include <memory>
 
 BlueprintEditorTab::BlueprintEditorTab() {
     SetEditedWorld(new World());
@@ -99,19 +99,9 @@ Class BlueprintEditorTab::GetParentClass() const {
     return blueprint ? blueprint->GetRootClass() : Class::None;
 }
 
-Array<Class> BlueprintEditorTab::GetSelectableParentClasses() const {
+Array<Class> BlueprintEditorTab::GetSelectableParentBlueprints() const {
     Blueprint* blueprint = m_Blueprint.Get();
     Array<Class> classes;
-
-    Array<Class> native = Class::GetSubclassesOf(Node::StaticClass());
-    native.Sort([](const Class& InA, const Class& InB) { return InA.Name < InB.Name; });
-    for (const Class& nodeClass : native) {
-        if (nodeClass.IsSubclassOf(Component::StaticClass()) || !nodeClass.IsDefaultConstructable()) {
-            continue;
-        }
-        classes.Add(nodeClass);
-    }
-
     for (Asset* asset : AssetManager::Get().GetAssetsOfClass(Blueprint::StaticClass())) {
         Blueprint* candidate = Cast<Blueprint>(asset);
         if (!candidate) {
@@ -122,7 +112,6 @@ Array<Class> BlueprintEditorTab::GetSelectableParentClasses() const {
         }
         classes.Add(Class::FromBlueprint(candidate->GetId()));
     }
-
     return classes;
 }
 
@@ -209,22 +198,21 @@ void BlueprintEditorTab::BuildToolBar(UINode& InToolBar) {
     caption->VAlign = UIVAlign::Middle;
     caption->Text = "Parent Class";
 
-    auto options = std::make_shared<Array<Class>>();
     UIDropdown* parent = InToolBar.Add<UIDropdown>();
     parent->Size = { 200.0_px, 1.0_rel };
+    parent->PopupSize = Vec2(300.0f, 380.0f);
     parent->GetSelectedLabel = [this] { return GetParentClass().GetDisplayName(); };
-    parent->GetOptions = [this, options] {
-        *options = GetSelectableParentClasses();
-        Array<UIDropdownOption> labels;
-        for (const Class& parentClass : *options) {
-            labels.Add(parentClass.GetDisplayName());
-        }
-        return labels;
-    };
-    parent->GetSelectedIndex = [this, options] { return options->IndexOf(GetParentClass()); };
-    parent->SelectionChanged = [this, options](int32_t InIndex) {
-        if (InIndex >= 0 && InIndex < options->Size()) {
-            SetParentClass((*options)[InIndex]);
-        }
+    parent->GetSelectedIcon = [this] { return EditorIcons::GetNodeIcon(GetParentClass()); };
+    parent->BuildPopup = [this, parent](UINode& InPanel) {
+        UIClassPicker* picker = InPanel.Add<UIClassPicker>();
+        picker->Fill();
+        picker->Selected = GetParentClass();
+        picker->Filter = &UIClassPicker::IsPlaceableNodeClass;
+        picker->ExtraClasses = GetSelectableParentBlueprints();
+        picker->SelectionChanged = [this, parent](const Class& InClass) {
+            SetParentClass(InClass);
+            parent->ClosePopup();
+        };
+        picker->FocusSearch();
     };
 }

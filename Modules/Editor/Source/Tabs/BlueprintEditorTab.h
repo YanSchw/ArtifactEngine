@@ -21,7 +21,7 @@ public:
 
     Class GetParentClass() const;
     void SetParentClass(const Class& InClass);
-    Array<Class> GetSelectableParentClasses() const;
+    Array<Class> GetSelectableParentBlueprints() const;
 
     virtual String GetTabTitle() const override;
     virtual VectorImage* GetTabIcon() const override;

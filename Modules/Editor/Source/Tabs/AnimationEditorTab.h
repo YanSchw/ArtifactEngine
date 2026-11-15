@@ -30,7 +30,6 @@ public:
 
     Class GetPlaceholderClass() const;
     void SetPlaceholderClass(const Class& InClass);
-    Array<Class> GetSelectablePlaceholderClasses() const;
 
     Node* GetAnimationRoot() const;
     void SetAnimationRoot(Node* InNode);

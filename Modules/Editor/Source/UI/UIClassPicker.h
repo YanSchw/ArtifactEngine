@@ -19,6 +19,9 @@ public:
     Class Selected;
     /** Classes failing this are left out, along with everything below them. */
     std::function<bool(const Class&)> Filter;
+    /** Classes outside the native registry are slotted in under their parent class. */
+    Array<Class> ExtraClasses;
+    std::function<void(const Class&)> SelectionChanged;
     std::function<void(const Class&)> Confirmed;
 
     static bool IsPlaceableNodeClass(const Class& InClass);
