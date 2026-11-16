@@ -56,6 +56,15 @@ UINode* DetailsRow::AddLabelHost() {
     return m_LabelHost;
 }
 
+UINode* DetailsRow::AddTrailingHost(float InWidth) {
+    if (!m_TrailingHost) {
+        m_TrailingHost = Add<UINode>();
+        m_TrailingHost->Anchor = m_TrailingHost->Pivot = Vec2(1.0f, 0.5f);
+    }
+    m_TrailingWidth = InWidth;
+    return m_TrailingHost;
+}
+
 float DetailsRow::MeasureHeight(const String& InFilter) const {
     return DetailsTab::MatchesFilter(m_Label, InFilter) ? Height : 0.0f;
 }
@@ -77,7 +86,11 @@ void DetailsRow::OnBind() {
     }
 
     m_ValueHost->Position = { UIValue(split, 5.0f), 0.0f };
-    m_ValueHost->Size = { UIValue(1.0f - split, -(5.0f + 3.0f + ResetColumnWidth)), Height - 4.0f };
+    m_ValueHost->Size = { UIValue(1.0f - split, -(5.0f + 3.0f + ResetColumnWidth + m_TrailingWidth)), Height - 4.0f };
+    if (m_TrailingHost) {
+        m_TrailingHost->Position = Vec2(-(2.0f + ResetColumnWidth), 0.0f);
+        m_TrailingHost->Size = Vec2(m_TrailingWidth, Height - 4.0f);
+    }
 }
 
 void DetailsRow::Paint(UIDrawList& OutDrawList) {

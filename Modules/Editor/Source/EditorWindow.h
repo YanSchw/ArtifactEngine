@@ -36,6 +36,7 @@ public:
     MajorTab* OpenAssetEditor(class Asset* InAsset);
     /** Activates the open Editor Settings tab, wherever it is, or opens one here. */
     void OpenEditorSettings();
+    void OpenProjectSettings();
     MajorTab* GetActiveTab() const { return m_ActiveTab; }
     const Array<MajorTab*>& GetOpenTabs() const { return m_OpenTabs; }
 

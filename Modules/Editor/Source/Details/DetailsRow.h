@@ -22,6 +22,7 @@ public:
     const String& GetLabel() const { return m_Label; }
     UINode* GetValueHost() const { return m_ValueHost; }
     UINode* AddLabelHost();
+    UINode* AddTrailingHost(float InWidth);
 
     std::function<void()> ResetAction;
     std::function<bool()> IsOverridden;
@@ -42,5 +43,7 @@ private:
     UIButton* m_ResetButton = nullptr;
     UINode* m_ValueHost = nullptr;
     UINode* m_LabelHost = nullptr;
+    UINode* m_TrailingHost = nullptr;
+    float m_TrailingWidth = 0.0f;
     bool m_DraggingSplit = false;
 };

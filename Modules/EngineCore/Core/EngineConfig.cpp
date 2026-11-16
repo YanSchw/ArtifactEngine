@@ -3,9 +3,12 @@
 #include <filesystem>
 #include <vector>
 #include <tuple>
+#include <cstdlib>
 #include "Log.h"
 #include "Object/Pointer.h"
 #include "Common/ConfigVar.h"
+#include "ProjectSettings.h"
+#include "Serialization/Ini.h"
 #include "Common/UUID.h"
 #include "Platform/Platform.h"
 #include "Platform/FileIO.h"
@@ -13,32 +16,45 @@
 static Map<String, ConfigVar> s_ConfigVars;
 
 void EngineConfig::Initialize(const Array<String>& InArgs) {
-    LoadConfigVars(InArgs);
     ResolvePaths();
+    LoadConfigVars(InArgs);
 }
 
 void EngineConfig::LoadConfigVars(const Array<String>& InArgs) {
     // 1. Load default ConfigVars
     SetConfigVar("EngineClass", IsPackagedBuild() ? "GameEngine" : "EditorEngine");
-    SetConfigVar("RenderPipeline", "ArtifactRenderPipeline");
     SetConfigVar("Fullscreen", IsPackagedBuild() ? "true" : "false");
-    SetConfigVar("CapFPS", "60");
-    SetConfigVar("AudioSampleRate", "48000");
-    SetConfigVar("AudioBufferFrames", "512");
-    SetConfigVar("AudioMaxVoices", "128");
-    SetConfigVar("DefaultScene", "a1b2c3d4-0001-4a00-9000-000000000001");
-    SetConfigVar("DefaultFont", "f0e1d2c3-b4a5-4967-8899-aabbccddeeff");
+    ProjectSettings::RegisterDefaults();
 
     // 2. Load frozen ConfigVars from packaged build
 #if defined(AE_PACKAGED)
-    // TODO: Implement
+    std::vector<std::tuple<std::string, std::string, bool>> frozen;
+    extern void __FrozenConfigVars(std::vector<std::tuple<std::string, std::string, bool>>& outVars);
+    __FrozenConfigVars(frozen);
+    for (const auto& [name, value, hasValue] : frozen) {
+        if (hasValue) {
+            SetConfigVar(String(name), String(value));
+        }
+        s_ConfigVars[String(name)].Freeze();
+    }
 #endif
 
     // 3. Load ConfigVars from config file
-    // TODO: Implement
+    LoadConfigFiles(GetConfigDir());
+    LoadConfigFiles(GetUserConfigDir());
 
     // 4. Load ConfigVars from environment variables
-    // TODO: Implement
+    Array<String> names;
+    for (const auto& [name, var] : s_ConfigVars) {
+        names.Add(name);
+    }
+    for (const String& name : names) {
+        if (const char* value = std::getenv(("AE_" + name).c_str())) {
+            if (!SetConfigVar(name, value)) {
+                AE_WARN("Ignoring environment variable AE_{0}: '{0}' is frozen", name);
+            }
+        }
+    }
 
     // 5. Load ConfigVars from command line args
     for (const String& arg : InArgs) {
@@ -48,20 +64,60 @@ void EngineConfig::LoadConfigVars(const Array<String>& InArgs) {
                 const String name = arg.substr(1, equalsIndex - 1);
                 const String value = arg.substr(equalsIndex + 1);
                 if (!SetConfigVar(name, value)) {
-                    AE_ERROR("Failed to set ConfigVar '{0}' from command line arg '{1}'", name, arg);
+                    AE_ERROR("Ignoring command line arg '{0}': '{1}' is frozen", arg, name);
                 }
             }
         }
     }
 }
 
-bool EngineConfig::SetConfigVar(const String& InName, const String& InValue) {
-    if (s_ConfigVars.ContainsKey(InName)) {
-        return s_ConfigVars[InName].Update(InValue);
-    } else {
-        s_ConfigVars[InName] = ConfigVar(InValue);
-        return true;
+void EngineConfig::LoadConfigFiles(const String& InDir) {
+    const std::filesystem::path dir = InDir;
+    std::error_code error;
+    Array<String> files;
+    for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(dir, error)) {
+        if (entry.is_regular_file(error) && entry.path().extension() == ".ini") {
+            files.Add(entry.path().string());
+        }
     }
+    files.Sort([](const String& InA, const String& InB) { return InA < InB; });
+
+    for (const String& file : files) {
+        for (const IniFile::Entry& entry : IniFile::Parse(FileIO::ReadFileToString(file)).GetEntries()) {
+            if (!SetConfigVar(entry.Key, entry.Value)) {
+                AE_WARN("Ignoring '{0}' in {1}: it is frozen", entry.Key, file);
+            }
+        }
+        AE_INFO("Loaded config {0}", file);
+    }
+}
+
+bool EngineConfig::SetConfigVar(const String& InName, const String& InValue) {
+    if (!s_ConfigVars[InName].Update(InValue)) {
+        return false;
+    }
+    ProjectSettings::OnConfigVarChanged(InName, InValue);
+    return true;
+}
+
+String EngineConfig::GetConfigDir() {
+    if (IsPackagedBuild()) {
+        return (std::filesystem::path(Platform::GetContentDirectory()) / "Config").string();
+    }
+    return (std::filesystem::path(GetProjectDir()) / "Config").string();
+}
+
+String EngineConfig::GetUserConfigDir() {
+    if (!IsPackagedBuild()) {
+        return (std::filesystem::path(GetProjectDir()) / "Saved" / "Config").string();
+    }
+    const ConfigVar* projectNameVar = s_ConfigVars.Find("ProjectName");
+    String projectName = projectNameVar ? projectNameVar->As<String>("") : String();
+    if (projectName.empty() || projectName == "." || projectName == ".." || projectName.find_first_of("/\\:*?\"<>|") != String::npos) {
+        AE_WARN("ProjectName '{0}' is not a valid file name; using 'Artifact'", projectName);
+        projectName = "Artifact";
+    }
+    return (std::filesystem::path(Platform::GetUserConfigDirectory()) / projectName / "Config").string();
 }
 
 void EngineConfig::ResolvePaths() {
@@ -213,6 +269,13 @@ bool EngineConfig::GetConfigVar<bool>(const String& InName) {
     return false;
 }
 template<>
+float EngineConfig::GetConfigVar<float>(const String& InName) {
+    if (s_ConfigVars.ContainsKey(InName)) {
+        return s_ConfigVars[InName].As<float>(0.0f);
+    }
+    return 0.0f;
+}
+template<>
 Class EngineConfig::GetConfigVar<Class>(const String& InName) {
     if (s_ConfigVars.ContainsKey(InName)) {
         return Class(s_ConfigVars[InName].As<String>(""));
@@ -236,5 +299,5 @@ Class EngineConfig::EngineClass() {
 }
 
 Class EngineConfig::RenderPipelineClass() {
-    return GetConfigVar<Class>("RenderPipeline");
+    return GetConfigVar<Class>("RenderPipelineClass");
 }

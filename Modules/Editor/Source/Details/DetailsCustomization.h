@@ -61,10 +61,10 @@ protected:
 
     static DetailsCategory& AddCategory(UINode& InParent, DetailsTab& InTab, const String& InTitle, int32_t InDepth);
     static DetailsRow& AddRow(UINode& InParent, DetailsTab& InTab, const String& InLabel, int32_t InDepth);
-    static void AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
-                               uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
-                               Property* InRootProperty = nullptr, const String& InLabel = String(),
-                               const String& InParentPath = String());
+    static DetailsRow* AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
+                                      uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
+                                      Property* InRootProperty = nullptr, const String& InLabel = String(),
+                                      const String& InParentPath = String());
     static DetailsCategory& AddStructCategory(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
                                               uint64_t InOffset, const Array<Property*>& InMembers, int32_t InDepth,
                                               Property* InRootProperty, const String& InLabel, const String& InPath,

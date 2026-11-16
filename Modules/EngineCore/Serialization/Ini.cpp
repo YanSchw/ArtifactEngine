@@ -11,69 +11,172 @@ namespace {
     }
 }
 
-Map<String, Map<String, String>> IniParser::Read(const String& InIni) {
-    Map<String, Map<String, String>> result;
-
-    // The global section (keys before any [Section] header) uses the empty string.
-    String currentSection = "";
-    result[currentSection];
-
-    size_t lineStart = 0;
-    while (lineStart <= InIni.size()) {
-        size_t lineEnd = InIni.find('\n', lineStart);
-        if (lineEnd == String::npos) {
-            lineEnd = InIni.size();
-        }
-
-        String line = Trim(InIni.substr(lineStart, lineEnd - lineStart));
-        lineStart = lineEnd + 1;
-
-        if (line.empty() || line[0] == ';' || line[0] == '#') {
-            continue;
-        }
-
-        if (line[0] == '[' && line.back() == ']') {
-            currentSection = Trim(line.substr(1, line.size() - 2));
-            result[currentSection];
-            continue;
-        }
-
-        size_t equals = line.find('=');
-        if (equals == String::npos) {
-            continue;
-        }
-
-        String key = Trim(line.substr(0, equals));
-        String value = Trim(line.substr(equals + 1));
-        result[currentSection][key] = value;
-    }
-
-    return result;
+bool IniFile::Line::IsBlank() const {
+    return Trim(Text).empty();
 }
 
-String IniParser::Write(Map<String, Map<String, String>>& InMap) {
-    String result;
+IniFile IniFile::Parse(const String& InText) {
+    IniFile file;
+    String section;
+    size_t start = 0;
+    while (start < InText.size()) {
+        size_t end = InText.find('\n', start);
+        if (end == String::npos) {
+            end = InText.size();
+        }
+        Line line;
+        line.Text = InText.substr(start, end - start);
+        if (!line.Text.empty() && line.Text.back() == '\r') {
+            line.Text.pop_back();
+        }
+        start = end + 1;
 
-    // Emit the global section first (keys with no [Section] header).
-    if (InMap.ContainsKey("")) {
-        for (const auto& [key, value] : InMap.At("")) {
-            result += key + "=" + value + "\n";
+        const String trimmed = Trim(line.Text);
+        if (trimmed.size() >= 2 && trimmed.front() == '[' && trimmed.back() == ']') {
+            section = Trim(trimmed.substr(1, trimmed.size() - 2));
+            line.Section = section;
+            line.IsHeader = true;
+        } else if (!trimmed.empty() && trimmed[0] != ';' && trimmed[0] != '#') {
+            const size_t equals = trimmed.find('=');
+            if (equals != String::npos) {
+                line.Section = section;
+                line.Key = Trim(trimmed.substr(0, equals));
+                line.Value = Trim(trimmed.substr(equals + 1));
+            }
+        }
+        file.m_Lines.Add(line);
+    }
+    return file;
+}
+
+String IniFile::ToString() const {
+    String text;
+    for (const Line& line : m_Lines) {
+        text += line.Text;
+        text += '\n';
+    }
+    return text;
+}
+
+Array<IniFile::Entry> IniFile::GetEntries() const {
+    Array<Entry> entries;
+    for (const Line& line : m_Lines) {
+        if (line.IsEntry()) {
+            entries.Add(Entry{ line.Section, line.Key, line.Value });
         }
     }
+    return entries;
+}
 
-    for (const auto& [section, entries] : InMap) {
-        if (section.empty()) {
-            continue;
-        }
+const String* IniFile::Find(const String& InSection, const String& InKey) const {
+    const int32_t index = FindEntry(InSection, InKey);
+    return index >= 0 ? &m_Lines[index].Value : nullptr;
+}
 
-        if (!result.empty()) {
-            result += "\n";
-        }
-        result += "[" + section + "]\n";
-        for (const auto& [key, value] : entries) {
-            result += key + "=" + value + "\n";
-        }
+void IniFile::Set(const String& InSection, const String& InKey, const String& InValue) {
+    Line entry;
+    entry.Text = InKey + "=" + InValue;
+    entry.Section = InSection;
+    entry.Key = InKey;
+    entry.Value = InValue;
+
+    const int32_t existing = FindEntry(InSection, InKey);
+    if (existing >= 0) {
+        m_Lines[existing] = entry;
+        return;
     }
 
-    return result;
+    const int32_t header = FindHeader(InSection);
+    if (header < 0 && !InSection.empty()) {
+        if (!m_Lines.IsEmpty() && !m_Lines.LastItem().IsBlank()) {
+            m_Lines.Add(Line());
+        }
+        Line headerLine;
+        headerLine.Text = "[" + InSection + "]";
+        headerLine.Section = InSection;
+        headerLine.IsHeader = true;
+        m_Lines.Add(headerLine);
+        m_Lines.Add(entry);
+        return;
+    }
+
+    int32_t insertAt = header + 1;
+    const int32_t end = FindSectionEnd(header);
+    for (int32_t i = header + 1; i < end; i++) {
+        if (!m_Lines[i].IsBlank()) {
+            insertAt = i + 1;
+        }
+    }
+    if (InSection.empty() && insertAt < m_Lines.Size() && m_Lines[insertAt].IsHeader) {
+        m_Lines.Insert(insertAt, Line());
+    }
+    m_Lines.Insert(insertAt, entry);
+}
+
+bool IniFile::Remove(const String& InSection, const String& InKey) {
+    const int32_t index = FindEntry(InSection, InKey);
+    if (index < 0) {
+        return false;
+    }
+    m_Lines.RemoveAt(index);
+    PruneSection(InSection);
+    return true;
+}
+
+bool IniFile::IsEmpty() const {
+    for (const Line& line : m_Lines) {
+        if (!line.IsBlank()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int32_t IniFile::FindEntry(const String& InSection, const String& InKey) const {
+    for (int32_t i = 0; i < m_Lines.Size(); i++) {
+        if (m_Lines[i].IsEntry() && m_Lines[i].Section == InSection && m_Lines[i].Key == InKey) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int32_t IniFile::FindHeader(const String& InSection) const {
+    if (InSection.empty()) {
+        return -1;
+    }
+    for (int32_t i = 0; i < m_Lines.Size(); i++) {
+        if (m_Lines[i].IsHeader && m_Lines[i].Section == InSection) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int32_t IniFile::FindSectionEnd(int32_t InHeader) const {
+    for (int32_t i = InHeader + 1; i < m_Lines.Size(); i++) {
+        if (m_Lines[i].IsHeader) {
+            return i;
+        }
+    }
+    return m_Lines.Size();
+}
+
+void IniFile::PruneSection(const String& InSection) {
+    const int32_t header = FindHeader(InSection);
+    if (header >= 0) {
+        const int32_t end = FindSectionEnd(header);
+        bool empty = true;
+        for (int32_t i = header + 1; i < end && empty; i++) {
+            empty = m_Lines[i].IsBlank();
+        }
+        if (empty) {
+            for (int32_t i = end - 1; i >= header; i--) {
+                m_Lines.RemoveAt(i);
+            }
+        }
+    }
+    while (!m_Lines.IsEmpty() && m_Lines.LastItem().IsBlank()) {
+        m_Lines.RemoveLastItem();
+    }
 }

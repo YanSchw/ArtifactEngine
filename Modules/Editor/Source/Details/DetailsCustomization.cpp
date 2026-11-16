@@ -215,15 +215,22 @@ static void WriteIntValue(const IntProperty& InProperty, void* InPtr, double InV
     }
 }
 
-static Object* ReadObjectPtr(void* InPtr, bool InIsWeak) {
-    return InIsWeak ? ((WeakObjectPtr<Object>*)InPtr)->Get() : ((SharedObjectPtr<Object>*)InPtr)->Get();
+enum class AssetReferenceKind : uint8_t { Shared, Weak, Id };
+
+static Asset* ReadAssetReference(void* InPtr, AssetReferenceKind InKind) {
+    switch (InKind) {
+        case AssetReferenceKind::Shared: return Cast<Asset>(((SharedObjectPtr<Object>*)InPtr)->Get());
+        case AssetReferenceKind::Weak: return Cast<Asset>(((WeakObjectPtr<Object>*)InPtr)->Get());
+        case AssetReferenceKind::Id: return AssetManager::Get().GetAsset(*(UUID*)InPtr);
+    }
+    return nullptr;
 }
 
-static void WriteObjectPtr(void* InPtr, bool InIsWeak, Object* InValue) {
-    if (InIsWeak) {
-        *(WeakObjectPtr<Object>*)InPtr = InValue;
-    } else {
-        *(SharedObjectPtr<Object>*)InPtr = InValue;
+static void WriteAssetReference(void* InPtr, AssetReferenceKind InKind, Asset* InAsset) {
+    switch (InKind) {
+        case AssetReferenceKind::Shared: *(SharedObjectPtr<Object>*)InPtr = (Object*)InAsset; break;
+        case AssetReferenceKind::Weak: *(WeakObjectPtr<Object>*)InPtr = (Object*)InAsset; break;
+        case AssetReferenceKind::Id: *(UUID*)InPtr = InAsset ? InAsset->GetId() : UUID::INVALID; break;
     }
 }
 
@@ -604,19 +611,19 @@ static void BuildNodeReferenceEditor(UINode& InHost, const WeakObjectPtr<Object>
 }
 
 static void BuildAssetSlot(UINode& InHost, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                           const Class& InAssetClass, bool InIsWeak, const DetailsEditHandler& InOnEdited) {
+                           const Class& InAssetClass, AssetReferenceKind InKind, const DetailsEditHandler& InOnEdited) {
     UIAssetSlot* slot = InHost.Add<UIAssetSlot>();
     slot->Fill();
     slot->AssetClass = InAssetClass;
     slot->Thumbnails = &InTab.GetThumbnails();
-    slot->GetAsset = [InObject, InOffset, InIsWeak]() -> Asset* {
+    slot->GetAsset = [InObject, InOffset, InKind]() -> Asset* {
         char* base = ResolveBase(InObject, InOffset);
-        return base ? Cast<Asset>(ReadObjectPtr(base, InIsWeak)) : nullptr;
+        return base ? ReadAssetReference(base, InKind) : nullptr;
     };
-    slot->SetAsset = [InObject, InOffset, InIsWeak, InOnEdited](Asset* InAsset) {
+    slot->SetAsset = [InObject, InOffset, InKind, InOnEdited](Asset* InAsset) {
         if (char* base = ResolveBase(InObject, InOffset)) {
             InOnEdited.Record();
-            WriteObjectPtr(base, InIsWeak, InAsset);
+            WriteAssetReference(base, InKind, InAsset);
             InOnEdited();
         }
     };
@@ -624,27 +631,31 @@ static void BuildAssetSlot(UINode& InHost, DetailsTab& InTab, const WeakObjectPt
 }
 
 static void BuildAssetRow(DetailsRow& InRow, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject, uint64_t InOffset,
-                          const Class& InAssetClass, bool InIsWeak, const DetailsEditHandler& InOnEdited) {
+                          const Class& InAssetClass, AssetReferenceKind InKind, const DetailsEditHandler& InOnEdited) {
     InRow.Height = AssetRowHeight;
-    BuildAssetSlot(*InRow.GetValueHost(), InTab, InObject, InOffset, InAssetClass, InIsWeak, InOnEdited);
+    BuildAssetSlot(*InRow.GetValueHost(), InTab, InObject, InOffset, InAssetClass, InKind, InOnEdited);
 }
 
-static const Class* FindAssetReferenceClass(Property* InProperty, bool& OutIsWeak) {
+static Class FindAssetReferenceClass(Property* InProperty, AssetReferenceKind& OutKind) {
     if (WeakObjectPtrProperty* weak = Cast<WeakObjectPtrProperty>(InProperty)) {
-        OutIsWeak = true;
-        return weak->InnerClass.IsSubclassOf(Asset::StaticClass()) ? &weak->InnerClass : nullptr;
+        OutKind = AssetReferenceKind::Weak;
+        return weak->InnerClass.IsSubclassOf(Asset::StaticClass()) ? weak->InnerClass : Class::None;
     }
     if (SharedObjectPtrProperty* shared = Cast<SharedObjectPtrProperty>(InProperty)) {
-        OutIsWeak = false;
-        return shared->InnerClass.IsSubclassOf(Asset::StaticClass()) ? &shared->InnerClass : nullptr;
+        OutKind = AssetReferenceKind::Shared;
+        return shared->InnerClass.IsSubclassOf(Asset::StaticClass()) ? shared->InnerClass : Class::None;
     }
-    return nullptr;
+    if (Cast<UUIDProperty>(InProperty) && !InProperty->AssetType.empty()) {
+        OutKind = AssetReferenceKind::Id;
+        return Class(InProperty->AssetType);
+    }
+    return Class::None;
 }
 
 static bool IsEditableArrayElement(Property* InProperty) {
-    bool isWeak = false;
-    if (Cast<WeakObjectPtrProperty>(InProperty) || Cast<SharedObjectPtrProperty>(InProperty)) {
-        return FindAssetReferenceClass(InProperty, isWeak) != nullptr;
+    AssetReferenceKind kind = AssetReferenceKind::Shared;
+    if (Cast<WeakObjectPtrProperty>(InProperty) || Cast<SharedObjectPtrProperty>(InProperty) || Cast<UUIDProperty>(InProperty)) {
+        return FindAssetReferenceClass(InProperty, kind) != Class::None;
     }
     return Cast<IntProperty>(InProperty) || Cast<FloatProperty>(InProperty) || Cast<BoolProperty>(InProperty)
         || Cast<StringProperty>(InProperty) || Cast<EnumProperty>(InProperty) || Cast<StructProperty>(InProperty)
@@ -1074,9 +1085,9 @@ static Property* FindHeaderToggle(const Array<Property*>& InMembers) {
     return nullptr;
 }
 
-void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
-                                          uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
-                                          Property* InRootProperty, const String& InLabel, const String& InParentPath) {
+DetailsRow* DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, const WeakObjectPtr<Object>& InObject,
+                                                 uint64_t InBaseOffset, Property* InProperty, int32_t InDepth,
+                                                 Property* InRootProperty, const String& InLabel, const String& InParentPath) {
     const uint64_t offset = InBaseOffset + InProperty->Offset;
     Property* root = InRootProperty ? InRootProperty : InProperty;
     const String label = InLabel.empty() ? PrettyPropertyName(InProperty->Name) : InLabel;
@@ -1086,26 +1097,26 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
     const Array<Property*> inner = GetInnerProperties(InProperty);
     if (!inner.IsEmpty()) {
         AddStructCategory(InParent, InTab, InObject, offset, inner, InDepth, root, label, path).SetTooltip(InProperty->Comment);
-        return;
+        return nullptr;
     }
 
     ArrayProperty* editableArray = Cast<ArrayProperty>(InProperty);
     if (editableArray && IsEditableArrayElement(editableArray->InnerProperty)) {
         AddArrayRows(InParent, InTab, InObject, offset, editableArray, InDepth, root, label, path).SetTooltip(InProperty->Comment);
-        return;
+        return nullptr;
     }
 
     MapProperty* editableMap = Cast<MapProperty>(InProperty);
     if (editableMap && IsEditableArrayElement(editableMap->ValueProperty)) {
         AddMapRows(InParent, InTab, InObject, offset, editableMap, InDepth, root, label, path).SetTooltip(InProperty->Comment);
-        return;
+        return nullptr;
     }
 
     DetailsRow& row = AddRow(InParent, InTab, label, InDepth);
     row.SetTooltip(InProperty->Comment);
     if (DelegateProperty* delegateProperty = Cast<DelegateProperty>(InProperty)) {
         if (InBaseOffset == 0 && BuildEventButton(*row.GetValueHost(), InTab, InObject, delegateProperty)) {
-            return;
+            return &row;
         }
         UILabel& summary = AddValueLabel(*row.GetValueHost(), "");
         summary.Bind = [summary = &summary, InObject, offset, delegateProperty] {
@@ -1113,7 +1124,7 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
             const int32_t count = base ? delegateProperty->GetBindingCount(base) : 0;
             summary->Text = "void(" + delegateProperty->Signature + ")   " + Plural((size_t)count, "listener", "listeners");
         };
-        return;
+        return &row;
     }
     if (IsOverridablePath(path)) {
         BindOverride(row, InObject, path);
@@ -1121,23 +1132,18 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
     const DetailsEditHandler onEdited = MakeEditHandler(InObject, root, &InTab, path);
 
     if (BuildValueEditor(*row.GetValueHost(), InObject, offset, InProperty, onEdited, label)) {
-        return;
+        return &row;
     }
 
-    if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
+    AssetReferenceKind kind = AssetReferenceKind::Shared;
+    if (const Class assetClass = FindAssetReferenceClass(InProperty, kind); assetClass != Class::None) {
+        BuildAssetRow(row, InTab, InObject, offset, assetClass, kind, onEdited);
+    } else if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
         AddValueLabel(*row.GetValueHost(), structProperty->InnerStructTypename);
     } else if (SharedObjectPtrProperty* sharedProperty = Cast<SharedObjectPtrProperty>(InProperty)) {
-        if (sharedProperty->InnerClass.IsSubclassOf(Asset::StaticClass())) {
-            BuildAssetRow(row, InTab, InObject, offset, sharedProperty->InnerClass, false, onEdited);
-        } else {
-            AddValueLabel(*row.GetValueHost(), sharedProperty->InnerClass.Name);
-        }
+        AddValueLabel(*row.GetValueHost(), sharedProperty->InnerClass.Name);
     } else if (WeakObjectPtrProperty* weakProperty = Cast<WeakObjectPtrProperty>(InProperty)) {
-        if (weakProperty->InnerClass.IsSubclassOf(Asset::StaticClass())) {
-            BuildAssetRow(row, InTab, InObject, offset, weakProperty->InnerClass, true, onEdited);
-        } else {
-            AddValueLabel(*row.GetValueHost(), weakProperty->InnerClass.Name);
-        }
+        AddValueLabel(*row.GetValueHost(), weakProperty->InnerClass.Name);
     } else if (ArrayProperty* arrayProperty = Cast<ArrayProperty>(InProperty)) {
         UILabel& label = AddValueLabel(*row.GetValueHost(), "");
         label.Bind = [label = &label, InObject, offset, arrayProperty] {
@@ -1153,6 +1159,7 @@ void DetailsCustomization::AddPropertyRow(UINode& InParent, DetailsTab& InTab, c
     } else {
         AddValueLabel(*row.GetValueHost(), "Unsupported");
     }
+    return &row;
 }
 
 /** The key type of a curve or gradient, found through its Keys array. Empty for any other struct. */
@@ -1336,10 +1343,10 @@ void DetailsCustomization::AddArrayElement(UINode& InParent, DetailsTab& InTab, 
     if (BuildValueEditor(*editor, InObject, offset, element, onEdited, label)) {
         return;
     }
-    bool isWeak = false;
-    if (const Class* assetClass = FindAssetReferenceClass(element, isWeak)) {
+    AssetReferenceKind kind = AssetReferenceKind::Shared;
+    if (const Class assetClass = FindAssetReferenceClass(element, kind); assetClass != Class::None) {
         row.Height = AssetRowHeight;
-        BuildAssetSlot(*editor, InTab, InObject, offset, *assetClass, isWeak, onEdited);
+        BuildAssetSlot(*editor, InTab, InObject, offset, assetClass, kind, onEdited);
     } else if (StructProperty* structProperty = Cast<StructProperty>(element)) {
         AddValueLabel(*editor, structProperty->InnerStructTypename);
     }
@@ -1461,10 +1468,10 @@ void DetailsCustomization::AddMapEntry(UINode& InParent, DetailsTab& InTab, cons
     if (BuildValueEditor(*editor, InObject, InEntryOffset, value, onEdited, keyLabel)) {
         return;
     }
-    bool isWeak = false;
-    if (const Class* assetClass = FindAssetReferenceClass(value, isWeak)) {
+    AssetReferenceKind kind = AssetReferenceKind::Shared;
+    if (const Class assetClass = FindAssetReferenceClass(value, kind); assetClass != Class::None) {
         row.Height = AssetRowHeight;
-        BuildAssetSlot(*editor, InTab, InObject, InEntryOffset, *assetClass, isWeak, onEdited);
+        BuildAssetSlot(*editor, InTab, InObject, InEntryOffset, assetClass, kind, onEdited);
     } else if (StructProperty* structProperty = Cast<StructProperty>(value)) {
         AddValueLabel(*editor, structProperty->InnerStructTypename);
     }

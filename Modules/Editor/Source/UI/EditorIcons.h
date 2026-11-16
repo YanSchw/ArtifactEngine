@@ -41,6 +41,8 @@ public:
     static VectorImage* More()          { return Get("ec94f9cf-6a03-4090-ac6e-9a9e5d01f939"); }
     static VectorImage* Reset()         { return Get("b1c2d3e4-0006-4a00-9000-000000000006"); }
     static VectorImage* Settings()      { return Get("bad42a9c-6ed5-4480-87b5-80327decc45d"); }
+    static VectorImage* Lock()          { return Get("c9cda6e1-3aec-4bb7-a745-3dd7298ff47a"); }
+    static VectorImage* LockOpen()      { return Get("6ce24fc1-cf06-4716-8167-b9370a33831e"); }
     static VectorImage* UseSelected()   { return Get("c605a931-fe32-4afc-b054-ff46bc5d9ecf"); }
     static VectorImage* Search()        { return Get("fcc09193-44bc-4f87-9e1e-f77546713c07"); }
     static VectorImage* Play()          { return Get("f24d1510-5091-462e-be7d-0a9cc35a711b"); }

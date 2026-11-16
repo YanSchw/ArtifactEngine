@@ -2,15 +2,19 @@
 
 The emscripten link already produced everything the browser needs (Artifact.js, the wasm module and
 the preloaded content in Artifact.data); packaging gathers them into one directory and writes the
-page that hosts the canvas. The result is static, so any HTTP server can serve Dist/Artifact.
+page that hosts the canvas. The result is static, so any HTTP server can serve Dist/<ProjectName>.
 """
 
+import html
 import shutil
 from pathlib import Path
 
 from SDK.Util import smart_open
+from SDK.Config import get_project_name
+from SDK.Paths import get_project_path
 
-APP_NAME = "Artifact"
+APP_NAME = get_project_name(get_project_path())
+BINARY_NAME = "Artifact"
 OUTPUT_DIR = Path("Dist") / APP_NAME
 BINARIES = Path("Binaries")
 
@@ -43,7 +47,7 @@ PAGE = """<!DOCTYPE html>
   }};
   Module.canvas.focus();
 </script>
-<script async src="{name}.js"></script>
+<script async src="{binary}.js"></script>
 </body>
 </html>
 """
@@ -57,13 +61,13 @@ def package_for_web(project_path: str, args):
 
     binaries = Path(project_path) / BINARIES
     for suffix in (".js", ".wasm", ".data"):
-        artifact = binaries / f"{APP_NAME}{suffix}"
+        artifact = binaries / f"{BINARY_NAME}{suffix}"
         if not artifact.exists():
             raise FileNotFoundError(f"The emscripten build produced no {artifact.name}")
         shutil.copy2(artifact, output / artifact.name)
 
     with smart_open(str(output / "index.html")) as page:
-        page.write(PAGE.format(name=APP_NAME))
+        page.write(PAGE.format(name=html.escape(APP_NAME), binary=BINARY_NAME))
 
     print(f"\n✔ Web build created: {output}")
     print(f"  Serve it with:  python3 -m http.server --directory {output}")

@@ -13,6 +13,7 @@ from SDK.Paths import get_engine_path, get_project_path
 from SDK.Platforms import get_current_platform, get_platform, get_platform_names, is_cross_compiled, PlatformType
 from SDK.Util import png_to_ico
 from SDK.Job import Job, JobError
+from SDK.Config import stage_packaged_config
 from Lint.Lint import lint_files
 import os
 import sys
@@ -180,6 +181,7 @@ def cmd_package(args):
     if os.path.exists(content_dest):
         shutil.rmtree(content_dest)
     shutil.copytree(cooked_src, content_dest)
+    stage_packaged_config(project_path, content_dest)
 
     args.target = target.name
     args.configuration = "Dist"  # Always package the Dist configuration

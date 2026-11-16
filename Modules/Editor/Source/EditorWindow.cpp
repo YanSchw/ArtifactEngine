@@ -14,6 +14,7 @@
 #include "Assets/ParticleSystemAsset.h"
 #include "Assets/AnimationGraph.h"
 #include "Tabs/EditorSettingsTab.h"
+#include "Tabs/ProjectSettingsTab.h"
 #include "Settings/EditorSettings.h"
 #include "Assets/Scene.h"
 #include "Assets/Blueprint.h"
@@ -169,6 +170,7 @@ void EditorWindow::BuildFileMenu(UIMenuModel& OutMenu) {
 
     OutMenu.Section("Editor");
     OutMenu.Item("New Scene Tab", [this] { OpenTab<SceneEditorTab>(); }).Icon(EditorIcons::Level());
+    OutMenu.Item("Project Settings", [this] { OpenProjectSettings(); }).Icon(EditorIcons::Settings());
     OutMenu.Item("Editor Settings", [this] { OpenEditorSettings(); })
            .Icon(EditorIcons::Settings()).Shortcut(EditorStyle::CommandKey + "+,");
     OutMenu.Separator();
@@ -370,21 +372,33 @@ MajorTab* EditorWindow::OpenAssetEditor(Asset* InAsset) {
     return nullptr;
 }
 
-void EditorWindow::OpenEditorSettings() {
+static bool ActivateOpenTab(const Class& InTabClass) {
     for (const SharedObjectPtr<ThemedWindow>& window : ThemedWindow::GetAllWindows()) {
         EditorWindow* editorWindow = window.Get() ? window->As<EditorWindow>() : nullptr;
         if (!editorWindow) {
             continue;
         }
-        for (MajorTab* tab : editorWindow->m_OpenTabs) {
-            if (tab->IsA<EditorSettingsTab>()) {
+        for (MajorTab* tab : editorWindow->GetOpenTabs()) {
+            if (tab->IsA(InTabClass)) {
                 editorWindow->ActivateTab(tab);
                 editorWindow->Focus();
-                return;
+                return true;
             }
         }
     }
-    OpenTab<EditorSettingsTab>();
+    return false;
+}
+
+void EditorWindow::OpenEditorSettings() {
+    if (!ActivateOpenTab(EditorSettingsTab::StaticClass())) {
+        OpenTab<EditorSettingsTab>();
+    }
+}
+
+void EditorWindow::OpenProjectSettings() {
+    if (!ActivateOpenTab(ProjectSettingsTab::StaticClass())) {
+        OpenTab<ProjectSettingsTab>();
+    }
 }
 
 void EditorWindow::CloseTab(MajorTab* InTab) {

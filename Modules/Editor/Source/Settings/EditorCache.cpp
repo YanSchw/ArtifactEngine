@@ -2,6 +2,7 @@
 #include "EditorWindow.h"
 #include "Tabs/MajorTab.h"
 #include "Tabs/EditorSettingsTab.h"
+#include "Tabs/ProjectSettingsTab.h"
 #include "Assets/Asset.h"
 #include "Assets/AssetManager.h"
 #include "Core/EngineConfig.h"
@@ -80,7 +81,7 @@ static bool IsReopenable(const EditorTabRecord& InRecord) {
     if (InRecord.AssetId.IsValid()) {
         return AssetManager::Get().GetAsset(InRecord.AssetId) != nullptr;
     }
-    return InRecord.TabClass == EditorSettingsTab::StaticClass().Name;
+    return InRecord.TabClass == EditorSettingsTab::StaticClass().Name || InRecord.TabClass == ProjectSettingsTab::StaticClass().Name;
 }
 
 static MajorTab* ReopenTab(EditorWindow& InWindow, const EditorTabRecord& InRecord) {
@@ -89,6 +90,9 @@ static MajorTab* ReopenTab(EditorWindow& InWindow, const EditorTabRecord& InReco
     }
     if (InRecord.AssetId.IsValid()) {
         return InWindow.OpenAssetEditor(AssetManager::Get().GetAsset(InRecord.AssetId));
+    }
+    if (InRecord.TabClass == ProjectSettingsTab::StaticClass().Name) {
+        return InWindow.OpenTab<ProjectSettingsTab>();
     }
     return InWindow.OpenTab<EditorSettingsTab>();
 }
@@ -146,7 +150,7 @@ void EditorCache::Capture() {
             tabRecord.TabClass = tab->GetClass().Name;
             if (Asset* asset = tab->GetEditedAsset()) {
                 tabRecord.AssetId = asset->GetId();
-            } else if (!tab->IsA<EditorSettingsTab>()) {
+            } else if (!tab->IsA<EditorSettingsTab>() && !tab->IsA<ProjectSettingsTab>()) {
                 continue;
             }
             if (tab == editorWindow->GetActiveTab()) {

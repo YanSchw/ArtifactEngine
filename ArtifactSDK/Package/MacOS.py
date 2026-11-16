@@ -5,13 +5,17 @@ import subprocess
 from pathlib import Path
 import plistlib
 
-APP_NAME = "Artifact"
+from SDK.Config import get_project_name
+from SDK.Paths import get_project_path
+
+DEV_NAME = "Artifact"
+APP_NAME = get_project_name(get_project_path())
 BINARY_PATH = Path("Binaries/Artifact")  # your compiled binary
 OUTPUT_DIR = Path("Dist")
 APP_PATH = OUTPUT_DIR / f"{APP_NAME}.app"
 
 BUNDLE_ID = "com.artifact"
-EXECUTABLE_NAME = "Artifact"
+EXECUTABLE_NAME = APP_NAME
 
 # Root of the Vulkan SDK whose runtime pieces get bundled into the .app. LunarG's installer exports
 # VULKAN_SDK; otherwise fall back to /usr/local, which is where this project links Vulkan from.
@@ -107,14 +111,14 @@ def fix_linkage():
     if "/usr/local/lib" in otool:
         print("⚠️ Executable still references /usr/local/lib after relinking")
 
-def create_plist(app_path: Path, game: bool = False):
+def create_plist(app_path: Path, name: str, game: bool = False):
     plist = {
-        "CFBundleName": APP_NAME,
-        "CFBundleDisplayName": APP_NAME,
+        "CFBundleName": name,
+        "CFBundleDisplayName": name,
         "CFBundleIdentifier": BUNDLE_ID,
         "CFBundleVersion": "1.0.0",
         "CFBundleShortVersionString": "1.0.0",
-        "CFBundleExecutable": EXECUTABLE_NAME,
+        "CFBundleExecutable": name,
         "CFBundlePackageType": "APPL",
         "CFBundleIconFile": "app.icns",
         "LSMinimumSystemVersion": "10.13",
@@ -197,21 +201,21 @@ def make_dev_icns(project_path):
 def create_dev_bundle(project_path):
     """Thin .app shim around Binaries/Artifact for unpackaged dev builds.
     The shim's executable is a symlink to the real binary."""
-    app_path = Path(project_path) / "Binaries" / f"{APP_NAME}.app"
+    app_path = Path(project_path) / "Binaries" / f"{DEV_NAME}.app"
     (app_path / "Contents/MacOS").mkdir(parents=True, exist_ok=True)
     (app_path / "Contents/Resources").mkdir(parents=True, exist_ok=True)
 
-    exe_link = app_path / "Contents/MacOS" / EXECUTABLE_NAME
+    exe_link = app_path / "Contents/MacOS" / DEV_NAME
     if not exe_link.is_symlink():
         if exe_link.exists():
             exe_link.unlink()
-        exe_link.symlink_to(Path("../../../" + EXECUTABLE_NAME))
+        exe_link.symlink_to(Path("../../../" + DEV_NAME))
 
     icns = Path(project_path) / "Build/Intermediate/Resources/app.icns"
     if icns.exists():
         shutil.copy2(icns, app_path / "Contents/Resources/app.icns")
 
-    create_plist(app_path)
+    create_plist(app_path, DEV_NAME)
 
 def package_for_macos(project_path, args):
     if APP_PATH.exists():
@@ -223,7 +227,7 @@ def package_for_macos(project_path, args):
     copy_binary()
     copy_content(project_path)
     copy_dependencies()
-    create_plist(APP_PATH, game=True)
+    create_plist(APP_PATH, APP_NAME, game=True)
     fix_linkage()   # must run after binaries are in place and before signing (it invalidates sigs)
     sign_app()
     verify()

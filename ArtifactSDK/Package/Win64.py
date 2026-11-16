@@ -1,12 +1,15 @@
 import shutil
 from pathlib import Path
 
-APP_NAME = "Artifact"
+from SDK.Config import get_project_name
+from SDK.Paths import get_project_path
+
+APP_NAME = get_project_name(get_project_path())
 BINARY_PATH = Path("Binaries/Artifact.exe")
 OUTPUT_DIR = Path("Dist")
 PACKAGE_DIR = OUTPUT_DIR / APP_NAME
 
-EXECUTABLE_NAME = "Artifact.exe"
+EXECUTABLE_NAME = f"{APP_NAME}.exe"
 
 def create_structure():
     PACKAGE_DIR.mkdir(parents=True, exist_ok=True)

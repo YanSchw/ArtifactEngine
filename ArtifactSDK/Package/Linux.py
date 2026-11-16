@@ -8,8 +8,10 @@ from PIL import Image
 from SDK.Job import JobError
 from SDK.Util import smart_open
 from SetupTool.AppImageTool import get_appimagetool, get_architecture
+from SDK.Config import get_project_name
+from SDK.Paths import get_project_path
 
-APP_NAME = "Artifact"
+APP_NAME = get_project_name(get_project_path())
 BINARY_PATH = Path("Binaries/Artifact")
 OUTPUT_DIR = Path("Dist")
 APPDIR_PATH = OUTPUT_DIR / f"{APP_NAME}.AppDir"
@@ -28,7 +30,7 @@ SYSTEM_LIBRARIES = (
 DESKTOP_ENTRY = """[Desktop Entry]
 Type=Application
 Name={name}
-Exec={name}
+Exec="{name}"
 Icon={name}
 Categories=Game;
 Terminal=false

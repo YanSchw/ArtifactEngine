@@ -40,3 +40,12 @@ bool ConfigVar::As<bool>(bool InDefault) const {
     }
     return InDefault;
 }
+
+template<>
+float ConfigVar::As<float>(float InDefault) const {
+    try {
+        return std::stof(Value);
+    } catch (...) {
+        return InDefault;
+    }
+}

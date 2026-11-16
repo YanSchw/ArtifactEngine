@@ -11,7 +11,7 @@ PROPERTY_PATTERN = re.compile(
         re.MULTILINE
     )
 
-KNOWN_SPECIFIERS = ["Range", "Params", "EditorOnly"]
+KNOWN_SPECIFIERS = ["Range", "Params", "EditorOnly", "AssetType"]
 
 SIMPLE_PROPERTY = """static {PROPERTY_TYPE} {VAR} = {PROPERTY_TYPE}("{PROPERTY_NAME}", {OFFSET}{INITIALIZER});"""
 
@@ -523,6 +523,16 @@ def _apply_specifiers(generated: GeneratedProperty, specifiers: dict, context: s
         if specifiers["EditorOnly"] is not None:
             raise HeaderToolError(f"{context}: EditorOnly takes no value")
         statements.append(f"{generated.Var}.SetEditorOnly();")
+    if "AssetType" in specifiers:
+        asset_type = specifiers["AssetType"]
+        if not asset_type or not re.fullmatch(r'[A-Za-z_]\w*', asset_type):
+            raise HeaderToolError(f"{context}: AssetType must name an asset class, as in AssetType = Scene")
+        target = generated
+        while target.Kind == "Array" and target.Element is not None:
+            target = target.Element
+        if target.Kind != "UUID":
+            raise HeaderToolError(f"{context}: AssetType only applies to UUID properties (or arrays of them)")
+        statements.append(f"{target.Var}.SetAssetType({cpp_string(asset_type)});")
     return statements
 
 

@@ -10,6 +10,11 @@
     "summary": "The artifact CLI: build targets, configurations, cooking and packaging."
   },
   {
+    "slug": "configuration",
+    "title": "Configuration",
+    "summary": "Config vars, .ini files, Project Settings and freezing values for packaged builds."
+  },
+  {
     "slug": "code-style",
     "title": "Code Style",
     "summary": "Conventions for engine and project C++ code — naming, containers, logging."

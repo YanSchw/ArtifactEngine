@@ -7,6 +7,7 @@ from SDK.Paths import get_engine_path
 from BuildTool.Target import TargetType, get_cpp_target_macro
 from BuildTool.Module import ArtifactModule
 from SDK.Util import smart_open
+from SDK.Config import generate_frozen_config_vars
 
 def discover_modules(engine_path: str, project_path: str, target_platform: str, is_packaged: bool = False):
     """Every module the build should include, resolved across the engine and the project.
@@ -251,10 +252,13 @@ endif()
         __MountContent += f'    mounts.push_back({{"{key}", "{escaped}", {"true" if packaged else "false"}}});\n'
     __MountContent += "}\n#endif\n"
 
+    __FrozenConfigVars = generate_frozen_config_vars(project_path, is_packaged)
+
     os.makedirs(f"{project_path}/Build/Intermediate/Modules", exist_ok=True)
     with smart_open(f"{project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp") as f:
         f.write(__LinkModules)
         f.write("\n" + __MountContent)
+        f.write("\n" + __FrozenConfigVars)
         f.write(f"""
 int __VERSION_MAJOR() {{ return {VERSION_MAJOR}; }}
 int __VERSION_MINOR() {{ return {VERSION_MINOR}; }}

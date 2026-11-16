@@ -9,15 +9,17 @@ from pathlib import Path
 from SDK.Job import Job, JobError
 from BuildTool.iOS import DEPLOYMENT_TARGET, moltenvk_framework, sdk_name
 from Package.iOSProvisioning import Signing, ensure_signing
+from SDK.Config import get_project_name
+from SDK.Paths import get_project_path
 
-APP_NAME = "Artifact"
+APP_NAME = get_project_name(get_project_path())
 EXECUTABLE_NAME = "Artifact"
 SIMULATOR_BUNDLE_ID = "com.artifact"
 SCENE_DELEGATE_CLASS = "ArtifactSceneDelegate"
 
 OUTPUT_DIR = Path("Dist")
 APP_PATH = OUTPUT_DIR / f"{APP_NAME}.app"
-BINARY_PATH = Path("Binaries") / f"{APP_NAME}.app" / EXECUTABLE_NAME
+BINARY_PATH = Path("Binaries") / "Artifact.app" / EXECUTABLE_NAME
 
 
 def run(cmd):
@@ -161,7 +163,7 @@ def install(bundle_id: str, simulator: bool, device):
     if "explicitly trusted" in output or "Security" in output:
         report(f"⚠️ {APP_NAME} is installed on {device.name}, but iOS does not trust your developer certificate yet.\n"
               "   On the phone: Settings > General > VPN & Device Management > Developer App > "
-              "Apple Development: <your Apple ID> > Trust, then open Artifact from the home screen.\n"
+              f"Apple Development: <your Apple ID> > Trust, then open {APP_NAME} from the home screen.\n"
               "   This is needed once per certificate; later packages launch directly.")
     else:
         report(f"⚠️ {APP_NAME} is installed on {device.name} but could not be launched:\n{output.strip()}")

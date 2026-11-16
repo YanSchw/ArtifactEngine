@@ -25,6 +25,8 @@ public:
     static String GetProjectContentDir();
     /** The root of the project, holding its Content and Modules; empty in packaged builds. */
     static String GetProjectDir();
+    static String GetConfigDir();
+    static String GetUserConfigDir();
     static String GetContentDir(const String& InKey);
     static String ResolveContentPath(const String& InRelativePath);
     /** The content path ResolveContentPath turns back into this file, empty outside every mount. */
@@ -37,6 +39,7 @@ public:
 private:
     static void Initialize(const Array<String>& InArgs);
     static void LoadConfigVars(const Array<String>& InArgs);
+    static void LoadConfigFiles(const String& InDir);
     static void ResolvePaths();
 
     inline static Map<String, String> s_ContentMounts;

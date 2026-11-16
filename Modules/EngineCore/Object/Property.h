@@ -28,6 +28,7 @@ struct Property : public Object {
     double RangeMin = 0.0;
     double RangeMax = 0.0;
     bool EditorOnly = false;
+    String AssetType;
 
     Property(const std::string& name, uint64_t offset)
         : Name(name), Offset(offset) {}
@@ -39,6 +40,7 @@ struct Property : public Object {
     Property* SetComment(const String& InComment) { Comment = InComment; return this; }
     Property* SetRange(double InMin, double InMax) { HasRange = true; RangeMin = InMin; RangeMax = InMax; return this; }
     Property* SetEditorOnly() { EditorOnly = true; return this; }
+    Property* SetAssetType(const String& InAssetType) { AssetType = InAssetType; return this; }
     double ClampToRange(double InValue) const {
         return !HasRange ? InValue : InValue < RangeMin ? RangeMin : InValue > RangeMax ? RangeMax : InValue;
     }
