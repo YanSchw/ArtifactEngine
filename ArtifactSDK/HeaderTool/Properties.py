@@ -11,7 +11,7 @@ PROPERTY_PATTERN = re.compile(
         re.MULTILINE
     )
 
-KNOWN_SPECIFIERS = ["Range", "Params", "EditorOnly", "AssetType"]
+KNOWN_SPECIFIERS = ["Range", "Params", "EditorOnly", "AssetType", "HideEnumValues"]
 
 SIMPLE_PROPERTY = """static {PROPERTY_TYPE} {VAR} = {PROPERTY_TYPE}("{PROPERTY_NAME}", {OFFSET}{INITIALIZER});"""
 
@@ -323,11 +323,11 @@ def _cpp_double(value: float) -> str:
     return repr(float(value))
 
 
-def parse_name_list(value: str, context: str) -> list[str]:
+def parse_name_list(value: str, context: str, specifier: str = "Params") -> list[str]:
     match = re.fullmatch(r'\(\s*(.*?)\s*\)', value or '')
     names = [name.strip() for name in match.group(1).split(',')] if match and match.group(1).strip() else []
     if not match or any(not re.fullmatch(r'[A-Za-z_]\w*', name) for name in names):
-        raise HeaderToolError(f"{context}: Params must be written as Params = (Name, ...)")
+        raise HeaderToolError(f"{context}: {specifier} must be written as {specifier} = (Name, ...)")
     return names
 
 
@@ -507,7 +507,7 @@ def generate_property_type(full_typename: str, prop_name: str, class_or_struct_t
     raise HeaderToolError(f"{context}: property type '{full_typename}' is not supported")
 
 
-def _apply_specifiers(generated: GeneratedProperty, specifiers: dict, context: str) -> list[str]:
+def _apply_specifiers(generated: GeneratedProperty, type_name: str, specifiers: dict, context: str) -> list[str]:
     statements = []
     if "Range" in specifiers:
         low, high = parse_range(specifiers["Range"], context)
@@ -533,6 +533,17 @@ def _apply_specifiers(generated: GeneratedProperty, specifiers: dict, context: s
         if target.Kind != "UUID":
             raise HeaderToolError(f"{context}: AssetType only applies to UUID properties (or arrays of them)")
         statements.append(f"{target.Var}.SetAssetType({cpp_string(asset_type)});")
+    if "HideEnumValues" in specifiers:
+        names = parse_name_list(specifiers["HideEnumValues"], context, "HideEnumValues")
+        from HeaderTool.HeaderTool import Enum
+        enum = next((e for e in Enum.ALL_ENUMS if e.Name == type_name), None)
+        if generated.Kind != "Enum" or enum is None:
+            raise HeaderToolError(f"{context}: HideEnumValues only applies to enum properties")
+        known = [name for name, _ in enum.parse_enum_values()]
+        for name in names:
+            if name not in known:
+                raise HeaderToolError(f"{context}: {type_name} has no value '{name}' to hide")
+        statements.append(f"{generated.Var}.SetHiddenEnumValues({{ {', '.join(cpp_string(name) for name in names)} }});")
     return statements
 
 
@@ -554,7 +565,7 @@ def generate_properties_registration_code(typename: str, body: str) -> str:
                 raise HeaderToolError(f"{context}: Params only applies to Delegate properties")
             delegate_params = parse_name_list(specifiers["Params"], context)
         generated = generate_property_type(type_name, prop_name, typename, context=context, delegate_params=delegate_params)
-        lines = [generated.Code] + _apply_specifiers(generated, specifiers, context)
+        lines = [generated.Code] + _apply_specifiers(generated, type_name, specifiers, context)
         if comment:
             lines.append(f"{generated.Var}.SetComment({cpp_string(comment)});")
         create_properties_list.append("\n".join(lines))

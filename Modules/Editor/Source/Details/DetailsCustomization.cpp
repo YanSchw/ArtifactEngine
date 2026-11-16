@@ -451,13 +451,13 @@ static void BuildEnumEditor(UINode& InHost, const WeakObjectPtr<Object>& InObjec
     };
     dropdown->GetOptions = [InProperty] {
         Array<UIDropdownOption> options;
-        for (const Enum::EnumValue& value : Enum(InProperty->InnerEnumTypename).GetValues()) {
+        for (const Enum::EnumValue& value : InProperty->GetVisibleEnumValues()) {
             options.Add(value.Name);
         }
         return options;
     };
     dropdown->GetSelectedIndex = [read, InProperty]() -> int32_t {
-        const Array<Enum::EnumValue>& values = Enum(InProperty->InnerEnumTypename).GetValues();
+        const Array<Enum::EnumValue> values = InProperty->GetVisibleEnumValues();
         for (int32_t i = 0; i < values.Size(); i++) {
             if (values[i].Value == read()) {
                 return i;
@@ -466,7 +466,7 @@ static void BuildEnumEditor(UINode& InHost, const WeakObjectPtr<Object>& InObjec
         return -1;
     };
     dropdown->SelectionChanged = [InObject, InOffset, InProperty, InOnEdited](int32_t InIndex) {
-        const Array<Enum::EnumValue>& values = Enum(InProperty->InnerEnumTypename).GetValues();
+        const Array<Enum::EnumValue> values = InProperty->GetVisibleEnumValues();
         if (InIndex < 0 || InIndex >= values.Size()) {
             return;
         }

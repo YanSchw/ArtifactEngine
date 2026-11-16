@@ -81,6 +81,11 @@ void Property::CopyValue(void* OutInstance, const void* InInstance) const {
     JsonSerializer::DeserializeProperty(const_cast<Property*>(this), GetValuePtr(OutInstance), value);
 }
 
+Array<Enum::EnumValue> EnumProperty::GetVisibleEnumValues() const {
+    Array<Enum::EnumValue> values = Enum(InnerEnumTypename).GetValues();
+    return values.Filter([this](const Enum::EnumValue& InValue) { return !HiddenEnumValues.Contains(InValue.Name); });
+}
+
 void Property::CopyRawValue(void* OutValue, const void* InValue) const {
     if (const IntProperty* p = Cast<IntProperty>(this)) {
         std::memcpy(OutValue, InValue, p->NumBits / 8);

@@ -1,5 +1,6 @@
 #pragma once
 #include "Asset.h"
+#include "AssetCompression.h"
 #include "Common/Types.h"
 #include "Object/Pointer.h"
 #include "Rendering/Image.h"
@@ -41,4 +42,7 @@ private:
 
     PROPERTY()
     bool m_FlipVertically = false;
+
+    PROPERTY()
+    TextureCompression m_Compression = TextureCompression::UseProjectDefault;
 };

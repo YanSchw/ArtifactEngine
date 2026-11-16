@@ -1,9 +1,26 @@
 #include "AudioClip.h"
 #include "Core/EngineConfig.h"
+#include "Core/EngineSettings.h"
 #include "Serialization/ChunkedBinary.h"
 #include "Serialization/Assets/AudioClipImporter.h"
+#include "Serialization/Compression/AdpcmCodec.h"
 
 #include <algorithm>
+
+namespace {
+
+void EncodeAdpcm(const AudioSampleBuffer& InSamples, ChunkWriter& OutWriter) {
+    const AudioSampleBuffer pcm = InSamples.WithSampleFormat(AudioSampleFormat::Int16);
+    AdpcmCodec::Encode((const int16_t*)pcm.GetData().Data(), pcm.GetFrameCount() * pcm.GetChannels(), pcm.GetChannels(), OutWriter);
+}
+
+AudioSampleBuffer DecodeAdpcm(ChunkReader& InReader, const AudioFormat& InFormat, uint64_t InFrameCount) {
+    AudioSampleBuffer pcm({ InFormat.SampleRate, InFormat.Channels, AudioSampleFormat::Int16 }, InFrameCount);
+    AdpcmCodec::Decode(InReader, (int16_t*)pcm.GetData().Data(), InFrameCount * InFormat.Channels, InFormat.Channels);
+    return pcm.WithSampleFormat(InFormat.SampleFormat);
+}
+
+} // namespace
 
 AudioClip::AudioClip() {
     m_StreamType = AssetStreamType::AlwaysLoaded;
@@ -41,15 +58,25 @@ void AudioClip::Load() {
     AudioFormat format;
     uint8_t sampleFormat = 0;
     uint64_t frameCount = 0;
-    chunkReader >> format.SampleRate >> format.Channels >> sampleFormat >> frameCount;
+    AudioCompression compression = AudioCompression::Uncompressed;
+    chunkReader >> format.SampleRate >> format.Channels >> sampleFormat >> frameCount >> compression;
     format.SampleFormat = (AudioSampleFormat)sampleFormat;
 
+    if (compression == AudioCompression::ADPCM) {
+        m_Samples = std::make_shared<const AudioSampleBuffer>(DecodeAdpcm(chunkReader, format, frameCount));
+        return;
+    }
     std::shared_ptr<AudioSampleBuffer> samples = std::make_shared<AudioSampleBuffer>(format, frameCount);
     chunkReader.ReadBytes(samples->GetData().Data(), samples->GetData().Size());
     m_Samples = samples;
 #else
     AudioSampleBuffer samples;
-    ImportSource(samples);
+    if (ImportSource(samples) && CompressionSettings::Resolve(m_Compression) == AudioCompression::ADPCM) {
+        ChunkWriter chunkWriter;
+        EncodeAdpcm(samples, chunkWriter);
+        ChunkReader chunkReader(chunkWriter.GetData());
+        samples = DecodeAdpcm(chunkReader, samples.GetFormat(), samples.GetFrameCount());
+    }
     m_Samples = std::make_shared<const AudioSampleBuffer>(std::move(samples));
 #endif
 }
@@ -72,12 +99,19 @@ void AudioClip::Cook(ChunkedBinary& OutChunkedBinary) {
         return;
     }
 
+    const AudioCompression compression = CompressionSettings::Resolve(m_Compression);
+
     ChunkWriter chunkWriter;
     chunkWriter << samples.GetSampleRate();
     chunkWriter << samples.GetChannels();
     chunkWriter << (uint8_t)samples.GetFormat().SampleFormat;
     chunkWriter << samples.GetFrameCount();
-    chunkWriter.WriteBytes(samples.GetData().Data(), samples.GetData().Size());
+    chunkWriter << compression;
+    if (compression == AudioCompression::ADPCM) {
+        EncodeAdpcm(samples, chunkWriter);
+    } else {
+        chunkWriter.WriteBytes(samples.GetData().Data(), samples.GetData().Size());
+    }
     OutChunkedBinary.AddChunk(1, chunkWriter);
 }
 

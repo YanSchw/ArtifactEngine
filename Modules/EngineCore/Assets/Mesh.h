@@ -1,5 +1,6 @@
 #pragma once
 #include "Asset.h"
+#include "AssetCompression.h"
 #include "Common/Types.h"
 #include "Object/Pointer.h"
 #include "Mesh.gen.h"
@@ -66,6 +67,7 @@ public:
 
 private:
     bool ImportSource(ImportedMesh& OutMesh) const;
+    bool ImportAsCooked(ImportedMesh& OutMesh) const;
     void BuildVertexBuffer(const ImportedMesh& InMesh);
 
     SharedObjectPtr<VertexBuffer> m_VertexBuffer = nullptr;
@@ -91,4 +93,7 @@ private:
 
     PROPERTY()
     MeshNormalMode m_NormalMode = MeshNormalMode::Import;
+
+    PROPERTY()
+    MeshCompression m_Compression = MeshCompression::UseProjectDefault;
 };

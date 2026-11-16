@@ -21,6 +21,7 @@ public:
     bool IsAtEnd() const;
 
     void ReadBytes(void* OutData, size_t InSize);
+    Array<byte> ReadRemaining();
 
     size_t GetSize() const;
     size_t GetRemaining() const;

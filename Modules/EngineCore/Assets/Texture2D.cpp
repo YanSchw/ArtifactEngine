@@ -1,7 +1,9 @@
 #include "Texture2D.h"
 #include "Rendering/Texture.h"
 #include "Core/EngineConfig.h"
+#include "Core/EngineSettings.h"
 #include "Serialization/ChunkedBinary.h"
+#include "Serialization/Compression/QoiCodec.h"
 #include "Serialization/Assets/Texture2DImporter.h"
 
 #include <algorithm>
@@ -54,14 +56,20 @@ void Texture2D::Load() {
 #if defined(AE_PACKAGED)
     ChunkReader chunkReader = GetChunkedBinary()->GetChunk(1);
     int width, height, channels, format;
+    TextureCompression compression;
     chunkReader >> width;
     chunkReader >> height;
     chunkReader >> channels;
     chunkReader >> format;
+    chunkReader >> compression;
     desc.Format = (ImageFormat)format;
     Array<byte> pixels;
     pixels.Resize((size_t)width * height * GetBytesPerPixel(desc.Format));
-    chunkReader.ReadBytes(pixels.Data(), pixels.Size());
+    if (compression == TextureCompression::QOI) {
+        QoiCodec::Decode(chunkReader, pixels.Data(), (size_t)width * height);
+    } else {
+        chunkReader.ReadBytes(pixels.Data(), pixels.Size());
+    }
     m_Texture = Texture::Create(pixels.Data(), width, height, channels, desc);
 #else
     Array<byte> pixels;
@@ -94,12 +102,21 @@ void Texture2D::Cook(ChunkedBinary& OutChunkedBinary) {
         return;
     }
 
+    const TextureCompression compression = format == ImageFormat::RGBA8
+        ? CompressionSettings::Resolve(m_Compression)
+        : TextureCompression::Uncompressed;
+
     ChunkWriter chunkWriter;
     chunkWriter << (int)width;
     chunkWriter << (int)height;
     chunkWriter << 4;
     chunkWriter << (int)format;
-    chunkWriter.WriteBytes(pixels.Data(), pixels.Size());
+    chunkWriter << compression;
+    if (compression == TextureCompression::QOI) {
+        QoiCodec::Encode(pixels.Data(), (size_t)width * height, chunkWriter);
+    } else {
+        chunkWriter.WriteBytes(pixels.Data(), pixels.Size());
+    }
     OutChunkedBinary.AddChunk(1, chunkWriter);
 }
 

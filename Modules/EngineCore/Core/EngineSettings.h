@@ -3,6 +3,7 @@
 #include "Object/SubclassOf.h"
 #include "Common/UUID.h"
 #include "Rendering/RenderPipeline.h"
+#include "Assets/AssetCompression.h"
 #include "EngineSettings.gen.h"
 
 class GameSettings : public ProjectSettings {
@@ -46,6 +47,33 @@ public:
 
     PROPERTY(Range = (1, 1024))
     int32_t AudioMaxVoices = 128;
+};
+
+class CompressionSettings : public ProjectSettings {
+public:
+    ARTIFACT_CLASS();
+
+    virtual String GetConfigFile() const override { return "Engine"; }
+
+    static MeshCompression Resolve(MeshCompression InCompression) { return Resolve(InCompression, Get<CompressionSettings>()->DefaultMeshCompression); }
+    static TextureCompression Resolve(TextureCompression InCompression) { return Resolve(InCompression, Get<CompressionSettings>()->DefaultTextureCompression); }
+    static AudioCompression Resolve(AudioCompression InCompression) { return Resolve(InCompression, Get<CompressionSettings>()->DefaultAudioCompression); }
+
+    PROPERTY(HideEnumValues = (UseProjectDefault))
+    MeshCompression DefaultMeshCompression = MeshCompression::Quantized;
+
+    PROPERTY(HideEnumValues = (UseProjectDefault))
+    TextureCompression DefaultTextureCompression = TextureCompression::QOI;
+
+    PROPERTY(HideEnumValues = (UseProjectDefault))
+    AudioCompression DefaultAudioCompression = AudioCompression::ADPCM;
+
+private:
+    template<typename T>
+    static T Resolve(T InCompression, T InProjectDefault) {
+        const T compression = InCompression == T::UseProjectDefault ? InProjectDefault : InCompression;
+        return compression == T::UseProjectDefault ? T::Uncompressed : compression;
+    }
 };
 
 class PackagingSettings : public ProjectSettings {

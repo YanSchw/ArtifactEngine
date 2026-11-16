@@ -67,7 +67,8 @@ public:
 
 Subclassing is the registration. The group is saved to `Config/Game.ini` under
 `[MyGame]` (the class name without `Settings`); override `GetConfigFile()` and `GetSection()`
-to change either. `PROPERTY(AssetType = ...)` turns a `UUID` into an asset picker.
+to change either. `PROPERTY(AssetType = ...)` turns a `UUID` into an asset picker, and
+`PROPERTY(HideEnumValues = (A, B))` leaves those values out of an enum's dropdown.
 
 The editor only writes values that differ from the default, and edits apply to the running
 editor right away. At runtime `ProjectSettings::Get<MyGameSettings>()` returns an instance that

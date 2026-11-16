@@ -1,5 +1,6 @@
 #pragma once
 #include "Asset.h"
+#include "AssetCompression.h"
 #include "Audio/AudioSampleBuffer.h"
 #include "AudioClip.gen.h"
 
@@ -46,4 +47,7 @@ private:
 
     PROPERTY(Range = (0, 4))
     float m_Volume = 1.0f;
+
+    PROPERTY()
+    AudioCompression m_Compression = AudioCompression::UseProjectDefault;
 };

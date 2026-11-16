@@ -4,6 +4,7 @@
 #include "Common/Map.h"
 #include "Common/Array.h"
 #include "SubclassOf.h"
+#include "Enum.h"
 #include <functional>
 #include <memory>
 #include <type_traits>
@@ -130,9 +131,13 @@ struct EnumProperty : public Property {
 
     String InnerEnumTypename;
     uint8_t ByteSize;  // size of the enum's underlying type, for raw memory access
+    Array<String> HiddenEnumValues;
 
     EnumProperty(const std::string& name, uint64_t offset, const String& innerEnumTypename, uint8_t byteSize)
         : Property(name, offset), InnerEnumTypename(innerEnumTypename), ByteSize(byteSize) {}
+
+    EnumProperty* SetHiddenEnumValues(const Array<String>& InNames) { HiddenEnumValues = InNames; return this; }
+    Array<Enum::EnumValue> GetVisibleEnumValues() const;
 };
 
 struct ArrayProperty : public Property {

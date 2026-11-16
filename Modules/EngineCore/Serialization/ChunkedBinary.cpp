@@ -51,6 +51,14 @@ void ChunkReader::ReadBytes(void* OutData, size_t InSize) {
     m_Cursor += InSize;
 }
 
+Array<byte> ChunkReader::ReadRemaining() {
+    Array<byte> bytes(GetRemaining());
+    if (!bytes.IsEmpty()) {
+        ReadBytes(bytes.Data(), bytes.Size());
+    }
+    return bytes;
+}
+
 size_t ChunkReader::GetSize() const {
     if (!m_Data)
         return 0;

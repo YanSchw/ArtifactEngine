@@ -5,7 +5,9 @@
 #include "Rendering/Vertex.h"
 #include "Rendering/VertexBuffer.h"
 #include "Core/EngineConfig.h"
+#include "Core/EngineSettings.h"
 #include "Serialization/ChunkedBinary.h"
+#include "Serialization/Compression/MeshQuantizer.h"
 #include "Serialization/Assets/MeshImporter.h"
 
 #include <cmath>
@@ -127,6 +129,19 @@ bool Mesh::ImportSource(ImportedMesh& OutMesh) const {
     return true;
 }
 
+bool Mesh::ImportAsCooked(ImportedMesh& OutMesh) const {
+    if (!ImportSource(OutMesh)) {
+        return false;
+    }
+    if (CompressionSettings::Resolve(m_Compression) == MeshCompression::Quantized) {
+        ChunkWriter chunkWriter;
+        MeshQuantizer::EncodeVertices(OutMesh.Vertices, chunkWriter);
+        ChunkReader chunkReader(chunkWriter.GetData());
+        MeshQuantizer::DecodeVertices(chunkReader, OutMesh.Vertices);
+    }
+    return true;
+}
+
 void Mesh::BuildVertexBuffer(const ImportedMesh& InMesh) {
     Vec3 boundsMin = Vec3(0.0f);
     Vec3 boundsMax = Vec3(0.0f);
@@ -146,6 +161,7 @@ void Mesh::Load() {
     ImportedMesh imported;
 #if defined(AE_PACKAGED)
     int32_t vertexSize, indexSize, subMeshCount;
+    MeshCompression compression;
     {
         ChunkReader chunkReader = GetChunkedBinary()->GetChunk(1);
         chunkReader >> vertexSize;
@@ -157,19 +173,21 @@ void Mesh::Load() {
             chunkReader >> subMesh.IndexCount;
             imported.SubMeshes.Add(subMesh);
         }
+        chunkReader >> compression;
     }
     imported.Vertices.Resize(vertexSize);
     imported.Indices.Resize(indexSize);
-    {
-        ChunkReader chunkReader = GetChunkedBinary()->GetChunk(2);
-        chunkReader.ReadBytes(&imported.Vertices[0], sizeof(Vertex) * vertexSize);
-    }
-    {
-        ChunkReader chunkReader = GetChunkedBinary()->GetChunk(3);
-        chunkReader.ReadBytes(&imported.Indices[0], sizeof(uint32_t) * indexSize);
+    ChunkReader vertexReader = GetChunkedBinary()->GetChunk(2);
+    ChunkReader indexReader = GetChunkedBinary()->GetChunk(3);
+    if (compression == MeshCompression::Quantized) {
+        MeshQuantizer::DecodeVertices(vertexReader, imported.Vertices);
+        MeshQuantizer::DecodeIndices(indexReader, imported.Indices);
+    } else {
+        vertexReader.ReadBytes(imported.Vertices.Data(), sizeof(Vertex) * vertexSize);
+        indexReader.ReadBytes(imported.Indices.Data(), sizeof(uint32_t) * indexSize);
     }
 #else
-    ImportSource(imported);
+    ImportAsCooked(imported);
 #endif
 
     BuildVertexBuffer(imported);
@@ -184,7 +202,7 @@ void Mesh::Unload() {
 
 void Mesh::Reimport() {
     ImportedMesh imported;
-    if (!ImportSource(imported)) {
+    if (!ImportAsCooked(imported)) {
         return;
     }
     BuildVertexBuffer(imported);
@@ -195,6 +213,7 @@ void Mesh::Cook(ChunkedBinary& OutChunkedBinary) {
 
     ImportedMesh imported;
     ImportSource(imported);
+    const MeshCompression compression = CompressionSettings::Resolve(m_Compression);
 
     {
         ChunkWriter chunkWriter;
@@ -205,18 +224,20 @@ void Mesh::Cook(ChunkedBinary& OutChunkedBinary) {
             chunkWriter << subMesh.FirstIndex;
             chunkWriter << subMesh.IndexCount;
         }
+        chunkWriter << compression;
         OutChunkedBinary.AddChunk(1, chunkWriter);
     }
-    {
-        ChunkWriter chunkWriter;
-        chunkWriter.WriteBytes(&imported.Vertices[0], sizeof(Vertex) * imported.Vertices.Size());
-        OutChunkedBinary.AddChunk(2, chunkWriter);
+    ChunkWriter vertexWriter;
+    ChunkWriter indexWriter;
+    if (compression == MeshCompression::Quantized) {
+        MeshQuantizer::EncodeVertices(imported.Vertices, vertexWriter);
+        MeshQuantizer::EncodeIndices(imported.Indices, indexWriter);
+    } else {
+        vertexWriter.WriteBytes(imported.Vertices.Data(), sizeof(Vertex) * imported.Vertices.Size());
+        indexWriter.WriteBytes(imported.Indices.Data(), sizeof(uint32_t) * imported.Indices.Size());
     }
-    {
-        ChunkWriter chunkWriter;
-        chunkWriter.WriteBytes(&imported.Indices[0], sizeof(uint32_t) * imported.Indices.Size());
-        OutChunkedBinary.AddChunk(3, chunkWriter);
-    }
+    OutChunkedBinary.AddChunk(2, vertexWriter);
+    OutChunkedBinary.AddChunk(3, indexWriter);
 }
 
 bool Mesh::IsLoaded() const {
