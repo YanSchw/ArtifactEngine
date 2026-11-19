@@ -163,3 +163,25 @@ class ArtifactModule:
 
     def __repr__(self) -> str:
         return f"ArtifactModule(name={self.name}, path={self.path}, dependencies={self.ImportModules})"
+
+
+def expand_indirect_module_dependencies(module_dirs: dict[str, str], import_modules: list[str]) -> set[str]:
+    to_check = set(import_modules)
+    expanded = set()
+
+    while to_check:
+        module_name = to_check.pop()
+        # skip if already processed
+        if module_name in expanded:
+            continue
+
+        expanded.add(module_name)
+        module_dir = module_dirs.get(module_name)
+        if module_dir is None:
+            continue
+        module = ArtifactModule.load_from_json(module_dir)
+        for dep in module.ImportModules:
+            if dep not in expanded:
+                to_check.add(dep)
+
+    return expanded

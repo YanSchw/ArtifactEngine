@@ -9,6 +9,8 @@ so generated files are never edited by hand.
 ```bash
 artifact setup          # check this machine's dev dependencies ('all' or a name installs them)
 artifact build [--target Win64|MacOS|Linux|Web|iOS] [--configuration Debug|Dev|Dist] [--clean]
+artifact prebuild [--target Win64|MacOS|Linux|Web|iOS]   # caches every engine module as a static library
+artifact clean          # removes Build/ and Binaries/, keeping Binaries/Prebuilt
 artifact run            # builds (Dev) then launches Binaries/Artifact
 artifact cook           # cooks Content/ into Build/Intermediate/Cooked
 artifact package        # cooks + Dist build + platform bundle
@@ -39,6 +41,19 @@ The engine is split into modules — one directory under `Modules/` each, declar
 `ImportModules` controls include-path propagation and link order. Projects resolve modules
 from both the engine and their own `Modules/` directory. See the
 [module list](/api) in the API reference.
+
+## Prebuilt modules
+
+`artifact prebuild` compiles every engine module for `Debug`, `Dev` and `Dist`, each packaged
+and non-packaged, into `Binaries/Prebuilt/<Module>/<hash>/<target>/<configuration>_<Packaged|NonPackaged>/`
+of the engine. Debug information is embedded in the libraries, so they reference no other files.
+The hash covers the module's sources, the sources of every module it imports and the HeaderTool,
+so it changes whenever any of them do. Prebuilding again removes the binaries of outdated hashes.
+
+`artifact build` and `artifact package` link a module's prebuilt library while its hash still
+matches and compile it from source otherwise, so editing one module only recompiles that module
+and the modules importing it until the next prebuild. Third-party CMake projects
+(`AddAdditionalCMakeProjects`) are still built from source.
 
 ## Cooking and packaging
 

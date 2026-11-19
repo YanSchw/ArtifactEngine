@@ -5,7 +5,8 @@ from SDK.Version import VERSION_MAJOR, VERSION_MINOR, get_patch_version
 from SDK.Platforms import PlatformType, get_platform, get_cpp_platform_macro
 from SDK.Paths import get_engine_path
 from BuildTool.Target import TargetType, get_cpp_target_macro
-from BuildTool.Module import ArtifactModule
+from BuildTool.Module import ArtifactModule, expand_indirect_module_dependencies
+from BuildTool.Prebuild import get_prebuilt_library
 from SDK.Util import smart_open
 from SDK.Config import generate_frozen_config_vars
 
@@ -63,27 +64,6 @@ def get_content_mounts(engine_path: str, project_path: str, target_platform: str
             mounts.append((module_name, f"{module_dir}/{module.MountContentDir}", not module.IsNonPackageOnly))
     return mounts
 
-def expand_indirect_module_dependencies(module_dirs: dict[str, str], import_modules: list[str]) -> set[str]:
-    to_check = set(import_modules)
-    expanded = set()
-
-    while to_check:
-        module_name = to_check.pop()
-        # skip if already processed
-        if module_name in expanded:
-            continue
-
-        expanded.add(module_name)
-        module_dir = module_dirs.get(module_name)
-        if module_dir is None:
-            continue
-        module = ArtifactModule.load_from_json(module_dir)
-        for dep in module.ImportModules:
-            if dep not in expanded:
-                to_check.add(dep)
-
-    return expanded
-
 def get_emscripten_setup(project_path: str, target_configuration: str, is_packaged: bool) -> str:
     """Compile settings the whole tree needs under emscripten, including the vendored projects.
 
@@ -129,7 +109,7 @@ def get_ios_link_options() -> str:
     return 'target_link_options(Artifact PRIVATE "-Wl,-rpath,@executable_path/Frameworks")\n'
 
 
-def generate_cmake(project_path: str, args):
+def generate_cmake(project_path: str, args) -> list[str]:
     target_platform = args.target
     target_configuration = args.configuration
     is_packaged = args.packaged if hasattr(args, "packaged") else False
@@ -140,6 +120,8 @@ def generate_cmake(project_path: str, args):
     engine_path = get_engine_path().replace("\\", "/").rstrip("/")
     modules = discover_modules(engine_path, project_path, target_platform, is_packaged)
     module_dirs = {name: module_dir for name, module_dir, _, _ in modules}
+    prebuilt_stub = f"{project_path}/Build/Intermediate/Modules/__PrebuiltModule.gen.cpp"
+    compiled_engine_modules = []
 
     global_definitions = [get_cpp_platform_macro(target_platform), get_cpp_target_macro(target_configuration)]
     if is_packaged:
@@ -154,6 +136,8 @@ void __LinkModules(std::vector<std::string>& modules) {
     with smart_open(f"{project_path}/CMakeLists.txt") as f:
         f.write(f"""# Generated using Artifact Build Tool
 cmake_minimum_required(VERSION 3.5)
+set(CMAKE_POLICY_DEFAULT_CMP0141 NEW)
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
 project(ArtifactEngine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -189,12 +173,20 @@ endif()
         f.write("endif()\n\n")
 
         for module_name, module_dir, module, owning_root in modules:
+            is_engine_module = module_dir.startswith(f"{engine_path}/Modules/")
+            prebuilt_library = get_prebuilt_library(module_name, module_dir, args) if is_engine_module else None
+            is_prebuilt = prebuilt_library is not None and os.path.exists(prebuilt_library)
             with smart_open(f"{module_dir}/CMakeLists.txt") as mf:
-                cpp_src = f'file(GLOB_RECURSE cpp_src {" ".join(module.get_source_files_pattern(target_platform))})'
-                mf.write(f"""# Generated using Artifact Build Tool for {module_name}
-{cpp_src}
-add_library({module_name} ${{cpp_src}} {owning_root}/Build/Intermediate/Modules/{module_name}.gen.cpp)
-""")
+                mf.write(f"# Generated using Artifact Build Tool for {module_name}\n")
+                if is_prebuilt:
+                    mf.write(f"add_library({module_name} STATIC {prebuilt_stub})\n")
+                else:
+                    mf.write(f'file(GLOB_RECURSE cpp_src {" ".join(module.get_source_files_pattern(target_platform))})\n')
+                    mf.write(f"add_library({module_name} ${{cpp_src}} {owning_root}/Build/Intermediate/Modules/{module_name}.gen.cpp)\n")
+                    if is_engine_module:
+                        compiled_engine_modules.append(module_name)
+                        if getattr(args, "prebuild", False):
+                            mf.write(f'set_target_properties({module_name} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_DEBUG "{os.path.dirname(prebuilt_library)}")\n')
                 for include_dir in module.IncludePaths:
                     mf.write(f"target_include_directories({module_name} PUBLIC {include_dir})\n")
                 for import_module_name in sorted(expand_indirect_module_dependencies(module_dirs, module.ImportModules)):
@@ -235,6 +227,8 @@ endif()
             else:
                 f.write(f"add_subdirectory({module_dir} {project_path}/Build/Intermediate/ModuleBuild/{module_name})\n")
             f.write(f"target_link_libraries(Artifact PUBLIC {module_name})\n")
+            if is_prebuilt:
+                f.write(f'target_link_libraries(Artifact PUBLIC "{prebuilt_library}")\n')
 
         f.write("\nif (UNIX AND NOT APPLE)\n")
         f.write('    target_link_libraries(Artifact PUBLIC "-Wl,--end-group")\n')
@@ -255,6 +249,8 @@ endif()
     __FrozenConfigVars = generate_frozen_config_vars(project_path, is_packaged)
 
     os.makedirs(f"{project_path}/Build/Intermediate/Modules", exist_ok=True)
+    with smart_open(prebuilt_stub) as f:
+        f.write("")
     with smart_open(f"{project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp") as f:
         f.write(__LinkModules)
         f.write("\n" + __MountContent)
@@ -264,3 +260,4 @@ int __VERSION_MAJOR() {{ return {VERSION_MAJOR}; }}
 int __VERSION_MINOR() {{ return {VERSION_MINOR}; }}
 int __VERSION_PATCH() {{ return {get_patch_version() if get_patch_version() is not None else '-1'}; }}
 """)
+    return compiled_engine_modules

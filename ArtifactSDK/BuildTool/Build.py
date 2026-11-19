@@ -4,6 +4,7 @@ import subprocess
 from colorama import Fore, Style
 from SDK.Platforms import *
 from SDK.Job import JobError
+from BuildTool.Prebuild import PREBUILT_DIR_NAME
 import re
 
 MSVC_PATTERN = re.compile(
@@ -113,7 +114,7 @@ def get_toolchain_file(target, simulator: bool = False):
     return str(get_emscripten_toolchain(root)).replace("\\", "/")
 
 
-def build_cmake(job=None, target=None, simulator: bool = False):
+def build_cmake(job=None, target=None, simulator: bool = False, cmake_targets: list[str] = ()):
     """Configure and build via CMake + Ninja.
 
     When a ``job`` is supplied, subprocess output is streamed into the job's
@@ -121,8 +122,8 @@ def build_cmake(job=None, target=None, simulator: bool = False):
     ETA. On success a warning summary (if any) is shown; on failure the parsed
     errors/warnings are reported and ``BuildError`` is raised.
     """
-    if os.path.exists("Binaries"):
-        shutil.rmtree("Binaries")
+    if not cmake_targets:
+        clear_binaries()
 
     env = build_environment(target)
     toolchain = get_toolchain_file(target, simulator)
@@ -132,6 +133,8 @@ def build_cmake(job=None, target=None, simulator: bool = False):
     if toolchain is not None:
         configure_cmd.append(f"-DCMAKE_TOOLCHAIN_FILE={toolchain}")
     build_cmd = ["cmake", "--build", "Build", "--config", "Debug"]
+    if cmake_targets:
+        build_cmd += ["--target", *cmake_targets]
 
     if job is not None:
         rc, configure_out = _run_streamed(configure_cmd, env, job)
@@ -156,6 +159,16 @@ def build_cmake(job=None, target=None, simulator: bool = False):
         # Surface the failure through the job's error handling so the spinner
         # region is torn down before the diagnostics are shown.
         raise BuildError(returncode)
+
+
+def clear_binaries():
+    for entry in os.scandir("Binaries") if os.path.isdir("Binaries") else []:
+        if entry.name == PREBUILT_DIR_NAME:
+            continue
+        if entry.is_dir(follow_symlinks=False):
+            shutil.rmtree(entry.path)
+        else:
+            os.remove(entry.path)
 
 
 def _clear_stale_cache(toolchain=None):

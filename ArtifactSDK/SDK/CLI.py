@@ -7,7 +7,8 @@ from HeaderTool.CSharpBindings import generate_csharp_bindings
 from BuildTool import DotNet
 from IL2CPP.IL2CPP import transpile
 from BuildTool.Generate import generate_cmake
-from BuildTool.Build import build_cmake
+from BuildTool.Build import build_cmake, clear_binaries
+from BuildTool.Prebuild import get_variant_name, remove_stale_prebuilds
 from BuildTool.IDEGen import generate_ide_project
 from SDK.Paths import get_engine_path, get_project_path
 from SDK.Platforms import get_current_platform, get_platform, get_platform_names, is_cross_compiled, PlatformType
@@ -15,6 +16,7 @@ from SDK.Util import png_to_ico
 from SDK.Job import Job, JobError
 from SDK.Config import stage_packaged_config
 from Lint.Lint import lint_files
+import itertools
 import os
 import sys
 import subprocess
@@ -45,7 +47,7 @@ def _generate(args):
                 transpile(DotNet.build_for_package(engine_path, project_path), f"{DotNet.intermediate_dir(project_path)}/Reflection.json", transpiled_modules)
                 header_tool.collect_headers(transpiled_modules, project_path)
 
-        generate_cmake(project_path, args)
+        compiled_engine_modules = generate_cmake(project_path, args)
         header_tool.generate()
 
         png_to_ico(f"{project_path}/Content/Icons/Icon.png", f"{project_path}/Build/Intermediate/Resources/IconWin64.ico")
@@ -63,6 +65,7 @@ def _generate(args):
 
     from SDK.Create import generate_sdk_activation_scripts
     generate_sdk_activation_scripts(project_path, engine_path)
+    return compiled_engine_modules
 
 def cmd_generate(args):
     try:
@@ -92,6 +95,26 @@ def cmd_build(args):
         sys.exit(1)
     except JobError as e:
         sys.exit(e.returncode)
+
+def cmd_prebuild(args):
+    args.prebuild = True
+    args.skip_ide_project = True
+    try:
+        remove_stale_prebuilds()
+        for args.configuration, args.packaged in itertools.product(("Debug", "Dev", "Dist"), (False, True)):
+            stale_modules = _generate(args)
+            with Job(f"Prebuilding {get_variant_name(args)} ({len(stale_modules)} modules)", dump_on_error=False) as job:
+                if stale_modules:
+                    build_cmake(job, args.target, args.simulator, stale_modules)
+    except KeyboardInterrupt:
+        print("Prebuild cancelled by user.")
+        sys.exit(1)
+    except JobError as e:
+        sys.exit(e.returncode)
+
+def cmd_clean(args):
+    shutil.rmtree(f"{get_project_path()}/Build", ignore_errors=True)
+    clear_binaries()
 
 def cmd_run(args):
     args.target = get_current_platform().name
@@ -286,6 +309,14 @@ def main():
 
     build_parser = subparsers.add_parser("build", parents=[generate_args_parser], help="Build the engine")
     build_parser.set_defaults(func=cmd_build)
+
+    prebuild_parser = subparsers.add_parser("prebuild", help="Prebuild every engine module for each configuration, packaged and non-packaged, so later builds link them instead of compiling")
+    prebuild_parser.add_argument("--target", type=_target_platform, choices=get_platform_names(), default=get_current_platform().name, help="Target platform to prebuild for")
+    prebuild_parser.add_argument("--simulator", action="store_true", default=False, help="iOS: prebuild for the iOS Simulator instead of a device")
+    prebuild_parser.set_defaults(func=cmd_prebuild)
+
+    clean_parser = subparsers.add_parser("clean", help="Remove Build/ and Binaries/, keeping the prebuilt engine modules")
+    clean_parser.set_defaults(func=cmd_clean)
 
     run_parser = subparsers.add_parser("run", help="Run the engine")
     run_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before running")

@@ -27,15 +27,18 @@ artifact --help
 ```
 ❯ artifact --help
 usage: artifact [-h]
-                {generate,build,run,cook,package,docs,lint,setup,version,location,create} ...
+                {generate,build,prebuild,clean,run,cook,package,docs,lint,setup,version,location,create} ...
 
 Artifact Engine Build Tool
 
 positional arguments:
-  {generate,build,run,cook,package,docs,lint,setup,version,location,create}
+  {generate,build,prebuild,clean,run,cook,package,docs,lint,setup,version,location,create}
     generate            Generate project files (CMake + native IDE project)
                         without building
     build               Build the engine
+    prebuild            Prebuild every engine module for later builds
+    clean               Remove Build/ and Binaries/, keeping the prebuilt
+                        engine modules
     run                 Run the engine
     cook                Cook assets
     package             Package project

@@ -43,12 +43,8 @@ def _build_command(activate_bat: str, target: str, extra_args: str = "") -> str:
     return f'call "{activate_bat}" && artifact build --configuration $(Configuration) --target {target} --skip-ide-project{extra_args}'
 
 
-def _clean_command(project_path: str) -> str:
-    win_path = project_path.replace("/", "\\")
-    return (
-        f'if exist "{win_path}\\Build" rmdir /s /q "{win_path}\\Build" & '
-        f'if exist "{win_path}\\Binaries" rmdir /s /q "{win_path}\\Binaries"'
-    )
+def _clean_command(activate_bat: str) -> str:
+    return f'call "{activate_bat}" && artifact clean'
 
 
 def _config_property_group(configuration: str, is_startup: bool) -> str:
@@ -87,7 +83,7 @@ def _vcxproj_xml(name: str, guid: str, project_path: str, activate_bat: str,
         f"""  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='{c}|{_PLATFORM}'">
     <NMakeBuildCommandLine>{_xml_text(_build_command(activate_bat, "Win64"))}</NMakeBuildCommandLine>
     <NMakeReBuildCommandLine>{_xml_text(_build_command(activate_bat, "Win64", " --clean"))}</NMakeReBuildCommandLine>
-    <NMakeCleanCommandLine>{_xml_text(_clean_command(project_path))}</NMakeCleanCommandLine>
+    <NMakeCleanCommandLine>{_xml_text(_clean_command(activate_bat))}</NMakeCleanCommandLine>
     <NMakeOutput>{_xml_text(output_exe)}</NMakeOutput>
     <NMakeIncludeSearchPath>{_xml_text(";".join(include_dirs))}</NMakeIncludeSearchPath>
     <LanguageStandard>stdcpp20</LanguageStandard>
