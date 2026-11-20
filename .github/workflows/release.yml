@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  Tag:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Tag main
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(python3 -c "import sys; sys.path.insert(0, 'ArtifactSDK/SDK'); import Version; print(Version.get_version_string())")
+          TAG="$VERSION-release"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "::error::Tag $TAG already exists"
+            exit 1
+          fi
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  Prebuild:
+    name: Prebuild ${{ matrix.platform }}
+    needs: Tag
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    strategy:
+      matrix:
+        include:
+          - platform: Win64
+            runner: windows-latest
+          - platform: MacOS
+            runner: macos-latest
+          - platform: Linux
+            runner: ubuntu-latest
+    steps:
+      - name: Free disk space
+        if: runner.os == 'Linux'
+        run: sudo rm -rf /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.Tag.outputs.tag }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Create virtual environment
+        shell: bash
+        run: |
+          python -m venv venv
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            echo "$GITHUB_WORKSPACE/venv/Scripts" >> "$GITHUB_PATH"
+          else
+            echo "$GITHUB_WORKSPACE/venv/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Install SDK
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./ArtifactSDK/.
+          artifact version
+
+      - name: Install development dependencies
+        shell: bash
+        run: artifact setup all
+
+      - name: Expose the Vulkan SDK to the build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "$env:SystemDrive\VulkanSDK" -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          "VULKAN_SDK=$($sdk.FullName)" >> $env:GITHUB_ENV
+
+      - name: Prebuild
+        shell: bash
+        run: artifact prebuild --target ${{ matrix.platform }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Prebuilt-${{ matrix.platform }}
+          path: Binaries/Prebuilt
+          retention-days: 1
+          if-no-files-found: error
+
+  Release:
+    needs: [Tag, Prebuild]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.Tag.outputs.version }}
+      TAG: ${{ needs.Tag.outputs.tag }}
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.Tag.outputs.tag }}
+          fetch-depth: 0
+          path: ArtifactEngine
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: Prebuilt-*
+          merge-multiple: true
+          path: ArtifactEngine/Binaries/Prebuilt
+
+      - name: Zip
+        run: |
+          python3 -c "import sys; sys.path.insert(0, 'ArtifactEngine/ArtifactSDK/SDK'); import Version; assert Version.get_version_string() == '$VERSION'"
+          cat ArtifactEngine/ArtifactSDK/SDK/.GIT_COMMIT_COUNT
+          rm -rf ArtifactEngine/.git
+          zip -r -q -9 "ArtifactEngine-$VERSION.zip" ArtifactEngine
+          ls -lh "ArtifactEngine-$VERSION.zip"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$TAG" "ArtifactEngine-$VERSION.zip" --repo "$GITHUB_REPOSITORY" --verify-tag --title "Artifact Engine $VERSION" --generate-notes

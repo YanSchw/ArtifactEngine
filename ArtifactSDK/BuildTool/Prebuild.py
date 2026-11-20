@@ -19,9 +19,9 @@ def _hash_files(directory: str, suffixes: tuple[str, ...]) -> str:
         for name in sorted(files):
             if name.endswith(suffixes):
                 path = os.path.join(root, name)
-                digest.update(os.path.relpath(path, directory).encode())
+                digest.update(os.path.relpath(path, directory).replace(os.sep, "/").encode())
                 with open(path, "rb") as f:
-                    digest.update(f.read())
+                    digest.update(f.read().replace(b"\r\n", b"\n"))
     return digest.hexdigest()
 
 
