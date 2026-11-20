@@ -496,6 +496,9 @@ void ViewportTab::RouteGameUI(const UIFrameContext& InContext, const Vec2& InVie
     context.SecondaryPressedThisFrame = hovered && InContext.SecondaryPressedThisFrame;
     context.SecondaryReleasedThisFrame = InContext.SecondaryReleasedThisFrame;
     context.ScrollDelta = hovered ? InContext.ScrollDelta : Vec2(0.0f);
+    if (Surface::IsAnyCursorLocked()) {
+        context.BlockPointer();
+    }
     ui->Route(InViewportSize, context);
 }
 

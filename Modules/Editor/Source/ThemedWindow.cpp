@@ -140,6 +140,9 @@ void ThemedWindow::BuildFrameContext(UIFrameContext& OutContext, double InDeltaT
     OutContext.TextInput = ConsumeTextInput();
     m_WasCursorDown = OutContext.CursorDown;
     m_WasSecondaryDown = OutContext.SecondaryDown;
+    if (Surface::IsAnyCursorLocked()) {
+        OutContext.BlockPointer();
+    }
 
     if (IsFocused()) {
         if (KeyboardDevice* keyboard = KeyboardDevice::Instance()) {

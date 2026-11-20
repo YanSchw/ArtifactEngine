@@ -22,3 +22,12 @@ SharedObjectPtr<Surface> Surface::CreateMain(const SurfaceParams& InParams) {
 Surface* Surface::GetMain() {
     return s_AllSurfaces.IsEmpty() ? nullptr : s_AllSurfaces[0];
 }
+
+bool Surface::IsAnyCursorLocked() {
+    for (Surface* surface : s_AllSurfaces) {
+        if (surface->IsCursorLocked()) {
+            return true;
+        }
+    }
+    return false;
+}

@@ -95,6 +95,9 @@ UIFrameContext GameEngine::ReadUIInput(double InDeltaTime) const {
         context.CursorPressedThisFrame = touch && touch->BeganThisFrame;
         context.CursorReleasedThisFrame = touch && !touch->IsActive();
     }
+    if (s_Surface->IsCursorLocked()) {
+        context.BlockPointer();
+    }
     if (KeyboardDevice* keyboard = KeyboardDevice::Instance()) {
         context.NavUp = keyboard->IsDown(KeyCode::Up);
         context.NavDown = keyboard->IsDown(KeyCode::Down);

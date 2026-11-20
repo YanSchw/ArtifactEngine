@@ -40,10 +40,7 @@ void UIWorld::Route(const Vec2& InViewportSize, const UIFrameContext& InContext)
         if (!pointerTaken && canvas->GetHoveredNode()) {
             pointerTaken = true;
             m_DesiredCursor = canvas->GetDesiredCursor();
-            context.CursorPosition = Vec2(-1.0e6f);
-            context.CursorPressedThisFrame = false;
-            context.SecondaryPressedThisFrame = false;
-            context.ScrollDelta = Vec2(0.0f);
+            context.BlockPointer();
         }
     }
 

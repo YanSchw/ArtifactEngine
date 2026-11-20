@@ -35,4 +35,11 @@ struct UIFrameContext {
     String TextInput;
 
     float DeltaTime = 0.0f;
+
+    void BlockPointer() {
+        CursorPosition = Vec2(-1.0e6f);
+        CursorPressedThisFrame = false;
+        SecondaryPressedThisFrame = false;
+        ScrollDelta = Vec2(0.0f);
+    }
 };

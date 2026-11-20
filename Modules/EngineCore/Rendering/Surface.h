@@ -42,4 +42,5 @@ public:
     /** The surface the application presents into, built from Platform::GetMainSurfaceClass(). */
     static SharedObjectPtr<Surface> CreateMain(const SurfaceParams& InParams);
     static Surface* GetMain();
+    static bool IsAnyCursorLocked();
 };
