@@ -34,12 +34,15 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   Prebuild:
-    name: Prebuild ${{ matrix.platform }}
+    name: Prebuild ${{ matrix.platform }} ${{ matrix.configuration }} ${{ matrix.packaging }}
     needs: Tag
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
     strategy:
       matrix:
+        platform: [Win64, MacOS, Linux]
+        configuration: [Debug, Dev, Dist]
+        packaging: [NonPackaged, Packaged]
         include:
           - platform: Win64
             runner: windows-latest
@@ -91,11 +94,11 @@ jobs:
 
       - name: Prebuild
         shell: bash
-        run: artifact prebuild --target ${{ matrix.platform }}
+        run: artifact prebuild --target ${{ matrix.platform }} --configuration ${{ matrix.configuration }} --packaging ${{ matrix.packaging }}
 
       - uses: actions/upload-artifact@v7
         with:
-          name: Prebuilt-${{ matrix.platform }}
+          name: Prebuilt-${{ matrix.platform }}-${{ matrix.configuration }}-${{ matrix.packaging }}
           path: Binaries/Prebuilt
           retention-days: 1
           if-no-files-found: error
@@ -126,7 +129,11 @@ jobs:
           cat ArtifactEngine/ArtifactSDK/SDK/.GIT_COMMIT_COUNT
           rm -rf ArtifactEngine/.git
           for PLATFORM in Win64 MacOS Linux; do
-            mv "Prebuilt-$PLATFORM" ArtifactEngine/Binaries/Prebuilt
+            mkdir -p ArtifactEngine/Binaries/Prebuilt
+            for VARIANT_DIR in Prebuilt-"$PLATFORM"-*; do
+              cp -a "$VARIANT_DIR"/. ArtifactEngine/Binaries/Prebuilt/
+              rm -rf "$VARIANT_DIR"
+            done
             zip -r -q -9 "ArtifactEngine-$VERSION-$PLATFORM.zip" ArtifactEngine
             rm -rf ArtifactEngine/Binaries/Prebuilt
           done

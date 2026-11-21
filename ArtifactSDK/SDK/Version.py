@@ -1,6 +1,6 @@
 VERSION_MAJOR = 0
 VERSION_MINOR = 1
-VERSION_PATCH_GIT_COMMIT_COUNT = 18
+VERSION_PATCH_GIT_COMMIT_COUNT = 304
 
 import os
 COMMIT_COUNT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.GIT_COMMIT_COUNT')

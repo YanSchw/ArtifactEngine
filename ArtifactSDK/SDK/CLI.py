@@ -101,7 +101,7 @@ def cmd_prebuild(args):
     args.skip_ide_project = True
     try:
         remove_stale_prebuilds()
-        for args.configuration, args.packaged in itertools.product(("Debug", "Dev", "Dist"), (False, True)):
+        for args.configuration, args.packaged in itertools.product(args.configurations, [packaging == "Packaged" for packaging in args.packagings]):
             stale_modules = _generate(args)
             with Job(f"Prebuilding {get_variant_name(args)} ({len(stale_modules)} modules)", dump_on_error=False) as job:
                 if stale_modules:
@@ -317,6 +317,8 @@ def main():
     prebuild_parser = subparsers.add_parser("prebuild", help="Prebuild every engine module for each configuration, packaged and non-packaged, so later builds link them instead of compiling")
     prebuild_parser.add_argument("--target", type=_target_platform, choices=get_platform_names(), default=get_current_platform().name, help="Target platform to prebuild for")
     prebuild_parser.add_argument("--simulator", action="store_true", default=False, help="iOS: prebuild for the iOS Simulator instead of a device")
+    prebuild_parser.add_argument("--configuration", dest="configurations", nargs="+", choices=["Debug", "Dev", "Dist"], default=["Debug", "Dev", "Dist"], help="Configurations to prebuild (defaults to all of them)")
+    prebuild_parser.add_argument("--packaging", dest="packagings", nargs="+", choices=["NonPackaged", "Packaged"], default=["NonPackaged", "Packaged"], help="Packaging variants to prebuild (defaults to both)")
     prebuild_parser.set_defaults(func=cmd_prebuild)
 
     clean_parser = subparsers.add_parser("clean", help="Remove Build/ and Binaries/, keeping the prebuilt engine modules")
