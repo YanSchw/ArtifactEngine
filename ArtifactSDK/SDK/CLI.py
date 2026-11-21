@@ -278,6 +278,10 @@ def cmd_create_project(args):
     from SDK.Create import create_project
     create_project(args.name)
 
+def cmd_link(args):
+    from SDK.Create import link_project
+    link_project(args.path)
+
 def cmd_create_module(args):
     from SDK.Create import create_module
     create_module(args.name, module_type=args.type)
@@ -354,7 +358,11 @@ def main():
     location_parser = subparsers.add_parser("location", help="Print the engine path to the terminal")
     location_parser.set_defaults(func=cmd_location)
 
-    create_parser = subparsers.add_parser("create", help="Scaffold a project, module, or reflected type")
+    link_parser = subparsers.add_parser("link", help="Write a project's SDK activation scripts, e.g. after cloning it")
+    link_parser.add_argument("path", nargs="?", default=".", help="Project directory (defaults to the current directory)")
+    link_parser.set_defaults(func=cmd_link)
+
+    create_parser = subparsers.add_parser("create",help="Scaffold a project, module, or reflected type")
     create_subparsers = create_parser.add_subparsers(dest="create_command", required=True)
 
     create_project_parser = create_subparsers.add_parser("project", help="Create a new project in a subdirectory")
