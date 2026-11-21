@@ -126,6 +126,18 @@ def generate_cmake(project_path: str, args) -> list[str]:
     global_definitions = [get_cpp_platform_macro(target_platform), get_cpp_target_macro(target_configuration)]
     if is_packaged:
         global_definitions.append("AE_PACKAGED")
+    
+    # Dist swaps flags for optimized ones.
+    # MSVC keeps /MDd
+    dist_flags = """if (MSVC)
+    set(AE_DIST_FLAGS "/MDd /O2 /Ob2")
+else()
+    set(AE_DIST_FLAGS "-O3")
+endif()
+foreach(lang C CXX OBJC OBJCXX)
+    set(CMAKE_${lang}_FLAGS_DEBUG "${AE_DIST_FLAGS}")
+endforeach()
+""" if target_configuration == "Dist" else ""
 
     __LinkModules = """#include <vector>
 #include <string>
@@ -137,7 +149,7 @@ void __LinkModules(std::vector<std::string>& modules) {
         f.write(f"""# Generated using Artifact Build Tool
 cmake_minimum_required(VERSION 3.5)
 set(CMAKE_POLICY_DEFAULT_CMP0141 NEW)
-set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT {'""' if target_configuration == "Dist" else "Embedded"})
 project(ArtifactEngine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -156,7 +168,7 @@ if (MSVC)
 endif()
 
 add_compile_definitions({" ".join(global_definitions)})
-
+{dist_flags}
 {get_emscripten_setup(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}{get_ios_setup() if get_platform(target_platform) == PlatformType.iOS else ""}
 add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp)
 
