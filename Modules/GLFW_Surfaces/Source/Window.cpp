@@ -152,7 +152,9 @@ void Window::Setup(const WindowParams& InParams) {
         s_InputDevicesCreated = true;
         InputSystem::Get().AddDevice(new GLFWKeyboardDevice());
         InputSystem::Get().AddDevice(new GLFWMouseDevice());
+#if !defined(AE_PLATFORM_MACOS)
         InputSystem::Get().AddDevice(new GLFWGamepadDevice());
+#endif
 
         Clipboard::SetBackend(
             [] {

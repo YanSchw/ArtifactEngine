@@ -87,6 +87,13 @@ void PhysicsWorld::WorldUpdate(float InDeltaTime) {
         m_BroadPhaseDirty = false;
     }
 
+    if (InDeltaTime > 0.0f) {
+        const float characterDeltaTime = glm::min(InDeltaTime, MaxAccumulatedTime);
+        for (int32_t i = m_Characters.Last(); i >= 0; i--) {
+            m_Characters[i]->StepCharacter(characterDeltaTime);
+        }
+    }
+
     m_Accumulator = glm::min(m_Accumulator + InDeltaTime, MaxAccumulatedTime);
     for (int32_t step = 0; step < m_MaxStepsPerUpdate && m_Accumulator >= m_FixedTimeStep; step++) {
         m_Accumulator -= m_FixedTimeStep;
@@ -97,9 +104,6 @@ void PhysicsWorld::WorldUpdate(float InDeltaTime) {
 void PhysicsWorld::Step(float InDeltaTime) {
     for (int32_t i = m_Bodies.Last(); i >= 0; i--) {
         m_Bodies[i]->PushTransformToBody(InDeltaTime);
-    }
-    for (int32_t i = m_Characters.Last(); i >= 0; i--) {
-        m_Characters[i]->StepCharacter(InDeltaTime);
     }
 
     m_Impl->System.Update(InDeltaTime, 1, &JoltSystem::GetTempAllocator(), &JoltSystem::GetJobSystem());

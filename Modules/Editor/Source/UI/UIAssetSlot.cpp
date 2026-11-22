@@ -3,16 +3,15 @@
 #include "EditorIcons.h"
 #include "UIDropdown.h"
 #include "EditorDragDrop.h"
+#include "UIThumbnail.h"
 #include "EditorWindow.h"
 #include "HeroTools/ContentDrawer.h"
 #include "HeroTools/ThumbnailRenderer.h"
 #include "GameFramework/UIQuad.h"
 #include "GameFramework/UISvg.h"
-#include "GameFramework/UIImage.h"
 #include "GameFramework/UIButton.h"
 #include "Assets/AssetManager.h"
 #include "Assets/Asset.h"
-#include "Rendering/Texture.h"
 #include <memory>
 
 static constexpr float s_ThumbnailSize = 44.0f;
@@ -48,14 +47,19 @@ void UIAssetSlot::BuildThumbnail() {
     UISvg* icon = background->Add<UISvg>();
     icon->Center(Vec2(22.0f, 22.0f));
 
-    UIImage* preview = background->Add<UIImage>();
+    UIThumbnail* preview = background->Add<UIThumbnail>();
     preview->Center({ 1.0_rel - 4.0_px, 1.0_rel - 4.0_px });
 
     UIQuad* typeBar = frame->Add<UIQuad>();
     typeBar->Anchor = typeBar->Pivot = Vec2(0.0f, 1.0f);
     typeBar->Size = { 1.0_rel, 3.0_px };
 
-    frame->Bind = [this, icon, preview, typeBar] {
+    preview->Fallback = icon;
+    preview->Resolve = [this](AssetStreamHandle& OutHold) {
+        return Thumbnails ? Thumbnails->GetThumbnail(ReadAsset(), OutHold) : nullptr;
+    };
+
+    frame->Bind = [this, icon, typeBar] {
         Asset* asset = ReadAsset();
         const Class assetClass = asset ? asset->GetClass() : AssetClass;
         const Vec4 color = EditorIcons::GetAssetColor(assetClass);
@@ -63,12 +67,6 @@ void UIAssetSlot::BuildThumbnail() {
         typeBar->Color = asset ? color : Vec4(color.r, color.g, color.b, 0.35f);
         icon->Image = EditorIcons::GetAssetIcon(assetClass);
         icon->Tint = asset ? color : Vec4(color.r, color.g, color.b, 0.4f);
-
-        Texture* thumbnail = (asset && Thumbnails) ? Thumbnails->GetThumbnail(asset) : nullptr;
-        const bool ready = thumbnail && thumbnail->GetDefaultView().Get();
-        preview->Image = ready ? thumbnail : nullptr;
-        preview->SetEnabled(ready);
-        icon->SetEnabled(!ready);
     };
 }
 
@@ -90,12 +88,19 @@ void UIAssetSlot::BuildDropdown() {
         Array<UIDropdownOption> entries;
         entries.Add(UIDropdownOption("None"));
         for (Asset* asset : AssetManager::Get().GetAssetsOfClass(AssetClass)) {
-            options->Add(WeakObjectPtr<Asset>(asset));
+            {
+                NonHoldingPointerScope listing;
+                options->Add(WeakObjectPtr<Asset>(asset));
+            }
 
             UIDropdownOption entry(asset->GetDisplayName());
             entry.Icon = EditorIcons::GetAssetIcon(asset->GetClass());
             entry.IconTint = EditorIcons::GetAssetColor(asset->GetClass());
-            entry.Thumbnail = Thumbnails ? Thumbnails->GetThumbnail(asset) : nullptr;
+            if (Thumbnails && ThumbnailRenderer::CanPreview(asset)) {
+                entry.GetThumbnail = [renderer = WeakObjectPtr<ThumbnailRenderer>(Thumbnails), id = asset->GetId()](AssetStreamHandle& OutHold) {
+                    return renderer.Get() ? renderer->GetThumbnail(AssetManager::Get().GetAsset(id), OutHold) : nullptr;
+                };
+            }
             entries.Add(entry);
         }
         return entries;

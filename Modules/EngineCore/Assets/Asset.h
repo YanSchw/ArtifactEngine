@@ -34,16 +34,16 @@ struct AssetStreamHandle {
 
     ~AssetStreamHandle();
 
-    Asset* Get() const { return m_Asset; }
+    Asset* Get() const;
 
-    explicit operator bool() const { return m_Asset != nullptr; }
+    explicit operator bool() const;
 
 private:
     void Acquire(Asset* AssetPtr);
     void Release();
 
 private:
-    Asset* m_Asset = nullptr;
+    WeakObjectPtr<Asset> m_Asset;
 };
 
 

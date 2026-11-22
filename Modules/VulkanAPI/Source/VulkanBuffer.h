@@ -19,11 +19,17 @@ public:
 
     static void DestroyAll();
 
+    static void FlushPendingWrites();
+
 private:
     VkBuffer m_Buffer = VK_NULL_HANDLE;
     VkDeviceMemory m_DeviceMemory = VK_NULL_HANDLE;
     VkDescriptorBufferInfo m_BufferInfo = {};
     VulkanAPI* m_VulkanAPI = nullptr;
+
+    std::vector<uint8_t> m_Staging;
+    void* m_Mapped = nullptr;
+    bool m_Dirty = false;
 };
 
 class VulkanStorageBuffer : public StorageBuffer {

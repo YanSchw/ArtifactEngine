@@ -36,5 +36,4 @@ void InputActionMapping::Load() {
 }
 
 void InputActionMapping::Unload() {
-    Actions.Clear();
 }

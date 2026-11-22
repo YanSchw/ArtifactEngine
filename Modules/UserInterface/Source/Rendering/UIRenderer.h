@@ -1,5 +1,6 @@
 #pragma once
 #include "Common/Types.h"
+#include "Common/Array.h"
 #include "Common/Map.h"
 #include "Object/Pointer.h"
 #include "GameFramework/UINode.h"
@@ -8,6 +9,7 @@ class Surface;
 class Shader;
 class Sampler;
 class Texture;
+class ImageView;
 class Pipeline;
 class VertexBuffer;
 class UniformBuffer;
@@ -25,10 +27,17 @@ public:
     void Submit(Object* InTarget, const Vec2& InViewportSize, const UIDrawList& InDrawList, const Mat4& InProjection);
 
 private:
-    using PipelineCache = Map<Texture*, SharedObjectPtr<Pipeline>>;
+    struct CachedPipeline {
+        SharedObjectPtr<Pipeline> Instance;
+        WeakObjectPtr<Texture> Source;
+        uint64_t LastUsedFrame = 0;
+    };
+    using PipelineCache = Map<ImageView*, CachedPipeline>;
 
     void CreateSharedResources();
     void CreatePipelines(Object* InTarget);
+    void RetirePipelines(PipelineCache& InCache, bool InAll);
+    void ReleaseRetiredPipelines();
     /** Pipeline drawing with InShader and sampling InTexture, cached per texture in InCache. */
     Pipeline* GetTexturedPipeline(PipelineCache& InCache, const SharedObjectPtr<Shader>& InShader, Texture* InTexture);
 
@@ -41,6 +50,7 @@ private:
     SharedObjectPtr<Pipeline> m_SolidPipeline;
     PipelineCache m_TextPipelines;   // keyed by font atlas
     PipelineCache m_ImagePipelines;  // keyed by image
+    Array<CachedPipeline> m_RetiredPipelines;
     SharedObjectPtr<VertexBuffer> m_DynamicVertexBuffer;
 
     bool m_ResourcesReady = false;

@@ -10,6 +10,7 @@ class UITextArea;
 class UIDropdownPopup;
 class VectorImage;
 class Texture;
+struct AssetStreamHandle;
 
 struct UIDropdownOption {
     UIDropdownOption() = default;
@@ -20,7 +21,7 @@ struct UIDropdownOption {
     /** Drawn while Thumbnail has no view yet, or when there is none. */
     VectorImage* Icon = nullptr;
     Vec4 IconTint = Vec4(1.0f);
-    Texture* Thumbnail = nullptr;
+    std::function<Texture*(AssetStreamHandle&)> GetThumbnail;
 };
 
 class UIDropdown : public UINode {

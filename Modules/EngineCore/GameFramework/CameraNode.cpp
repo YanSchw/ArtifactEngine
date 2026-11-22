@@ -49,6 +49,15 @@ Vec3 CameraNode::ScreenPosToWorldDirection(const Vec2& InScreenPos, float InWind
     return glm::normalize(Vec3(farPoint) / farPoint.w - Vec3(nearPoint) / nearPoint.w);
 }
 
+bool CameraNode::WorldToViewportPoint(const Vec3& InWorldPosition, Vec2& OutViewportPoint) const {
+    const Vec4 clip = GetViewProjectionMatrix() * Vec4(InWorldPosition, 1.0f);
+    if (clip.w <= 0.0f) {
+        return false;
+    }
+    OutViewportPoint = Vec2(clip.x, clip.y) / clip.w * 0.5f + 0.5f;
+    return true;
+}
+
 void CameraNode::RecalculateProjection() {
     if (m_ProjectionType == ProjectionType::Perspective) {
         m_Projection = glm::perspectiveLH(glm::radians(m_PerspectiveFOV), m_AspectRatio, m_PerspectiveNear, m_PerspectiveFar);

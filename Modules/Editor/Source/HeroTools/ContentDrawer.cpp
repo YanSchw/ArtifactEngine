@@ -1,6 +1,7 @@
 #include "ContentDrawer.h"
 #include "ContentTile.h"
 #include "ThumbnailRenderer.h"
+#include "UI/UIThumbnail.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
 #include "UI/UIGrid.h"
@@ -1048,15 +1049,12 @@ void ContentDrawer::BuildAssetTile(const Item& InItem) {
         if (!m_Thumbnails.Get()) {
             m_Thumbnails = Object::Create<ThumbnailRenderer>();
         }
-        if (Texture* thumbnail = m_Thumbnails->GetThumbnail(item.AssetPtr)) {
-            UIImage* preview = thumb->Add<UIImage>();
+        if (ThumbnailRenderer::CanPreview(item.AssetPtr)) {
+            UIThumbnail* preview = thumb->Add<UIThumbnail>();
             preview->Center({ 1.0_rel - 8.0_px, 1.0_rel - 8.0_px });
-            preview->Image = thumbnail;
-            // On the parent, because a node that disables itself is never bound again.
-            thumb->Bind = [preview, icon, thumbnail] {
-                const bool ready = thumbnail->GetDefaultView().Get() != nullptr;
-                preview->SetEnabled(ready);
-                icon->SetEnabled(!ready);
+            preview->Fallback = icon;
+            preview->Resolve = [renderer = WeakObjectPtr<ThumbnailRenderer>(m_Thumbnails.Get()), id = item.AssetPtr->GetId()](AssetStreamHandle& OutHold) {
+                return renderer.Get() ? renderer->GetThumbnail(AssetManager::Get().GetAsset(id), OutHold) : nullptr;
             };
         }
     }
@@ -1367,7 +1365,8 @@ void ContentDrawer::BeginDrag(const Item& InItem) {
     // An asset card drags two ways at once: onto a folder here, or out into the rest of the
     // editor. Whichever the cursor ends over wins in EndDrag.
     if (!InItem.IsFolder && InItem.AssetPtr && m_Grid) {
-        Texture* thumbnail = m_Thumbnails.Get() ? m_Thumbnails->GetThumbnail(InItem.AssetPtr) : nullptr;
+        AssetStreamHandle hold;
+        Texture* thumbnail = m_Thumbnails.Get() ? m_Thumbnails->GetThumbnail(InItem.AssetPtr, hold) : nullptr;
         EditorDragDrop::Begin(*m_Grid, InItem.AssetPtr, thumbnail, InItem.Name);
     }
 }

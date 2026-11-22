@@ -25,7 +25,9 @@ void StaticMeshPass::Execute(const RenderContext& InContext) {
         }
 
         VertexBuffer* vertexBuffer = mesh->GetVertexBuffer();
-        AE_ASSERT(vertexBuffer);
+        if (!vertexBuffer) {
+            continue;
+        }
         ShaderData* shaderData = staticMesh->GetPerMeshShaderData();
         const Array<SubMesh>& subMeshes = mesh->GetSubMeshes();
         for (int32_t slot = 0; slot < subMeshes.Size(); slot++) {

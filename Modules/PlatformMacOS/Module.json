@@ -4,7 +4,8 @@
     ],
     "ImportModules": [
         "EngineCore",
-        "Networking"
+        "Networking",
+        "InputSystem"
     ],
     "LinkLibraries": [
         "-framework Security",
@@ -12,6 +13,7 @@
         "-framework AppKit",
         "-framework AudioToolbox",
         "-framework CoreAudio",
+        "-framework GameController",
         "-lobjc"
     ],
     "TargetPlatforms": [

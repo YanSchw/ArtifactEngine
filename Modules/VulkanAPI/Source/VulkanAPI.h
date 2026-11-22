@@ -28,7 +28,7 @@ public:
     void CreateTimestampQueries();
     void ResolveTimestampQueries();
 
-    void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer);
+    void RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer, size_t InBegin, size_t InEnd, bool InAfterDraws);
 
     virtual void CleanUp(bool fullClean) override;
     virtual void DestroySurfaceResources(class Surface* InSurface) override;

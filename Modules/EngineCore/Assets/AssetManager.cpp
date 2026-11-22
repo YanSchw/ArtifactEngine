@@ -265,14 +265,6 @@ void AssetManager::UnloadNow(Asset* InAsset) {
     InAsset->m_Dependencies.Clear();
 }
 
-void AssetManager::ReleaseDependents(Asset* InAsset) {
-    for (auto& [id, asset] : m_Assets) {
-        if (asset.Get()) {
-            asset->m_Dependencies.Filter([InAsset](const AssetStreamHandle& InHandle) { return InHandle.Get() != InAsset; });
-        }
-    }
-}
-
 void AssetManager::CollectGarbage() {
     for (bool progress = true; progress;) {
         progress = false;
@@ -460,7 +452,6 @@ bool AssetManager::DeleteAsset(Asset* InAsset) {
     if (RenderingAPI* api = RenderingAPI::GetInstance()) {
         api->WaitIdle();
     }
-    ReleaseDependents(InAsset);
     UnloadNow(InAsset);
     m_AssetPaths.Remove(id);
     m_Assets.Remove(id);
@@ -492,7 +483,6 @@ void AssetManager::UnregisterAssetsUnder(const String& InDirectory) {
     }
     for (const UUID& id : removed) {
         if (Asset* asset = GetAsset(id)) {
-            ReleaseDependents(asset);
             UnloadNow(asset);
         }
         m_AssetPaths.Remove(id);

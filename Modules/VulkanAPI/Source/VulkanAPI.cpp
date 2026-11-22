@@ -95,6 +95,7 @@ VkSampleCountFlagBits swapChainSampleCount = VK_SAMPLE_COUNT_1_BIT;
 
 static VkCommandPool commandPool;
 static VkCommandBuffer graphicsCommandBuffer = VK_NULL_HANDLE;
+static VkCommandBuffer swapchainCommandBuffer = VK_NULL_HANDLE;
 static VkFence frameFence = VK_NULL_HANDLE;
 
 static uint32_t graphicsQueueFamily;
@@ -507,6 +508,7 @@ void VulkanAPI::CleanUp(bool fullClean) {
 
     if (fullClean) {
         vkFreeCommandBuffers(device, commandPool, 1, &graphicsCommandBuffer);
+        vkFreeCommandBuffers(device, commandPool, 1, &swapchainCommandBuffer);
         vkDestroyFence(device, frameFence, nullptr);
         vkDestroyCommandPool(device, commandPool, nullptr);
 
@@ -930,7 +932,8 @@ void VulkanAPI::CreateCommandBuffers() {
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = 1;
 
-    if (vkAllocateCommandBuffers(device, &allocInfo, &graphicsCommandBuffer) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(device, &allocInfo, &graphicsCommandBuffer) != VK_SUCCESS
+        || vkAllocateCommandBuffers(device, &allocInfo, &swapchainCommandBuffer) != VK_SUCCESS) {
         AE_ERROR("failed to allocate graphics command buffers");
         exit(1);
     }
@@ -993,12 +996,57 @@ void VulkanAPI::Draw() {
     }
 
     // Acquiring re-signals ImageAvailable, so the previous frame must have consumed it first.
-    // The fence is only reset once past the point where this frame can still bail out.
     vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
     m_CompletedFrames = m_SubmittedFrames;
 
     VulkanPipelineLayout::FlushRetired();
     ResolveTimestampQueries();
+    VulkanUniformBuffer::FlushPendingWrites();
+
+    size_t swapchainBegin = m_RenderQueue.commands.size();
+    for (size_t i = 0; i < m_RenderQueue.commands.size(); i++) {
+        const RenderCommand& cmd = m_RenderQueue.commands[i];
+        if (cmd.Type != RenderCommandType::BeginRenderPass) {
+            continue;
+        }
+        Object* target = std::get<CmdBeginRenderPass>(cmd.Data).Target.Get();
+        if (target && target->As<Surface>()) {
+            swapchainBegin = i;
+            break;
+        }
+    }
+
+    vkResetFences(device, 1, &frameFence);
+
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    vkResetCommandBuffer(graphicsCommandBuffer, 0);
+    vkBeginCommandBuffer(graphicsCommandBuffer, &beginInfo);
+    if (m_TimestampPool != VK_NULL_HANDLE) {
+        vkCmdResetQueryPool(graphicsCommandBuffer, m_TimestampPool, 0, MaxTimestampQueries);
+        m_TimestampsWritten.assign(MaxTimestampQueries, false);
+    }
+    RecordCommandBuffer(m_RenderQueue, graphicsCommandBuffer, 0, swapchainBegin, false);
+    if (vkEndCommandBuffer(graphicsCommandBuffer) != VK_SUCCESS) {
+        AE_ERROR("failed to record command buffer");
+        exit(1);
+    }
+
+    VkSubmitInfo sceneSubmitInfo = {};
+    sceneSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    sceneSubmitInfo.commandBufferCount = 1;
+    sceneSubmitInfo.pCommandBuffers = &graphicsCommandBuffer;
+    if (vkQueueSubmit(graphicsQueue, 1, &sceneSubmitInfo, targets.empty() ? frameFence : VK_NULL_HANDLE) != VK_SUCCESS) {
+        AE_ERROR("failed to submit draw command buffer");
+        exit(1);
+    }
+    m_TimestampsSubmitted = m_TimestampPool != VK_NULL_HANDLE;
+    if (targets.empty()) {
+        m_SubmittedFrames++;
+        m_RenderQueue.Clear();
+        return;
+    }
 
     for (VulkanSwapchainData* swapchain : targets) {
         swapchain->Acquired = false;
@@ -1015,6 +1063,8 @@ void VulkanAPI::Draw() {
                     acquired->Acquired = false;
                 }
             }
+            vkQueueSubmit(graphicsQueue, 0, nullptr, frameFence);
+            m_SubmittedFrames++;
             m_RenderQueue.Clear();
             return;
         }
@@ -1025,17 +1075,8 @@ void VulkanAPI::Draw() {
         swapchain->Acquired = true;
     }
 
-    vkResetFences(device, 1, &frameFence);
-
-    vkResetCommandBuffer(graphicsCommandBuffer, 0);
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    vkBeginCommandBuffer(graphicsCommandBuffer, &beginInfo);
-
-    if (m_TimestampPool != VK_NULL_HANDLE) {
-        vkCmdResetQueryPool(graphicsCommandBuffer, m_TimestampPool, 0, MaxTimestampQueries);
-        m_TimestampsWritten.assign(MaxTimestampQueries, false);
-    }
+    vkResetCommandBuffer(swapchainCommandBuffer, 0);
+    vkBeginCommandBuffer(swapchainCommandBuffer, &beginInfo);
 
     VkImageSubresourceRange subResourceRange = {};
     subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1056,7 +1097,7 @@ void VulkanAPI::Draw() {
         presentToDrawBarrier.image = swapchain->Images[swapchain->ImageIndex];
         presentToDrawBarrier.subresourceRange = subResourceRange;
 
-        vkCmdPipelineBarrier(graphicsCommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
+        vkCmdPipelineBarrier(swapchainCommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentToDrawBarrier);
 
         if (swapchain->MsaaImage != VK_NULL_HANDLE) {
             VkImageMemoryBarrier msaaBarrier = {};
@@ -1070,21 +1111,21 @@ void VulkanAPI::Draw() {
             msaaBarrier.image = swapchain->MsaaImage;
             msaaBarrier.subresourceRange = subResourceRange;
 
-            vkCmdPipelineBarrier(graphicsCommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &msaaBarrier);
+            vkCmdPipelineBarrier(swapchainCommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &msaaBarrier);
         }
     }
 
-    RecordCommandBuffer(m_RenderQueue, graphicsCommandBuffer);
+    RecordCommandBuffer(m_RenderQueue, swapchainCommandBuffer, swapchainBegin, m_RenderQueue.commands.size(), true);
 
     for (VulkanSwapchainData* swapchain : targets) {
-        VulkanHelpers::TransitionImage(graphicsCommandBuffer,
+        VulkanHelpers::TransitionImage(swapchainCommandBuffer,
             swapchain->Images[swapchain->ImageIndex],
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             VK_IMAGE_ASPECT_COLOR_BIT);
     }
 
-    if (vkEndCommandBuffer(graphicsCommandBuffer) != VK_SUCCESS) {
+    if (vkEndCommandBuffer(swapchainCommandBuffer) != VK_SUCCESS) {
         AE_ERROR("failed to record command buffer");
         exit(1);
     }
@@ -1107,7 +1148,7 @@ void VulkanAPI::Draw() {
     submitInfo.signalSemaphoreCount = (uint32_t)signalSemaphores.size();
     submitInfo.pSignalSemaphores = signalSemaphores.data();
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &graphicsCommandBuffer;
+    submitInfo.pCommandBuffers = &swapchainCommandBuffer;
 
     if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, frameFence) != VK_SUCCESS) {
         AE_ERROR("failed to submit draw command buffer");
@@ -1165,9 +1206,9 @@ static void BarrierBeforeDispatch(VkCommandBuffer InCmdBuffer) {
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 }
 
-void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer) {
+void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer InCmdBuffer, size_t InBegin, size_t InEnd, bool InAfterDraws) {
     bool hasRenderPassBegun = false;
-    bool hasDrawnSinceDispatch = false;
+    bool hasDrawnSinceDispatch = InAfterDraws;
     VulkanFrameBuffer* openFrameBuffer = nullptr;
     VulkanPipeline* currentPipeline = nullptr;
     VulkanComputePipeline* currentComputePipeline = nullptr;
@@ -1185,7 +1226,9 @@ void VulkanAPI::RecordCommandBuffer(RenderCommandQueue& InQueue, VkCommandBuffer
         hasRenderPassBegun = false;
     };
 
-    for (const RenderCommand& cmd : InQueue.commands) {
+    InEnd = std::min(InEnd, InQueue.commands.size());
+    for (size_t index = InBegin; index < InEnd; index++) {
+        const RenderCommand& cmd = InQueue.commands[index];
         switch (cmd.Type) {
             case RenderCommandType::BeginRenderPass: {
                 const auto& data = std::get<CmdBeginRenderPass>(cmd.Data);

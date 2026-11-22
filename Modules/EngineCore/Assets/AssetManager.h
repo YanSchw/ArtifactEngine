@@ -57,7 +57,6 @@ private:
     void StreamIn(Asset* InAsset);
     void RequestUnload(Asset* InAsset);
     void CancelUnload(Asset* InAsset);
-    void ReleaseDependents(Asset* InAsset);
     void UnloadNow(Asset* InAsset);
     void AcquireDependencies(Asset* InAsset);
 

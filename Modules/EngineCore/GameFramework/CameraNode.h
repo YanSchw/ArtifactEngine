@@ -54,6 +54,9 @@ public:
     void SetProjectionType(CameraProjectionType type) { m_ProjectionType = type; RecalculateProjection(); }
     FUNCTION(Pure)
     Vec3 ScreenPosToWorldDirection(const Vec2& InScreenPos, float InWindowWidth, float InWindowHeight) const;
+    /** 0-1 from the top-left of the view. false when behind the camera. */
+    FUNCTION(Pure)
+    bool WorldToViewportPoint(const Vec3& InWorldPosition, Vec2& OutViewportPoint) const;
 
     public:
     void RecalculateProjection();

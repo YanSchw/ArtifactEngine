@@ -14,11 +14,10 @@ AssetStreamHandle::AssetStreamHandle(Asset* InAsset) {
 }
 
 AssetStreamHandle::AssetStreamHandle(const AssetStreamHandle& Other) {
-    Acquire(Other.m_Asset);
+    Acquire(Other.Get());
 }
 
-AssetStreamHandle::AssetStreamHandle(AssetStreamHandle&& Other) noexcept : m_Asset(Other.m_Asset) {
-    Other.m_Asset = nullptr;
+AssetStreamHandle::AssetStreamHandle(AssetStreamHandle&& Other) noexcept : m_Asset(std::move(Other.m_Asset)) {
 }
 
 AssetStreamHandle& AssetStreamHandle::operator=(const AssetStreamHandle& Other) {
@@ -26,7 +25,7 @@ AssetStreamHandle& AssetStreamHandle::operator=(const AssetStreamHandle& Other) 
         return *this;
 
     Release();
-    Acquire(Other.m_Asset);
+    Acquire(Other.Get());
 
     return *this;
 }
@@ -37,10 +36,21 @@ AssetStreamHandle& AssetStreamHandle::operator=(AssetStreamHandle&& Other) noexc
 
     Release();
 
-    m_Asset = Other.m_Asset;
+    {
+        NonHoldingPointerScope nonHolding;
+        m_Asset = Other.Get();
+    }
     Other.m_Asset = nullptr;
 
     return *this;
+}
+
+Asset* AssetStreamHandle::Get() const {
+    return m_Asset.Get();
+}
+
+AssetStreamHandle::operator bool() const {
+    return Get() != nullptr;
 }
 
 AssetStreamHandle::~AssetStreamHandle() {
@@ -48,23 +58,24 @@ AssetStreamHandle::~AssetStreamHandle() {
 }
 
 void AssetStreamHandle::Acquire(Asset* AssetPtr) {
-    m_Asset = AssetPtr;
-    if (m_Asset) {
-        m_Asset->AddStreamReference();
+    {
+        NonHoldingPointerScope nonHolding;
+        m_Asset = AssetPtr;
+    }
+    if (AssetPtr) {
+        AssetPtr->AddStreamReference();
     }
 }
 
 void AssetStreamHandle::Release() {
-    if (!m_Asset)
+    Asset* asset = Get();
+    if (!asset)
         return;
 
-    if (!AssetManager::IsAvailable()) {
-        m_Asset = nullptr;
-        return;
-    }
-
-    m_Asset->RemoveStreamReference();
     m_Asset = nullptr;
+    if (AssetManager::IsAvailable()) {
+        asset->RemoveStreamReference();
+    }
 }
 
 

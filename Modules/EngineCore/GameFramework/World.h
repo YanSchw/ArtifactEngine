@@ -21,6 +21,15 @@ public:
 
     void Update(double InDeltatime);
 
+    /** 1 is real time, 0 freezes the World. */
+    FUNCTION()
+    void SetTimeScale(float InTimeScale) { m_TimeScale = InTimeScale > 0.0f ? InTimeScale : 0.0f; }
+    FUNCTION(Pure)
+    float GetTimeScale() const { return m_TimeScale; }
+    /** This frame's delta time before the time scale. */
+    FUNCTION(Pure)
+    float GetUnscaledDeltaTime() const { return m_UnscaledDeltaTime; }
+
     FUNCTION(Pure)
     WorldSubsystem* GetSubsystem(const Class& InClass) const;
     template<typename T>
@@ -87,6 +96,9 @@ private:
     Array<Node*> m_PendingKills;
 
     WeakObjectPtr<CameraNode> m_MainCamera;
+
+    float m_TimeScale = 1.0f;
+    float m_UnscaledDeltaTime = 0.0f;
 
     Array<SharedObjectPtr<WorldSubsystem>> m_Subsystems;
 

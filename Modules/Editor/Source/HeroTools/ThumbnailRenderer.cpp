@@ -6,6 +6,7 @@
 #include "Assets/Texture2D.h"
 #include "Rendering/RenderPipeline.h"
 #include "Rendering/RenderTargetTexture.h"
+#include "Rendering/RenderingAPI.h"
 #include "GameFramework/World.h"
 #include "GameFramework/StaticMeshNode.h"
 #include "GameFramework/CameraNode.h"
@@ -42,21 +43,22 @@ static float FitDistance(const Vec3& InExtents, const Vec3& InForward) {
     return glm::max(distance, 0.001f);
 }
 
-Texture* ThumbnailRenderer::GetThumbnail(Asset* InAsset) {
-    if (!InAsset) {
+bool ThumbnailRenderer::CanPreview(const Asset* InAsset) {
+    return InAsset && (InAsset->IsA<Texture2D>() || InAsset->IsA<Mesh>() || InAsset->IsA<Material>());
+}
+
+Texture* ThumbnailRenderer::GetThumbnail(Asset* InAsset, AssetStreamHandle& OutHold) {
+    Texture2D* texture = Cast<Texture2D>(InAsset);
+    if (OutHold.Get() != texture) {
+        OutHold = AssetStreamHandle(texture);
+    }
+    if (texture) {
+        return texture->GetTexture();
+    }
+    if (!CanPreview(InAsset)) {
         return nullptr;
     }
 
-    if (Texture2D* texture = InAsset->As<Texture2D>()) {
-        if (!texture->IsPinned()) {
-            AssetManager::Get().LoadAsset(texture);
-        }
-        return texture->IsLoaded() ? texture->GetTexture() : nullptr;
-    }
-
-    if (!InAsset->IsA(Mesh::StaticClass()) && !InAsset->IsA(Material::StaticClass())) {
-        return nullptr;
-    }
     const UUID id = InAsset->GetId();
     if (!m_Cache.ContainsKey(id)) {
         if (m_Cache.Size() >= s_MaxCache) {
@@ -70,7 +72,18 @@ Texture* ThumbnailRenderer::GetThumbnail(Asset* InAsset) {
     return m_Cache[id].Texture.Get();
 }
 
+void ThumbnailRenderer::ReleaseRenderedScenes() {
+    const uint64_t completed = RenderingAPI::GetInstance()->GetCompletedFrames();
+    for (auto& [id, entry] : m_Cache) {
+        if (entry.Rendered && entry.Scene.Get() && completed >= entry.RenderedInFrame) {
+            entry.Scene = nullptr;
+            entry.Pipeline = nullptr;
+        }
+    }
+}
+
 void ThumbnailRenderer::Tick() {
+    ReleaseRenderedScenes();
     int32_t budget = s_PerFrameBudget;
     while (!m_Pending.IsEmpty() && budget > 0) {
         const UUID id = m_Pending[0];
@@ -140,5 +153,6 @@ void ThumbnailRenderer::RenderEntry(const UUID& InId, Entry& InEntry) {
     params.m_World = InEntry.Scene.Get();
     InEntry.Pipeline->Render(0.016, params);
     InEntry.Texture->SetView(InEntry.Pipeline->GetFinalImageView());
+    InEntry.RenderedInFrame = RenderingAPI::GetInstance()->GetSubmittedFrames() + 1;
     InEntry.Rendered = true;
 }

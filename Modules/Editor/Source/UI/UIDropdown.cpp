@@ -3,12 +3,11 @@
 #include "EditorIcons.h"
 #include "GameFramework/UIBuilder.h"
 #include "GameFramework/UISvg.h"
-#include "GameFramework/UIImage.h"
+#include "UIThumbnail.h"
 #include "UIRoundedQuad.h"
 #include "GameFramework/UICanvas.h"
 #include "GameFramework/UITextArea.h"
 #include "GameFramework/UIScrollArea.h"
-#include "Rendering/Texture.h"
 #include "Rendering/UIDrawList.h"
 #include <algorithm>
 #include <cctype>
@@ -136,7 +135,7 @@ void UIDropdownPopup::Build(UIDropdown* InOwner, const Array<UIDropdownOption>& 
     m_Options = InOptions;
     m_Selected = InSelected;
     for (const UIDropdownOption& option : m_Options) {
-        m_HasThumbnails = m_HasThumbnails || option.Thumbnail;
+        m_HasThumbnails = m_HasThumbnails || option.GetThumbnail;
         m_HasIcons = m_HasIcons || option.Icon;
     }
 
@@ -251,18 +250,12 @@ void UIDropdownPopup::AddRow(int32_t InIndex) {
         icon->Image = option.Icon;
         icon->Tint = option.IconTint;
 
-        UIImage* preview = item->Add<UIImage>();
+        UIThumbnail* preview = item->Add<UIThumbnail>();
         preview->Anchor = preview->Pivot = Vec2(0.0f, 0.5f);
         preview->Position = Vec2(3.0f, 0.0f);
         preview->Size = Vec2(height - 6.0f);
-        preview->Image = option.Thumbnail;
-
-        Texture* thumbnail = option.Thumbnail;
-        item->Bind = [preview, icon, thumbnail] {
-            const bool ready = thumbnail && thumbnail->GetDefaultView().Get();
-            preview->SetEnabled(ready);
-            icon->SetEnabled(!ready);
-        };
+        preview->Resolve = option.GetThumbnail;
+        preview->Fallback = icon;
     } else if (option.Icon) {
         UISvg* icon = item->Add<UISvg>();
         icon->Anchor = icon->Pivot = Vec2(0.0f, 0.5f);

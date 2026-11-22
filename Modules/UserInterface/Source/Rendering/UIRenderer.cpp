@@ -9,6 +9,7 @@
 #include "Rendering/Sampler.h"
 #include "Rendering/Texture.h"
 #include "Rendering/Pipeline.h"
+#include "Rendering/RenderingAPI.h"
 #include "Rendering/VertexBuffer.h"
 #include "Rendering/Buffer.h"
 
@@ -39,8 +40,8 @@ void UIRenderer::CreateSharedResources() {
 
 void UIRenderer::CreatePipelines(Object* InTarget) {
     // Text and image pipelines are built lazily per texture against the current target.
-    m_TextPipelines = PipelineCache();
-    m_ImagePipelines = PipelineCache();
+    RetirePipelines(m_TextPipelines, true);
+    RetirePipelines(m_ImagePipelines, true);
 
     PipelineDesc solidDesc;
     solidDesc.Target = InTarget;
@@ -67,6 +68,10 @@ void UIRenderer::Submit(Object* InTarget, const Vec2& InViewportSize, const UIDr
     if (!m_ResourcesReady) {
         CreateSharedResources();
     }
+
+    RetirePipelines(m_TextPipelines, false);
+    RetirePipelines(m_ImagePipelines, false);
+    ReleaseRetiredPipelines();
 
     const uint32_t width = (uint32_t)InViewportSize.x;
     const uint32_t height = (uint32_t)InViewportSize.y;
@@ -127,11 +132,11 @@ Pipeline* UIRenderer::GetTexturedPipeline(PipelineCache& InCache, const SharedOb
     if (!view.Get()) {
         return nullptr;
     }
-    if (InCache.ContainsKey(InTexture)) {
-        Pipeline* cached = InCache[InTexture].Get();
-        if (std::get<1>(cached->GetDesc().ImageBindings[0]).Get() == view.Get()) {
-            return cached;
-        }
+    CachedPipeline& cached = InCache[view.Get()];
+    cached.Source = InTexture;
+    cached.LastUsedFrame = RenderingAPI::GetInstance()->GetSubmittedFrames() + 1;
+    if (cached.Instance) {
+        return cached.Instance.Get();
     }
     PipelineDesc desc;
     desc.Target = (Object*)m_CachedTarget;
@@ -139,7 +144,25 @@ Pipeline* UIRenderer::GetTexturedPipeline(PipelineCache& InCache, const SharedOb
     desc.VertexLayout = UIVertex::GetLayout();
     desc.Buffers.Add(m_ProjectionBuffer);
     desc.ImageBindings.Add({ 16, view, m_Sampler });
-    SharedObjectPtr<Pipeline> pipeline = Pipeline::Create(desc);
-    InCache[InTexture] = pipeline;
-    return pipeline.Get();
+    cached.Instance = Pipeline::Create(desc);
+    return cached.Instance.Get();
+}
+
+void UIRenderer::RetirePipelines(PipelineCache& InCache, bool InAll) {
+    Array<ImageView*> retired;
+    for (auto& [view, cached] : InCache) {
+        Texture* source = cached.Source.Get();
+        if (InAll || !source || source->GetDefaultView().Get() != view) {
+            m_RetiredPipelines.Add(cached);
+            retired.Add(view);
+        }
+    }
+    for (ImageView* view : retired) {
+        InCache.Remove(view);
+    }
+}
+
+void UIRenderer::ReleaseRetiredPipelines() {
+    const uint64_t completed = RenderingAPI::GetInstance()->GetCompletedFrames();
+    m_RetiredPipelines.Filter([completed](const CachedPipeline& InCached) { return InCached.LastUsedFrame > completed; });
 }

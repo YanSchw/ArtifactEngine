@@ -1,6 +1,9 @@
 #include "VulkanBuffer.h"
 
+#include <cstring>
+
 static Array<VulkanUniformBuffer*> s_UniformBuffers;
+static Array<VulkanUniformBuffer*> s_DirtyUniformBuffers;
 static Array<VulkanStorageBuffer*> s_StorageBuffers;
 
 static uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, VulkanAPI& InVulkanAPI) {
@@ -51,11 +54,19 @@ VulkanUniformBuffer::VulkanUniformBuffer(uint32_t InBinding, VkDeviceSize InSize
     m_BufferInfo.buffer = m_Buffer;
     m_BufferInfo.offset = 0;
     m_BufferInfo.range  = InSize; // VK_WHOLE_SIZE;
+
+    m_Staging.assign(m_Size, 0);
+    vkMapMemory(m_VulkanAPI->GetDevice(), m_DeviceMemory, 0, VK_WHOLE_SIZE, 0, &m_Mapped);
 }
 
 VulkanUniformBuffer::~VulkanUniformBuffer() {
     s_UniformBuffers.Remove(this);
+    s_DirtyUniformBuffers.Remove(this);
 
+    if (m_Mapped) {
+        vkUnmapMemory(m_VulkanAPI->GetDevice(), m_DeviceMemory);
+        m_Mapped = nullptr;
+    }
     if (m_Buffer != VK_NULL_HANDLE) {
         vkDestroyBuffer(m_VulkanAPI->GetDevice(), m_Buffer, nullptr);
         m_Buffer = VK_NULL_HANDLE;
@@ -67,13 +78,25 @@ VulkanUniformBuffer::~VulkanUniformBuffer() {
 }
 
 void* VulkanUniformBuffer::MapData(size_t InSize, size_t InOffset) {
-    void* data;
-    vkMapMemory(m_VulkanAPI->GetDevice(), m_DeviceMemory, InOffset, InSize, 0, &data);
-    return data;
+    (void)InSize;
+    return m_Staging.data() + InOffset;
 }
 
 void VulkanUniformBuffer::UnmapData() {
-    vkUnmapMemory(m_VulkanAPI->GetDevice(), m_DeviceMemory);
+    if (!m_Dirty) {
+        m_Dirty = true;
+        s_DirtyUniformBuffers.Add(this);
+    }
+}
+
+void VulkanUniformBuffer::FlushPendingWrites() {
+    for (VulkanUniformBuffer* buffer : s_DirtyUniformBuffers) {
+        if (buffer->m_Mapped) {
+            memcpy(buffer->m_Mapped, buffer->m_Staging.data(), buffer->m_Size);
+        }
+        buffer->m_Dirty = false;
+    }
+    s_DirtyUniformBuffers.Clear();
 }
 
 void VulkanUniformBuffer::DestroyAll() {

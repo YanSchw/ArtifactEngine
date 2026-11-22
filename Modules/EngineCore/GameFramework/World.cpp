@@ -167,16 +167,19 @@ void World::Update(double InDeltatime) {
 
     ResolveAllBeginPlayIssues();
 
+    m_UnscaledDeltaTime = (float)InDeltatime;
+    const float deltaTime = m_UnscaledDeltaTime * m_TimeScale;
+
     for (const SharedObjectPtr<WorldSubsystem>& subsystem : m_Subsystems) {
-        subsystem->WorldUpdate((float)InDeltatime);
+        subsystem->WorldUpdate(deltaTime);
     }
 
-    WorldUpdate((float)InDeltatime);
-    HalfWorldUpdate((float)InDeltatime);
-    LocalUpdate((float)InDeltatime);
+    WorldUpdate(deltaTime);
+    HalfWorldUpdate(deltaTime);
+    LocalUpdate(deltaTime);
 
     for (const SharedObjectPtr<WorldSubsystem>& subsystem : m_Subsystems) {
-        subsystem->LateWorldUpdate((float)InDeltatime);
+        subsystem->LateWorldUpdate(deltaTime);
     }
 
     ResolvePendingKills();

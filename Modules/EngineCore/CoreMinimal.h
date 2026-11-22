@@ -8,6 +8,7 @@
 #include "Common/Map.h"
 #include "Common/String.h"
 #include "Common/Delegate.h"
+#include "Common/Interpolation.h"
 
 #include "Object/Object.h"
 #include "Object/Struct.h"
