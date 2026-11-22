@@ -36,6 +36,9 @@ public:
     FUNCTION(Pure)
     bool WasReleasedThisFrame() const;   // active -> inactive this frame
 
+    FUNCTION()
+    void ConsumeInput();
+
     // Callback API. Each listener lives only as long as InOwner:
     // when that Object dies its callbacks are
     // pruned automatically, so no manual Unbind is required on teardown.
@@ -64,6 +67,7 @@ private:
 
     InputValue m_Value;
     InputValue m_ValueLastFrame;
+    bool m_Consumed = false;
 
     InputDelegate<const InputValue&> m_OnPressed;
     InputDelegate<const InputValue&> m_OnReleased;

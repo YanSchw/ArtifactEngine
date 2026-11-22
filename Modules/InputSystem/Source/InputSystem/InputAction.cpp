@@ -21,6 +21,12 @@ bool InputAction::WasReleasedThisFrame() const {
     return !IsActive() && WasActive();
 }
 
+void InputAction::ConsumeInput() {
+    m_Consumed |= m_Value.AsVec2() != Vec2(0.0f);
+    m_Value = {};
+    m_ValueLastFrame = {};
+}
+
 void InputAction::BindPressed(Object* InOwner, ActionCallback InCallback) {
     m_OnPressed.Bind(InOwner, std::move(InCallback));
 }
@@ -69,8 +75,9 @@ void InputAction::Evaluate() {
                 best = value;
             }
         }
+        m_Consumed &= bestMagnitude > 0.0f;
     }
-    m_Value = best;
+    m_Value = m_Consumed ? InputValue() : best;
 
     // Remember which device drove us active, for GetLastActiveDevice().
     if (IsActive() && m_Value.Device) {
