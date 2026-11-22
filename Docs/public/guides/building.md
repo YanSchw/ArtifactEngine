@@ -11,11 +11,20 @@ artifact setup          # check this machine's dev dependencies ('all' or a name
 artifact build [--target Win64|MacOS|Linux|Web|iOS] [--configuration Debug|Dev|Dist] [--clean]
 artifact prebuild [--target Win64|MacOS|Linux|Web|iOS]   # caches every engine module as a static library
 artifact clean          # removes Build/ and Binaries/, keeping Binaries/Prebuilt
-artifact run            # builds (Dev) then launches Binaries/Artifact
+artifact run [--clean] [--args ...]   # builds (Dev) then launches Binaries/Artifact
 artifact cook           # cooks Content/ into Build/Intermediate/Cooked
 artifact package        # cooks + Dist build + platform bundle
 artifact docs           # dumps the API reference JSON for this documentation site
 artifact lint           # lints all .cpp/.h files
+```
+
+## Passing engine arguments
+
+Everything after `--args` goes to the launched binary, so it has to be the last option. A
+`Name=Value` pair sets that [config var](/guides/configuration); its leading `-` is optional here.
+
+```bash
+artifact run --args EngineClass=GameEngine CapFPS=30
 ```
 
 ## Configurations

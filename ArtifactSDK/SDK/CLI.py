@@ -129,8 +129,9 @@ def cmd_run(args):
     bundled = f"{project_path}/Binaries/Artifact.app/Contents/MacOS/Artifact"
     if get_current_platform() == PlatformType.MacOS and os.path.exists(bundled):
         binary = bundled
+    engine_args = [f"-{arg}" if "=" in arg and not arg.startswith("-") else arg for arg in args.engine_args]
     try:
-        subprocess.run([binary], check=True)
+        subprocess.run([binary, *engine_args], check=True)
     except KeyboardInterrupt:
         pass  # Allow graceful exit on Ctrl+C
     except subprocess.CalledProcessError as e:
@@ -326,6 +327,7 @@ def main():
 
     run_parser = subparsers.add_parser("run", help="Run the engine")
     run_parser.add_argument("--clean", action="store_true", default=False, help="Clean build artifacts before running")
+    run_parser.add_argument("--args", dest="engine_args", nargs=argparse.REMAINDER, default=[], metavar="ARG", help="Pass everything after --args to the engine, e.g. --args EngineClass=GameEngine CapFPS=30 (must come last)")
     run_parser.set_defaults(func=cmd_run)
 
     cook_parser = subparsers.add_parser("cook", parents=[generate_args_parser], help="Cook assets")
