@@ -126,6 +126,9 @@ public:
     PROPERTY(Range = (-10, 10))
     float Speed = 1.0f;
 
+    PROPERTY()
+    Array<String> Tags;
+
     virtual void ConstructPins() override;
     virtual String GetTitle() const override { return StateName; }
     virtual Vec4 GetAccentColor() const override;

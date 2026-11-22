@@ -49,6 +49,10 @@ public:
     FUNCTION(Pure)
     String GetCurrentState() const;
     FUNCTION(Pure)
+    Array<String> GetCurrentStateTags() const;
+    FUNCTION(Pure)
+    bool HasStateTag(const String& InTag) const;
+    FUNCTION(Pure)
     float GetNormalizedTime() const;
 
     FUNCTION()
@@ -93,6 +97,7 @@ public:
 
 private:
     bool IsBlending() const { return m_BlendDuration > 0.0f; }
+    AnimationStateNode* FindCurrentState() const;
     void ResetParameters();
     void SetParameter(const String& InName, float InValue);
     float GetParameter(const String& InName) const;

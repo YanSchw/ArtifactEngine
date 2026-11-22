@@ -104,10 +104,24 @@ void AnimatorNode::CrossFade(const String& InStateName, float InDuration) {
     EnterState(*state, InDuration, 0.0f, nullptr);
 }
 
-String AnimatorNode::GetCurrentState() const {
+AnimationStateNode* AnimatorNode::FindCurrentState() const {
     AnimationGraph* graph = GetAnimationGraph();
-    AnimationStateNode* state = graph ? Cast<AnimationStateNode>(graph->GetStateMachine()->FindNode(m_Current.State)) : nullptr;
+    return graph ? Cast<AnimationStateNode>(graph->GetStateMachine()->FindNode(m_Current.State)) : nullptr;
+}
+
+String AnimatorNode::GetCurrentState() const {
+    const AnimationStateNode* state = FindCurrentState();
     return state ? state->StateName : String();
+}
+
+Array<String> AnimatorNode::GetCurrentStateTags() const {
+    const AnimationStateNode* state = FindCurrentState();
+    return state ? state->Tags : Array<String>();
+}
+
+bool AnimatorNode::HasStateTag(const String& InTag) const {
+    const AnimationStateNode* state = FindCurrentState();
+    return state && state->Tags.Contains(InTag);
 }
 
 float AnimatorNode::GetNormalizedTime() const {
@@ -195,6 +209,7 @@ AnimationGraph* AnimatorNode::GetAnimationGraph() const {
 void AnimatorNode::SetAnimationGraph(AnimationGraph* InGraph) {
     m_Source = AnimatorSource::AnimationGraph;
     m_AnimationGraph = InGraph;
+    m_Current = AnimatorPlayback();
     ResetParameters();
     if (m_Playing) {
         Play();
