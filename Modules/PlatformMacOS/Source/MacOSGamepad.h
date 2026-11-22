@@ -10,6 +10,7 @@ public:
 
 protected:
     virtual void Tick() override;
+    virtual void ApplyMotorSpeeds(float InLowFrequency, float InHighFrequency) override;
 };
 
 /** Adds the GameController gamepad to the InputSystem when the engine starts. */

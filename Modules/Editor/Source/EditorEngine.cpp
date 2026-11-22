@@ -15,6 +15,7 @@
 #include "Assets/Scene.h"
 #include "Core/EngineConfig.h"
 #include "InputSystem/InputSystem.h"
+#include "InputSystem/GamepadDevice.h"
 #include "InputSystem/MouseCodes.h"
 #include "Common/UUID.h"
 
@@ -109,6 +110,7 @@ void EditorEngine::DisposePlayInstance() {
     m_HadGameInput = false;
     m_PlayingTab = nullptr;
     m_GameInstance = nullptr;
+    GamepadDevice::StopAllRumble();
 }
 
 void EditorEngine::UpdatePlayCursor() {

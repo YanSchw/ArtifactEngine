@@ -4,6 +4,7 @@
 
 #include "Rendering/Surface.h"
 #include "InputSystem/InputSystem.h"
+#include "InputSystem/GamepadDevice.h"
 #include "InputSystem/KeyboardDevice.h"
 #include "InputSystem/MouseDevice.h"
 #include "InputSystem/MultiTouchDevice.h"
@@ -141,6 +142,7 @@ bool GameEngine::MainTick(double InDeltaTime) {
 
 void GameEngine::Shutdown() {
     m_GameInstance = nullptr;
+    GamepadDevice::StopAllRumble();
     UINode::SetDefaultFont(nullptr);
     AudioEngine::Get().Shutdown();
     AssetManager::Get().Shutdown();

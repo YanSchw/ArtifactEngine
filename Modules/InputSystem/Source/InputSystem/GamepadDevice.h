@@ -24,6 +24,11 @@ public:
     // D-pad as a Vec2 derived from its four buttons (x = right, y = up)
     Vec2 GetDPad();
 
+    void SetMotorSpeeds(float InLowFrequency, float InHighFrequency);
+    void PlayRumble(float InLowFrequency, float InHighFrequency, float InDuration);
+    void StopRumble();
+    static void StopAllRumble();
+
     // Whether the underlying physical pad is currently connected
     bool IsConnected() const;
 
@@ -37,6 +42,7 @@ public:
 
 protected:
     virtual void Tick() override;
+    virtual void ApplyMotorSpeeds(float InLowFrequency, float InHighFrequency);
 
     /** Sticks never rest at exactly zero; anything inside the deadzone reads as centered and the
      *  rest is rescaled so motion still starts smoothly at its edge. */
@@ -54,6 +60,24 @@ protected:
     bool m_Connected = false;
 
 private:
+    struct MotorSpeeds {
+        float LowFrequency = 0.0f;
+        float HighFrequency = 0.0f;
+
+        bool operator==(const MotorSpeeds&) const = default;
+    };
+
+    struct RumblePulse {
+        MotorSpeeds Speeds;
+        double EndTime = 0.0;
+    };
+
+    void UpdateMotors();
+
+    MotorSpeeds m_MotorSpeeds;
+    MotorSpeeds m_AppliedMotorSpeeds;
+    Array<RumblePulse> m_RumblePulses;
+
     Map<GamepadCode, bool> m_ButtonsLastFrame;
     Map<String, GamepadCode> m_NameToButton;
 };

@@ -27,6 +27,13 @@ public:
     FUNCTION(Pure, Category = "Input|Mouse")
     static Vec2 GetMouseDelta();
 
+    FUNCTION(Category = "Input|Gamepad")
+    static void PlayGamepadRumble(float InLowFrequency, float InHighFrequency, float InDuration);
+    FUNCTION(Category = "Input|Gamepad")
+    static void SetGamepadMotorSpeeds(float InLowFrequency, float InHighFrequency);
+    FUNCTION(Category = "Input|Gamepad")
+    static void StopGamepadRumble();
+
     FUNCTION(Pure, Category = "Input|Touch")
     static bool IsTouching();
     FUNCTION(Pure, Category = "Input|Touch")

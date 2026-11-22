@@ -16,3 +16,5 @@ struct MacOSGamepadState {
 /** Reads the first connected controller with an extended gamepad profile through the GameController
  *  framework. False when none is connected. */
 bool ReadMacOSGamepad(MacOSGamepadState& OutState);
+
+void SetMacOSGamepadMotorSpeeds(float InLowFrequency, float InHighFrequency);

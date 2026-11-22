@@ -25,3 +25,7 @@ void GameControllerGamepadDevice::Tick() {
     m_LeftTrigger = state.LeftTrigger;
     m_RightTrigger = state.RightTrigger;
 }
+
+void GameControllerGamepadDevice::ApplyMotorSpeeds(float InLowFrequency, float InHighFrequency) {
+    SetMacOSGamepadMotorSpeeds(InLowFrequency, InHighFrequency);
+}

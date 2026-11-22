@@ -26,3 +26,7 @@ void GLFWGamepadDevice::Tick() {
     m_LeftTrigger = (state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER] + 1.0f) * 0.5f;
     m_RightTrigger = (state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER] + 1.0f) * 0.5f;
 }
+
+void GLFWGamepadDevice::ApplyMotorSpeeds(float InLowFrequency, float InHighFrequency) {
+    glfwSetJoystickRumble(GLFW_JOYSTICK_1, InLowFrequency, InHighFrequency);
+}

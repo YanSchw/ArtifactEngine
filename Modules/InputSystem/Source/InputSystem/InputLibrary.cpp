@@ -2,6 +2,7 @@
 #include "InputSystem.h"
 #include "InputAction.h"
 #include "InputActionMapping.h"
+#include "GamepadDevice.h"
 #include "KeyboardDevice.h"
 #include "MouseDevice.h"
 #include "MultiTouchDevice.h"
@@ -39,6 +40,22 @@ Vec2 InputLibrary::GetMousePosition() {
 Vec2 InputLibrary::GetMouseDelta() {
     MouseDevice* mouse = MouseDevice::Instance();
     return mouse ? mouse->GetPositionDelta() : Vec2(0.0f);
+}
+
+void InputLibrary::PlayGamepadRumble(float InLowFrequency, float InHighFrequency, float InDuration) {
+    if (GamepadDevice* gamepad = GamepadDevice::Instance()) {
+        gamepad->PlayRumble(InLowFrequency, InHighFrequency, InDuration);
+    }
+}
+
+void InputLibrary::SetGamepadMotorSpeeds(float InLowFrequency, float InHighFrequency) {
+    if (GamepadDevice* gamepad = GamepadDevice::Instance()) {
+        gamepad->SetMotorSpeeds(InLowFrequency, InHighFrequency);
+    }
+}
+
+void InputLibrary::StopGamepadRumble() {
+    GamepadDevice::StopAllRumble();
 }
 
 static const TouchPoint* GetTouchAt(int32_t InIndex) {

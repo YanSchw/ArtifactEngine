@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/inotify.h>
+#include <assert.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <dirent.h>
@@ -135,7 +136,10 @@ static GLFWbool openJoystickDevice(const char* path)
     }
 
     _GLFWjoystickLinux linjs = {0};
-    linjs.fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    linjs.rumbleEffect = -1;
+    linjs.fd = open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC);
+    if (linjs.fd == -1)
+        linjs.fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (linjs.fd == -1)
         return GLFW_FALSE;
 
@@ -430,6 +434,42 @@ const char* _glfwGetMappingNameLinux(void)
 
 void _glfwUpdateGamepadGUIDLinux(char* guid)
 {
+}
+
+GLFWAPI int glfwSetJoystickRumble(int jid, float lowFrequency, float highFrequency)
+{
+    assert(jid >= GLFW_JOYSTICK_1);
+    assert(jid <= GLFW_JOYSTICK_LAST);
+
+    _GLFW_REQUIRE_INIT_OR_RETURN(GLFW_FALSE);
+
+    _GLFWjoystick* js = _glfw.joysticks + jid;
+    if (!js->connected)
+        return GLFW_FALSE;
+
+    const GLFWbool playing = lowFrequency > 0.f || highFrequency > 0.f;
+    if (playing)
+    {
+        struct ff_effect effect = {0};
+        effect.type = FF_RUMBLE;
+        effect.id = js->linjs.rumbleEffect;
+        effect.u.rumble.strong_magnitude = (__u16) (lowFrequency * 65535.f);
+        effect.u.rumble.weak_magnitude = (__u16) (highFrequency * 65535.f);
+
+        if (ioctl(js->linjs.fd, EVIOCSFF, &effect) < 0)
+            return GLFW_FALSE;
+
+        js->linjs.rumbleEffect = effect.id;
+    }
+    else if (js->linjs.rumbleEffect < 0)
+        return GLFW_TRUE;
+
+    struct input_event event = {0};
+    event.type = EV_FF;
+    event.code = js->linjs.rumbleEffect;
+    event.value = playing;
+
+    return write(js->linjs.fd, &event, sizeof(event)) == sizeof(event);
 }
 
 #endif // GLFW_BUILD_LINUX_JOYSTICK

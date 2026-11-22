@@ -481,5 +481,10 @@ void _glfwUpdateGamepadGUIDCocoa(char* guid)
     }
 }
 
+GLFWAPI int glfwSetJoystickRumble(int jid, float lowFrequency, float highFrequency)
+{
+    return GLFW_FALSE;
+}
+
 #endif // _GLFW_COCOA
 

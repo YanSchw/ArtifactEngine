@@ -1,11 +1,27 @@
 #include "BrowserGamepadDevice.h"
 
+#include <emscripten.h>
 #include <emscripten/html5.h>
 
 // Where each GamepadCode sits in the W3C standard mapping, in GamepadCode order.
 static constexpr int32_t s_StandardButtons[] = { 0, 1, 2, 3, 4, 5, 8, 9, 16, 10, 11, 12, 15, 13, 14 };
 static constexpr int32_t s_LeftTriggerButton = 6;
 static constexpr int32_t s_RightTriggerButton = 7;
+static constexpr double s_EffectDurationMs = 1000.0;
+
+EM_JS(void, ArtifactGamepadRumble, (int InIndex, float InLowFrequency, float InHighFrequency, double InDurationMs), {
+    var gamepad = navigator.getGamepads()[InIndex];
+    var actuator = gamepad && gamepad.vibrationActuator;
+    if (!actuator || !actuator.playEffect) {
+        return;
+    }
+    var effect = { duration: InDurationMs, strongMagnitude: InLowFrequency, weakMagnitude: InHighFrequency };
+    var stopping = !InLowFrequency && !InHighFrequency && actuator.reset;
+    var result = stopping ? actuator.reset() : actuator.playEffect('dual-rumble', effect);
+    if (result) {
+        result.catch(function() {});
+    }
+});
 
 static float ReadAxis(const EmscriptenGamepadEvent& InState, int32_t InAxis) {
     return InAxis < InState.numAxes ? (float)InState.axis[InAxis] : 0.0f;
@@ -43,10 +59,18 @@ void BrowserGamepadDevice::Tick() {
     EmscriptenGamepadEvent state;
     if (emscripten_sample_gamepad_data() != EMSCRIPTEN_RESULT_SUCCESS || !FindGamepad(state)) {
         ResetState();
+        m_LowFrequency = 0.0f;
+        m_HighFrequency = 0.0f;
         return;
     }
 
     m_Connected = true;
+    m_GamepadIndex = state.index;
+
+    const bool rumbling = m_LowFrequency > 0.0f || m_HighFrequency > 0.0f;
+    if (rumbling && emscripten_get_now() - m_LastEffectTime >= s_EffectDurationMs * 0.5) {
+        ApplyMotorSpeeds(m_LowFrequency, m_HighFrequency);
+    }
 
     for (auto& [button, pressed] : m_Buttons) {
         const int32_t code = (int32_t)button;
@@ -60,4 +84,11 @@ void BrowserGamepadDevice::Tick() {
 
     m_LeftTrigger = ReadAnalogButton(state, s_LeftTriggerButton);
     m_RightTrigger = ReadAnalogButton(state, s_RightTriggerButton);
+}
+
+void BrowserGamepadDevice::ApplyMotorSpeeds(float InLowFrequency, float InHighFrequency) {
+    m_LowFrequency = InLowFrequency;
+    m_HighFrequency = InHighFrequency;
+    m_LastEffectTime = emscripten_get_now();
+    ArtifactGamepadRumble(m_GamepadIndex, InLowFrequency, InHighFrequency, s_EffectDurationMs);
 }

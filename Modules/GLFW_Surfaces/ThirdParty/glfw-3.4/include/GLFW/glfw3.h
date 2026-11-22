@@ -5728,6 +5728,8 @@ GLFWAPI const char* glfwGetJoystickName(int jid);
  */
 GLFWAPI const char* glfwGetJoystickGUID(int jid);
 
+GLFWAPI int glfwSetJoystickRumble(int jid, float lowFrequency, float highFrequency);
+
 /*! @brief Sets the user pointer of the specified joystick.
  *
  *  This function sets the user-defined pointer of the specified joystick.  The

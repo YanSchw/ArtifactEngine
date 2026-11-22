@@ -1,8 +1,18 @@
 #include "GamepadDevice.h"
 #include "InputSystem.h"
 
+#include <chrono>
+
 // Radius around the stick centre that reads as no input at all.
 static constexpr float s_StickDeadzone = 0.15f;
+
+static double GetRealTime() {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+static float ClampMotorSpeed(float InSpeed) {
+    return std::min(std::max(0.0f, InSpeed), 1.0f);
+}
 
 Vec2 GamepadDevice::ApplyStickDeadzone(const Vec2& InStick) {
     const float length = glm::length(InStick);
@@ -22,6 +32,7 @@ void GamepadDevice::ResetState() {
     m_RightStick = Vec2(0.0f);
     m_LeftTrigger = 0.0f;
     m_RightTrigger = 0.0f;
+    m_AppliedMotorSpeeds = {};
 }
 
 GamepadDevice::GamepadDevice() {
@@ -68,6 +79,54 @@ Vec2 GamepadDevice::GetDPad() {
               (m_Buttons.At(GamepadCode::DPadDown) ? 1.0f : 0.0f);
     return {x, y};
 }
+
+void GamepadDevice::SetMotorSpeeds(float InLowFrequency, float InHighFrequency) {
+    m_MotorSpeeds = {ClampMotorSpeed(InLowFrequency), ClampMotorSpeed(InHighFrequency)};
+    UpdateMotors();
+}
+
+void GamepadDevice::PlayRumble(float InLowFrequency, float InHighFrequency, float InDuration) {
+    if (!(InDuration > 0.0f)) {
+        return;
+    }
+    m_RumblePulses.Add({{ClampMotorSpeed(InLowFrequency), ClampMotorSpeed(InHighFrequency)}, GetRealTime() + InDuration});
+    UpdateMotors();
+}
+
+void GamepadDevice::StopRumble() {
+    m_MotorSpeeds = {};
+    m_RumblePulses.Clear();
+    UpdateMotors();
+}
+
+void GamepadDevice::StopAllRumble() {
+    for (const auto& device : InputSystem::Get().GetDevices()) {
+        if (GamepadDevice* gamepad = device->As<GamepadDevice>()) {
+            gamepad->StopRumble();
+        }
+    }
+}
+
+void GamepadDevice::UpdateMotors() {
+    const double now = GetRealTime();
+    m_RumblePulses.Filter([now](const RumblePulse& InPulse) { return InPulse.EndTime > now; });
+
+    MotorSpeeds speeds;
+    if (m_Connected && !InputSystem::Get().AreActionsSuppressed()) {
+        speeds = m_MotorSpeeds;
+        for (const RumblePulse& pulse : m_RumblePulses) {
+            speeds.LowFrequency = std::max(speeds.LowFrequency, pulse.Speeds.LowFrequency);
+            speeds.HighFrequency = std::max(speeds.HighFrequency, pulse.Speeds.HighFrequency);
+        }
+    }
+
+    if (speeds != m_AppliedMotorSpeeds) {
+        m_AppliedMotorSpeeds = speeds;
+        ApplyMotorSpeeds(speeds.LowFrequency, speeds.HighFrequency);
+    }
+}
+
+void GamepadDevice::ApplyMotorSpeeds(float, float) {}
 
 bool GamepadDevice::IsConnected() const {
     return m_Connected;
@@ -130,4 +189,5 @@ GamepadDevice* GamepadDevice::Instance() {
 
 void GamepadDevice::Tick() {
     m_ButtonsLastFrame = m_Buttons;
+    UpdateMotors();
 }

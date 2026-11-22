@@ -31,6 +31,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
 
 #define _GLFW_TYPE_AXIS     0
 #define _GLFW_TYPE_SLIDER   1
@@ -761,6 +762,24 @@ void _glfwUpdateGamepadGUIDWin32(char* guid)
         sprintf(guid, "03000000%.4s0000%.4s000000000000",
                 original, original + 4);
     }
+}
+
+GLFWAPI int glfwSetJoystickRumble(int jid, float lowFrequency, float highFrequency)
+{
+    assert(jid >= GLFW_JOYSTICK_1);
+    assert(jid <= GLFW_JOYSTICK_LAST);
+
+    _GLFW_REQUIRE_INIT_OR_RETURN(GLFW_FALSE);
+
+    _GLFWjoystick* js = _glfw.joysticks + jid;
+    if (!js->connected || js->win32.device || !XInputSetState)
+        return GLFW_FALSE;
+
+    XINPUT_VIBRATION vibration;
+    vibration.wLeftMotorSpeed = (WORD) (lowFrequency * 65535.f);
+    vibration.wRightMotorSpeed = (WORD) (highFrequency * 65535.f);
+
+    return XInputSetState(js->win32.index, &vibration) == ERROR_SUCCESS;
 }
 
 #endif // _GLFW_WIN32
