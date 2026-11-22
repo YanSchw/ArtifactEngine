@@ -1,4 +1,5 @@
 #include "OutlinerTab.h"
+#include "PreviewEnvironment.h"
 #include "OutlinerRow.h"
 #include "MajorTab.h"
 #include "AnimationEditorTab.h"
@@ -142,7 +143,11 @@ OutlinerTab::OutlinerTab() {
 
 void OutlinerTab::RefreshFooter() {
     World* world = GetEditedWorld();
-    const int total = world ? world->GetAllNodes().Size() : 0;
+    int total = 0;
+    if (world) {
+        const Array<Node*>& nodes = world->GetAllNodes();
+        total = (int)std::count_if(nodes.begin(), nodes.end(), [](Node* InNode) { return !PreviewEnvironment::Contains(*InNode); });
+    }
     String text = HasFilter()
         ? std::to_string(m_MatchCount) + " of " + std::to_string(total) + " nodes"
         : std::to_string(total) + " nodes";
@@ -223,7 +228,7 @@ void OutlinerTab::RebuildVisible() {
     }
 
     for (Node* node : world->GetAllNodes()) {
-        if (node->GetParent()) {
+        if (node->GetParent() || PreviewEnvironment::Contains(*node)) {
             continue;
         }
         if (!HasFilter()) {

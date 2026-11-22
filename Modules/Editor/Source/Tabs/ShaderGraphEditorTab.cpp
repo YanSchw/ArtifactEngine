@@ -57,7 +57,6 @@ void ShaderGraphEditorTab::Recompile() {
     if (!graph->Recompile(m_CompileError)) {
         AE_WARN("ShaderGraph '{0}' failed to compile:\n{1}", graph->GetDisplayName(), m_CompileError);
     }
-    m_Preview->InvalidatePipeline();
     RefreshStatusLabel();
 }
 

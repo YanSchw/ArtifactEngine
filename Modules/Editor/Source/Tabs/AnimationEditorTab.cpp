@@ -3,6 +3,7 @@
 #include "OutlinerTab.h"
 #include "DetailsTab.h"
 #include "ViewportTab.h"
+#include "PreviewEnvironment.h"
 #include "UI/UIDockArea.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
@@ -24,6 +25,7 @@ static const Vec4 s_RecordColor = HexColor(0xC42B1C);
 
 AnimationEditorTab::AnimationEditorTab() {
     SetEditedWorld(new World());
+    m_Environment = GetEditedWorld()->Spawn<PreviewEnvironment>();
 
     UIDockArea* area = GetDockArea();
     m_Viewport = area->DockNew<ViewportTab>(UIDockSlot::Center);
@@ -261,6 +263,7 @@ void AnimationEditorTab::ApplyCurrentFrame() {
 
 void AnimationEditorTab::OnUIUpdate(const UIFrameContext& InContext) {
     Super::OnUIUpdate(InContext);
+    m_Environment->YieldTo(AuthoredNodes::All);
 
     Animation* animation = m_Animation.Get();
     if (!animation) {

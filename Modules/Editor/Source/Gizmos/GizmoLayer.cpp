@@ -1,4 +1,5 @@
 #include "GizmoLayer.h"
+#include "PreviewEnvironment.h"
 #include "Tabs/MajorTab.h"
 #include "Settings/EditorSettings.h"
 #include "UI/EditorStyle.h"
@@ -192,7 +193,7 @@ void GizmoLayer::CollectNode(World* InWorld, Node3D* InNode, CameraNode* InViewC
     }
 
     if (DirectionalLightNode* light = InNode->As<DirectionalLightNode>()) {
-        if (InSettings.DirectionalLights) {
+        if (InSettings.DirectionalLights && !PreviewEnvironment::Contains(*light)) {
             DrawSunDirection(InWorld, light);
         }
     } else if (PointLightNode* pointLight = InNode->As<PointLightNode>()) {

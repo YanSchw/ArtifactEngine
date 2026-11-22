@@ -1,17 +1,16 @@
 #pragma once
 #include "MinorTab.h"
 #include "Object/Pointer.h"
-#include "GameFramework/DirectionalLightNode.h"
 #include "AssetPreviewTab.gen.h"
 
 class Material;
 class Mesh;
-class FrameBuffer;
-class Pipeline;
-class UniformBuffer;
+class World;
+class CameraNode;
+class StaticMeshNode;
+class RenderPipeline;
 class RenderTargetTexture;
 class UIImage;
-class Sampler;
 class VectorImage;
 class UIMenuModel;
 
@@ -19,12 +18,6 @@ enum class PreviewPanMode : uint8_t {
     Rotate,
     PanLeftRight,
     None
-};
-
-struct PreviewSlotPipeline {
-    SharedObjectPtr<Pipeline> Instance;
-    Array<void*> Resources;
-    bool Dirty = true;
 };
 
 /** Renders one mesh, with one material or the mesh's own per slot, framed by the mesh's bounds.
@@ -47,15 +40,9 @@ public:
     /** Leave unset to preview on the default cube. */
     void SetMesh(Mesh* InMesh);
 
-    void InvalidatePipeline();
-
 private:
-    Material* ResolveMaterial(int32_t InSlot) const;
     Mesh* ResolveMesh() const;
-
-    void EnsureTarget(uint32_t InWidth, uint32_t InHeight);
-    Pipeline* EnsurePipeline(PreviewSlotPipeline& InOutSlot, Material* InMaterial);
-    void UpdateSceneBuffer(float InDeltaTime, const Mesh& InMesh);
+    void UpdateScene(Mesh& InMesh);
 
     void BuildMeshMenu(UIMenuModel& OutMenu);
     void BuildPanMenu(UIMenuModel& OutMenu);
@@ -65,19 +52,12 @@ private:
     WeakObjectPtr<Material> m_Material;
     WeakObjectPtr<Mesh> m_Mesh;
 
-    SharedObjectPtr<FrameBuffer> m_Target;
-    Array<PreviewSlotPipeline> m_Pipelines;
-    SharedObjectPtr<UniformBuffer> m_SceneBuffer;
+    SharedObjectPtr<World> m_PreviewWorld;
+    SharedObjectPtr<RenderPipeline> m_Pipeline;
     SharedObjectPtr<RenderTargetTexture> m_Texture;
-    SharedObjectPtr<Sampler> m_Sampler;
-    SharedObjectPtr<class ShaderData> m_ShaderData;
-    ShadowMapPlaceholder m_ShadowMap;
+    CameraNode* m_Camera = nullptr;
+    StaticMeshNode* m_MeshNode = nullptr;
     UIImage* m_Image = nullptr;
-
-    uint32_t m_Width = 0;
-    uint32_t m_Height = 0;
-    float m_Time = 0.0f;
-    bool m_PipelineDirty = true;
 
     PreviewPanMode m_PanMode = PreviewPanMode::Rotate;
     float m_Yaw = 0.0f;

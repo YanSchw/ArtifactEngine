@@ -7,6 +7,7 @@ class Animation;
 class AnimationTimelineTab;
 class Node;
 class NodeRecord;
+class PreviewEnvironment;
 class ViewportTab;
 class VectorImage;
 
@@ -75,6 +76,7 @@ private:
     WeakObjectPtr<Node> m_Instance;
     WeakObjectPtr<Node> m_AnimationRoot;
     ViewportTab* m_Viewport = nullptr;
+    PreviewEnvironment* m_Environment = nullptr;
     AnimationTimelineTab* m_Timeline = nullptr;
 
     Array<AnimationPreviewPose> m_PreviewPose;

@@ -6,6 +6,7 @@
 class Blueprint;
 class Node;
 class NodeRecord;
+class PreviewEnvironment;
 class ViewportTab;
 
 /** Edits one Blueprint: its instance lives alone in a throwaway world. */
@@ -29,6 +30,7 @@ public:
     virtual Asset* GetEditedAsset() const override;
     virtual Node* GetAssetRootNode() const override;
     virtual void OnAssetSaved(Asset* InAsset) override;
+    virtual void OnUIUpdate(const UIFrameContext& InContext) override;
 
 private:
     void DestroyInstance();
@@ -38,5 +40,6 @@ private:
     WeakObjectPtr<Blueprint> m_Blueprint;
     WeakObjectPtr<Node> m_Instance;
     ViewportTab* m_Viewport = nullptr;
+    PreviewEnvironment* m_Environment = nullptr;
     int8_t m_RootWasUI = -1;
 };

@@ -49,7 +49,6 @@ void MeshEditorTab::Reimport() {
     }
     mesh->Reimport();
     AssetManager::Get().LoadAsset(mesh->GetMaterial());
-    m_Preview->InvalidatePipeline();
 }
 
 void MeshEditorTab::OnObjectEdited(Object* InObject) {

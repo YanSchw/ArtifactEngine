@@ -4,6 +4,7 @@
 #include "OutlinerTab.h"
 #include "DetailsTab.h"
 #include "ViewportTab.h"
+#include "PreviewEnvironment.h"
 #include "UI/UIDockArea.h"
 #include "UI/EditorStyle.h"
 #include "UI/EditorIcons.h"
@@ -20,6 +21,7 @@
 
 BlueprintEditorTab::BlueprintEditorTab() {
     SetEditedWorld(new World());
+    m_Environment = GetEditedWorld()->Spawn<PreviewEnvironment>();
 
     UIDockArea* area = GetDockArea();
     m_Viewport = area->DockNew<ViewportTab>(UIDockSlot::Center);
@@ -27,6 +29,11 @@ BlueprintEditorTab::BlueprintEditorTab() {
     m_Viewport->GetDockNode()->SetActiveTab(m_Viewport);
     OutlinerTab* outliner = area->DockNew<OutlinerTab>(UIDockSlot::Left, nullptr, 0.24f);
     area->DockNew<DetailsTab>(UIDockSlot::Bottom, outliner->GetDockNode(), 0.45f);
+}
+
+void BlueprintEditorTab::OnUIUpdate(const UIFrameContext& InContext) {
+    Super::OnUIUpdate(InContext);
+    m_Environment->YieldTo(AuthoredNodes::Enabled);
 }
 
 void BlueprintEditorTab::DestroyInstance() {

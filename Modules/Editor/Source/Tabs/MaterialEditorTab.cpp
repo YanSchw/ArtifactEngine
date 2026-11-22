@@ -48,7 +48,6 @@ void MaterialEditorTab::OnObjectEdited(Object* InObject) {
         return;
     }
     material->RefreshPropertyBuffer();
-    m_Preview->InvalidatePipeline();
 }
 
 void MaterialEditorTab::OnAssetSaved(Asset* InAsset) {
@@ -59,7 +58,6 @@ void MaterialEditorTab::OnAssetSaved(Asset* InAsset) {
     // Wiring a pin in the graph retires the input it fed, so the parameter rows are rebuilt.
     material->RefreshPropertyBuffer();
     m_Details->MarkDirty();
-    m_Preview->InvalidatePipeline();
 }
 
 Asset* MaterialEditorTab::GetEditedAsset() const {
