@@ -129,7 +129,7 @@ def build_cmake(job=None, target=None, simulator: bool = False, cmake_targets: l
     toolchain = get_toolchain_file(target, simulator)
     _clear_stale_cache(toolchain)
 
-    configure_cmd = ["cmake", "-S", ".", "-G", CMAKE_GENERATOR, "-B", "Build"]
+    configure_cmd = ["cmake", "-S", ".", "-G", CMAKE_GENERATOR, "-B", "Build", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
     if toolchain is not None:
         configure_cmd.append(f"-DCMAKE_TOOLCHAIN_FILE={toolchain}")
     build_cmd = ["cmake", "--build", "Build", "--config", "Debug"]

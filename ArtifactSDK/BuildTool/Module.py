@@ -127,7 +127,7 @@ class ArtifactModule:
 
     def get_source_extensions(self, platform: str) -> List[str]:
         """Source file extensions compiled for the given target platform."""
-        return ["cpp", "mm"] if platform == "iOS" else ["cpp"]
+        return ["cpp", "mm"] if platform in ("iOS", "MacOS") else ["cpp"]
 
     def get_source_files_pattern(self, platform: str) -> List[str]:
         """Get glob patterns for source files."""

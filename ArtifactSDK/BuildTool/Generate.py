@@ -169,7 +169,7 @@ endif()
 
 add_compile_definitions({" ".join(global_definitions)})
 {dist_flags}
-{get_emscripten_setup(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}{get_ios_setup() if get_platform(target_platform) == PlatformType.iOS else ""}
+{get_emscripten_setup(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}{get_ios_setup() if get_platform(target_platform) in (PlatformType.iOS, PlatformType.MacOS) else ""}
 add_executable(Artifact {project_path}/Build/Intermediate/Modules/__LinkModules.gen.cpp)
 
 {get_emscripten_link_options(project_path, target_configuration, is_packaged) if get_platform(target_platform) == PlatformType.Web else ""}{get_ios_link_options() if get_platform(target_platform) == PlatformType.iOS else ""}
