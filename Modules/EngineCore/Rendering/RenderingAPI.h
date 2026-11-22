@@ -82,8 +82,15 @@ public:
 
     virtual SampleCount GetMaxSupportedSampleCount() const = 0;
 
+    /** A resource last used while frame GetSubmittedFrames() + 1 was being recorded can be freed
+     *  once GetCompletedFrames() reaches that number. */
+    uint64_t GetSubmittedFrames() const { return m_SubmittedFrames; }
+    uint64_t GetCompletedFrames() const { return m_CompletedFrames; }
+
 protected:
     RenderingCapabilities m_Capabilities;
+    uint64_t m_SubmittedFrames = 0;
+    uint64_t m_CompletedFrames = 0;
 
 private:
     inline static RenderingAPI* s_Instance = nullptr;

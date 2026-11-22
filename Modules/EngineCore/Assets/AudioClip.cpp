@@ -23,7 +23,6 @@ AudioSampleBuffer DecodeAdpcm(ChunkReader& InReader, const AudioFormat& InFormat
 } // namespace
 
 AudioClip::AudioClip() {
-    m_StreamType = AssetStreamType::AlwaysLoaded;
 }
 
 bool AudioClip::ImportSource(AudioSampleBuffer& OutSamples) const {

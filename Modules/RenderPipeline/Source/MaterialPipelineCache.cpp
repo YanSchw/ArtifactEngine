@@ -19,9 +19,21 @@ MaterialPipelineCache::MaterialPipelineCache(const Array<ShaderDataType>& InVert
 
 MaterialPipelineCache::~MaterialPipelineCache() = default;
 
+static bool Matches(const Array<WeakObjectPtr<Object>>& InCached, const Array<Object*>& InResources) {
+    if (InCached.Size() != InResources.Size()) {
+        return false;
+    }
+    for (int32_t i = 0; i < InCached.Size(); i++) {
+        if (InCached[i].Get() != InResources[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 Pipeline* MaterialPipelineCache::Resolve(Material& InMaterial, FrameBuffer& InTarget, const RenderContext& InContext) {
     Shader* shader = InMaterial.GetShader();
-    Array<void*> resources = { &InTarget, shader, InMaterial.GetPropertyBuffer(), InContext.SceneUniforms, InContext.ShadowMap };
+    Array<Object*> resources = { &InTarget, shader, InMaterial.GetPropertyBuffer(), InContext.SceneUniforms, InContext.ShadowMap };
     Array<SampledImageBinding> imageBindings;
     imageBindings.Add({ ShaderTemplate::ShadowMapBinding, InContext.ShadowMap, InContext.ShadowSampler });
     for (const MaterialTextureBinding& binding : InMaterial.GetTextureBindings()) {
@@ -34,7 +46,7 @@ Pipeline* MaterialPipelineCache::Resolve(Material& InMaterial, FrameBuffer& InTa
     }
 
     Entry& cached = m_Entries[InMaterial.GetId()];
-    if (cached.Instance && cached.Resources == resources) {
+    if (cached.Instance && Matches(cached.Resources, resources)) {
         return cached.Instance.Get();
     }
 
@@ -49,6 +61,9 @@ Pipeline* MaterialPipelineCache::Resolve(Material& InMaterial, FrameBuffer& InTa
     desc.ImageBindings = imageBindings;
 
     cached.Instance = Pipeline::Create(desc);
-    cached.Resources = resources;
+    cached.Resources.Clear();
+    for (Object* resource : resources) {
+        cached.Resources.Add(WeakObjectPtr<Object>(resource));
+    }
     return cached.Instance.Get();
 }

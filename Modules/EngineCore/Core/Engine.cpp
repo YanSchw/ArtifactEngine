@@ -3,6 +3,7 @@
 #include "EngineConfig.h"
 #include "EngineSubsystem.h"
 #include "Audio/AudioEngine.h"
+#include "Assets/AssetManager.h"
 #include "GameFramework/DebugDraw.h"
 #include "Platform/PlatformHooks.h"
 
@@ -41,6 +42,9 @@ bool Engine::Tick() {
     const bool keepRunning = MainTick(m_DeltaTime);
     if (AudioEngine::IsAvailable()) {
         AudioEngine::Get().Update();
+    }
+    if (AssetManager::IsAvailable()) {
+        AssetManager::Get().CollectGarbage();
     }
     return keepRunning && s_IsRunning;
 }

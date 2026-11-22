@@ -1,6 +1,8 @@
 #include "FullscreenQuad.h"
 #include "VertexBuffer.h"
 #include "Buffer.h"
+#include "Shader.h"
+#include "Image.h"
 
 FullscreenQuad::FullscreenQuad() {
     const Array<Vertex> vertices = {
@@ -29,9 +31,24 @@ Array<void*> FullscreenQuad::Identify(const PipelineDesc& InDesc) {
 
 void FullscreenQuad::Draw(const PipelineDesc& InDesc) {
     Array<void*> identity = Identify(InDesc);
-    if (!m_Pipeline || !(identity == m_Identity)) {
+    bool current = m_Pipeline && identity == m_Identity;
+    for (const WeakObjectPtr<Object>& object : m_Objects) {
+        current = current && object.Get();
+    }
+    if (!current) {
         m_Pipeline = Pipeline::Create(InDesc);
         m_Identity = identity;
+        m_Objects.Clear();
+        const auto track = [this](Object* InObject) {
+            if (InObject) {
+                m_Objects.Add(WeakObjectPtr<Object>(InObject));
+            }
+        };
+        track(InDesc.Target.Get());
+        track(InDesc.Shader.Get());
+        for (const auto& [binding, view, sampler] : InDesc.ImageBindings) {
+            track(view.Get());
+        }
     }
     m_Pipeline->Bind();
     m_Quad->Draw();

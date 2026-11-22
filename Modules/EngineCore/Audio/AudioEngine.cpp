@@ -75,9 +75,7 @@ AudioHandle AudioEngine::Play(AudioClip* InClip, const AudioPlayParams& InParams
     if (!InClip) {
         return {};
     }
-    if (!InClip->IsLoaded()) {
-        AssetManager::Get().LoadAsset(InClip);
-    }
+    const AssetStreamHandle handle = InClip->GetStreamHandle();
     return Play(InClip->GetSamples(), InParams);
 }
 

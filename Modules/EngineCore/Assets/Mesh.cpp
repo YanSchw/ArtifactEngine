@@ -92,7 +92,6 @@ void GenerateSmoothNormals(Array<Vertex>& OutVertices, const Array<uint32_t>& In
 } // namespace
 
 Mesh::Mesh() {
-    m_StreamType = AssetStreamType::AlwaysLoaded;
 }
 
 bool Mesh::ImportSource(ImportedMesh& OutMesh) const {
@@ -154,6 +153,10 @@ void Mesh::BuildVertexBuffer(const ImportedMesh& InMesh) {
     m_BoundsRadius = glm::max(glm::length(boundsMax - m_BoundsCenter), 0.001f);
 
     m_SubMeshes = InMesh.SubMeshes;
+    if (InMesh.Vertices.IsEmpty() || InMesh.Indices.IsEmpty()) {
+        m_VertexBuffer = nullptr;
+        return;
+    }
     m_VertexBuffer = VertexBuffer::Create(InMesh.Vertices, InMesh.Indices);
 }
 
@@ -191,9 +194,6 @@ void Mesh::Load() {
 #endif
 
     BuildVertexBuffer(imported);
-    for (int32_t slot = 0; slot < m_SubMeshes.Size(); slot++) {
-        AssetManager::Get().LoadAsset(GetMaterial(slot));
-    }
 }
 
 void Mesh::Unload() {
@@ -265,7 +265,6 @@ void Mesh::SetMaterial(int32_t InSlot, Material* InMaterial) {
         m_Materials.Add(WeakObjectPtr<Material>());
     }
     m_Materials[InSlot] = InMaterial;
-    AssetManager::Get().LoadAsset(InMaterial);
 }
 
 void Mesh::SetImportSettings(const Vec3& InScale, const Vec3& InOffset, MeshNormalMode InNormalMode) {

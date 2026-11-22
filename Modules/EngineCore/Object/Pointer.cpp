@@ -8,6 +8,7 @@ void InternalPtr::Nullify(Object* InObject) {
     Array<InternalPtr*> pointers = it->second;
     for (InternalPtr* ptr : pointers) {
         ptr->m_Value = nullptr;
+        ptr->m_Holding = false;
     }
 
     s_PtrTable.erase(InObject);
@@ -42,6 +43,18 @@ InternalPtr::InternalPtr(const InternalPtr& InOther) {
     Assign(InOther.m_Value);
 }
 
+InternalPtr::InternalPtr(InternalPtr&& InOther) noexcept
+    : m_Value(InOther.m_Value), m_RefCounting(InOther.m_RefCounting), m_Holding(InOther.m_Holding)
+{
+    if (m_Value) {
+        Array<InternalPtr*>& pointers = s_PtrTable[m_Value];
+        pointers.Remove(&InOther);
+        pointers.Add(this);
+    }
+    InOther.m_Value = nullptr;
+    InOther.m_Holding = false;
+}
+
 InternalPtr& InternalPtr::operator=(const InternalPtr& InOther) {
     if (this == &InOther)
         return *this;
@@ -70,6 +83,11 @@ void InternalPtr::Assign(Object* InObject) {
                 it->second.Remove(this);
         }
 
+        if (m_Holding) {
+            m_Holding = false;
+            m_Value->OnUnreferencedByPointer();
+        }
+
         if (m_RefCounting) {
             auto rcIt = s_RefCounts.find(m_Value);
             if (rcIt != s_RefCounts.end()) {
@@ -90,6 +108,8 @@ void InternalPtr::Assign(Object* InObject) {
 
         if (m_RefCounting)
             s_RefCounts[m_Value]++;
+
+        m_Holding = s_NonHoldingDepth == 0 && m_Value->OnReferencedByPointer();
     }
 }
 

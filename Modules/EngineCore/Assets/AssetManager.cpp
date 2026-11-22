@@ -7,6 +7,7 @@
 #include "Serialization/Json.h"
 #include "Core/EngineConfig.h"
 #include "Platform/PlatformHooks.h"
+#include "Rendering/RenderingAPI.h"
 
 #include <thread>
 #include <mutex>
@@ -35,6 +36,7 @@ bool AssetManager::IsAvailable() {
 void AssetManager::Initialize(bool InLoadAssets) {
     AE_ASSERT(!s_Instance, "AssetManager instance is already initialized!");
     s_Instance = this;
+    NonHoldingPointerScope nonHolding;
 
     // Spawn a separate thread to load assets
     if (PlatformHooks::Get().SupportsBackgroundThreads()) {
@@ -74,8 +76,7 @@ void AssetManager::Initialize(bool InLoadAssets) {
     if (InLoadAssets) {
         for (auto& [id, asset] : m_Assets) {
             if (asset->m_StreamType == AssetStreamType::AlwaysLoaded) {
-                AE_INFO("Loading asset: {0}", asset->GetId().ToString());
-                asset->Load();
+                StreamIn(asset.Get());
             }
         }
     }
@@ -97,6 +98,8 @@ AssetManager::~AssetManager() {
         AE_WARN("Waiting for {0} pending asset load requests to finish before shutting down AssetManager.", s_PendingAssetLoadRequests.Size());
     } while (true);
 
+    m_PendingUnloads.Clear();
+
     // Unload all loaded assets
     for (auto& [id, asset] : m_Assets) {
         if (asset->IsLoaded()) {
@@ -114,6 +117,7 @@ AssetManager::~AssetManager() {
 
 void AssetManager::HotLoadAssets() {
     AE_ASSERT(!EngineConfig::IsPackagedBuild(), "Hot loading is only supported in non-packaged builds!");
+    NonHoldingPointerScope nonHolding;
 
     Array<String> contentFiles;
     for (const String& mountDir : EngineConfig::GetContentMountDirs()) {
@@ -175,19 +179,119 @@ void AssetManager::HotLoadAssets() {
 }
 
 void AssetManager::LoadAsset(Asset* InAsset) {
-    if (!InAsset || InAsset->IsLoaded())
+    if (!InAsset)
         return;
 
-    InAsset->Load();
+    InAsset->m_Pinned = true;
+    StreamIn(InAsset);
 }
 
 void AssetManager::UnloadAsset(Asset* InAsset) {
-    if (!InAsset || !InAsset->IsLoaded())
-        return;
-    if (InAsset->m_StreamType == AssetStreamType::AlwaysLoaded)
+    if (!InAsset)
         return;
 
-    InAsset->Unload();
+    InAsset->m_Pinned = false;
+    if (InAsset->m_StreamReferenceCount == 0) {
+        RequestUnload(InAsset);
+    }
+}
+
+void AssetManager::StreamIn(Asset* InAsset) {
+    if (InAsset->m_Resident)
+        return;
+
+    NonHoldingPointerScope nonHolding;
+    InAsset->m_Resident = true;
+    AcquireDependencies(InAsset);
+    if (!InAsset->IsLoaded()) {
+        AE_INFO("Loading asset: {0}", InAsset->GetId().ToString());
+        InAsset->Load();
+    }
+    AcquireDependencies(InAsset);
+}
+
+void AssetManager::AcquireDependencies(Asset* InAsset) {
+    Array<Asset*> dependencies;
+    InAsset->CollectDependencies(dependencies);
+
+    Array<AssetStreamHandle> handles;
+    for (Asset* dependency : dependencies) {
+        if (dependency && dependency != InAsset) {
+            handles.Add(dependency->GetStreamHandle());
+        }
+    }
+    InAsset->m_Dependencies = handles;
+}
+
+static uint64_t NextGpuFrame() {
+    RenderingAPI* api = RenderingAPI::GetInstance();
+    return api ? api->GetSubmittedFrames() + 1 : 0;
+}
+
+static bool IsGpuFrameRetired(uint64_t InFrame) {
+    RenderingAPI* api = RenderingAPI::GetInstance();
+    return !api || api->GetCompletedFrames() >= InFrame;
+}
+
+void AssetManager::RequestUnload(Asset* InAsset) {
+    if (!InAsset->m_Resident || InAsset->m_Pinned || InAsset->m_StreamType == AssetStreamType::AlwaysLoaded)
+        return;
+
+    InAsset->m_UnloadAfterFrame = NextGpuFrame();
+    if (!InAsset->m_UnloadPending) {
+        InAsset->m_UnloadPending = true;
+        m_PendingUnloads.Add(InAsset);
+    }
+}
+
+void AssetManager::CancelUnload(Asset* InAsset) {
+    if (InAsset->m_UnloadPending) {
+        InAsset->m_UnloadPending = false;
+        m_PendingUnloads.Remove(InAsset);
+    }
+}
+
+void AssetManager::UnloadNow(Asset* InAsset) {
+    CancelUnload(InAsset);
+    if (!InAsset->m_Resident && !InAsset->IsLoaded())
+        return;
+
+    NonHoldingPointerScope nonHolding;
+    if (InAsset->IsLoaded()) {
+        AE_INFO("Unloading asset: {0}", InAsset->GetId().ToString());
+        InAsset->Unload();
+    }
+    InAsset->m_Resident = false;
+    InAsset->m_Dependencies.Clear();
+}
+
+void AssetManager::ReleaseDependents(Asset* InAsset) {
+    for (auto& [id, asset] : m_Assets) {
+        if (asset.Get()) {
+            asset->m_Dependencies.Filter([InAsset](const AssetStreamHandle& InHandle) { return InHandle.Get() != InAsset; });
+        }
+    }
+}
+
+void AssetManager::CollectGarbage() {
+    for (bool progress = true; progress;) {
+        progress = false;
+        const Array<Asset*> pending = m_PendingUnloads;
+        for (Asset* asset : pending) {
+            if (!asset->m_UnloadPending) {
+                continue;
+            }
+            if (asset->m_StreamReferenceCount > 0 || asset->m_Pinned || asset->m_StreamType == AssetStreamType::AlwaysLoaded) {
+                CancelUnload(asset);
+                continue;
+            }
+            if (!IsGpuFrameRetired(asset->m_UnloadAfterFrame)) {
+                continue;
+            }
+            UnloadNow(asset);
+            progress = true;
+        }
+    }
 }
 
 String AssetManager::GetAssetPath(const UUID& InId) {
@@ -204,6 +308,7 @@ Asset* AssetManager::GetAssetAtPath(const String& InPath) const {
 }
 
 Asset* AssetManager::CreateAsset(const Class& InClass, const String& InDirectory, const String& InName) {
+    NonHoldingPointerScope nonHolding;
     Asset* asset = Cast<Asset>(Object::Create(InClass));
     if (!asset) {
         AE_ERROR("Cannot create an asset of class '{0}'", InClass.Name);
@@ -213,6 +318,7 @@ Asset* AssetManager::CreateAsset(const Class& InClass, const String& InDirectory
 }
 
 Asset* AssetManager::AddAsset(Asset* InAsset, const String& InDirectory, const String& InName) {
+    NonHoldingPointerScope nonHolding;
     InAsset->m_Id = UUID::Generate();
     m_Assets[InAsset->GetId()] = InAsset;
     m_AssetPaths[InAsset->GetId()] = InDirectory + "/" + InName + ".asset";
@@ -230,6 +336,7 @@ Asset* AssetManager::AddSubAsset(Asset* InAsset, Asset* InOwner, const UUID& InI
         name = base + std::to_string(suffix);
     }
 
+    NonHoldingPointerScope nonHolding;
     InAsset->m_Id = InId;
     InAsset->m_Owner = InOwner;
     m_Assets[InId] = InAsset;
@@ -350,9 +457,11 @@ bool AssetManager::DeleteAsset(Asset* InAsset) {
         UnregisterAssetsUnder(path);
     }
 
-    if (InAsset->IsLoaded()) {
-        InAsset->Unload();
+    if (RenderingAPI* api = RenderingAPI::GetInstance()) {
+        api->WaitIdle();
     }
+    ReleaseDependents(InAsset);
+    UnloadNow(InAsset);
     m_AssetPaths.Remove(id);
     m_Assets.Remove(id);
     return true;
@@ -378,11 +487,13 @@ void AssetManager::UnregisterAssetsUnder(const String& InDirectory) {
             removed.Add(id);
         }
     }
+    if (RenderingAPI* api = RenderingAPI::GetInstance(); api && !removed.IsEmpty()) {
+        api->WaitIdle();
+    }
     for (const UUID& id : removed) {
         if (Asset* asset = GetAsset(id)) {
-            if (asset->IsLoaded()) {
-                asset->Unload();
-            }
+            ReleaseDependents(asset);
+            UnloadNow(asset);
         }
         m_AssetPaths.Remove(id);
         m_Assets.Remove(id);

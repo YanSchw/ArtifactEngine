@@ -202,7 +202,7 @@ static void ReadNodeFiles(NodeRecord& OutParent, const fs::path& InDirectory) {
 }
 
 SceneRootNode* Scene::Populate(World& OutWorld) {
-    AssetManager::Get().LoadAsset(this);
+    const AssetStreamHandle handle = GetStreamHandle();
 
     SceneRootNode* root = OutWorld.Spawn<SceneRootNode>();
     root->SetName(GetDisplayName());

@@ -528,9 +528,20 @@ Pipeline* ParticlePass::FindPipeline(const Batch& InBatch, const RenderContext& 
     FrameBuffer* target = GetStage()->GetTarget();
     ImageView* depth = InSceneDepth ? InSceneDepth : m_DefaultTexture->GetDefaultView().Get();
     const bool instanced = InBatch.MeshBuffer != nullptr;
-    const Array<void*> resources = { target, InContext.SceneUniforms, InContext.ShadowMap, depth, InBatch.View.Get() };
+    const Array<Object*> resources = { target, InContext.SceneUniforms, InContext.ShadowMap, depth, InBatch.View.Get() };
+    const auto matches = [&resources](const Array<WeakObjectPtr<Object>>& InCached) {
+        if (InCached.Size() != resources.Size()) {
+            return false;
+        }
+        for (int32_t i = 0; i < InCached.Size(); i++) {
+            if (InCached[i].Get() != resources[i]) {
+                return false;
+            }
+        }
+        return true;
+    };
     for (CachedPipeline& cached : m_Pipelines) {
-        if (cached.Blend == InBatch.Blend && cached.Instanced == instanced && cached.Resources == resources) {
+        if (cached.Blend == InBatch.Blend && cached.Instanced == instanced && matches(cached.Resources)) {
             cached.LastUsedFrame = InContext.FrameIndex;
             return cached.Instance.Get();
         }
@@ -559,7 +570,9 @@ Pipeline* ParticlePass::FindPipeline(const Batch& InBatch, const RenderContext& 
     CachedPipeline cached;
     cached.Blend = InBatch.Blend;
     cached.Instanced = instanced;
-    cached.Resources = resources;
+    for (Object* resource : resources) {
+        cached.Resources.Add(WeakObjectPtr<Object>(resource));
+    }
     cached.Instance = Pipeline::Create(desc);
     cached.LastUsedFrame = InContext.FrameIndex;
     m_Pipelines.Add(cached);

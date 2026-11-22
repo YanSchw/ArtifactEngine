@@ -49,9 +49,8 @@ AssetStreamHandle::~AssetStreamHandle() {
 
 void AssetStreamHandle::Acquire(Asset* AssetPtr) {
     m_Asset = AssetPtr;
-
-    if (m_Asset && ++m_Asset->m_ActiveStreamHandleCount == 1) {
-        AssetManager::Get().LoadAsset(m_Asset);
+    if (m_Asset) {
+        m_Asset->AddStreamReference();
     }
 }
 
@@ -60,24 +59,118 @@ void AssetStreamHandle::Release() {
         return;
 
     if (!AssetManager::IsAvailable()) {
-        AE_WARN("AssetStreamHandle released after AssetManager shutdown; asset '{0}' will not be unloaded", m_Asset->GetDisplayName());
         m_Asset = nullptr;
         return;
     }
 
-    AE_ASSERT(m_Asset->m_ActiveStreamHandleCount > 0);
-
-    --m_Asset->m_ActiveStreamHandleCount;
-
-    if (m_Asset->m_ActiveStreamHandleCount == 0) {
-        AssetManager::Get().UnloadAsset(m_Asset);
-    }
-
+    m_Asset->RemoveStreamReference();
     m_Asset = nullptr;
 }
 
 
 // Asset
+
+Asset::~Asset() {
+    if (m_UnloadPending && AssetManager::IsAvailable()) {
+        AssetManager::Get().CancelUnload(this);
+    }
+}
+
+void Asset::AddStreamReference() {
+    if (++m_StreamReferenceCount == 1 && AssetManager::IsAvailable()) {
+        AssetManager::Get().StreamIn(this);
+    }
+}
+
+void Asset::RemoveStreamReference() {
+    AE_ASSERT(m_StreamReferenceCount > 0);
+    if (--m_StreamReferenceCount == 0 && AssetManager::IsAvailable()) {
+        AssetManager::Get().RequestUnload(this);
+    }
+}
+
+bool Asset::OnReferencedByPointer() {
+    if (!AssetManager::IsAvailable() || AssetManager::Get().GetAsset(m_Id) != this) {
+        return false;
+    }
+    AddStreamReference();
+    return true;
+}
+
+void Asset::OnUnreferencedByPointer() {
+    if (m_StreamReferenceCount > 0) {
+        RemoveStreamReference();
+    }
+}
+
+void Asset::RetainDependency(Asset* InDependency) {
+    if (!InDependency || InDependency == this || !m_Resident) {
+        return;
+    }
+    for (const AssetStreamHandle& handle : m_Dependencies) {
+        if (handle.Get() == InDependency) {
+            return;
+        }
+    }
+    m_Dependencies.Add(InDependency->GetStreamHandle());
+}
+
+static void AddDependency(Asset* InAsset, Array<Asset*>& OutDependencies) {
+    if (InAsset && !OutDependencies.Contains(InAsset)) {
+        OutDependencies.Add(InAsset);
+    }
+}
+
+static void CollectObjectDependencies(const Object* InObject, Array<const Object*>& InOutVisited, Array<Asset*>& OutDependencies);
+
+static void CollectPropertyDependencies(Property* InProperty, void* InValue, Array<const Object*>& InOutVisited, Array<Asset*>& OutDependencies) {
+    if (Cast<WeakObjectPtrProperty>(InProperty)) {
+        AddDependency(Cast<Asset>((*(WeakObjectPtr<Object>*)InValue).Get()), OutDependencies);
+    } else if (Cast<SharedObjectPtrProperty>(InProperty)) {
+        Object* object = (*(SharedObjectPtr<Object>*)InValue).Get();
+        if (Asset* asset = Cast<Asset>(object)) {
+            AddDependency(asset, OutDependencies);
+        } else {
+            CollectObjectDependencies(object, InOutVisited, OutDependencies);
+        }
+    } else if (SubclassOfProperty* subclass = Cast<SubclassOfProperty>(InProperty)) {
+        const UUID id = subclass->Read(InValue).GetBlueprintId();
+        if (id.IsValid() && AssetManager::IsAvailable()) {
+            AddDependency(AssetManager::Get().GetAsset(id), OutDependencies);
+        }
+    } else if (ArrayProperty* array = Cast<ArrayProperty>(InProperty)) {
+        const size_t count = array->GetSize(InValue);
+        for (size_t i = 0; i < count; i++) {
+            CollectPropertyDependencies(array->InnerProperty, array->GetElementPtr(InValue, i), InOutVisited, OutDependencies);
+        }
+    } else if (MapProperty* map = Cast<MapProperty>(InProperty)) {
+        Array<MapProperty::Entry> entries;
+        map->GetEntries(InValue, entries);
+        for (const MapProperty::Entry& entry : entries) {
+            CollectPropertyDependencies(map->KeyProperty, (void*)entry.Key, InOutVisited, OutDependencies);
+            CollectPropertyDependencies(map->ValueProperty, entry.Value, InOutVisited, OutDependencies);
+        }
+    } else if (StructProperty* structProperty = Cast<StructProperty>(InProperty)) {
+        for (Property* inner : Property::GetTypeProperties(structProperty->InnerStructTypename)) {
+            CollectPropertyDependencies(inner, inner->GetValuePtr(InValue), InOutVisited, OutDependencies);
+        }
+    }
+}
+
+static void CollectObjectDependencies(const Object* InObject, Array<const Object*>& InOutVisited, Array<Asset*>& OutDependencies) {
+    if (!InObject || InOutVisited.Contains(InObject)) {
+        return;
+    }
+    InOutVisited.Add(InObject);
+    for (Property* property : Property::GetAllTypeProperties(InObject->GetClass())) {
+        CollectPropertyDependencies(property, property->GetValuePtr((void*)InObject), InOutVisited, OutDependencies);
+    }
+}
+
+void Asset::CollectDependencies(Array<Asset*>& OutDependencies) const {
+    Array<const Object*> visited;
+    CollectObjectDependencies(this, visited, OutDependencies);
+}
 
 void Asset::Cook(ChunkedBinary& OutChunkedBinary) {
     auto bytes = BinarySerializer::SerializeObject(this);

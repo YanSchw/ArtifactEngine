@@ -10,7 +10,6 @@
 #include <glm/gtc/packing.hpp>
 
 Texture2D::Texture2D() {
-    m_StreamType = AssetStreamType::AlwaysLoaded;
 }
 
 static void PackHalfFloats(const Array<float>& InPixels, Array<byte>& OutPixels) {

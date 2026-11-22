@@ -82,12 +82,9 @@ void NodeAsset::Load() {
             m_Root = NodeRecord::FromBinary(bytes);
         }
     }
-
-    AcquireReferencedAssets();
 }
 
 void NodeAsset::Unload() {
-    m_ReferencedAssets.Clear();
     m_Loaded = false;
     if (EngineConfig::IsPackagedBuild()) {
         m_Root = nullptr;
@@ -107,21 +104,22 @@ void NodeAsset::Cook(ChunkedBinary& OutChunkedBinary) {
     OutChunkedBinary.AddChunk(s_NodeTreeChunk, writer);
 }
 
-void NodeAsset::AcquireReferencedAssets() {
-    m_ReferencedAssets.Clear();
+void NodeAsset::CollectDependencies(Array<Asset*>& OutDependencies) const {
+    Super::CollectDependencies(OutDependencies);
     if (!m_Root.Get()) {
         return;
     }
 
     Array<UUID> ids;
     m_Root->CollectAssetReferences(ids);
-
     for (const UUID& id : ids) {
         if (id == GetId()) {
             continue;
         }
         if (Asset* referenced = AssetManager::Get().GetAsset(id)) {
-            m_ReferencedAssets.Add(referenced->GetStreamHandle());
+            if (!OutDependencies.Contains(referenced)) {
+                OutDependencies.Add(referenced);
+            }
         } else {
             AE_WARN("Asset '{0}' references missing asset {1}", GetDisplayName(), id.ToString());
         }

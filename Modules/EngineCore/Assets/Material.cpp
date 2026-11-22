@@ -19,7 +19,11 @@ Material* Material::CreateEmpty(const String& InDirectory, const String& InName)
 
 Material* Material::GetDefault() {
     static const UUID s_DefaultId = UUID::FromString("d351ca39-9ab6-43cf-9921-4965ec126be8");
-    return AssetManager::Get().GetAsset<Material>(s_DefaultId);
+    Material* material = AssetManager::Get().GetAsset<Material>(s_DefaultId);
+    if (material && !material->IsPinned()) {
+        AssetManager::Get().LoadAsset(material);
+    }
+    return material;
 }
 
 ShaderGraph* Material::GetBaseGraph() const {
@@ -36,10 +40,7 @@ void Material::SetBaseGraph(ShaderGraph* InShaderGraph) {
     m_InputValues.Clear();
     m_TextureNames.Clear();
     m_TextureValues.Clear();
-
-    if (InShaderGraph) {
-        AssetManager::Get().LoadAsset(InShaderGraph);
-    }
+    RetainDependency(InShaderGraph);
     RefreshPropertyBuffer();
 }
 
@@ -75,12 +76,14 @@ Array<MaterialTextureBinding> Material::GetTextureBindings() const {
 }
 
 bool Material::IsReadyToRender() {
-    AssetManager::Get().LoadAsset(this);
+    if (!IsResident()) {
+        AssetManager::Get().LoadAsset(this);
+    }
     if (!GetShader()) {
         return false;
     }
     for (const MaterialTextureBinding& binding : GetTextureBindings()) {
-        AssetManager::Get().LoadAsset(binding.Texture);
+        RetainDependency(binding.Texture);
         if (!binding.Texture || !binding.Texture->GetTexture()) {
             return false;
         }
@@ -132,9 +135,7 @@ void Material::SetInputTexture(const String& InName, Texture2D* InTexture) {
         m_TextureNames.Add(InName);
         m_TextureValues.Add(WeakObjectPtr<Texture2D>(InTexture));
     }
-    if (InTexture) {
-        AssetManager::Get().LoadAsset(InTexture);
-    }
+    RetainDependency(InTexture);
 }
 
 bool Material::IsInputOverridden(const String& InName) const {
@@ -204,10 +205,6 @@ void Material::Load() {
         return;
     }
 
-    AssetManager::Get().LoadAsset(parent);
-    for (const MaterialTextureBinding& binding : GetTextureBindings()) {
-        AssetManager::Get().LoadAsset(binding.Texture);
-    }
     RefreshPropertyBuffer();
 }
 

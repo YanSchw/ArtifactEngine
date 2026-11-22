@@ -15,6 +15,7 @@ struct InternalPtr {
 
     InternalPtr();
     InternalPtr(const InternalPtr& InOther);
+    InternalPtr(InternalPtr&& InOther) noexcept;
     InternalPtr& operator=(const InternalPtr& InOther);
     ~InternalPtr();
 
@@ -27,11 +28,23 @@ struct InternalPtr {
 private:
     inline static std::unordered_map<Object*, Array<InternalPtr*>> s_PtrTable;
     inline static std::unordered_map<Object*, uint32_t> s_RefCounts;
+    inline static thread_local int32_t s_NonHoldingDepth = 0;
 
     Object* m_Value = nullptr;
     bool m_RefCounting = false;
+    bool m_Holding = false;
 
     template<typename T, bool R> friend struct TObjectPtr;
+    friend struct NonHoldingPointerScope;
+};
+
+/** Pointers assigned while one is alive don't keep their target loaded (an asset's own references,
+ *  the AssetManager registry); the referencing asset holds those as dependencies instead. */
+struct NonHoldingPointerScope {
+    NonHoldingPointerScope() { InternalPtr::s_NonHoldingDepth++; }
+    ~NonHoldingPointerScope() { InternalPtr::s_NonHoldingDepth--; }
+    NonHoldingPointerScope(const NonHoldingPointerScope&) = delete;
+    NonHoldingPointerScope& operator=(const NonHoldingPointerScope&) = delete;
 };
 
 
@@ -63,6 +76,10 @@ struct TObjectPtr {
         m_InternalPtr.m_RefCounting = REF_COUNTED;
         m_InternalPtr = (Object*)InPointer.get();
     }
+
+    TObjectPtr(const TObjectPtr& InOther) = default;
+    TObjectPtr(TObjectPtr&& InOther) noexcept = default;
+    TObjectPtr& operator=(const TObjectPtr& InOther) = default;
 
     ~TObjectPtr() {
         m_InternalPtr.Assign(nullptr);

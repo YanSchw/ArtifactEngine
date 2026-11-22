@@ -16,5 +16,4 @@ public:
 
 private:
     WeakObjectPtr<Scene> m_Scene;
-    Array<AssetStreamHandle> m_AssetHandles;
 };

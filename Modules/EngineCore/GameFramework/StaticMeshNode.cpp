@@ -50,5 +50,4 @@ void StaticMeshNode::SetMaterialOverride(int32_t InSlot, Material* InMaterial) {
         m_MaterialOverrides.Add(WeakObjectPtr<Material>());
     }
     m_MaterialOverrides[InSlot] = InMaterial;
-    AssetManager::Get().LoadAsset(InMaterial);
 }

@@ -18,4 +18,5 @@ private:
     SharedObjectPtr<VertexBuffer> m_Quad;
     SharedObjectPtr<Pipeline> m_Pipeline;
     Array<void*> m_Identity;
+    Array<WeakObjectPtr<Object>> m_Objects;
 };

@@ -73,7 +73,7 @@ private:
     struct CachedPipeline {
         ParticleBlendMode Blend = ParticleBlendMode::Alpha;
         bool Instanced = false;
-        Array<void*> Resources;
+        Array<WeakObjectPtr<Object>> Resources;
         SharedObjectPtr<Pipeline> Instance;
         uint64_t LastUsedFrame = 0;
     };

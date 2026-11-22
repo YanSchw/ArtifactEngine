@@ -21,7 +21,6 @@ public:
     EventGraph* GetEventGraph() const;
     EventGraph* GetOrCreateEventGraph();
     void SetEventGraph(EventGraph* InGraph);
-    Array<AssetStreamHandle> GetReferencedAssetHandles() const { return m_ReferencedAssets; }
 
     virtual String SerializeToJson() const override;
     virtual void DeserializeFromJson(const String& InJson) override;
@@ -31,14 +30,12 @@ protected:
     virtual void Load() override;
     virtual void Unload() override;
     virtual void Cook(class ChunkedBinary& OutChunkedBinary) override;
-
-    void AcquireReferencedAssets();
+    virtual void CollectDependencies(Array<Asset*>& OutDependencies) const override;
 
     SharedObjectPtr<NodeRecord> m_Root;
 
     PROPERTY()
     SharedObjectPtr<EventGraph> m_EventGraph;
 
-    Array<AssetStreamHandle> m_ReferencedAssets;
     bool m_Loaded = false;
 };

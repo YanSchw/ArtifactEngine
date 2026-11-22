@@ -96,6 +96,11 @@ public:
             }
         }
     };
+
+protected:
+    virtual bool OnReferencedByPointer() { return false; }
+    virtual void OnUnreferencedByPointer() {}
+
 private:
     template<typename T>
     static Object* InternalAllocate() {
@@ -105,6 +110,7 @@ private:
     inline static std::unordered_map<std::string, std::function<Object*()>> s_ObjectAllocators;
     template<typename T> friend struct RegisterArtifactClass;
     friend struct Class;
+    friend struct InternalPtr;
 };
 
 #define GENERATED_BODY_CONCAT(line) _GENERATED_BODY_##line

@@ -48,6 +48,9 @@ Texture* ThumbnailRenderer::GetThumbnail(Asset* InAsset) {
     }
 
     if (Texture2D* texture = InAsset->As<Texture2D>()) {
+        if (!texture->IsPinned()) {
+            AssetManager::Get().LoadAsset(texture);
+        }
         return texture->IsLoaded() ? texture->GetTexture() : nullptr;
     }
 

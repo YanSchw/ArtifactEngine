@@ -995,6 +995,7 @@ void VulkanAPI::Draw() {
     // Acquiring re-signals ImageAvailable, so the previous frame must have consumed it first.
     // The fence is only reset once past the point where this frame can still bail out.
     vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
+    m_CompletedFrames = m_SubmittedFrames;
 
     VulkanPipelineLayout::FlushRetired();
     ResolveTimestampQueries();
@@ -1112,6 +1113,7 @@ void VulkanAPI::Draw() {
         AE_ERROR("failed to submit draw command buffer");
         exit(1);
     }
+    m_SubmittedFrames++;
     m_TimestampsSubmitted = m_TimestampPool != VK_NULL_HANDLE;
 
     if (targets.empty()) {
@@ -1370,6 +1372,7 @@ VkPhysicalDevice VulkanAPI::GetPhysicalDevice() const {
 
 void VulkanAPI::WaitIdle() {
     vkDeviceWaitIdle(device);
+    m_CompletedFrames = m_SubmittedFrames;
 }
 
 VkCommandPool VulkanAPI::GetCommandPool() const {

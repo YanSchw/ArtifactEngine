@@ -22,6 +22,8 @@ public:
 
     void LoadAsset(Asset* InAsset);
     void UnloadAsset(Asset* InAsset);
+    void CollectGarbage();
+    int32_t GetPendingUnloadCount() const { return m_PendingUnloads.Size(); }
     Asset* GetAsset(const UUID& InId);
     Array<Asset*> GetAssetsOfClass(const Class& InClass) const;
 
@@ -52,9 +54,18 @@ private:
     static void AssetStreamingThreadFunc();
     Array<Asset*> GetAllAssets() const;
 
+    void StreamIn(Asset* InAsset);
+    void RequestUnload(Asset* InAsset);
+    void CancelUnload(Asset* InAsset);
+    void ReleaseDependents(Asset* InAsset);
+    void UnloadNow(Asset* InAsset);
+    void AcquireDependencies(Asset* InAsset);
+
 private:
     Map<UUID, SharedObjectPtr<Asset>> m_Assets;
     Map<UUID, String> m_AssetPaths;
+    Array<Asset*> m_PendingUnloads;
 
+    friend class Asset;
     friend class AssetCookerEngine;
 };

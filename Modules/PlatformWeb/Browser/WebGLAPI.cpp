@@ -30,6 +30,7 @@ void WebGLAPI::Draw() {
     m_SurfacePassDrawn = false;
     Execute();
     m_RenderQueue.Clear();
+    m_CompletedFrames = ++m_SubmittedFrames;
     Present();
 }
 

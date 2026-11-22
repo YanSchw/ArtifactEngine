@@ -20,7 +20,7 @@ public:
 private:
     struct Entry {
         SharedObjectPtr<Pipeline> Instance;
-        Array<void*> Resources;
+        Array<WeakObjectPtr<Object>> Resources;
     };
 
     Map<UUID, Entry> m_Entries;

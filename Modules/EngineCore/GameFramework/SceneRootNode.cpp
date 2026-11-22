@@ -7,12 +7,4 @@ Scene* SceneRootNode::GetScene() const {
 
 void SceneRootNode::BindScene(Scene* InScene) {
     m_Scene = InScene;
-    m_AssetHandles.Clear();
-
-    if (!InScene) {
-        return;
-    }
-
-    m_AssetHandles.Add(InScene->GetStreamHandle());
-    m_AssetHandles += InScene->GetReferencedAssetHandles();
 }

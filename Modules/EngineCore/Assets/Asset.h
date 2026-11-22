@@ -50,12 +50,15 @@ private:
 class Asset : public Object {
 public:
     ARTIFACT_CLASS();
-    virtual ~Asset() = default;
+    virtual ~Asset();
 
 protected:
     virtual void Load() = 0;
     virtual void Unload() = 0;
     virtual void Cook(class ChunkedBinary& OutChunkedBinary);
+    virtual void CollectDependencies(Array<Asset*>& OutDependencies) const;
+    virtual bool OnReferencedByPointer() override;
+    virtual void OnUnreferencedByPointer() override;
 
     SharedObjectPtr<class ChunkedBinary> GetChunkedBinary() const;
     static String DisplayNameFromPath(const String& InPath);
@@ -65,6 +68,10 @@ public:
     FUNCTION(Pure)
     bool IsMissing() const;
     AssetStreamHandle GetStreamHandle() const;
+    uint32_t GetStreamReferenceCount() const { return m_StreamReferenceCount; }
+    bool IsResident() const { return m_Resident; }
+    bool IsPinned() const { return m_Pinned; }
+    void RetainDependency(Asset* InDependency);
     FUNCTION(Pure)
     UUID GetId() const { return m_Id; }
     FUNCTION(Pure)
@@ -95,7 +102,15 @@ protected:
     AssetFlags m_Flags = AssetFlags::None;
     WeakObjectPtr<Asset> m_Owner;
 
-    uint32_t m_ActiveStreamHandleCount = 0;
+    uint32_t m_StreamReferenceCount = 0;
+    bool m_Resident = false;
+    bool m_Pinned = false;
+    bool m_UnloadPending = false;
+    uint64_t m_UnloadAfterFrame = 0;
+    Array<AssetStreamHandle> m_Dependencies;
+
+    void AddStreamReference();
+    void RemoveStreamReference();
 
     friend struct AssetStreamHandle;
     friend class AssetManager;
